@@ -124,10 +124,10 @@ a lot of data that needs to be copied, this should be set high. */
 #define PBUF_POOL_BUFSIZE       1600
 #elif defined(CFG_CHIP_BL606P)
 #define PBUF_POOL_BUFSIZE       1600
-#elif defined(BL602_MATTER_SUPPORT)
-#define PBUF_POOL_BUFSIZE       (1280 + 150)
 #else
+#ifndef PBUF_POOL_BUFSIZE
 #define PBUF_POOL_BUFSIZE       760
+#endif
 #endif /* CFG_ETHERNET_ENABLE */
 
 
@@ -386,8 +386,10 @@ a lot of data that needs to be copied, this should be set high. */
  * local TCP/UDP pcb (default==0). This can prevent creating predictable port
  * numbers after booting a device.
  */
-#ifndef BL602_MATTER_SUPPORT
-extern int bl_rand();
+#if defined(__cplusplus)
+extern "C" int bl_rand(void);
+#else
+extern int bl_rand(void);
 #endif
 
 #define LWIP_RANDOMIZE_INITIAL_LOCAL_PORTS 1
