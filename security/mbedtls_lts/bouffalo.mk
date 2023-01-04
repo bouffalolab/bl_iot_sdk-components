@@ -10,6 +10,9 @@ endif
 ifeq ($(CONFIG_CHIP_NAME),BL702)
 CFLAGS += -DBL702
 endif
+ifeq ($(CONFIG_CHIP_NAME),BL702L)
+CFLAGS += -DBL702L
+endif
 ifeq ($(CONFIG_CHIP_NAME),BL808)
 CFLAGS += -DBL808
 endif
@@ -127,6 +130,7 @@ COMPONENT_SRCS += port/hw_acc/bignum_hw.c
 else
 COMPONENT_SRCS += $(addprefix $(LIBRARY_DIR)/, bignum.c)
 endif
+
 
 # Hash HW
 ifeq ($(CONFIG_MBEDTLS_SHA1_USE_HW),1)

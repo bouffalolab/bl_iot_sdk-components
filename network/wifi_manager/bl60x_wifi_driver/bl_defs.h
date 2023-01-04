@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -56,7 +56,7 @@
 #define RWNX_RXBUFF_MAX (4 * 1)
 #define IEEE80211_MIN_AMPDU_BUF 0x8
 #define IEEE80211_MAX_AMPDU_BUF 0x40
-#define NX_VIRT_DEV_MAX 2
+#define NX_VIRT_DEV_MAX CFG_VIRT_DEV_MAX
 #define NX_REMOTE_STA_MAX CFG_STA_MAX
 #define CONFIG_USER_MAX 1
 #define cpu_to_le16(v16) (v16)

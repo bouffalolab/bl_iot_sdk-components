@@ -123,11 +123,6 @@ exit:
         StopPolling();
         break;
 
-    case kErrorAlready:
-        LogDebg("Data poll tx requested when a previous data request still in send queue.");
-        ScheduleNextPoll(kUsePreviousPollPeriod);
-        break;
-
     default:
         LogWarn("Unexpected error %s requesting data poll", ErrorToString(error));
         ScheduleNextPoll(kRecalculatePollPeriod);
@@ -632,79 +627,5 @@ Mac::TxFrame *DataPollSender::PrepareDataRequest(Mac::TxFrames &aTxFrames)
 exit:
     return frame;
 }
-
-void DataPollSender::GetPollingInfo(bool *pRetx, uint32_t* pPollPeriodCurrent, uint32_t *pPollPeriodDefault, uint8_t *pPollQuick, 
-                                    uint8_t *pPollFastRemaining, uint8_t *pPollFailure)
-{
-    *pRetx = mRetxMode;
-
-    *pPollPeriodCurrent = mPollPeriod;
-    if (mExternalPollPeriod) {
-        *pPollPeriodDefault = OT_MIN(mExternalPollPeriod, GetDefaultPollPeriod());
-    }
-    else {
-        *pPollPeriodDefault = GetDefaultPollPeriod();
-    }
-
-    *pPollFastRemaining = mRemainingFastPolls;
-
-    *pPollQuick = mPollTimeoutCounter;
-    *pPollFastRemaining = mRemainingFastPolls;
-    *pPollFailure = mPollTxFailureCounter;
-}
-
-
-void DataPollSender::SetPollingInfo(bool retxMode, uint32_t pollPeriodCurrent, uint8_t pollQuick, uint8_t pollFastRemaining, uint8_t pollFailure)
-{
-    mRetxMode = retxMode;
-    mPollPeriod = pollPeriodCurrent;
-
-    mPollTimeoutCounter = pollQuick;
-    mRemainingFastPolls = pollFastRemaining;
-    if (mRemainingFastPolls == 0) {
-        mFastPollsUsers = 0;
-    }
-    mPollTxFailureCounter = pollFailure;
-}
-
-extern "C" void *otGetDataPollingTimerFunctPtr(void) 
-{
-    return (void*)(DataPollSender::HandlePollTimer);
-}
-
-extern "C" bool otGetDataPollingInfo(otInstance *aInstance, bool *pRetx, uint32_t* pPollPeriodCurrent, uint32_t *pPollPeriodDefault, uint8_t *pPollQuick, 
-                                    uint8_t *pPollFastRemaining, uint8_t *pPollFailure) 
-{
-    VerifyOrExit(otInstanceIsInitialized(aInstance));
-
-    AsCoreType(aInstance).Get<DataPollSender>().GetPollingInfo(pRetx, pPollPeriodCurrent, pPollPeriodDefault, pPollQuick, pPollFastRemaining, pPollFailure);
-
-    return true;
-exit:
-    return false;
-}
-
-extern "C" bool otSetDataPollingInfo(otInstance *aInstance, bool retxMode, uint32_t pollPeriodCurrent, uint8_t pollQuick, uint8_t pollFastRemaining, uint8_t pollFailure) 
-{
-    VerifyOrExit(otInstanceIsInitialized(aInstance));
-
-    AsCoreType(aInstance).Get<DataPollSender>().SetPollingInfo(retxMode, pollPeriodCurrent, pollQuick, pollFastRemaining, pollFailure);
-
-    return true;
-exit:
-    return false;
-}
-
-extern "C" bool otStartFastPolling(otInstance *aInstance, uint32_t number) 
-{
-    VerifyOrExit(otInstanceIsInitialized(aInstance));
-
-    AsCoreType(aInstance).Get<DataPollSender>().SendFastPolls(number);
-
-    return true;
-exit:
-    return false;
-}
-
 
 } // namespace ot

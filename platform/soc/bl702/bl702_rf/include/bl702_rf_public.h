@@ -10,6 +10,7 @@ uint32_t rf702_inc_cal_tsen_based(int16_t tsen_value);
 
 // callback function, should be implemented by user
 void rf_reset_done_callback(void);
+void rf_full_cal_start_callback(uint32_t addr, uint32_t size);
 
 
 #endif

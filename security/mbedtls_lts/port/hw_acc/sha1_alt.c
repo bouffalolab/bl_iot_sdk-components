@@ -63,6 +63,20 @@ void mbedtls_sha1_starts( mbedtls_sha1_context *ctx )
 }
 #endif
 
+int mbedtls_internal_sha1_process( mbedtls_sha1_context *ctx,
+                                   const unsigned char data[64] )
+{
+    return mbedtls_sha1_update_ret( ctx, data, 64 );
+}
+
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha1_process( mbedtls_sha1_context *ctx,
+                           const unsigned char data[64] )
+{
+    mbedtls_internal_sha1_process( ctx, data );
+}
+#endif
+
 int mbedtls_sha1_update_ret( mbedtls_sha1_context *ctx,
                              const unsigned char *input,
                              size_t ilen )

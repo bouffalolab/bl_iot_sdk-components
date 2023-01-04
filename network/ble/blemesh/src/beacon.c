@@ -7,7 +7,7 @@
  */
 
 #include <zephyr.h>
-#include <errno.h>
+#include <sys/errno.h>
 #include <util.h>
 
 #include <net/buf.h>
@@ -142,7 +142,7 @@ static int secure_beacon_send(void)
 
 		bt_mesh_beacon_create(sub, &buf->b);
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		static u32_t pts_cnt = 0;
 		BT_PTS("[PTS] Sending secure network beacon (Flags = 0x%02X, IV Index = 0x%08X) %u", bt_mesh_net_flags(sub), bt_mesh.iv_index, ++pts_cnt);
 #endif
@@ -187,7 +187,7 @@ static int unprovisioned_beacon_send(void)
     #endif
 	net_buf_add_mem(buf, uri_hash, 4);
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	static u32_t pts_cnt = 0;
 	BT_PTS("[PTS] Sending unprovisioned device beacon %u", ++pts_cnt);
 #endif
@@ -335,7 +335,7 @@ static void secure_beacon_recv(struct net_buf_simple *buf)
 	iv_index = net_buf_simple_pull_be32(buf);
 	auth = buf->data;
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	BT_PTS("[PTS] Secure network beacon received");
 	BT_PTS("[PTS] - Flags: [0x%02X]", flags);
 	BT_PTS("[PTS] - IV Index: [0x%08X]", iv_index);

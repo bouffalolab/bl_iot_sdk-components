@@ -2,14 +2,15 @@
 #include <string.h>
 #include <stdint.h>
 #include <openthread/platform/misc.h>
-
+#include <FreeRTOS.h>
+#include <task.h>
+#include <semphr.h>
 #include <bl_sys.h>
 
 void otPlatReset(otInstance *aInstance) 
 {
-    bl_sys_reset_system();
+    bl_sys_reset_por();
 }
-
 
 otPlatResetReason otPlatGetResetReason(otInstance *aInstance)
 {

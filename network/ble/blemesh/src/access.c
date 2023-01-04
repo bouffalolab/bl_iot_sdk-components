@@ -7,7 +7,7 @@
  */
 
 #include <zephyr.h>
-#include <errno.h>
+#include <sys/errno.h>
 #include <util.h> /* Modified by bouffalo */
 #include <byteorder.h> /* Modified by bouffalo */
 
@@ -481,6 +481,13 @@ static bool model_has_key(struct bt_mesh_model *mod, u16_t key)
 	return false;
 }
 
+#if defined(CONFIG_AUTO_PTS)
+bool bt_mesh_model_has_key(struct bt_mesh_model *mod, u16_t key)
+{
+	return model_has_key(mod, key);
+}
+#endif /* CONFIG_AUTO_PTS */
+
 static bool model_has_dst(struct bt_mesh_model *mod, u16_t dst)
 {
 	if (BT_MESH_ADDR_IS_UNICAST(dst)) {
@@ -576,17 +583,25 @@ void bt_mesh_model_recv(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 	u32_t opcode;
 	u8_t count;
 	int i;
-
+	#if defined(CONFIG_AUTO_PTS)
+	BT_WARN("app_idx 0x%04x src 0x%04x dst 0x%04x", rx->ctx.app_idx,
+			rx->ctx.addr, rx->ctx.recv_dst);
+	BT_WARN("len %u: %s", buf->len, bt_hex(buf->data, buf->len));
+	#else
 	BT_DBG("app_idx 0x%04x src 0x%04x dst 0x%04x", rx->ctx.app_idx,
-	       rx->ctx.addr, rx->ctx.recv_dst);
+			rx->ctx.addr, rx->ctx.recv_dst);
 	BT_DBG("len %u: %s", buf->len, bt_hex(buf->data, buf->len));
+	#endif /* CONFIG_AUTO_PTS */
 
 	if (get_opcode(buf, &opcode) < 0) {
 		BT_WARN("Unable to decode OpCode");
 		return;
 	}
-
+	#if defined(CONFIG_AUTO_PTS)
+	BT_WARN("OpCode 0x%08x", opcode);
+	#else
 	BT_DBG("OpCode 0x%08x", opcode);
+	#endif /* CONFIG_AUTO_PTS */
 
 	for (i = 0; i < dev_comp->elem_count; i++) {
 		struct bt_mesh_elem *elem = &dev_comp->elem[i];
@@ -668,9 +683,15 @@ static int model_send(struct bt_mesh_model *model,
 		      struct net_buf_simple *msg,
 		      const struct bt_mesh_send_cb *cb, void *cb_data)
 {
+	#if defined(CONFIG_AUTO_PTS)
+	BT_WARN("net_idx 0x%04x app_idx 0x%04x dst 0x%04x", tx->ctx->net_idx,
+			tx->ctx->app_idx, tx->ctx->addr);
+	BT_WARN("len %u: %s", msg->len, bt_hex(msg->data, msg->len));
+	#else
 	BT_DBG("net_idx 0x%04x app_idx 0x%04x dst 0x%04x", tx->ctx->net_idx,
-	       tx->ctx->app_idx, tx->ctx->addr);
+			tx->ctx->app_idx, tx->ctx->addr);
 	BT_DBG("len %u: %s", msg->len, bt_hex(msg->data, msg->len));
+	#endif
 
 	if (!bt_mesh_is_provisioned()) {
 		BT_ERR("Local node is not yet provisioned");

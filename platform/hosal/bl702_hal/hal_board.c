@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -75,7 +75,9 @@ static int update_mac_config_get_mac_from_efuse(uint8_t mac_addr[8])
 {
     uint8_t result_or, result_and;
 
-    bl_efuse_read_mac(mac_addr);
+    if (bl_efuse_read_mac(mac_addr)) {
+        return -1;
+    }
     result_or = mac_addr[0] | mac_addr[1] | mac_addr[2] | mac_addr[3] | mac_addr[4] | mac_addr[5] | mac_addr[6] | mac_addr[7];
     result_and = mac_addr[0] & mac_addr[1] & mac_addr[2] & mac_addr[3] & mac_addr[4] & mac_addr[5] & mac_addr[6] & mac_addr[7];
 

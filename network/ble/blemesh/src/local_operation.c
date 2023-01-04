@@ -1,7 +1,7 @@
 /*  Bluetooth Mesh */
 
 #include <string.h>
-#include <errno.h>
+#include <sys/errno.h>
 
 #include "mesh.h"
 #include "lpn.h"

@@ -77,6 +77,20 @@ void mbedtls_sha512_starts( mbedtls_sha512_context *ctx,
 }
 #endif
 
+int mbedtls_internal_sha512_process( mbedtls_sha512_context *ctx,
+                                     const unsigned char data[128] )
+{
+    return mbedtls_sha512_update_ret( ctx, data, 128 );
+}
+
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha512_process( mbedtls_sha512_context *ctx,
+                             const unsigned char data[128] )
+{
+    mbedtls_internal_sha512_process( ctx, data );
+}
+#endif
+
 /*
  * SHA-512 process buffer
  */

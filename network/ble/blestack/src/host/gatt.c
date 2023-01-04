@@ -192,6 +192,9 @@ BT_GATT_SERVICE_DEFINE(_2_gap_svc,
 	/* Require pairing for writes to device name */
 	BT_GATT_CHARACTERISTIC(BT_UUID_GAP_DEVICE_NAME,
 			       BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
+#if defined(CONFIG_AUTO_PTS)
+			       BT_GATT_PERM_WRITE_ENCRYPT |
+#endif /* CONFIG_AUTO_PTS */
 			       BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
 			       read_name, write_name, bt_dev.name),
 #else

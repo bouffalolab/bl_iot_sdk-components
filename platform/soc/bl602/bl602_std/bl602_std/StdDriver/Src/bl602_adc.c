@@ -493,67 +493,100 @@ uint32_t ADC_Read_FIFO(void)
  * @return None
  *
 *******************************************************************************/
-void ADC_Parse_Result(uint32_t *orgVal,uint32_t len,ADC_Result_Type *result)
+void ADC_Parse_Result(uint32_t *orgVal, uint32_t len, ADC_Result_Type *result)
 {
-    uint8_t neg=0;
-    uint32_t tmpVal1=0,tmpVal2=0;
+    uint8_t neg = 0;
+    uint32_t tmpVal1 = 0, tmpVal2 = 0;
     ADC_Data_Width_Type dataType;
     ADC_SIG_INPUT_Type sigType;
-    float ref=2.0;
-    uint32_t i=0;
+    uint32_t conv_result = 0;
+    float ref = 2.0;
+    uint32_t i = 0;
 
-    float coe=1.0;
+    float coe = 1.0;
 
-    if(adcGainCoeffCal.adcGainCoeffEnable){
-        coe=adcGainCoeffCal.coe;
+    if (adcGainCoeffCal.adcGainCoeffEnable) {
+        coe = adcGainCoeffCal.coe;
     }
 
-    tmpVal1=BL_RD_REG(AON_BASE,AON_GPADC_REG_CONFIG1);
-    tmpVal2=BL_RD_REG(AON_BASE,AON_GPADC_REG_CONFIG2);
-    dataType=BL_GET_REG_BITS_VAL(tmpVal1,AON_GPADC_RES_SEL);
-    sigType=BL_GET_REG_BITS_VAL(tmpVal2,AON_GPADC_DIFF_MODE);
+    tmpVal1 = BL_RD_REG(AON_BASE, AON_GPADC_REG_CONFIG1);
+    tmpVal2 = BL_RD_REG(AON_BASE, AON_GPADC_REG_CONFIG2);
+    dataType = BL_GET_REG_BITS_VAL(tmpVal1, AON_GPADC_RES_SEL);
+    sigType = BL_GET_REG_BITS_VAL(tmpVal2, AON_GPADC_DIFF_MODE);
 
-    if(BL_GET_REG_BITS_VAL(tmpVal2,AON_GPADC_VREF_SEL)==ADC_VREF_3P2V){
-        ref=3.2;
+    if (BL_GET_REG_BITS_VAL(tmpVal2, AON_GPADC_VREF_SEL) == ADC_VREF_3P2V) {
+        ref = 3.2;
     }
-    if(sigType==ADC_INPUT_SINGLE_END){
-        for(i=0;i<len;i++){
-            result[i].posChan=orgVal[i]>>21;
-            result[i].negChan=-1;
-            if(dataType==ADC_DATA_WIDTH_12){
-                result[i].value=(unsigned int)(((orgVal[i]&0xffff)>>4)/coe);
-                result[i].volt=result[i].value/4096.0*ref;
-            }else if(dataType==ADC_DATA_WIDTH_14_WITH_16_AVERAGE){
-                result[i].value=(unsigned int)(((orgVal[i]&0xffff)>>2)/coe);
-                result[i].volt=result[i].value/16384.0*ref;
-            }else if(dataType==ADC_DATA_WIDTH_16_WITH_64_AVERAGE||dataType==ADC_DATA_WIDTH_16_WITH_256_AVERAGE){
-                result[i].value=(unsigned int)((orgVal[i]&0xffff)/coe);
-                result[i].volt=result[i].value/65536.0*ref;
+
+    if (sigType == ADC_INPUT_SINGLE_END) {
+        for (i = 0; i < len; i++) {
+            result[i].posChan = orgVal[i] >> 21;
+            result[i].negChan = -1;
+
+            if (dataType == ADC_DATA_WIDTH_12) {
+                conv_result = (unsigned int)(((orgVal[i] & 0xffff) >> 4) / coe);
+                if (conv_result > 4095) {
+                    conv_result = 4095;
+                }
+                result[i].value = conv_result;
+                result[i].volt = result[i].value / 4096.0 * ref;
+            } else if ((dataType == ADC_DATA_WIDTH_14_WITH_16_AVERAGE) ||
+                       (dataType == ADC_DATA_WIDTH_14_WITH_64_AVERAGE)) {
+                conv_result = (unsigned int)(((orgVal[i] & 0xffff) >> 2) / coe);
+                if (conv_result > 16383) {
+                    conv_result = 16383;
+                }
+                result[i].value = conv_result;
+                result[i].volt = result[i].value / 16384.0 * ref;
+            } else if ((dataType == ADC_DATA_WIDTH_16_WITH_128_AVERAGE) ||
+                       (dataType == ADC_DATA_WIDTH_16_WITH_256_AVERAGE)) {
+                conv_result = (unsigned int)((orgVal[i] & 0xffff) / coe);
+                if (conv_result > 65535) {
+                    conv_result = 65535;
+                }
+                result[i].value = conv_result;
+                result[i].volt = result[i].value / 65536.0 * ref;
             }
         }
-    }else{
-        for(i=0;i<len;i++){
+    } else {
+        for (i = 0; i < len; i++) {
             neg = 0;
-            result[i].posChan=orgVal[i]>>21;
-            result[i].negChan=(orgVal[i]>>16)&0x1F;
+            result[i].posChan = orgVal[i] >> 21;
+            result[i].negChan = (orgVal[i] >> 16) & 0x1F;
 
-            if(orgVal[i]&0x8000){
+            if (orgVal[i] & 0x8000) {
                 orgVal[i] = ~orgVal[i];
                 orgVal[i] += 1;
                 neg = 1;
             }
-            if(dataType==ADC_DATA_WIDTH_12){
-                result[i].value=(unsigned int)(((orgVal[i]&0xffff)>>4)/coe);
-                result[i].volt=result[i].value/2048.0*ref;
-            }else if(dataType==ADC_DATA_WIDTH_14_WITH_16_AVERAGE){
-                result[i].value=(unsigned int)(((orgVal[i]&0xffff)>>2)/coe);
-                result[i].volt=result[i].value/8192.0*ref;
-            }else if(dataType==ADC_DATA_WIDTH_16_WITH_64_AVERAGE||dataType==ADC_DATA_WIDTH_16_WITH_256_AVERAGE){
-                result[i].value=(unsigned int)((orgVal[i]&0xffff)/coe);
-                result[i].volt=result[i].value/32768.0*ref;
+
+            if (dataType == ADC_DATA_WIDTH_12) {
+                conv_result = (unsigned int)(((orgVal[i] & 0xffff) >> 4) / coe);
+                if (conv_result > 2047) {
+                    conv_result = 2047;
+                }
+                result[i].value = conv_result;
+                result[i].volt = result[i].value / 2048.0 * ref;
+            } else if ((dataType == ADC_DATA_WIDTH_14_WITH_16_AVERAGE) ||
+                       (dataType == ADC_DATA_WIDTH_14_WITH_64_AVERAGE)) {
+                conv_result = (unsigned int)(((orgVal[i] & 0xffff) >> 2) / coe);
+                if (conv_result > 8191) {
+                    conv_result = 8191;
+                }
+                result[i].value = conv_result;
+                result[i].volt = result[i].value / 8192.0 * ref;
+            } else if ((dataType == ADC_DATA_WIDTH_16_WITH_128_AVERAGE) ||
+                       (dataType == ADC_DATA_WIDTH_16_WITH_256_AVERAGE)) {
+                conv_result = (unsigned int)((orgVal[i] & 0xffff) / coe);
+                if (conv_result > 32767) {
+                    conv_result = 32767;
+                }
+                result[i].value = conv_result;
+                result[i].volt = result[i].value / 32768.0 * ref;
             }
-            if(neg){
-                result[i].volt = - result[i].volt;
+
+            if (neg) {
+                result[i].volt = -result[i].volt;
             }
         }
     }
@@ -575,7 +608,7 @@ void ADC_IntMask(ADC_INT_Type intType, BL_Mask_Type intMask)
     /* Check the parameters */
     CHECK_PARAM(IS_GPIP_ADC_INT_TYPE(intType));
     CHECK_PARAM(IS_BL_MASK_TYPE(intMask));
-    
+
     switch(intType)
     {
         case ADC_INT_POS_SATURATION:
@@ -1031,7 +1064,7 @@ uint32_t TSEN_Get_V_Error(void)
     ADC_Start();
     while (ADC_Get_FIFO_Count() == 0)
         ;
-    regVal = ADC_Read_FIFO();
+    regVal = ADC_Read_FIFO();    
     gainCalEnabled=adcGainCoeffCal.adcGainCoeffEnable;
     adcGainCoeffCal.adcGainCoeffEnable=0;
     ADC_Parse_Result(&regVal, 1, &result);
@@ -1049,7 +1082,7 @@ uint32_t TSEN_Get_V_Error(void)
     ADC_Start();
     while (ADC_Get_FIFO_Count() == 0)
         ;
-    regVal = ADC_Read_FIFO();    
+    regVal = ADC_Read_FIFO();
     gainCalEnabled=adcGainCoeffCal.adcGainCoeffEnable;
     adcGainCoeffCal.adcGainCoeffEnable=0;
     ADC_Parse_Result(&regVal, 1, &result);
@@ -1077,25 +1110,25 @@ BL_Err_Type ATTR_CLOCK_SECTION ADC_Trim_TSEN(uint16_t * tsen_offset)
     uint32_t tmpVal=0;
     float A1=0.0,A2=0.0,C=0.0,delta=0.0;
     Efuse_TSEN_Refcode_Corner_Type trim;
-    
+
     EF_Ctrl_Read_TSEN_Trim(&trim);
-    
+
     if(trim.tsenRefcodeCornerEn){
         if(trim.tsenRefcodeCornerParity==EF_Ctrl_Get_Trim_Parity(trim.tsenRefcodeCorner,12)){
-            
+
             MSG("TSEN ATE Version = %d\r\n",trim.tsenRefcodeCornerVersion);
 
             *tsen_offset = trim.tsenRefcodeCorner;
 
             if(trim.tsenRefcodeCornerVersion == 0){
                 /* debug advise by ran
-                 * 2020.9.04 
+                 * 2020.9.04
                  */
- 
+
                 //set 4000F90C[19](gpadc_mic2_diff) = 0
                 tmpVal = BL_RD_REG(AON_BASE,AON_GPADC_REG_CMD);
                 tmpVal = BL_SET_REG_BITS_VAL(tmpVal,AON_GPADC_MIC2_DIFF,0);
-                BL_WR_REG(AON_BASE,AON_GPADC_REG_CMD,tmpVal);   
+                BL_WR_REG(AON_BASE,AON_GPADC_REG_CMD,tmpVal);
 
                 for(average_index=0;average_index<50;average_index++){
                     v_error_sum += TSEN_Get_V_Error();
@@ -1111,13 +1144,13 @@ BL_Err_Type ATTR_CLOCK_SECTION ADC_Trim_TSEN(uint16_t * tsen_offset)
                 //set 4000F90C[19](gpadc_mic2_diff) = 1
                 tmpVal = BL_RD_REG(AON_BASE,AON_GPADC_REG_CMD);
                 tmpVal = BL_SET_REG_BITS_VAL(tmpVal,AON_GPADC_MIC2_DIFF,1);
-                BL_WR_REG(AON_BASE,AON_GPADC_REG_CMD,tmpVal);   
+                BL_WR_REG(AON_BASE,AON_GPADC_REG_CMD,tmpVal);
 
                 for(average_index=0;average_index<50;average_index++){
                     v_error_sum += TSEN_Get_V_Error();
                 }
 
-                v_error_sum /= 50;                
+                v_error_sum /= 50;
 
                 MSG("A2 = %d\r\n",v_error_sum);
                 A2 = v_error_sum;
@@ -1135,7 +1168,7 @@ BL_Err_Type ATTR_CLOCK_SECTION ADC_Trim_TSEN(uint16_t * tsen_offset)
             return SUCCESS;
         }
     }
-    
+
     return ERROR;
 }
 
@@ -1199,7 +1232,7 @@ float TSEN_Get_Temp(uint32_t tsen_offset)
     while (ADC_Get_FIFO_Count() == 0)
         ;
     regVal = ADC_Read_FIFO();
-    
+
     gainCalEnabled=adcGainCoeffCal.adcGainCoeffEnable;
     adcGainCoeffCal.adcGainCoeffEnable=0;
     ADC_Parse_Result(&regVal, 1, &result);
@@ -1277,7 +1310,7 @@ BL_Err_Type ADC_Mic_Init(ADC_MIC_Type * adc_mic_config)
 
     tmpVal1=BL_SET_REG_BITS_VAL(tmpVal1,AON_GPADC_MICBIAS_EN,adc_mic_config->micBiasEn);
 
-    BL_WR_REG(AON_BASE,AON_GPADC_REG_CMD,tmpVal1);    
+    BL_WR_REG(AON_BASE,AON_GPADC_REG_CMD,tmpVal1);
 
     return SUCCESS;
 
@@ -1332,9 +1365,9 @@ BL_Err_Type ATTR_CLOCK_SECTION ADC_Gain_Trim(void)
 {
     Efuse_ADC_Gain_Coeff_Type trim;
     uint32_t tmp;
-    
+
     EF_Ctrl_Read_ADC_Gain_Trim(&trim);
-    
+
     if(trim.adcGainCoeffEn){
         if(trim.adcGainCoeffParity==EF_Ctrl_Get_Trim_Parity(trim.adcGainCoeff,12)){
             adcGainCoeffCal.adcGainCoeffEnable = ENABLE;
@@ -1348,14 +1381,14 @@ BL_Err_Type ATTR_CLOCK_SECTION ADC_Gain_Trim(void)
                 adcGainCoeffCal.coe=(1.0+((float)tmp/2048.0));
                 //printf("coe==%0f\r\n",adcGainCoeffCal.coe);
             }else{
-                adcGainCoeffCal.coe=(1.0-((float)tmp/2048.0));    
-                //printf("coe==%0f\r\n",adcGainCoeffCal.coe);     
+                adcGainCoeffCal.coe=(1.0-((float)tmp/2048.0));
+                //printf("coe==%0f\r\n",adcGainCoeffCal.coe);
             }
 
             return SUCCESS;
         }
     }
-    
+
     return ERROR;
 }
 

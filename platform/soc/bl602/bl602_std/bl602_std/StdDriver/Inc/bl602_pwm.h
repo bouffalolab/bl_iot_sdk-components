@@ -185,6 +185,9 @@ void PWM_SW_Mode(PWM_CH_ID_Type ch,BL_Fun_Type enable);
 void PWM_SW_Force_Value(PWM_CH_ID_Type ch,uint8_t value);
 void PWM_Int_Callback_Install(PWM_CH_ID_Type ch,uint32_t intType,intCallback_Type* cbFun);
 BL_Err_Type PWM_Smart_Configure(PWM_CH_ID_Type ch,uint32_t frequency,uint8_t dutyCycle);
+BL_Err_Type PWM_Smart_Configure_Float(PWM_CH_ID_Type ch, uint32_t frequency, float dutyCycle);
+BL_Err_Type PWM_Smart_Configure_Float_2channels(PWM_CH_ID_Type ch0, uint32_t pin0, uint32_t frequency0, float dutyCycle0, \
+                                                PWM_CH_ID_Type ch1, uint32_t pin1, uint32_t frequency1, float dutyCycle1);
 
 /*@} end of group PWM_Public_Functions */
 

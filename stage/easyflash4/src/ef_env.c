@@ -1883,6 +1883,52 @@ __retry:
     return result;
 }
 
+#ifdef EF_ENV_USING_CACHE
+bool env_key_possibly_exist(const char *name, size_t name_len)
+{
+    size_t i = 0, is_cache_avaiable = false;
+    uint16_t name_crc = (uint16_t) (ef_calc_crc32(0, name, name_len) >> 16);
+
+    for (i = 0; i < EF_ENV_CACHE_TABLE_SIZE; i++) {
+        if ((env_cache_table[i].addr != FAILED_ADDR) && (env_cache_table[i].name_crc == name_crc)) {
+            /** crc matched, means that it has high possibility in cache */
+            return true;
+        }
+
+        if (env_cache_table[i].addr == FAILED_ADDR) {
+            is_cache_avaiable = true;
+        }
+    }
+
+    if (false == is_cache_avaiable) {
+        return true;
+    }
+
+    return false;
+}
+
+static bool env_cache_cb (env_node_obj_t env, void *arg1, void *arg2) 
+{
+    env->name[env->name_len] = '\0';
+
+    update_env_cache(env->name, env->name_len, env->addr.start);
+    return false;
+}
+
+void ef_load_env_cache(void) 
+{
+    ef_print_env_cb(env_cache_cb);
+
+    int i = 0, cnt = 0;
+    for (i = 0; i < EF_ENV_CACHE_TABLE_SIZE; i++) {
+
+        if (env_cache_table[i].addr != FAILED_ADDR) {
+            cnt ++;
+        }
+    }
+}
+#endif
+
 /**
  * Flash ENV initialize.
  *

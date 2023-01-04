@@ -7,7 +7,7 @@
  */
 
 #include <zephyr.h>
-#include <errno.h>
+#include <sys/errno.h>
 #include <string.h>
 #include <types.h>
 #include <util.h>
@@ -39,6 +39,10 @@
 #include "util.h"
 //#endif
 #include "mesh_config.h"
+
+#if defined(CONFIG_AUTO_PTS)
+#include "testing.h"
+#endif
 
 #define AID_MASK                    ((u8_t)(BIT_MASK(6)))
 
@@ -527,8 +531,13 @@ static int send_seg(struct bt_mesh_net_tx *net_tx, struct net_buf_simple *sdu,
 		tx->ttl = net_tx->ctx->send_ttl;
 	}
 
+	#if defined(CONFIG_AUTO_PTS)
+	BT_PTS("SeqZero 0x%04x (segs: %u)",
+		(u16_t)(tx->seq_auth & TRANS_SEQ_ZERO_MASK), tx->nack_count);
+	#else
 	BT_DBG("SeqZero 0x%04x (segs: %u)",
-	       (u16_t)(tx->seq_auth & TRANS_SEQ_ZERO_MASK), tx->nack_count);
+		(u16_t)(tx->seq_auth & TRANS_SEQ_ZERO_MASK), tx->nack_count);
+	#endif /* CONFIG_AUTO_PTS */
 
 	if (IS_ENABLED(CONFIG_BT_MESH_FRIEND) &&
 	    !bt_mesh_friend_queue_has_space(tx->sub->net_idx, net_tx->src,
@@ -556,7 +565,11 @@ static int send_seg(struct bt_mesh_net_tx *net_tx, struct net_buf_simple *sdu,
 		len = MIN(sdu->len, seg_len(!!ctl_op));
 		memcpy(buf, net_buf_simple_pull_mem(sdu, len), len);
 
+		#if defined(CONFIG_AUTO_PTS)
+		BT_PTS("seg %u: %s", seg_o, bt_hex(buf, len));
+		#else
 		BT_DBG("seg %u: %s", seg_o, bt_hex(buf, len));
+		#endif /* CONFIG_AUTO_PTS */
 
 		tx->seg[seg_o] = buf;
 
@@ -618,6 +631,70 @@ static int send_seg(struct bt_mesh_net_tx *net_tx, struct net_buf_simple *sdu,
 
 	return 0;
 }
+
+#if defined(CONFIG_AUTO_PTS)
+static struct bt_mesh_app_key *app_key_alloc(uint16_t app_idx)
+{
+	struct bt_mesh_app_key *app_key = NULL;
+
+	for (int i = 0; i < ARRAY_SIZE(bt_mesh.app_keys); i++) {
+		/* Check for already existing app_key */
+		if (bt_mesh.app_keys[i].app_idx == app_idx) {
+			return &bt_mesh.app_keys[i];
+		}
+
+		if (!app_key && bt_mesh.app_keys[i].app_idx == BT_MESH_KEY_UNUSED) {
+			app_key = &bt_mesh.app_keys[i];
+		}
+	}
+
+	return app_key;
+}
+
+uint8_t bt_mesh_app_key_add(uint16_t app_idx, uint16_t net_idx,
+			const uint8_t key[16])
+{
+	struct bt_mesh_app_key *app_key = NULL;
+
+	BT_DBG("net_idx 0x%04x app_idx %04x val %s", net_idx, app_idx,
+	       bt_hex(key, 16));
+
+	if (!bt_mesh_subnet_get(net_idx)) {
+		return STATUS_INVALID_NETKEY;
+	}
+
+	app_key = app_key_alloc(app_idx);
+	if (!app_key) {
+		return STATUS_INSUFF_RESOURCES;
+	}
+
+	if (app_key->app_idx == app_idx) {
+		if (app_key->net_idx != net_idx) {
+			return STATUS_INVALID_BINDING;
+		}
+
+		if (memcmp(key, app_key->keys[0].val, 16)) {
+			return STATUS_IDX_ALREADY_STORED;
+		}
+
+		return STATUS_SUCCESS;
+	}
+
+	app_key->net_idx = net_idx;
+	app_key->app_idx = app_idx;
+	app_key->updated = false;
+	memcpy(app_key->keys[0].val, key, 16);
+
+	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		BT_DBG("Storing AppKey persistently");
+		//update_app_key_settings(app->app_idx, true);
+		bt_mesh_store_app_key(app_key);
+
+	}
+
+	return STATUS_SUCCESS;
+}
+#endif /* CONFIG_AUTO_PTS */
 
 struct bt_mesh_app_key *bt_mesh_app_key_find(u16_t app_idx)
 {
@@ -1101,7 +1178,7 @@ static int trans_ack(struct bt_mesh_net_rx *rx, u8_t hdr,
 
 	ack = net_buf_simple_pull_be32(buf);
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	BT_PTS("[PTS]   - SeqZero: 0x%04X", seq_zero);
 	BT_PTS("[PTS]   - BlockAck: 0x%08X", ack);
 #endif
@@ -1122,7 +1199,7 @@ static int trans_ack(struct bt_mesh_net_rx *rx, u8_t hdr,
 	*seq_auth = tx->seq_auth;
 
 	if (!ack) {
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		BT_PTS("[PTS] Transmission cancelled");
 #endif
 
@@ -1150,7 +1227,7 @@ static int trans_ack(struct bt_mesh_net_rx *rx, u8_t hdr,
 	if (tx->nack_count) {
 		seg_tx_send_unacked(tx);
 	} else {
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		BT_PTS("[PTS] All segments sent and acknowledged");
 #endif
 
@@ -1205,12 +1282,18 @@ static int ctl_recv(struct bt_mesh_net_rx *rx, u8_t hdr,
 		return trans_heartbeat(rx, buf);
 	}
 
+#if defined(CONFIG_AUTO_PTS)
+    BT_PTS("rx->local_match[%x]", rx->local_match);
+#endif /* CONFIG_AUTO_PTS */
 	/* Only acks and heartbeats may need processing without local_match */
 	if (!rx->local_match) {
 		return 0;
 	}
 
 	if (IS_ENABLED(CONFIG_BT_MESH_FRIEND) && !bt_mesh_lpn_established()) {
+#if defined(CONFIG_AUTO_PTS)
+	BT_PTS("ctl_op[%x]", ctl_op);
+#endif /* CONFIG_AUTO_PTS */
 		switch (ctl_op) {
 		case TRANS_CTL_OP_FRIEND_POLL:
 			return bt_mesh_friend_poll(rx, buf);
@@ -1269,7 +1352,7 @@ static int trans_unseg(struct net_buf_simple *buf, struct bt_mesh_net_rx *rx,
 	}
 
 	if (bt_mesh_rpl_check(rx, NULL)) {
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		BT_PTS("[PTS] Replayed message (SEQ = 0x%06X) ignored", rx->seq);
 #endif
 
@@ -1375,7 +1458,7 @@ static int send_ack(struct bt_mesh_subnet *sub, u16_t src, u16_t dst,
 		return 0;
 	}
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	BT_PTS("[PTS] Sending BlockAck 0x%08X (SeqZero = 0x%04X)", block, seq_zero);
 #endif
 
@@ -1430,7 +1513,7 @@ static void seg_ack(struct k_work *work)
 
 	BT_DBG("rx %p", rx);
 
-#ifndef CONFIG_BT_MESH_PTS
+#if !(defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS))
 	if (k_uptime_get_32() - rx->last > (60 * MSEC_PER_SEC)) {
 		BT_WARN("Incomplete timer expired");
 #else
@@ -1439,7 +1522,7 @@ static void seg_ack(struct k_work *work)
 #endif
 		seg_rx_reset(rx, false);
 
-        #if defined(CONFIG_BT_TESTING) /* Modified by bouffalo */
+        #if defined(CONFIG_AUTO_PTS) /* Modified by bouffalo */
 		/*if (IS_ENABLED(CONFIG_BT_TESTING))*/ {
 			bt_test_mesh_trans_incomp_timer_exp();
 		}
@@ -1591,7 +1674,7 @@ static int trans_seg(struct net_buf_simple *buf, struct bt_mesh_net_rx *net_rx,
 	seg_o |= seg_n >> 5;
 	seg_n &= 0x1f;
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	BT_PTS("[PTS]   - SeqZero: 0x%04X", seq_zero);
 	BT_PTS("[PTS]   - Segment: %u/%u", seg_o, seg_n);
 #endif
@@ -1759,7 +1842,7 @@ found_rx:
 		return 0;
 	}
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	BT_PTS("[PTS] All segments received");
 #endif
 
@@ -1811,9 +1894,8 @@ int bt_mesh_trans_recv(struct net_buf_simple *buf, struct bt_mesh_net_rx *rx)
 
 	BT_DBG("Payload %s", bt_hex(buf->data, buf->len));
 
-    #if defined(CONFIG_BT_TESTING)/* Modified by bouffalo */
+	#if defined(CONFIG_AUTO_PTS)/* Modified by bouffalo */
 	/*if (IS_ENABLED(CONFIG_BT_TESTING))*/ {
-        
 		bt_test_mesh_net_recv(rx->ctx.recv_ttl, rx->ctl, rx->ctx.addr,
 				      rx->ctx.recv_dst, buf->data, buf->len);
 	}

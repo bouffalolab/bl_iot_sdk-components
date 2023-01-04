@@ -1234,6 +1234,9 @@ void EF_Ctrl_Read_Device_Info(Efuse_Device_Info_Type *deviceInfo)
 
     tmpVal=BL_RD_REG(EF_DATA_BASE,EF_DATA_0_EF_WIFI_MAC_HIGH);
     *p=tmpVal;
+
+    tmpVal = BL_RD_REG(EF_DATA_BASE, EF_DATA_0_EF_CFG_0);
+    deviceInfo->chip_ver = (tmpVal >> 8) & 0x07;
 }
 
 /****************************************************************************//**

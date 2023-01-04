@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -38,6 +38,7 @@
 #include <lwip/dhcp6.h>
 #endif
 
+#include <utils_tlv_bl.h>
 #include <aos/yloop.h>
 #include <bl60x_fw_api.h>
 #include <dns_server.h>
@@ -1079,6 +1080,7 @@ static void stateConnectedIPNoEnter(void *stateData, struct event *event )
     bl_os_printf("Entering %s state, up time is %.1fs, cost time is %.1fs\r\n", (char *)stateData, now/1000.0, (now - wifiMgmr.connect_time)/1000.0);
 #endif
 
+#if (!CFG_NETBUS_WIFI_ENABLE)
     /* timeout 15 seconds for ip obtaining */
     if (use_dhcp) {
         stateConnectedIPNo_data->timer = bl_os_timer_create(ip_obtaining_timeout, stateConnectedIPNo_data);
@@ -1088,6 +1090,7 @@ static void stateConnectedIPNoEnter(void *stateData, struct event *event )
     }
 
     __sta_setup_ip(use_dhcp);
+#endif
     aos_post_event(EV_WIFI, CODE_WIFI_ON_CONNECTED, 0);
 }
 
@@ -1119,6 +1122,20 @@ static void stateConnectedIPNoExit(void *stateData, struct event *event )
     }
 }
 
+static void stateConnectedIPNoAction_disconn( void *oldStateData, struct event *event, void *newStateData)
+{
+    ip4_addr_t addr_ipaddr;
+
+    ip4_addr_set_any(&addr_ipaddr);
+    bl_os_printf(DEBUG_HEADER "State Action ###%s### --->>> ###%s###\r\n",
+            (char*)oldStateData,
+            (char*)newStateData
+    );
+
+    wifi_netif_dhcp_stop(&(wifiMgmr.wlan_sta.netif));
+    netifapi_netif_set_addr(&(wifiMgmr.wlan_sta.netif), &addr_ipaddr, &addr_ipaddr, &addr_ipaddr);
+}
+
 const static struct state stateConnectedIPNo = {
    .parentState = &stateGlobal,
    .entryState = NULL,
@@ -1126,7 +1143,7 @@ const static struct state stateConnectedIPNo = {
    {
       {EVENT_TYPE_APP, (void*)WIFI_MGMR_EVENT_APP_IP_GOT, &stateGuard, &stateConnectedIPNoAction_ipgot, &stateConnectedIPYes},
       {EVENT_TYPE_APP, (void*)WIFI_MGMR_EVENT_APP_DISCONNECT, &stateConnectedIPNoGuard_disconnect, &stateAction, &stateDisconnect},
-      {EVENT_TYPE_FW, (void*)WIFI_MGMR_EVENT_FW_IND_DISCONNECT, &stateGuard, &stateAction, &stateDisconnect},
+      {EVENT_TYPE_FW, (void*)WIFI_MGMR_EVENT_FW_IND_DISCONNECT, &stateGuard, &stateConnectedIPNoAction_disconn, &stateDisconnect},
    },
    .numTransitions = 3,
    .data = &stateConnectedIPNo_data,
@@ -1196,6 +1213,12 @@ static void stateConnectedIPYes_action( void *oldStateData, struct event *event,
 
 static void stateConnectedIPYes_enter( void *stateData, struct event *event )
 {
+    // XXX: tell FW GOT IP
+    uint32_t trigger_flag = 0;
+    bl_main_cfg_task_req(CFG_ELEMENT_TYPE_OPS_SET, TASK_SM,
+                         TASK_SM_CFG_RECONNECT_TRIGGER_FLAG,
+                         CFG_ELEMENT_TYPE_UINT32, &trigger_flag, NULL);
+
     if (_pending_task_is_set(WIFI_MGMR_PENDING_TASK_CONNECT_BIT)) {
         //disconnect, not need to clear pending
         bl_os_printf("IPYES enter, disconnect\r\n");
@@ -1301,7 +1324,11 @@ static void stateDisconnect_action_reconnect( void *oldStateData, struct event *
 
     dump_connect_param(profile_msg, band, freq, bssid ? bssid : null_bssid);
 
-
+    // XXX: tell FW reconnect happening
+    uint32_t trigger_flag = 1;
+    bl_main_cfg_task_req(CFG_ELEMENT_TYPE_OPS_SET, TASK_SM,
+                         TASK_SM_CFG_RECONNECT_TRIGGER_FLAG,
+                         CFG_ELEMENT_TYPE_UINT32, &trigger_flag, NULL);
 
     //TODO Other security support
     bl_main_connect((const uint8_t *)profile_msg->ssid, profile_msg->ssid_len,

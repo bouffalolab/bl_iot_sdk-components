@@ -1,4 +1,8 @@
+#if defined(BL702) || defined(BL602)
 #include "ble_lib_api.h"
+#else
+#include "btble_lib_api.h"
+#endif
 #include "bluetooth.h"
 #include "conn.h"
 #include "hci_core.h"

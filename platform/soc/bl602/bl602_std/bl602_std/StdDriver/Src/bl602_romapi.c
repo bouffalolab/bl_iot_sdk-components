@@ -396,10 +396,12 @@ BL_Err_Type ATTR_TCM_SECTION PDS_Reset(void){
     return RomDriver_PDS_Reset();
 }
 
+#if 0
 __ALWAYS_INLINE
 BL_Err_Type ATTR_TCM_SECTION PDS_Enable(PDS_CTL_Type *cfg,PDS_CTL4_Type *cfg4,uint32_t pdsSleepCnt){
     return RomDriver_PDS_Enable(cfg,cfg4,pdsSleepCnt);
 }
+#endif
 
 __ALWAYS_INLINE
 BL_Err_Type ATTR_TCM_SECTION PDS_Force_Config(PDS_CTL2_Type *cfg2,PDS_CTL3_Type *cfg3){
@@ -411,10 +413,12 @@ BL_Err_Type ATTR_TCM_SECTION PDS_RAM_Config(PDS_RAM_CFG_Type *ramCfg){
     return RomDriver_PDS_RAM_Config(ramCfg);
 }
 
+#if 0
 __ALWAYS_INLINE
 BL_Err_Type ATTR_TCM_SECTION PDS_Default_Level_Config(PDS_DEFAULT_LV_CFG_Type *defaultLvCfg,PDS_RAM_CFG_Type *ramCfg,uint32_t pdsSleepCnt){
     return RomDriver_PDS_Default_Level_Config(defaultLvCfg,ramCfg,pdsSleepCnt);
 }
+#endif
 
 __ALWAYS_INLINE
 BL_Err_Type ATTR_CLOCK_SECTION PDS_Trim_RC32M(void){

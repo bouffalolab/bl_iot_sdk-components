@@ -8,12 +8,13 @@
 
 #include <zephyr.h>
 #include <stdbool.h>
-#include <errno.h>
+#include <sys/errno.h>
 
 #include <net/buf.h>
 #include <bluetooth.h>
 #include <conn.h>
-#include <uuid.h>
+#include "../../blestack/src/include/bluetooth/uuid.h"
+
 #include <include/mesh.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG)

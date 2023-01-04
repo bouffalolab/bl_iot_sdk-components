@@ -52,6 +52,8 @@ EfErrCode ef_set_env_blob(const char *key, const void *value_buf, size_t buf_len
 
 /* ef_env.c, ef_env_legacy_wl.c and ef_env_legacy.c */
 EfErrCode ef_load_env(void);
+void ef_load_env_cache(void);
+bool env_key_possibly_exist(const char *name, size_t name_len);
 void ef_print_env(void);
 /* Added by bouffalo */
 typedef bool (*print_env_cb_t)(env_node_obj_t env, void *arg1, void *arg2);

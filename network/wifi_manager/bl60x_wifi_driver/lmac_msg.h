@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -573,6 +573,7 @@ struct mm_tim_update_req
     u8_l inst_nbr;
 };
 
+
 /// Structure containing the parameters of the @ref MM_REMAIN_ON_CHANNEL_REQ message.
 struct mm_remain_on_channel_req
 {
@@ -580,20 +581,10 @@ struct mm_remain_on_channel_req
     u8_l op_code;
     /// VIF Index
     u8_l vif_index;
-    /// Band (2.4GHz or 5GHz)
-    u8_l band;
-    /// Channel type: 20,40,80,160 or 80+80 MHz
-    u8_l type;
-    /// Frequency for Primary 20MHz channel (in MHz)
-    u16_l prim20_freq;
-    /// Frequency for Center of the contiguous channel or center of Primary 80+80
-    u16_l center1_freq;
-    /// Frequency for Center of the non-contiguous secondary 80+80
-    u16_l center2_freq;
-    /// Duration (in ms)
+    /// Duration
     u32_l duration_ms;
-    /// TX power (in dBm)
-    s8_l tx_power;
+    /// Parameters of the channel
+    struct mm_chan_ctxt_add_req channel;
 };
 
 /// Structure containing the parameters of the @ref MM_REMAIN_ON_CHANNEL_CFM message

@@ -521,7 +521,9 @@ struct bt_conn *bt_conn_create_br(const bt_addr_t *peer,
 	struct net_buf *buf;
 
 	conn = bt_conn_lookup_addr_br(peer);
+	BT_DBG("conn(%p)",conn);
 	if (conn) {
+		BT_DBG("state(%p)",conn->state);
 		switch (conn->state) {
 		case BT_CONN_CONNECT:
 		case BT_CONN_CONNECTED:
@@ -565,7 +567,7 @@ struct bt_conn *bt_conn_create_br(const bt_addr_t *peer,
 	return conn;
 }
 
-struct bt_conn *bt_conn_create_sco(const bt_addr_t *peer)
+struct bt_conn *bt_conn_create_sco(const bt_addr_t *peer,const struct esco_para *para)
 {
 	struct bt_hci_cp_setup_sync_conn *cp;
 	struct bt_conn *sco_conn;
@@ -586,6 +588,8 @@ struct bt_conn *bt_conn_create_sco(const bt_addr_t *peer)
 
 	if (BT_FEAT_LMP_ESCO_CAPABLE(bt_dev.features)) {
 		link_type = BT_HCI_ESCO;
+        if(!(para->pkt_type & ESCO_PKT_MASK))
+            link_type = BT_HCI_SCO;    
 	} else {
 		link_type = BT_HCI_SCO;
 	}
@@ -605,18 +609,26 @@ struct bt_conn *bt_conn_create_sco(const bt_addr_t *peer)
 
 	(void)memset(cp, 0, sizeof(*cp));
 
-	BT_ERR("handle : %x", sco_conn->sco.acl->handle);
-
 	cp->handle = sco_conn->sco.acl->handle;
-	cp->pkt_type = sco_conn->sco.pkt_type;
-	cp->tx_bandwidth = 0x00001f40;
-	cp->rx_bandwidth = 0x00001f40;
-	cp->max_latency = 0x0007;
-	cp->retrans_effort = 0x01;
-	cp->content_format = BT_VOICE_CVSD_16BIT;
+	if(sco_conn->sco.pkt_type & para->pkt_type){
+		cp->pkt_type = para->pkt_type;
+        if(link_type == BT_HCI_SCO)
+            cp->pkt_type |= EDR_ESCO_PKT_MASK;
+	}else{
+		BT_ERR("Not support");
+		bt_sco_cleanup(sco_conn);
+		return NULL;
+	}
+
+	cp->tx_bandwidth = para->tx_bandwidth;
+	cp->rx_bandwidth = para->rx_bandwidth;
+	cp->max_latency = para->max_latency;
+	cp->retrans_effort = para->retrans_effort;
+	cp->content_format = para->content_format;
 
 	if (bt_hci_cmd_send_sync(BT_HCI_OP_SETUP_SYNC_CONN, buf,
 				 NULL) < 0) {
+		BT_ERR("Failed to setup sync conn");
 		bt_sco_cleanup(sco_conn);
 		return NULL;
 	}
@@ -652,6 +664,7 @@ struct bt_conn *bt_conn_lookup_addr_br(const bt_addr_t *peer)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(conns); i++) {
+		BT_DBG("Addre (%s)",bt_hex(conns[i].br.dst.val,6));
 		if (!atomic_get(&conns[i].ref)) {
 			continue;
 		}
@@ -680,6 +693,13 @@ struct bt_conn *bt_conn_add_sco(const bt_addr_t *peer, int link_type)
 	sco_conn->type = BT_CONN_TYPE_SCO;
 
 	if (link_type == BT_HCI_SCO) {
+        #if defined(BFLB_BREDR_SCO_TYPE_FIX)
+        //bit6:2-EV3 shall not be used.
+        //bit7:3-EV3 shall not be used.
+        //bit8:2-EV5 shall not be used.
+        //bit9:3-EV5 shall not be used.
+        sco_conn->sco.pkt_type = SCO_PKT_MASK | EDR_ESCO_PKT_MASK;
+        #else
 		if (BT_FEAT_LMP_ESCO_CAPABLE(bt_dev.features)) {
 			sco_conn->sco.pkt_type = (bt_dev.br.esco_pkt_type &
 						  ESCO_PKT_MASK);
@@ -687,6 +707,8 @@ struct bt_conn *bt_conn_add_sco(const bt_addr_t *peer, int link_type)
 			sco_conn->sco.pkt_type = (bt_dev.br.esco_pkt_type &
 						  SCO_PKT_MASK);
 		}
+        #endif
+
 	} else if (link_type == BT_HCI_ESCO) {
 		sco_conn->sco.pkt_type = (bt_dev.br.esco_pkt_type &
 					  ~EDR_ESCO_PKT_MASK);
@@ -1148,15 +1170,18 @@ static int start_security(struct bt_conn *conn)
 #if defined(CONFIG_BT_BREDR)
 	if (conn->type == BT_CONN_TYPE_BR) {
 		if (atomic_test_bit(conn->flags, BT_CONN_BR_PAIRING)) {
+			BT_DBG("0");
 			return -EBUSY;
 		}
 
 		if (conn->required_sec_level > BT_SECURITY_L3) {
+			BT_DBG("required_sec_level %d",conn->required_sec_level);
 			return -ENOTSUP;
 		}
 
 		if (bt_conn_get_io_capa() == BT_IO_NO_INPUT_OUTPUT &&
 		    conn->required_sec_level > BT_SECURITY_L2) {
+		    BT_DBG("required_sec_level 2 %d",conn->required_sec_level);
 			return -EINVAL;
 		}
 
@@ -1219,6 +1244,35 @@ void bt_conn_cb_register(struct bt_conn_cb *cb)
 	cb->_next = callback_list;
 	callback_list = cb;
 }
+
+void bt_conn_cb_unregister(struct bt_conn_cb *cb)
+{
+	struct bt_conn_cb *ucb,*prev_cb = callback_list;
+
+	for (ucb = callback_list;ucb;ucb = ucb->_next) {
+		if (ucb==cb){
+			if (cb != callback_list) {
+				prev_cb->_next = cb->_next;
+			}else {
+				callback_list = cb->_next;
+			}
+		}else {
+			prev_cb = ucb;
+		}
+	}
+}
+
+void bt_conn_cb_clear(void)
+{
+	struct bt_conn_cb *tcb;
+
+	while(callback_list) {
+		tcb = callback_list->_next;
+		callback_list = NULL;
+		callback_list = tcb;
+	}
+}
+
 
 void bt_conn_reset_rx_state(struct bt_conn *conn)
 {

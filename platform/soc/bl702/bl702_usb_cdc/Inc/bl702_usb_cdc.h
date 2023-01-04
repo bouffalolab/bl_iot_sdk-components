@@ -15,6 +15,6 @@ int usb_cdc_data_send(const uint8_t *data, uint32_t len);
 void usb_cdc_stop(void);
 void usb_cdc_restore(void);
 void usb_cdc_data_out_irq(uint8_t epnum);
-
+void usb_cdc_update_serial_number(uint32_t * pdeviceserial0, uint32_t * pdeviceserial1, uint32_t * pdeviceserial2);
 
 #endif

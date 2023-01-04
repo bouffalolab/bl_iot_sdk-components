@@ -231,6 +231,8 @@ uint8_t * USBD_FS_InterfaceStrDescriptor(USBD_SpeedTypeDef speed, uint16_t *leng
   * @param  None 
   * @retval None
   */
+__attribute__((weak)) void usb_cdc_update_serial_number(uint32_t * pdeviceserial0, uint32_t * pdeviceserial1, uint32_t * pdeviceserial2) {}
+
 static void Get_SerialNum(void)
 {
     uint32_t deviceserial0, deviceserial1, deviceserial2;
@@ -243,6 +245,8 @@ static void Get_SerialNum(void)
     //deviceserial2 = *(uint32_t *) DEVICE_ID3;
 
     deviceserial0 += deviceserial2;
+
+    usb_cdc_update_serial_number(&deviceserial0, &deviceserial1, &deviceserial2);
 
     if (deviceserial0 != 0){
         IntToUnicode(deviceserial0, &USBD_StringSerial[2], 8);

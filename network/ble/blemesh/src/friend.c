@@ -167,7 +167,10 @@ static void friend_clear(struct bt_mesh_friend *frnd)
 		purge_buffers(&seg->queue);
 		seg->seg_count = 0U;
 	}
-
+	#if defined(CONFIG_AUTO_PTS)
+	extern void friend_terminated(uint16_t net_idx, uint16_t lpn_addr);
+	friend_terminated(bt_mesh.sub[0].net_idx, frnd->lpn);
+	#endif /* CONFIG_AUTO_PTS */
 	frnd->valid = 0U;
 	frnd->established = 0U;
 	frnd->pending_buf = 0U;
@@ -695,6 +698,12 @@ int bt_mesh_friend_poll(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 	if (!frnd->established) {
 		BT_DBG("Friendship established with 0x%04x", frnd->lpn);
 		frnd->established = 1U;
+		#if defined(CONFIG_AUTO_PTS)
+		extern void friend_established(uint16_t net_idx, uint16_t lpn_addr,
+				uint8_t recv_delay, uint32_t polltimeout);
+		friend_established(bt_mesh.sub[0].net_idx, frnd->lpn, frnd->recv_delay,
+						frnd->poll_to);
+		#endif /* CONFIG_AUTO_PTS */
 	}
 
 	if (msg->fsn == frnd->fsn && frnd->last) {
@@ -984,8 +993,13 @@ init_friend:
 	frnd->lpn_counter = sys_be16_to_cpu(msg->lpn_counter);
 	frnd->clear.frnd = sys_be16_to_cpu(msg->prev_addr);
 
+#if defined(CONFIG_AUTO_PTS)
+	BT_PTS("LPN 0x%04x rssi %d recv_delay %u poll_to %ums",
+	       frnd->lpn, rx->ctx.recv_rssi, frnd->recv_delay, frnd->poll_to);
+#else
 	BT_DBG("LPN 0x%04x rssi %d recv_delay %u poll_to %ums",
 	       frnd->lpn, rx->ctx.recv_rssi, frnd->recv_delay, frnd->poll_to);
+#endif /* CONFIG_AUTO_PTS */
 
 	if (BT_MESH_ADDR_IS_UNICAST(frnd->clear.frnd) &&
 	    !bt_mesh_elem_find(frnd->clear.frnd)) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -31,6 +31,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <bl702.h>
+#include <bl702_dma.h>
 
 #include "bl_efuse.h"
 #include "bl_wireless.h"
@@ -100,4 +101,70 @@ void bl_wireless_tcal_en_set(uint8_t en)
 uint8_t bl_wireless_tcal_en_get(void)
 {
     return wireless_env.tcal_en;
+}
+
+
+void rf_full_cal_start_callback(uint32_t addr, uint32_t size)
+{
+    uint8_t ch;
+    uint32_t DMAx;
+    uint32_t tmpVal;
+    uint32_t src_addr, dst_addr;
+    uint8_t src_width, dst_width;
+    uint8_t src_inc, dst_inc;
+    uint16_t transfer_size;
+    
+    if(!BL_IS_REG_BIT_SET(BL_RD_REG(DMA_BASE, DMA_TOP_CONFIG), DMA_E)){
+        //printf("DMA disabled\r\n");
+        return;
+    }
+    
+    for(ch = 0; ch < DMA_CH_MAX; ch++){
+        DMAx = DMA_BASE + DMA_CHANNEL_OFFSET + ch * 0x100;
+        if(!BL_IS_REG_BIT_SET(BL_RD_REG(DMAx, DMA_CONFIG), DMA_E)){
+            //printf("DMA ch%d disabled\r\n", ch);
+            continue;
+        }
+        
+        src_addr = BL_RD_REG(DMAx, DMA_SRCADDR);
+        dst_addr = BL_RD_REG(DMAx, DMA_DSTADDR);
+        
+        tmpVal = BL_RD_REG(DMAx, DMA_CONTROL);
+        src_width = 1 << BL_GET_REG_BITS_VAL(tmpVal, DMA_SWIDTH);
+        dst_width = 1 << BL_GET_REG_BITS_VAL(tmpVal, DMA_DWIDTH);
+        src_inc = BL_GET_REG_BITS_VAL(tmpVal, DMA_SI);
+        dst_inc = BL_GET_REG_BITS_VAL(tmpVal, DMA_DI);
+        transfer_size = BL_GET_REG_BITS_VAL(tmpVal, DMA_TRANSFERSIZE);
+        
+        if(src_addr >= 0x42010000 && src_addr < 0x42030000){
+            if(src_addr >= addr && src_addr < addr + size){
+                printf("DMA ch%d src addr(0x%08lX) conflicts with rf full calibration area(0x%08lX, 0x%08lX)\r\n", 
+                        ch, src_addr, addr, addr + size);
+                while(1);
+            }else{
+                if(src_inc && src_addr < addr && src_addr + src_width * transfer_size > addr){
+                    printf("DMA ch%d src area(0x%08lX, 0x%08lX) conflicts with rf full calibration area(0x%08lX, 0x%08lX)\r\n", 
+                            ch, src_addr, src_addr + src_width * transfer_size, addr, addr + size);
+                    while(1);
+                }
+            }
+        }
+        
+        if(dst_addr >= 0x42010000 && dst_addr < 0x42030000){
+            if(dst_addr >= addr && dst_addr < addr + size){
+                printf("DMA ch%d dst addr(0x%08lX) conflicts with rf full calibration area(0x%08lX, 0x%08lX)\r\n", 
+                        ch, dst_addr, addr, addr + size);
+                while(1);
+            }else{
+                if(dst_inc && dst_addr < addr && dst_addr + dst_width * transfer_size > addr){
+                    printf("DMA ch%d dst area(0x%08lX, 0x%08lX) conflicts with rf full calibration area(0x%08lX, 0x%08lX)\r\n", 
+                            ch, dst_addr, dst_addr + dst_width * transfer_size, addr, addr + size);
+                    while(1);
+                }
+            }
+        }
+        
+        //printf("DMA ch%d ok\r\n");
+        continue;
+    }
 }

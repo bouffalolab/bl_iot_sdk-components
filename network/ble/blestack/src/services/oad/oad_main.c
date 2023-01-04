@@ -14,7 +14,7 @@
 #include "bl_flash.h"
 #include "bl_sys.h"
 #include "hosal_ota.h"
-#include "bl702_common.h"
+//#include "bl702_common.h"
 #include "hal_sys.h"
 #else
 #include "partition.h"
@@ -24,7 +24,7 @@
 #include "mbedtls/sha256.h"
 #endif
 #include "log.h"
-#include "bl702.h"
+//#include "bl702.h"
 #include "softcrc.h"
 #if defined(CONFIG_BL_MCU_SDK)
 #define BL_SDK_VER "1.00"

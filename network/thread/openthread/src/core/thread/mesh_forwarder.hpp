@@ -328,8 +328,6 @@ public:
     void HandleDeferredAck(Neighbor &aNeighbor, Error aError);
 #endif
 
-    void SetParentLinkFailures(uint32_t linkFailures, uint8_t aFailLimit = Mle::kFailedRouterTransmissions);
-    uint8_t GetParentLinkFailures(uint8_t *pExt, uint16_t *pShort);
 private:
     static constexpr uint8_t kReassemblyTimeout      = OPENTHREAD_CONFIG_6LOWPAN_REASSEMBLY_TIMEOUT; // in seconds.
     static constexpr uint8_t kMeshHeaderFrameMtu     = OT_RADIO_FRAME_MAX_SIZE; // Max MTU with a Mesh Header frame.

@@ -39,8 +39,6 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-int errno;
-
 xTaskHandle xTaskGetCurrentTaskHandle( void ) PRIVILEGED_FUNCTION;
 
 /* This is the number of threads that can be started with sys_thread_new() */
@@ -63,7 +61,7 @@ err_t sys_mbox_new(sys_mbox_t *mbox, int size)
 #endif /* SYS_STATS */
  if (*mbox == NULL)
   return ERR_MEM;
- 
+
  return ERR_OK;
 }
 
@@ -82,7 +80,7 @@ void sys_mbox_free(sys_mbox_t *mbox)
 #if SYS_STATS
 	    lwip_stats.sys.mbox.err++;
 #endif /* SYS_STATS */
-			
+
 		// TODO notify the user of failure.
 	}
 
@@ -114,11 +112,11 @@ err_t result;
    else {
       // could not post, queue must be full
       result = ERR_MEM;
-			
+
 #if SYS_STATS
       lwip_stats.sys.mbox.err++;
 #endif /* SYS_STATS */
-			
+
    }
 
    return result;
@@ -151,20 +149,20 @@ portTickType StartTime, EndTime, Elapsed;
 	{
 		msg = &dummyptr;
 	}
-		
+
 	if ( timeout != 0 )
 	{
 		if ( pdTRUE == xQueueReceive( *mbox, &(*msg), timeout / portTICK_RATE_MS ) )
 		{
 			EndTime = xTaskGetTickCount();
 			Elapsed = (EndTime - StartTime) * portTICK_RATE_MS;
-			
+
 			return ( Elapsed );
 		}
 		else // timed out blocking for message
 		{
 			*msg = NULL;
-			
+
 			return SYS_ARCH_TIMEOUT;
 		}
 	}
@@ -173,8 +171,8 @@ portTickType StartTime, EndTime, Elapsed;
 		while( pdTRUE != xQueueReceive( *mbox, &(*msg), portMAX_DELAY ) ){} // time is arbitrary
 		EndTime = xTaskGetTickCount();
 		Elapsed = (EndTime - StartTime) * portTICK_RATE_MS;
-		
-		return ( Elapsed ); // return time blocked TODO test	
+
+		return ( Elapsed ); // return time blocked TODO test
 	}
 }
 
@@ -202,18 +200,18 @@ void *dummyptr;
    }
 }
 /*----------------------------------------------------------------------------------*/
-int sys_mbox_valid(sys_mbox_t *mbox)          
-{      
-  if (*mbox == SYS_MBOX_NULL) 
+int sys_mbox_valid(sys_mbox_t *mbox)
+{
+  if (*mbox == SYS_MBOX_NULL)
     return 0;
   else
     return 1;
-}                                             
-/*-----------------------------------------------------------------------------------*/                                              
-void sys_mbox_set_invalid(sys_mbox_t *mbox)   
-{                                             
-  *mbox = SYS_MBOX_NULL;                      
-}                                             
+}
+/*-----------------------------------------------------------------------------------*/
+void sys_mbox_set_invalid(sys_mbox_t *mbox)
+{
+  *mbox = SYS_MBOX_NULL;
+}
 
 /*-----------------------------------------------------------------------------------*/
 //  Creates a new semaphore. The "count" argument specifies
@@ -225,10 +223,10 @@ err_t sys_sem_new(sys_sem_t *sem, u8_t count)
 	{
 #if SYS_STATS
       ++lwip_stats.sys.sem.err;
-#endif /* SYS_STATS */	
+#endif /* SYS_STATS */
 		return ERR_MEM;
 	}
-	
+
 	if(count == 0)	// Means it can't be taken
 	{
 		xSemaphoreTake(*sem,1);
@@ -240,7 +238,7 @@ err_t sys_sem_new(sys_sem_t *sem, u8_t count)
 		lwip_stats.sys.sem.max = lwip_stats.sys.sem.used;
 	}
 #endif /* SYS_STATS */
-		
+
 	return ERR_OK;
 }
 
@@ -272,8 +270,8 @@ portTickType StartTime, EndTime, Elapsed;
 		{
 			EndTime = xTaskGetTickCount();
 			Elapsed = (EndTime - StartTime) * portTICK_RATE_MS;
-			
-			return (Elapsed); // return time blocked TODO test	
+
+			return (Elapsed); // return time blocked TODO test
 		}
 		else
 		{
@@ -286,8 +284,8 @@ portTickType StartTime, EndTime, Elapsed;
 		EndTime = xTaskGetTickCount();
 		Elapsed = (EndTime - StartTime) * portTICK_RATE_MS;
 
-		return ( Elapsed ); // return time blocked	
-		
+		return ( Elapsed ); // return time blocked
+
 	}
 }
 
@@ -305,23 +303,23 @@ void sys_sem_free(sys_sem_t *sem)
 #if SYS_STATS
       --lwip_stats.sys.sem.used;
 #endif /* SYS_STATS */
-			
+
 	vQueueDelete(*sem);
 }
 /*-----------------------------------------------------------------------------------*/
-int sys_sem_valid(sys_sem_t *sem)                                               
+int sys_sem_valid(sys_sem_t *sem)
 {
   if (*sem == SYS_SEM_NULL)
     return 0;
   else
-    return 1;                                       
+    return 1;
 }
 
-/*-----------------------------------------------------------------------------------*/                                                                                                                                                                
-void sys_sem_set_invalid(sys_sem_t *sem)                                        
-{                                                                               
-  *sem = SYS_SEM_NULL;                                                          
-} 
+/*-----------------------------------------------------------------------------------*/
+void sys_sem_set_invalid(sys_sem_t *sem)
+{
+  *sem = SYS_SEM_NULL;
+}
 
 /*-----------------------------------------------------------------------------------*/
 // Initialize sys arch
@@ -343,7 +341,7 @@ err_t sys_mutex_new(sys_mutex_t *mutex) {
 	{
 #if SYS_STATS
       ++lwip_stats.sys.mutex.err;
-#endif /* SYS_STATS */	
+#endif /* SYS_STATS */
 		return ERR_MEM;
 	}
 
@@ -362,7 +360,7 @@ void sys_mutex_free(sys_mutex_t *mutex)
 #if SYS_STATS
       --lwip_stats.sys.mutex.used;
 #endif /* SYS_STATS */
-			
+
 	vQueueDelete(*mutex);
 }
 /*-----------------------------------------------------------------------------------*/
@@ -451,7 +449,7 @@ void sys_arch_unprotect(sys_prot_t pval)
  * Prints an assertion messages and aborts execution.
  */
 void sys_assert( const char *msg )
-{	
+{
 	( void ) msg;
 	/*FSL:only needed for debugging
 	printf(msg);

@@ -21,7 +21,8 @@
 #include <sys/types.h>
 #include <misc/util.h>
 #include <conn.h>
-#include <uuid.h>
+#include <../bluetooth/uuid.h>
+
 #include <att.h>
 #ifdef __cplusplus
 extern "C" {

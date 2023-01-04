@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -63,7 +63,7 @@
 #define NET_DEBUG         bl_os_printf
 #else
 #define NET_DEBUG(...)
-#endif 
+#endif
 /**
  ****************************************************************************************
  *
@@ -94,13 +94,104 @@ static void bl_tx_notify(void *cb_arg, bool tx_ok)
     return;
 }
 
-#if 1
+#if CFG_NETBUS_WIFI_ENABLE
 /* ethernet device interface */
 /* Transmit packet. */
+err_t wifi_tx(struct netif *netif, struct pbuf* p)
+{
+    bool can_tx = false;
+    bool from_local = false;
+    if ((uintptr_t)p & 1) {
+        can_tx = true;
+    } else {
+#if 0
+        from_local = true;
+        if (npf_is_arp(p)) {
+            can_tx = true;
+        }
+        if (npf_is_dhcp(p)) {
+            can_tx = true;
+        }
+#endif
+    }
+    if (!can_tx) {
+        NET_DEBUG("[wifi tx] can not tx %p\r\n", p);
+        return ERR_IF;
+    }
+    p = (struct pbuf *)((uintptr_t)p & ~1);
+
+    struct wlan_netif *wlan;
+    struct bl_tx_cfm custom_cfm = { bl_tx_notify, NULL };
+#if 0
+    struct net_device * bl606a0_sta = (struct net_device *)dev;
+#endif
+    struct pbuf* q;
+    static uint32_t ticks;
+#define WARNING_LIMIT_TICKS_TX_SIZE  2000
+#ifdef ETH_TX_DUMP
+    int dump_count = 0;
+    uint8_t * dump_ptr;
+    int dump_i;
+#endif
+
+#ifdef PKT_OUTPUT_HOOK
+    if (bl_wifi_pkt_eth_output_hook) {
+        bool is_sta = netif == wifi_mgmr_sta_netif_get();
+        p = bl_wifi_pkt_eth_output_hook(is_sta, p, bl_wifi_pkt_eth_output_hook_arg);
+        if (p == NULL) {
+            // hook ate the packet
+            return ERR_IF;
+        }
+    }
+#endif
+    if (p->tot_len > WIFI_MTU_SIZE) {
+        if (bl_os_get_time_ms() - ticks > WARNING_LIMIT_TICKS_TX_SIZE) {
+            bl_os_printf("[TX] %s, TX size too big: %u bytes\r\n", __func__, p->tot_len);
+            ticks = bl_os_get_time_ms();
+        }
+        return ERR_IF;
+    }
+
+#ifdef ETH_TX_DUMP
+    NET_DEBUG("tx_dump, size:%d\r\n", p->tot_len);
+#endif
+    for (q = p; q != NULL; q = q->next)
+    {
+#ifdef ETH_RX_DUMP
+        dump_ptr = q->payload;
+        for(dump_i=0; dump_i<q->len; dump_i++)
+        {
+            NET_DEBUG("%02x ", *dump_ptr);
+            if( ((dump_count+1)%8) == 0 )
+            {
+                NET_DEBUG("  ");
+            }
+            if( ((dump_count+1)%16) == 0 )
+            {
+                NET_DEBUG("\r\n");
+            }
+            dump_count++;
+            dump_ptr++;
+        }
+#endif
+    }
+#ifdef ETH_RX_DUMP
+    NET_DEBUG("\r\n");
+#endif
+
+    if (0 == taskHandle_output) {
+        taskHandle_output = bl_os_task_get_current_task();
+    }
+    wlan = container_of(netif, struct wlan_netif, netif);
+    return bl_output(bl606a0_sta.bl_hw, netif, p, 0 == wlan->mode, &custom_cfm, from_local);
+}
+
+#else
+
 static err_t wifi_tx(struct netif *netif, struct pbuf* p)
 {
     struct wlan_netif *wlan;
-    struct bl_custom_tx_cfm custom_cfm = { bl_tx_notify, NULL };
+    struct bl_tx_cfm custom_cfm = { bl_tx_notify, NULL };
 #if 0
     struct net_device * bl606a0_sta = (struct net_device *)dev;
 #endif
@@ -166,7 +257,7 @@ static err_t wifi_tx(struct netif *netif, struct pbuf* p)
 }
 #endif
 
-int bl_wifi_eth_tx(struct pbuf *p, bool is_sta, struct bl_custom_tx_cfm *custom_cfm)
+int bl_wifi_eth_tx(struct pbuf *p, bool is_sta, struct bl_tx_cfm *custom_cfm)
 {
     err_t ret;
     struct netif *iface;
@@ -175,7 +266,11 @@ int bl_wifi_eth_tx(struct pbuf *p, bool is_sta, struct bl_custom_tx_cfm *custom_
     } else {
         iface = wifi_mgmr_ap_netif_get();
     }
+#ifdef CFG_NETBUS_WIFI_ENABLE
+    ret = bl_output(bl606a0_sta.bl_hw, iface, p, is_sta, custom_cfm, 1);
+#else
     ret = bl_output(bl606a0_sta.bl_hw, iface, p, is_sta, custom_cfm);
+#endif
     if (ret == ERR_OK) {
         return 0;
     } else {
@@ -207,7 +302,7 @@ err_t bl606a0_wifi_netif_init(struct netif *netif)
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
     netif->output_ip6 = ethip6_output;
 #else
-    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP;
+    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_IGMP;
 #endif
     netif->output = etharp_output;
     netif->linkoutput = wifi_tx;

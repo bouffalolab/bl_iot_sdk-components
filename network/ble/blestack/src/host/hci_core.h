@@ -278,6 +278,7 @@ int set_adv_param(const struct bt_le_adv_param *param);
 int set_adv_channel_map(u8_t channel);
 int bt_get_local_public_address(bt_addr_le_t *adv_addr);
 int bt_get_local_ramdon_address(bt_addr_le_t *adv_addr);
+int bt_set_local_public_address(u8_t *adv_addr);
 int bt_le_set_data_len(struct bt_conn *conn, u16_t tx_octets, u16_t tx_time);
 int hci_le_set_phy(struct bt_conn *conn, uint8_t all_phys,
 		  uint8_t pref_tx_phy, uint8_t pref_rx_phy, uint8_t phy_opts);
@@ -287,10 +288,7 @@ int hci_le_set_default_phy(u8_t default_phy);
    In some condition, BD address may be reset to chip mac address.*/
 int bt_set_bd_addr(const bt_addr_t *addr);
 
-
-#if defined(CONFIG_SET_TX_PWR)
 int bt_set_tx_pwr(int8_t power);
-#endif
 
 #if defined(BFLB_HOST_ASSISTANT)
 struct blhast_cb{

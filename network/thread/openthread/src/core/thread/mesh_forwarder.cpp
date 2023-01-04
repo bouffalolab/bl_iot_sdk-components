@@ -1142,45 +1142,6 @@ void MeshForwarder::UpdateNeighborLinkFailures(Neighbor &aNeighbor,
     }
 }
 
-void MeshForwarder::SetParentLinkFailures(uint32_t linkFailures, uint8_t aFailLimit) 
-{ 
-    Neighbor &parentCandidate = Get<Mle::MleRouter>().GetParentCandidate();
-    Neighbor &parent = Get<Mle::MleRouter>().GetParent();
-
-
-    if (parent.IsStateValid()) {
-        parent.SetLinkFailures(linkFailures);
-        if ((Mle::Mle::IsActiveRouter(parent.GetRloc16())) && (parent.GetLinkFailures() >= aFailLimit)) {
-            Get<Mle::MleRouter>().RemoveRouterLink(static_cast<Router &>(parent));
-        }
-    }
-    else if (parentCandidate.IsStateValid()) {
-        parentCandidate.SetLinkFailures(linkFailures);
-        if ((Mle::Mle::IsActiveRouter(parentCandidate.GetRloc16())) && (parentCandidate.GetLinkFailures() >= aFailLimit)) {
-            Get<Mle::MleRouter>().RemoveRouterLink(static_cast<Router &>(parentCandidate));
-        }
-    }
-}
-
-uint8_t MeshForwarder::GetParentLinkFailures(uint8_t *pExt, uint16_t *pShort) 
-{
-    const Neighbor &parentCandidate = Get<Mle::MleRouter>().GetParentCandidate();
-    const Neighbor &parent = Get<Mle::MleRouter>().GetParent();
-
-    if (parent.IsStateValid()) {
-        memcpy(pExt, parent.GetExtAddress().m8, 8);
-        *pShort = parent.GetRloc16();
-        return parent.GetLinkFailures();
-    }
-    else if (parentCandidate.IsStateValid()) {
-        memcpy(pExt, parentCandidate.GetExtAddress().m8, 8);
-        *pShort = parentCandidate.GetRloc16();
-        return parentCandidate.GetLinkFailures();
-    }
-
-    return -1;
-}
-
 #if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
 void MeshForwarder::HandleDeferredAck(Neighbor &aNeighbor, Error aError)
 {
@@ -2075,30 +2036,6 @@ void MeshForwarder::LogLowpanHcFrameDrop(Error, uint16_t, const Mac::Address &, 
 }
 
 #endif // #if OT_SHOULD_LOG_AT( OT_LOG_LEVEL_NOTE)
-
-
-
-extern "C" bool otGetMeshForwarderInfo(otInstance *aInstance, uint8_t *pLinkFailures, uint8_t *pExt, uint16_t *pShort) 
-{
-    VerifyOrExit(otInstanceIsInitialized(aInstance));
-
-    *pLinkFailures = AsCoreType(aInstance).Get<MeshForwarder>().GetParentLinkFailures(pExt, pShort);
-
-    return true;
-exit:
-    return false;
-}
-
-extern "C" bool otSetMeshForwarderInfo(otInstance *aInstance, uint8_t linkFailures) 
-{
-    VerifyOrExit(otInstanceIsInitialized(aInstance));
-
-    AsCoreType(aInstance).Get<MeshForwarder>().SetParentLinkFailures(linkFailures);
-
-    return true;
-exit:
-    return false;
-}
 
 // LCOV_EXCL_STOP
 

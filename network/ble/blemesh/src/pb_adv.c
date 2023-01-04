@@ -25,6 +25,10 @@
 #include "log.h"
 #include "errno.h"
 
+#if defined(CONFIG_AUTO_PTS)
+#include "testing.h"
+#endif
+
 #define GPCF(gpc)           (gpc & 0x03)
 #define GPC_START(last_seg) (((last_seg) << 2) | 0x00)
 #define GPC_ACK             0x01
@@ -220,7 +224,7 @@ static void close_link(enum prov_bearer_link_status reason)
 	const struct prov_bearer_cb *cb = link.cb;
 	void *cb_data = link.cb_data;
 
-#if defined(CONFIG_BT_MESH_PTS)
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	/* Added by bouffalo for MESH/PVNR/PBADV/BV-01-C PTS */
 	u8_t sts = PROV_BEARER_LINK_STATUS_FAIL;
 	bearer_ctl_send(LINK_CLOSE, &sts, 1, false);
@@ -523,11 +527,11 @@ static void gen_prov_ctl(struct prov_rx *rx, struct net_buf_simple *buf)
 	default:
 		BT_ERR("Unknown bearer opcode: 0x%02x", BEARER_CTL(rx->gpc));
 
-		#if defined(CONFIG_BT_TESTING)
-		/* if (IS_ENABLED(CONFIG_BT_TESTING)) */{
+		#if defined(CONFIG_AUTO_PTS)
+		/* if (IS_ENABLED(CONFIG_AUTO_PTS)) */{
 			bt_test_mesh_prov_invalid_bearer(BEARER_CTL(rx->gpc));
 		}
-		#endif /* CONFIG_BT_TESTING */
+		#endif /* CONFIG_AUTO_PTS */
 
 		return;
 	}

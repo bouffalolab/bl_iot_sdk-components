@@ -156,6 +156,26 @@ static void app_main_entry(void *pvParameters)
     vTaskDelete(NULL);
 }
 
+void __attribute__((weak)) app_aos_init()
+{
+#ifdef SYS_AOS_CLI_ENABLE
+    int fd_console;
+    fd_console = aos_open("/dev/ttyS0", 0);
+    if (fd_console >= 0) {
+        printf("Init CLI with event Driven\r\n");
+        aos_cli_init(0);
+        aos_poll_read_fd(fd_console, aos_cli_event_cb_read_get(), (void*)0x12345678);
+        _cli_init(fd_console);
+    }
+#elif defined (CFG_ZIGBEE_DONGLE_EN)
+    extern void zb_dongle_init(void);
+    zb_dongle_init();
+#elif defined (CFG_OPENTHREAD_CLI_EN)
+    extern void ot_cli_init(void);
+    ot_cli_init();
+#endif
+}
+
 static void aos_loop_proc(void *pvParameters)
 {
 #ifdef SYS_LOOPRT_ENABLE
@@ -195,22 +215,7 @@ static void aos_loop_proc(void *pvParameters)
     aos_loop_init();
 #endif
 
-#ifdef SYS_AOS_CLI_ENABLE
-    int fd_console;
-    fd_console = aos_open("/dev/ttyS0", 0);
-    if (fd_console >= 0) {
-        printf("Init CLI with event Driven\r\n");
-        aos_cli_init(0);
-        aos_poll_read_fd(fd_console, aos_cli_event_cb_read_get(), (void*)0x12345678);
-        _cli_init(fd_console);
-    }
-#elif defined (CFG_ZIGBEE_DONGLE_EN)
-    extern void zb_dongle_init(void);
-    zb_dongle_init();
-#elif defined (CFG_OPENTHREAD_EN)
-    extern void ot_cli_init(void);
-    ot_cli_init();
-#endif
+    app_aos_init();
 
     xTaskCreate(app_main_entry,
             (char*)"main",

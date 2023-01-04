@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -186,7 +186,7 @@ static void _apply_gpio_config(struct gpio_feature_config *config)
         bl_gpio_output_set(led_onoff_config.pin, !led_onoff_config.active);
         
     }else{
-        loopset_led_trigger(config->pin, config->time);
+        //loopset_led_trigger(config->pin, config->time);
     }
 }
 

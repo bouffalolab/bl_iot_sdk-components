@@ -54,7 +54,7 @@ extern "C" {
 #define BT_INFO(fmt, ...)   //printf(fmt", %s\r\n", ##__VA_ARGS__, __func__)
 #endif
 
-#if defined(CONFIG_BT_STACK_PTS) || defined(CONFIG_BT_MESH_PTS)
+#if defined(CONFIG_BT_STACK_PTS) || defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 #if defined(BL_MCU_SDK)
 #define BT_PTS(fmt, ...)   bflb_platform_printf(fmt"\r\n", ##__VA_ARGS__)
 #else

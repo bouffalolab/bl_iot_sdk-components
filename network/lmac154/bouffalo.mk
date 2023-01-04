@@ -1,5 +1,5 @@
 COMPONENT_LIB_ONLY := 1
-COMPONENT_ADD_INCLUDEDIRS += ./include
+COMPONENT_ADD_INCLUDEDIRS += include
 LIBS ?= lmac154
 COMPONENT_ADD_LDFLAGS += -L$(COMPONENT_PATH)/lib $(addprefix -l,$(LIBS))
 ALL_LIB_FILES := $(patsubst %,$(COMPONENT_PATH)/lib/lib%.a,$(LIBS))

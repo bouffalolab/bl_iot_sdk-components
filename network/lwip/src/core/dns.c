@@ -94,6 +94,7 @@
 #include "lwip/memp.h"
 #include "lwip/dns.h"
 #include "lwip/prot/dns.h"
+#include "lwip/timeouts.h"
 
 #include <string.h>
 
@@ -285,6 +286,7 @@ static err_t dns_lookup_local(const char *hostname, ip_addr_t *addr LWIP_DNS_ADD
 static void dns_recv(void *s, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port);
 static void dns_check_entries(void);
 static void dns_call_found(u8_t idx, ip_addr_t *addr);
+static bool dns_check_table_empty(void);
 
 /*-----------------------------------------------------------------------------
  * Globals
@@ -395,7 +397,16 @@ void
 dns_tmr(void)
 {
   LWIP_DEBUGF(DNS_DEBUG, ("dns_tmr: dns_check_entries\n"));
-  dns_check_entries();
+  if (dns_check_table_empty()) {
+    /**
+     * bouffalo lp change
+     * Disable DNS timer when it is not useful.
+     */
+    sys_timeouts_set_timer_enable(false, dns_tmr);
+    /** bouffalo lp change end */
+  } else {
+    dns_check_entries();
+  }
 }
 
 #if DNS_LOCAL_HOSTLIST
@@ -1130,6 +1141,29 @@ dns_check_entries(void)
   }
 }
 
+/* bouffalo lp change
+ * Disable DNS timer when it is not useful.
+ **/
+static bool
+dns_check_table_empty(void)
+{
+    u8_t i, num = 0;
+    struct dns_table_entry *entry;
+
+    for (i = 0; i < DNS_TABLE_SIZE; i++) {
+        entry = &dns_table[i];
+        if (entry->state == DNS_STATE_UNUSED) {
+            num++;
+        }
+    }
+
+    if (num == DNS_TABLE_SIZE) {
+        return true;
+    }
+    return false;
+}
+/* bouffalo lp change end */
+
 /**
  * Save TTL and call dns_call_found for correct response.
  */
@@ -1497,6 +1531,12 @@ dns_enqueue(const char *name, size_t hostnamelen, dns_found_callback found,
 
   /* force to send query without waiting timer */
   dns_check_entry(i);
+  /**
+   * bouffalo lp change
+   * Enable DNS timer when it is useful.
+   */
+  sys_timeouts_set_timer_enable(true, dns_tmr);
+  /** bouffalo lp change end */
 
   /* dns query is enqueued */
   return ERR_INPROGRESS;

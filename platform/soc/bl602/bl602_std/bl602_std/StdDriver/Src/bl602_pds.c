@@ -100,15 +100,15 @@ __WEAK
 BL_Err_Type ATTR_TCM_SECTION PDS_Reset(void)
 {
     uint32_t tmpVal = 0;
-    
+
     tmpVal = *(uint32_t *)0x40000014;
     tmpVal = tmpVal | (1<<14);
     *(uint32_t *)0x40000014 = tmpVal;
-    
+
     tmpVal = *(uint32_t *)0x40000014;
     tmpVal = tmpVal & ~(1<<14);
     *(uint32_t *)0x40000014 = tmpVal;
-    
+
     return SUCCESS;
 }
 #endif
@@ -123,11 +123,12 @@ BL_Err_Type ATTR_TCM_SECTION PDS_Reset(void)
  * @return SUCCESS or ERROR
  *
 *******************************************************************************/
-#ifndef BL602_USE_ROM_DRIVER
-__WEAK
+// #ifndef BL602_USE_ROM_DRIVER
+// __WEAK
 BL_Err_Type ATTR_TCM_SECTION PDS_Enable(PDS_CTL_Type *cfg,PDS_CTL4_Type *cfg4,uint32_t pdsSleepCnt)
 {
-    
+    uint32_t tmpVal=0;
+
     /* PDS sleep time 0 <=> sleep forever */
     /* PDS sleep time 1~PDS_WARMUP_LATENCY_CNT <=> error */
     /* PDS sleep time >PDS_WARMUP_LATENCY_CNT <=> correct */
@@ -138,21 +139,29 @@ BL_Err_Type ATTR_TCM_SECTION PDS_Enable(PDS_CTL_Type *cfg,PDS_CTL4_Type *cfg4,ui
     }else{
         BL_WR_REG(PDS_BASE,PDS_TIME1,pdsSleepCnt-PDS_WARMUP_LATENCY_CNT);
     }
-    
+
     /* PDS_CTL4 config */
     BL_WR_REG(PDS_BASE,PDS_CTL4,*(uint32_t *)cfg4);
-    
+
     /* PDS_CTL config */
     if(cfg->pdsStart){
+        tmpVal = BL_RD_REG(PDS_BASE, PDS_INT);
+        tmpVal = BL_SET_REG_BIT(tmpVal, PDS_CR_PDS_INT_CLR);
+        BL_WR_REG(PDS_BASE, PDS_INT, tmpVal);
+
+        tmpVal = BL_RD_REG(PDS_BASE, PDS_INT);
+        tmpVal = BL_CLR_REG_BIT(tmpVal, PDS_CR_PDS_INT_CLR);
+        BL_WR_REG(PDS_BASE, PDS_INT, tmpVal);
+
         BL_WR_REG(PDS_BASE,PDS_CTL,(*(uint32_t *)cfg&~(1<<0)));
         BL_WR_REG(PDS_BASE,PDS_CTL,(*(uint32_t *)cfg|(1<<0)));
     }else{
         BL_WR_REG(PDS_BASE,PDS_CTL,*(uint32_t *)cfg);
     }
-    
+
     return SUCCESS;
 }
-#endif
+// #endif
 
 /****************************************************************************//**
  * @brief  power down sleep force configure
@@ -169,10 +178,10 @@ BL_Err_Type ATTR_TCM_SECTION PDS_Force_Config(PDS_CTL2_Type *cfg2,PDS_CTL3_Type 
 {
     /* PDS_CTL2 config */
     BL_WR_REG(PDS_BASE,PDS_CTL2,*(uint32_t *)cfg2);
-    
+
     /* PDS_CTL3 config */
     BL_WR_REG(PDS_BASE,PDS_CTL3,*(uint32_t *)cfg3);
-    
+
     return SUCCESS;
 }
 #endif
@@ -190,7 +199,7 @@ __WEAK
 BL_Err_Type ATTR_TCM_SECTION PDS_RAM_Config(PDS_RAM_CFG_Type *ramCfg)
 {
     uint32_t tmpVal = 0;
-    
+
     if(NULL==ramCfg){
         return SUCCESS;
     }
@@ -201,17 +210,17 @@ BL_Err_Type ATTR_TCM_SECTION PDS_RAM_Config(PDS_RAM_CFG_Type *ramCfg)
     /* enter bist mode (make ram ret) */
     tmpVal = tmpVal|(0x1<<3);
     BL_WR_REG(GLB_BASE,GLB_MBIST_CTL,tmpVal);
-    
+
     /* PDS_RAM1 config */
     BL_WR_REG(PDS_BASE,PDS_RAM1,*(uint32_t *)ramCfg);
-    
+
     tmpVal = BL_RD_REG(GLB_BASE,GLB_MBIST_CTL);
     /* exit bist mode (make ram idle/slp) */
     //tmpVal = tmpVal&~0x1F;
     /* exit bist mode (make ram ret) */
     tmpVal = tmpVal&~(0x1<<3);
     BL_WR_REG(GLB_BASE,GLB_MBIST_CTL,tmpVal);
-    
+
     return SUCCESS;
 }
 #endif
@@ -226,18 +235,18 @@ BL_Err_Type ATTR_TCM_SECTION PDS_RAM_Config(PDS_RAM_CFG_Type *ramCfg)
  * @return SUCCESS or ERROR
  *
 *******************************************************************************/
-#ifndef BL602_USE_ROM_DRIVER
-__WEAK
+// #ifndef BL602_USE_ROM_DRIVER
+// __WEAK
 BL_Err_Type ATTR_TCM_SECTION PDS_Default_Level_Config(PDS_DEFAULT_LV_CFG_Type *defaultLvCfg,PDS_RAM_CFG_Type *ramCfg,uint32_t pdsSleepCnt)
 {
     /* RAM config need fix after ECO */
     PDS_RAM_Config(ramCfg);
     PDS_Force_Config((PDS_CTL2_Type *)&(defaultLvCfg->pdsCtl2),(PDS_CTL3_Type *)&(defaultLvCfg->pdsCtl3));
     PDS_Enable((PDS_CTL_Type *)&(defaultLvCfg->pdsCtl),(PDS_CTL4_Type *)&(defaultLvCfg->pdsCtl4),pdsSleepCnt);
-    
+
     return SUCCESS;
 }
-#endif
+// #endif
 
 /****************************************************************************//**
  * @brief  power down sleep int mask
@@ -251,7 +260,7 @@ BL_Err_Type ATTR_TCM_SECTION PDS_Default_Level_Config(PDS_DEFAULT_LV_CFG_Type *d
 BL_Err_Type PDS_IntMask(PDS_INT_Type intType,BL_Mask_Type intMask)
 {
     uint32_t tmpVal = 0;
-    
+
     tmpVal = BL_RD_REG(PDS_BASE,PDS_INT);
     if(intMask!=UNMASK){
         tmpVal = tmpVal|(1<<(intType+PDS_INT_MASK_BIT_OFFSET));
@@ -259,7 +268,7 @@ BL_Err_Type PDS_IntMask(PDS_INT_Type intType,BL_Mask_Type intMask)
         tmpVal = tmpVal&~(1<<(intType+PDS_INT_MASK_BIT_OFFSET));
     }
     BL_WR_REG(PDS_BASE,PDS_INT,tmpVal);
-    
+
     return SUCCESS;
 }
 
@@ -287,19 +296,19 @@ BL_Sts_Type PDS_Get_IntStatus(PDS_INT_Type intType)
 BL_Err_Type PDS_IntClear(void)
 {
     uint32_t tmpVal = 0;
-    
+
     tmpVal = BL_RD_REG(PDS_BASE,PDS_INT);
     tmpVal = BL_CLR_REG_BIT(tmpVal,PDS_CR_PDS_INT_CLR);
     BL_WR_REG(PDS_BASE,PDS_INT,tmpVal);
-    
+
     tmpVal = BL_RD_REG(PDS_BASE,PDS_INT);
     tmpVal = BL_SET_REG_BIT(tmpVal,PDS_CR_PDS_INT_CLR);
     BL_WR_REG(PDS_BASE,PDS_INT,tmpVal);
-    
+
     tmpVal = BL_RD_REG(PDS_BASE,PDS_INT);
     tmpVal = BL_CLR_REG_BIT(tmpVal,PDS_CR_PDS_INT_CLR);
     BL_WR_REG(PDS_BASE,PDS_INT,tmpVal);
-    
+
     return SUCCESS;
 }
 
@@ -355,7 +364,7 @@ BL_Err_Type PDS_WAKEUP_IRQHandler_Install(void)
 #ifndef BFLB_USE_HAL_DRIVER
     //Interrupt_Handler_Register(PDS_WAKEUP_IRQn,PDS_WAKEUP_IRQHandler);
 #endif
-    
+
     return SUCCESS;
 }
 
@@ -371,7 +380,7 @@ BL_Err_Type PDS_WAKEUP_IRQHandler_Install(void)
 BL_Err_Type PDS_Int_Callback_Install(PDS_INT_Type intType,intCallback_Type* cbFun)
 {
     pdsIntCbfArra[intType][0] = cbFun;
-    
+
     return SUCCESS;
 }
 
@@ -389,7 +398,7 @@ BL_Err_Type ATTR_CLOCK_SECTION PDS_Trim_RC32M(void)
 {
     Efuse_Ana_RC32M_Trim_Type trim;
     int32_t tmpVal = 0;
-    
+
     EF_Ctrl_Read_RC32M_Trim(&trim);
     if(trim.trimRc32mExtCodeEn){
         if(trim.trimRc32mCodeFrExtParity==EF_Ctrl_Get_Trim_Parity(trim.trimRc32mCodeFrExt,8)){
@@ -401,7 +410,7 @@ BL_Err_Type ATTR_CLOCK_SECTION PDS_Trim_RC32M(void)
             return SUCCESS;
         }
     }
-    
+
     return ERROR;
 }
 #endif
@@ -419,12 +428,12 @@ __WEAK
 BL_Err_Type ATTR_CLOCK_SECTION PDS_Select_RC32M_As_PLL_Ref(void)
 {
     uint32_t tmpVal = 0;
-    
+
     tmpVal = BL_RD_REG(PDS_BASE,PDS_CLKPLL_TOP_CTRL);
     tmpVal = BL_CLR_REG_BIT(tmpVal,PDS_CLKPLL_REFCLK_SEL);
     tmpVal = BL_SET_REG_BIT(tmpVal,PDS_CLKPLL_XTAL_RC32M_SEL);
     BL_WR_REG(PDS_BASE,PDS_CLKPLL_TOP_CTRL,tmpVal);
-    
+
     return SUCCESS;
 }
 #endif
@@ -442,12 +451,12 @@ __WEAK
 BL_Err_Type ATTR_CLOCK_SECTION PDS_Select_XTAL_As_PLL_Ref(void)
 {
     uint32_t tmpVal = 0;
-    
+
     tmpVal = BL_RD_REG(PDS_BASE,PDS_CLKPLL_TOP_CTRL);
     tmpVal = BL_SET_REG_BIT(tmpVal,PDS_CLKPLL_REFCLK_SEL);
     tmpVal = BL_CLR_REG_BIT(tmpVal,PDS_CLKPLL_XTAL_RC32M_SEL);
     BL_WR_REG(PDS_BASE,PDS_CLKPLL_TOP_CTRL,tmpVal);
-    
+
     return SUCCESS;
 }
 #endif
@@ -465,31 +474,31 @@ __WEAK
 BL_Err_Type ATTR_CLOCK_SECTION PDS_Power_On_PLL(PDS_PLL_XTAL_Type xtalType)
 {
     uint32_t tmpVal = 0;
-    
+
     /* Check parameter*/
     CHECK_PARAM(IS_PDS_PLL_XTAL_TYPE(xtalType));
-    
+
     /**************************/
     /* select PLL XTAL source */
     /**************************/
-    
+
     if((xtalType==PDS_PLL_XTAL_RC32M)||(xtalType==PDS_PLL_XTAL_NONE)){
         PDS_Trim_RC32M();
         PDS_Select_RC32M_As_PLL_Ref();
     }else{
         PDS_Select_XTAL_As_PLL_Ref();
     }
-    
+
     /*******************************************/
     /* PLL power down first, not indispensable */
     /*******************************************/
     /* power off PLL first, this step is not indispensable */
     PDS_Power_Off_PLL();
-    
+
     /********************/
     /* PLL param config */
     /********************/
-    
+
     /* clkpll_icp_1u */
     /* clkpll_icp_5u */
     /* clkpll_int_frac_sw */
@@ -504,7 +513,7 @@ BL_Err_Type ATTR_CLOCK_SECTION PDS_Power_On_PLL(PDS_PLL_XTAL_Type xtalType)
         tmpVal=BL_SET_REG_BITS_VAL(tmpVal,PDS_CLKPLL_INT_FRAC_SW,0);
     }
     BL_WR_REG(PDS_BASE,PDS_CLKPLL_CP,tmpVal);
-    
+
     /* clkpll_c3 */
     /* clkpll_cz */
     /* clkpll_rz */
@@ -524,14 +533,14 @@ BL_Err_Type ATTR_CLOCK_SECTION PDS_Power_On_PLL(PDS_PLL_XTAL_Type xtalType)
     }
     tmpVal=BL_SET_REG_BITS_VAL(tmpVal,PDS_CLKPLL_R4,2);
     BL_WR_REG(PDS_BASE,PDS_CLKPLL_RZ,tmpVal);
-    
+
     /* clkpll_refdiv_ratio */
     /* clkpll_postdiv */
     tmpVal=BL_RD_REG(PDS_BASE,PDS_CLKPLL_TOP_CTRL);
     tmpVal=BL_SET_REG_BITS_VAL(tmpVal,PDS_CLKPLL_POSTDIV,0x14);
     tmpVal=BL_SET_REG_BITS_VAL(tmpVal,PDS_CLKPLL_REFDIV_RATIO,2);
     BL_WR_REG(PDS_BASE,PDS_CLKPLL_TOP_CTRL,tmpVal);
-    
+
     /* clkpll_sdmin */
     tmpVal=BL_RD_REG(PDS_BASE,PDS_CLKPLL_SDM);
     switch(xtalType){
@@ -561,31 +570,31 @@ BL_Err_Type ATTR_CLOCK_SECTION PDS_Power_On_PLL(PDS_PLL_XTAL_Type xtalType)
             break;
     }
     BL_WR_REG(PDS_BASE,PDS_CLKPLL_SDM,tmpVal);
-    
+
     /* clkpll_sel_fb_clk */
     /* clkpll_sel_sample_clk can be 0/1, default is 1 */
     tmpVal=BL_RD_REG(PDS_BASE,PDS_CLKPLL_FBDV);
     tmpVal=BL_SET_REG_BITS_VAL(tmpVal,PDS_CLKPLL_SEL_FB_CLK,1);
     tmpVal=BL_SET_REG_BITS_VAL(tmpVal,PDS_CLKPLL_SEL_SAMPLE_CLK,1);
     BL_WR_REG(PDS_BASE,PDS_CLKPLL_FBDV,tmpVal);
-    
-    
+
+
     /*************************/
     /* PLL power up sequence */
     /*************************/
-    
+
     /* pu_clkpll_sfreg=1 */
     tmpVal=BL_RD_REG(PDS_BASE,PDS_PU_RST_CLKPLL);
     tmpVal=BL_SET_REG_BIT(tmpVal,PDS_PU_CLKPLL_SFREG);
     BL_WR_REG(PDS_BASE,PDS_PU_RST_CLKPLL,tmpVal);
-    
+
     BL602_Delay_US(5);
-    
+
     /* pu_clkpll=1 */
     tmpVal=BL_RD_REG(PDS_BASE,PDS_PU_RST_CLKPLL);
     tmpVal=BL_SET_REG_BIT(tmpVal,PDS_PU_CLKPLL);
     BL_WR_REG(PDS_BASE,PDS_PU_RST_CLKPLL,tmpVal);
-    
+
     /* clkpll_pu_cp=1 */
     /* clkpll_pu_pfd=1 */
     /* clkpll_pu_fbdv=1 */
@@ -596,9 +605,9 @@ BL_Err_Type ATTR_CLOCK_SECTION PDS_Power_On_PLL(PDS_PLL_XTAL_Type xtalType)
     tmpVal=BL_SET_REG_BIT(tmpVal,PDS_CLKPLL_PU_FBDV);
     tmpVal=BL_SET_REG_BIT(tmpVal,PDS_CLKPLL_PU_POSTDIV);
     BL_WR_REG(PDS_BASE,PDS_PU_RST_CLKPLL,tmpVal);
-    
+
     BL602_Delay_US(5);
-    
+
     /* clkpll_sdm_reset=1 */
     tmpVal=BL_RD_REG(PDS_BASE,PDS_PU_RST_CLKPLL);
     tmpVal=BL_SET_REG_BIT(tmpVal,PDS_CLKPLL_SDM_RESET);
@@ -618,7 +627,7 @@ BL_Err_Type ATTR_CLOCK_SECTION PDS_Power_On_PLL(PDS_PLL_XTAL_Type xtalType)
     tmpVal=BL_RD_REG(PDS_BASE,PDS_PU_RST_CLKPLL);
     tmpVal=BL_CLR_REG_BIT(tmpVal,PDS_CLKPLL_SDM_RESET);
     BL_WR_REG(PDS_BASE,PDS_PU_RST_CLKPLL,tmpVal);
-    
+
     return SUCCESS;
 }
 #endif
@@ -671,11 +680,11 @@ __WEAK
 BL_Err_Type ATTR_CLOCK_SECTION PDS_Enable_PLL_All_Clks(void)
 {
     uint32_t tmpVal = 0;
-    
+
     tmpVal=BL_RD_REG(PDS_BASE,PDS_CLKPLL_OUTPUT_EN);
     tmpVal |= 0x1FF;
     BL_WR_REG(PDS_BASE,PDS_CLKPLL_OUTPUT_EN,tmpVal);
-    
+
     return SUCCESS;
 }
 #endif
@@ -693,11 +702,11 @@ __WEAK
 BL_Err_Type ATTR_CLOCK_SECTION PDS_Disable_PLL_All_Clks(void)
 {
     uint32_t tmpVal = 0;
-    
+
     tmpVal=BL_RD_REG(PDS_BASE,PDS_CLKPLL_OUTPUT_EN);
     tmpVal &= (~0x1FF);
     BL_WR_REG(PDS_BASE,PDS_CLKPLL_OUTPUT_EN,tmpVal);
-    
+
     return SUCCESS;
 }
 #endif
@@ -715,14 +724,14 @@ __WEAK
 BL_Err_Type ATTR_CLOCK_SECTION PDS_Enable_PLL_Clk(PDS_PLL_CLK_Type pllClk)
 {
     uint32_t tmpVal = 0;
-    
+
     /* Check parameter*/
     CHECK_PARAM(IS_PDS_PLL_CLK_TYPE(pllClk));
-    
+
     tmpVal=BL_RD_REG(PDS_BASE,PDS_CLKPLL_OUTPUT_EN);
     tmpVal |= (1<<pllClk);
     BL_WR_REG(PDS_BASE,PDS_CLKPLL_OUTPUT_EN,tmpVal);
-    
+
     return SUCCESS;
 }
 #endif
@@ -740,14 +749,14 @@ __WEAK
 BL_Err_Type ATTR_CLOCK_SECTION PDS_Disable_PLL_Clk(PDS_PLL_CLK_Type pllClk)
 {
     uint32_t tmpVal = 0;
-    
+
     /* Check parameter*/
     CHECK_PARAM(IS_PDS_PLL_CLK_TYPE(pllClk));
-    
+
     tmpVal=BL_RD_REG(PDS_BASE,PDS_CLKPLL_OUTPUT_EN);
     tmpVal &= (~(1<<pllClk));
     BL_WR_REG(PDS_BASE,PDS_CLKPLL_OUTPUT_EN,tmpVal);
-    
+
     return SUCCESS;
 }
 #endif
@@ -765,14 +774,14 @@ __WEAK
 BL_Err_Type ATTR_CLOCK_SECTION PDS_Power_Off_PLL(void)
 {
     uint32_t tmpVal = 0;
-    
+
     /* pu_clkpll_sfreg=0 */
     /* pu_clkpll=0 */
     tmpVal=BL_RD_REG(PDS_BASE,PDS_PU_RST_CLKPLL);
     tmpVal=BL_CLR_REG_BIT(tmpVal,PDS_PU_CLKPLL_SFREG);
     tmpVal=BL_CLR_REG_BIT(tmpVal,PDS_PU_CLKPLL);
     BL_WR_REG(PDS_BASE,PDS_PU_RST_CLKPLL,tmpVal);
-    
+
     /* clkpll_pu_cp=0 */
     /* clkpll_pu_pfd=0 */
     /* clkpll_pu_fbdv=0 */
@@ -783,7 +792,7 @@ BL_Err_Type ATTR_CLOCK_SECTION PDS_Power_Off_PLL(void)
     tmpVal=BL_CLR_REG_BIT(tmpVal,PDS_CLKPLL_PU_FBDV);
     tmpVal=BL_CLR_REG_BIT(tmpVal,PDS_CLKPLL_PU_POSTDIV);
     BL_WR_REG(PDS_BASE,PDS_PU_RST_CLKPLL,tmpVal);
-    
+
     return SUCCESS;
 }
 #endif
@@ -804,7 +813,7 @@ void PDS_WAKEUP_IRQHandler(void)
             pdsIntCbfArra[intType][0]();
         }
     }
-    
+
     PDS_IntClear();
 }
 #endif

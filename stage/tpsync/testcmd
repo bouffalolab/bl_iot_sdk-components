@@ -1,0 +1,13 @@
+
+
+rs_init
+rs_mpush 10
+rs_mpop
+
+rs_spush
+rs_spop
+
+
+rs_deinit
+
+

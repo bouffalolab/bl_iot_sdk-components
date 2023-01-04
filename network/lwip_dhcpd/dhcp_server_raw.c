@@ -183,7 +183,7 @@ dhcp_client_find(struct dhcp_server *dhcpserver, struct dhcp_msg *msg,
                 return node;
             } else {
                 puts("IP Found, but MAC address is NOT the same\r\n");
-                return node;  //FIXME use hostname instead of mac address
+                // return node;  //FIXME use hostname instead of mac address
             }
         }
     }

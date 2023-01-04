@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -39,6 +39,25 @@
 #include <bl_coredump.h>
 
 #define REVERSE(a) (((a)&0xff) << 24 | ((a)&0xff00) << 8 | ((a)&0xff0000) >> 8 | ((a)&0xff000000) >> 24)
+
+#define read_const_csr(reg) ({ register uintptr_t __tmp; \
+  asm ("csrr %0, " #reg : "=r"(__tmp)); __tmp; })
+
+#define read_csr(reg) ({ register uintptr_t __tmp; \
+  asm volatile ("csrr %0, " #reg : "=r"(__tmp)); __tmp; })
+
+#define write_csr(reg, val) ({ \
+  asm volatile ("csrw " #reg ", %0" :: "rK"(val)); })
+
+#define swap_csr(reg, val) ({ register uintptr_t __tmp; \
+  asm volatile ("csrrw %0, " #reg ", %1" : "=r"(__tmp) : "rK"(val)); __tmp; })
+
+#define set_csr(reg, bit) ({ register uintptr_t __tmp; \
+  asm volatile ("csrrs %0, " #reg ", %1" : "=r"(__tmp) : "rK"(bit)); __tmp; })
+
+#define clear_csr(reg, bit) ({ register uintptr_t __tmp; \
+  asm volatile ("csrrc %0, " #reg ", %1" : "=r"(__tmp) : "rK"(bit)); __tmp; })
+
 #define COREDUM_CMD_BUF_LEN (128)
 
 #define COREDUMP_VERSION "0.0.1"
@@ -107,6 +126,7 @@ enum dump_type {
   DUMP_BASE64_BYTE, /* Dump memory in byte units, in base64 format. */
   DUMP_BASE64_WORD, /* Dump memory in word units, in base64 format. */
   DUMP_REG_OTHERS,
+  DUMP_CSR,         /* Dump string */
   DUMP_TYPE_MAX,
 };
 
@@ -116,12 +136,14 @@ static void dump_ascii(const void *data, ssize_t len, struct crc32_stream_ctx *c
 static void dump_base64_byte(const void *data, ssize_t len, struct crc32_stream_ctx *crc_ctx);
 static void dump_base64_word(const void *data, ssize_t len, struct crc32_stream_ctx *crc_ctx);
 static void dump_wifi_reg_others(const void *data, ssize_t len, struct crc32_stream_ctx *crc_ctx);
+static void dump_csr(const void *data, ssize_t len, struct crc32_stream_ctx *crc_ctx);
 
 static const dump_handler_t dump_handler_list[DUMP_TYPE_MAX] = {
     dump_ascii,
     dump_base64_byte,
     dump_base64_word,
     dump_wifi_reg_others,
+    dump_csr,
 };
 
 /* Define default ram dump list */
@@ -143,6 +165,8 @@ static const struct mem_hdr {
     {(uintptr_t)0x24C00000, (unsigned int)0x3c, DUMP_BASE64_WORD, "0x24C00000-0x24C0003C"},
     {(uintptr_t)0x24C00800, (unsigned int)0xbc, DUMP_BASE64_WORD, "0x24C00800-0x24C008BC"},
     {(uintptr_t)0xf0000000, (unsigned int)0x20, DUMP_REG_OTHERS, "others_reg"},
+    {(uintptr_t)0xf0004000, (unsigned int)12, DUMP_CSR, "dump riscv csr"},
+    {(uintptr_t)0xf0004000, (unsigned int)12, DUMP_CSR, "dump riscv csr"},
 
     {(uintptr_t)0x40000000, (unsigned int)0x318, DUMP_BASE64_WORD, "GLB_reg"},
     {(uintptr_t)0x4000A100, (unsigned int)0x8F, DUMP_BASE64_WORD, "uart1_reg"},
@@ -166,9 +190,9 @@ static const struct mem_hdr {
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "ram_tcm"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "ram_wifi"},
 #elif BL616
+    //{(uintptr_t)0xf0004000, (unsigned int)12, DUMP_CSR, "dump riscv csr"},
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "ram_tcm"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "ram_wifi"},
-    {(uintptr_t)&_ld_ram_addr3, (unsigned int)&_ld_ram_size3, DUMP_BASE64_BYTE, "ram_code"},
 #endif
 };
 
@@ -399,6 +423,63 @@ static void dump_wifi_reg_others(const void *data, ssize_t len, struct crc32_str
   ctx.crc_ctx = crc_ctx;
 
   utils_base64_encode_stream(read_word_cb, cd_base64_wirte_block, (void *)&ctx);
+}
+
+/* Dump CSR */
+static int read_csr_cb(uint8_t *data, void *opaque)
+{
+  struct base64_word_ctx *ctx = (struct base64_word_ctx *)opaque;
+  uintptr_t base;
+
+  if (ctx->addr_curr < ctx->addr_end)
+    {
+      base = (ctx->addr_curr >> 2) << 2;
+      if (base != ctx->addr_base)
+        {
+          ctx->addr_base = base;
+          switch (base)
+            {
+            case 0x0:
+              *(uint32_t *)ctx->buf = read_csr(mcause);
+              break;
+            case 0x4:
+              *(uint32_t *)ctx->buf = read_csr(mtval);
+              break;
+            case 0x8:
+              *(uint32_t *)ctx->buf = read_csr(mepc);
+              break;
+            default:
+              *(uint32_t *)ctx->buf = read_csr(mstatus);
+            }
+        }
+
+      *data = ctx->buf[ctx->addr_curr & 0x3];
+      ctx->addr_curr++;
+
+      /* update crc checksum */
+
+      utils_crc32_stream_feed(ctx->crc_ctx, *data);
+
+      return 0;
+    }
+  else
+    {
+      return 1;
+    }
+}
+
+static void dump_csr(const void *data, ssize_t len,
+    struct crc32_stream_ctx *crc_ctx)
+{
+  struct base64_word_ctx ctx = {0};
+
+  ctx.addr_base = -1;
+  ctx.addr_curr = ((uintptr_t)data & 0xFFF);
+  ctx.addr_end = ctx.addr_curr + len;
+  ctx.crc_ctx = crc_ctx;
+
+  utils_base64_encode_stream(read_csr_cb, cd_base64_wirte_block,
+      (void *)&ctx);
 }
 
 /**

@@ -31,9 +31,12 @@ COMPONENT_SRCS   := src/access.c \
 					src/proxy.c \
 					src/settings.c \
 					src/transport.c \
-					src/mesh_cli_cmds/mesh_cli_cmds.c \
 					src/local_operation.c \
 					src/mem_slab/slab.c
+
+ifneq ($(CONFIG_AUTO_PTS),1)
+COMPONENT_SRCS += src/mesh_cli_cmds/mesh_cli_cmds.c
+endif
 
 ifeq ($(CONFIG_BT_MESH_FRIEND),1)
 COMPONENT_SRCS   += src/friend.c

@@ -36,6 +36,10 @@ COMPONENT_SRCS := src/utils_hex.c \
                   #src/utils_hmac_sha1_fast.c \
                   #src/utils_psk_fast.c \
 
+ifeq ("$(CONFIG_CHIP_NAME)", "BL616")
+COMPONENT_SRCS += src/time_statics.c
+endif
+
 else
 ifeq ("$(CONFIG_CHIP_NAME)", "BL808")
 COMPONENT_SRCS := src/utils_hex.c \

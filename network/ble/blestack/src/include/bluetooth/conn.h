@@ -556,6 +556,8 @@ void bt_clear_smpflag(smp_test_id id);
  *  @param cb Callback struct.
  */
 void bt_conn_cb_register(struct bt_conn_cb *cb);
+void bt_conn_cb_unregister(struct bt_conn_cb *cb);
+void bt_conn_cb_clear(void);
 
 /** Enable/disable bonding.
  *
@@ -934,6 +936,35 @@ struct bt_br_conn_param {
 struct bt_conn *bt_conn_create_br(const bt_addr_t *peer,
 				  const struct bt_br_conn_param *param);
 
+#if defined(BFLB_BLE)
+#if defined(CONFIG_BT_BREDR)
+struct esco_para {
+	u32_t  tx_bandwidth;
+	u32_t  rx_bandwidth;
+	u16_t  max_latency;
+	u16_t  content_format;
+	u8_t   retrans_effort;
+	u16_t  pkt_type;
+};
+
+#define ESCO_PARAM(tx,rx,latency,format,retrans,type) \
+	(&(struct esco_para) { \
+		.tx_bandwidth = (tx), \
+		.rx_bandwidth = (rx), \
+		.max_latency = (latency), \
+		.content_format = (format), \
+		.retrans_effort = (retrans), \
+		.pkt_type = (type), \
+	})
+
+#define SCO_PARAM_D0 ESCO_PARAM(8000,8000,0xffff,BT_VOICE_CVSD_16BIT,0,HCI_PKT_TYPE_HV1)
+#define SCO_PARAM_D1 ESCO_PARAM(8000,8000,0xffff,BT_VOICE_CVSD_16BIT,0,HCI_PKT_TYPE_HV3)
+
+#define ESCO_PARAM_S1 ESCO_PARAM(8000,8000,7,BT_VOICE_CVSD_16BIT,1,HCI_PKT_TYPE_ESCO_EV3)
+#define ESCO_PARAM_S2 ESCO_PARAM(8000,8000,7,BT_VOICE_CVSD_16BIT,1,HCI_PKT_TYPE_ESCO_2EV3)
+#define ESCO_PARAM_S3 ESCO_PARAM(8000,8000,10,BT_VOICE_CVSD_16BIT,1,HCI_PKT_TYPE_ESCO_2EV3)
+#define ESCO_PARAM_S4 ESCO_PARAM(8000,8000,12,BT_VOICE_CVSD_16BIT,2,HCI_PKT_TYPE_ESCO_2EV3)
+
 /** @brief Initiate an SCO connection to a remote device.
  *
  *  Allows initiate new SCO link to remote peer using its address.
@@ -943,7 +974,10 @@ struct bt_conn *bt_conn_create_br(const bt_addr_t *peer,
  *
  *  @return Valid connection object on success or NULL otherwise.
  */
-struct bt_conn *bt_conn_create_sco(const bt_addr_t *peer);
+struct bt_conn *bt_conn_create_sco(const bt_addr_t *peer,const struct esco_para *para);
+
+#endif
+#endif
 
 #ifdef __cplusplus
 }

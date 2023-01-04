@@ -2664,10 +2664,12 @@ static int smp_init(struct bt_smp *smp)
 
 	atomic_set_bit(&smp->allowed_cmds, BT_SMP_CMD_PAIRING_FAIL);
 
+    #if defined(CONFIG_BT_ECC)
 	sc_public_key = bt_pub_key_get();
     #if defined(BFLB_BLE)
     if(!sc_local_pkey_ready.sem.hdl)
         k_sem_init(&sc_local_pkey_ready, 0, 1);
+    #endif
     #endif
 	return 0;
 }
@@ -5591,6 +5593,7 @@ int bt_smp_init(void)
     #endif
     
 	sc_supported = le_sc_supported();
+
 	if (IS_ENABLED(CONFIG_BT_SMP_SC_PAIR_ONLY) && !sc_supported) {
 		BT_ERR("SC Pair Only Mode selected but LE SC not supported");
 		return -ENOENT;
@@ -5601,8 +5604,8 @@ int bt_smp_init(void)
     #endif
 
 	BT_DBG("LE SC %s", sc_supported ? "enabled" : "disabled");
-
+    #if defined(CONFIG_BT_ECC)
 	bt_pub_key_gen(&pub_key_cb);
-
+    #endif
 	return smp_self_test();
 }

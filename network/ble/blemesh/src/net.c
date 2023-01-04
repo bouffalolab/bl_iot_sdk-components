@@ -8,7 +8,7 @@
 
 #include <zephyr.h>
 #include <string.h>
-#include <errno.h>
+#include <sys/errno.h>
 #include <stdbool.h>
 #include <common/include/atomic.h>
 #include <util.h>
@@ -89,6 +89,7 @@ struct bt_mesh_net bt_mesh = {
 	.app_keys = {
 		[0 ... (CONFIG_BT_MESH_APP_KEY_COUNT - 1)] = {
 			.net_idx = BT_MESH_KEY_UNUSED,
+			.app_idx = BT_MESH_KEY_UNUSED,
 		}
 	},
 };
@@ -492,7 +493,14 @@ int bt_mesh_net_create(u16_t idx, u8_t flags, const u8_t key[16],
 	 * doesn't apply straight after provisioning (since we can't know how
 	 * long has actually passed since the network changed its state).
 	 */
-	bt_mesh.ivu_duration = BT_MESH_IVU_MIN_HOURS;
+#if defined(CONFIG_AUTO_PTS)
+	/* MESH/NODE/IVU/BI-01-C */
+	if(BT_MESH_IV_UPDATE(flags)){
+#endif
+		bt_mesh.ivu_duration = BT_MESH_IVU_MIN_HOURS;
+#if defined(CONFIG_AUTO_PTS)
+	}
+#endif
 
 	/* Make sure we have valid beacon data to be sent */
 	bt_mesh_net_beacon_update(sub);
@@ -543,7 +551,7 @@ bool bt_mesh_kr_update(struct bt_mesh_subnet *sub, u8_t new_kr, bool new_key)
 
 	if (sub->kr_flag) {
 		if (sub->kr_phase == BT_MESH_KR_PHASE_1) {
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 			BT_PTS("[PTS] Key Refresh: Phase 1 -> Phase 2");
 #endif
 			BT_DBG("Phase 1 -> Phase 2");
@@ -571,7 +579,7 @@ bool bt_mesh_kr_update(struct bt_mesh_subnet *sub, u8_t new_kr, bool new_key)
 		 */
 			__attribute__((fallthrough));/* Fix compile error by bouffalo  */
 		case BT_MESH_KR_PHASE_2:
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 			BT_PTS("[PTS] Key Refresh: Phase %d -> Normal", sub->kr_phase);
 #endif
 
@@ -726,7 +734,7 @@ do_update:
 	atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS, iv_update);
 	bt_mesh.ivu_duration = 0U;
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	if (iv_update) {
 		BT_PTS("[PTS] IV Update: transitioning to IV Update in Progress state");
 	} else {
@@ -1090,7 +1098,7 @@ static int net_decrypt(struct bt_mesh_subnet *sub, const u8_t *enc,
 
 	rx->ctx.addr = SRC(buf->data);
 	if (!BT_MESH_ADDR_IS_UNICAST(rx->ctx.addr)) {
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		BT_PTS("[PTS] Invalid address (SRC = 0x%04X)", rx->ctx.addr);
 #endif
 		BT_DBG("Ignoring non-unicast src addr 0x%04x", rx->ctx.addr);
@@ -1266,7 +1274,7 @@ static void bt_mesh_net_relay(struct net_buf_simple *sbuf,
 	priv = rx->sub->keys[rx->sub->kr_flag].privacy;
 	nid = rx->sub->keys[rx->sub->kr_flag].nid;
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	if (rx->net_if != BT_MESH_NET_IF_LOCAL) {
 		BT_PTS("[PTS] Relaying packet (TTL = 0x%02X)", TTL(buf->data));
 	}
@@ -1304,8 +1312,12 @@ static void bt_mesh_net_relay(struct net_buf_simple *sbuf,
 			goto done;
 		}
 	}
-
-	if (relay_to_adv(rx->net_if)) {
+	/* Fix by bouffalolab for MESH/NODE/FRND/FN/BV-23-C*/
+	if (relay_to_adv(rx->net_if) 
+	#if defined(CONFIG_AUTO_PTS)
+		|| rx->friend_cred
+	#endif 
+		) {
 		bt_mesh_adv_send(buf, NULL, NULL);
 	}
 
@@ -1344,7 +1356,7 @@ int bt_mesh_net_decode(struct net_buf_simple *data, enum bt_mesh_net_if net_if,
 	rx->net_if = net_if;
 
 	if (!net_find_and_decrypt(data->data, data->len, rx, buf)) {
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		/* Comment by boufflalo */
 		//BT_PTS("[PTS] Fail to decrypt packet");
 #endif
@@ -1352,7 +1364,7 @@ int bt_mesh_net_decode(struct net_buf_simple *data, enum bt_mesh_net_if net_if,
 		BT_DBG("Unable to find matching net for packet");
 		return -ENOENT;
 	}
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	/* Comment by boufflalo */
 	BT_PTS("[PTS] NID[%x]\n", NID(data->data));
 #endif
@@ -1377,7 +1389,7 @@ int bt_mesh_net_decode(struct net_buf_simple *data, enum bt_mesh_net_if net_if,
 
 	if (net_if != BT_MESH_NET_IF_PROXY_CFG &&
 	    rx->ctx.recv_dst == BT_MESH_ADDR_UNASSIGNED) {
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		BT_PTS("[PTS] Invalid address (DST = 0x%04X)", rx->ctx.recv_dst);
 #endif
 
@@ -1391,7 +1403,7 @@ int bt_mesh_net_decode(struct net_buf_simple *data, enum bt_mesh_net_if net_if,
 
 	msg_cache_add(rx);
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	if (net_if != BT_MESH_NET_IF_LOCAL) {
 		BT_PTS("[PTS] Network packet received");
 		BT_PTS("[PTS] - TTL: [0x%02X]", rx->ctx.recv_ttl);

@@ -24,6 +24,10 @@ COMPONENT_PRIV_INCLUDEDIRS :=
 ## This component's src
 COMPONENT_SRCS := ./syscalls.c ./assert.c
 
+ifeq ("$(CPU_ID)", "D0")
+COMPONENT_SRCS += ./memcpy.c
+endif
+
 COMPONENT_OBJS := $(patsubst %.c,%.o, $(COMPONENT_SRCS))
 
 COMPONENT_SRCDIRS := ./
