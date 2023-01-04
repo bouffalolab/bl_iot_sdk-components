@@ -385,7 +385,14 @@ a lot of data that needs to be copied, this should be set high. */
    ---------------------------------
 */
 
+#if defined(__cplusplus)
+extern "C" int bl_rand(void);
+extern "C" int * __errno(void);
+#else
+extern int bl_rand(void);
 extern int * __errno(void);
+#endif
+
 #define errno (*__errno())
 
 /**
@@ -393,13 +400,6 @@ extern int * __errno(void);
  * local TCP/UDP pcb (default==0). This can prevent creating predictable port
  * numbers after booting a device.
  */
-#ifndef BL602_MATTER_SUPPORT
-#if defined(__cplusplus)
-extern "C" int bl_rand(void);
-#else
-extern int bl_rand(void);
-#endif
-#endif
 
 #define LWIP_RANDOMIZE_INITIAL_LOCAL_PORTS 1
 #define LWIP_RAND() ((u32_t)bl_rand())
