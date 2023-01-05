@@ -20,12 +20,6 @@
 #define LWIP_MDNS_RESPONDER     1
 #define LWIP_IGMP               1
 
-#ifdef BL602_MATTER_SUPPORT
-#define LWIP_AUTOIP             1
-#define LWIP_IPV6_MLD           1
-#define LWIP_ND6_RDNSS_MAX_DNS_SERVERS  1
-#endif
-
 #define LWIP_NUM_NETIF_CLIENT_DATA      1
 
 #define LWIP_ALTCP                      1
@@ -373,11 +367,6 @@ a lot of data that needs to be copied, this should be set high. */
 #define PBUF_LINK_ENCAPSULATION_HLEN    48u
 
 #define LWIP_RAW                        1
-
-#ifdef BL602_MATTER_SUPPORT
-#define LWIP_IPV6                       1
-#define LWIP_IPV6_DHCP6                 1
-#endif
 
 /*
    ---------------------------------
