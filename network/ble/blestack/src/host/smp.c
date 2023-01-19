@@ -2664,10 +2664,12 @@ static int smp_init(struct bt_smp *smp)
 
 	atomic_set_bit(&smp->allowed_cmds, BT_SMP_CMD_PAIRING_FAIL);
 
+    #if defined(CONFIG_BT_ECC)
 	sc_public_key = bt_pub_key_get();
     #if defined(BFLB_BLE)
     if(!sc_local_pkey_ready.sem.hdl)
         k_sem_init(&sc_local_pkey_ready, 0, 1);
+    #endif
     #endif
 	return 0;
 }
@@ -4059,6 +4061,7 @@ static u8_t display_passkey(struct bt_smp *smp)
 	return 0;
 }
 
+#if defined(CONFIG_BT_ECC)
 #if defined(CONFIG_BT_PERIPHERAL)
 static u8_t smp_public_key_slave(struct bt_smp *smp)
 {
@@ -4287,6 +4290,7 @@ static u8_t smp_dhkey_check(struct bt_smp *smp, struct net_buf *buf)
 
 	return 0;
 }
+#endif
 
 static const struct {
 	u8_t  (*func)(struct bt_smp *smp, struct net_buf *buf);
@@ -4304,8 +4308,10 @@ static const struct {
 	{ smp_ident_addr_info,     sizeof(struct bt_smp_ident_addr_info) },
 	{ smp_signing_info,        sizeof(struct bt_smp_signing_info) },
 	{ smp_security_request,    sizeof(struct bt_smp_security_request) },
+    #if defined(CONFIG_BT_ECC)
 	{ smp_public_key,          sizeof(struct bt_smp_public_key) },
 	{ smp_dhkey_check,         sizeof(struct bt_smp_dhkey_check) },
+    #endif
 };
 
 static int bt_smp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
@@ -4368,6 +4374,7 @@ static int bt_smp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	return 0;
 }
 
+#if defined(CONFIG_BT_ECC)
 static void bt_smp_pkey_ready(const u8_t *pkey)
 {
 	int i;
@@ -4411,6 +4418,7 @@ static void bt_smp_pkey_ready(const u8_t *pkey)
 #endif /* CONFIG_BT_PERIPHERAL */
 	}
 }
+#endif
 
 static void bt_smp_connected(struct bt_l2cap_chan *chan)
 {
@@ -5583,11 +5591,14 @@ int bt_smp_init(void)
 		.accept		= bt_smp_accept,
 	};
     #endif
+
+    #if defined(CONFIG_BT_ECC)
 	static struct bt_pub_key_cb pub_key_cb = {
 		.func           = bt_smp_pkey_ready,
 	};
     #if defined(BFLB_BLE)
     k_sem_init(&sc_local_pkey_ready, 0, 1);
+    #endif
     #endif
     
 	sc_supported = le_sc_supported();
@@ -5601,8 +5612,8 @@ int bt_smp_init(void)
     #endif
 
 	BT_DBG("LE SC %s", sc_supported ? "enabled" : "disabled");
-
+    #if defined(CONFIG_BT_ECC)
 	bt_pub_key_gen(&pub_key_cb);
-
+    #endif
 	return smp_self_test();
 }

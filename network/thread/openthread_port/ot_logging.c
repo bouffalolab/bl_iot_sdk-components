@@ -6,7 +6,7 @@
 #include <openthread/platform/logging.h>
 #include <openthread_port.h>
 
-
+/* this should not be a WEAK function */
 void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
 {
     va_list argp;
@@ -16,9 +16,7 @@ void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat
     va_end(argp);
 }
 
-
-
 void otPlatLogLine(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aLogLine)
 {
-    otPlatLog(aLogLevel, aLogRegion, "%s\r\n", aLogLine);
+    otPlatLog(aLogLevel, aLogRegion, "%s", aLogLine);
 }

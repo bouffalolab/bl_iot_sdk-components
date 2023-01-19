@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -97,6 +97,7 @@ uint32_t bl_sys_time_sync(void)
     uint32_t xTicksToJump = 0;
     
     if(bl_sys_time_sync_state(&xTicksToJump) > 0){
+        extern void vTaskStepTickSafe( const TickType_t xTicksToJump );
         vTaskStepTickSafe(xTicksToJump);
     }
     

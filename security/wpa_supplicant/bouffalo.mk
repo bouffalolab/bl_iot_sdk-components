@@ -1,5 +1,29 @@
 # Component Makefile
 #
+ifeq ($(CONFIG_CHIP_NAME),BL602)
+CFLAGS   += -DBL602
+endif
+
+ifeq ($(CONFIG_CHIP_NAME),BL616)
+CFLAGS   += -DBL616
+endif
+
+ifeq ($(CONFIG_CHIP_NAME),BL702)
+CFLAGS   += -DBL702
+endif
+
+ifeq ($(CONFIG_CHIP_NAME),BL702L)
+CFLAGS   += -DBL702L
+endif
+
+ifeq ($(CONFIG_CHIP_NAME),BL808)
+CFLAGS   += -DBL808
+endif
+
+ifeq ($(CONFIG_CHIP_NAME),BL606P)
+CFLAGS   += -DBL606P
+endif
+
 ## These include paths would be exported to project level
 COMPONENT_ADD_INCLUDEDIRS += include/bl_supplicant
 
@@ -31,7 +55,7 @@ COMPONENT_SRCS += port/os_bl.c \
                   src/crypto/md5.c \
                   src/crypto/rc4.c \
                   src/crypto/sha1-internal.c \
-                  src/crypto/sha1-pbkdf2.c \
+                  src/crypto/sha1-pbkdf2-bl.c \
                   src/crypto/sha1.c \
                   src/crypto/sha256-internal.c \
                   src/crypto/sha256-prf.c \

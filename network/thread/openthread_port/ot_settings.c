@@ -13,7 +13,7 @@
 
 void otPlatSettingsInit(otInstance *aInstance, const uint16_t *aSensitiveKeys, uint16_t aSensitiveKeysLength)
 {
-    easyflash_init();
+
 }
 
 void otPlatSettingsSetCriticalKeys(otInstance *aInstance, const uint16_t *aKeys, uint16_t aKeysLength) {}
@@ -204,3 +204,6 @@ void otPlatSettingsWipe(otInstance *aInstance)
     /** reset all */
     ef_env_set_default();
 }
+
+void otPlatSettingsDeinit(otInstance *aInstance)
+{}

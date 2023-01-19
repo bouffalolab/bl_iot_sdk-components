@@ -5,10 +5,10 @@
 #include "task.h"
 #include "cli.h"
 #include "mesh_cli_cmds.h"
-#include "include/mesh.h"
+#include "src/include/mesh.h"
 #include "errno.h"
 
-#include "mesh.h"
+#include "src/mesh.h"
 #include "net.h"
 #include "transport.h"
 #include "foundation.h"
@@ -69,7 +69,7 @@ static struct {
 	.dst = BT_MESH_ADDR_UNASSIGNED,
 };
 
-#if defined(BL602) || defined(BL702) || defined(BL606P)
+#if defined(BL602) || defined(BL702) || defined(BL606P) || defined(BL616)
 #define vOutputString(...)  printf(__VA_ARGS__)
 #else
 #define vOutputString(...)  bl_print(SYSTEM_UART_ID, PRINT_MODULE_CLI, __VA_ARGS__)
@@ -104,6 +104,7 @@ static void blemeshcli_init(char *pcWriteBuffer, int xWriteBufferLen, int argc, 
 #if defined(CONFIG_BT_MESH_PROVISIONER)
 static void blemeshcli_pvnr_init(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 #endif
+static void blemeshcli_addr_get(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 static void blemeshcli_set_dev_uuid(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 static void blemeshcli_input_num(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 static void blemeshcli_input_str(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
@@ -231,12 +232,12 @@ static struct bt_mesh_prov prov = {
 	.reset = prov_reset,
 	.static_val = auth_value,
 	.static_val_len = 16,
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	.output_size = 8,
 #else
 	.output_size = 6,
 #endif
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	.output_actions = (BT_MESH_BLINK | BT_MESH_BEEP | BT_MESH_VIBRATE | BT_MESH_DISPLAY_NUMBER | BT_MESH_DISPLAY_STRING),
 #else
 	.output_actions = (BT_MESH_DISPLAY_NUMBER | BT_MESH_DISPLAY_STRING),
@@ -247,12 +248,12 @@ static struct bt_mesh_prov prov = {
 #endif
 	.output_number = output_number,
 	.output_string = output_string,
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	.input_size = 8,
 #else
 	.input_size = 6,
 #endif
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	.input_actions = (BT_MESH_PUSH | BT_MESH_TWIST | BT_MESH_ENTER_NUMBER | BT_MESH_ENTER_STRING),
 #else
 	.input_actions = (BT_MESH_ENTER_NUMBER | BT_MESH_ENTER_STRING),
@@ -488,6 +489,7 @@ const struct cli_command btMeshCmdSet[] = {
 #if defined(CONFIG_BT_MESH_PROVISIONER)
     {"blemesh_pvnr_init", "blemesh_pvnr_init:[Initialize]\r\n Parameter[Null]", blemeshcli_pvnr_init},
 #endif
+	{"blemesh_addr_get", "blemesh_pvnr_init:[Initialize]\r\n Parameter[Null]", blemeshcli_addr_get},
 	{"blemesh_set_dev_uuid", "blemesh_input_num:[input number in provisionging procedure]\r\n\
      [Size:16 Octets, e.g.112233445566778899AA]", blemeshcli_set_dev_uuid},
     {"blemesh_pb", "blemesh_pb:[Enable or disable provisioning]\r\n\
@@ -714,7 +716,7 @@ static void blemeshcli_init(char *pcWriteBuffer, int xWriteBufferLen, int argc, 
 		vOutputString("Use pb-adv or pb-gatt to enable advertising\r\n");
 	}
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
     int i;
 
     // used for almost all test cases
@@ -842,6 +844,16 @@ static void blemeshcli_pvnr_init(char *pcWriteBuffer, int xWriteBufferLen, int a
 	return;
 }
 #endif
+
+static void blemeshcli_addr_get(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+	extern u16_t bt_mesh_primary_addr(void);
+	if (!bt_mesh_is_provisioned()){
+		vOutputString("Node is not provisioned\r\n");
+		return;
+	}
+	vOutputString("Primary address is 0x%04x\r\n", bt_mesh_primary_addr());
+}
 
 static const char *bearer2str(bt_mesh_prov_bearer_t bearer)
 {
@@ -2114,14 +2126,14 @@ static int fault_test(struct bt_mesh_model *model, uint8_t test_id, uint16_t cid
 
 static void attn_on(struct bt_mesh_model *model)
 {
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	vOutputString("[PTS] Attention timer on\r\n");
 #endif
 }
 
 static void attn_off(struct bt_mesh_model *model)
 {
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	vOutputString("[PTS] Attention timer off\r\n");
 #endif
 }
@@ -4463,7 +4475,7 @@ static void blemeshcli_clhm_fault(char *pcWriteBuffer, int xWriteBufferLen, int 
 	int err = 0;
 	u16_t app_idx, cid, dst;
 	u8_t test_id, faults[16];
-	u32_t fault_count;
+	size_t fault_count;
 
 	if(0 == strcmp(argv[1], "test")){
 		get_uint16_from_string(&argv[2], &dst);

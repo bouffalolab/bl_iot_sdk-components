@@ -51,6 +51,8 @@
 #include "lwip/ip6_addr.h"
 #include "lwip/prot/tcp.h"
 
+#include "lwip/timeouts.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -66,6 +68,15 @@ void             tcp_tmr     (void);  /* Must be called every
    intervals (instead of calling tcp_tmr()). */
 void             tcp_slowtmr (void);
 void             tcp_fasttmr (void);
+
+/**
+ * bouffalo lp change
+ * TCP_TMR Optimization, only enable tcp_tmr MAX_TCP_ONCE_RUNNING_TIME
+ */
+void             tcp_keepalive_tmr(void *arg);
+void             tcp_keepalive_timer_stop(struct tcp_pcb *pcb);
+void             tcp_keepalive_timer_start(struct tcp_pcb *pcb);
+/* bouffalo lp change end */
 
 /* Call this from a netif driver (watch out for threading issues!) that has
    returned a memory error on transmit and now has free buffers to send more.
@@ -117,7 +128,7 @@ err_t            tcp_process_refused_data(struct tcp_pcb *pcb);
 #define TCP_SEQ_BETWEEN(a,b,c) (TCP_SEQ_GEQ(a,b) && TCP_SEQ_LEQ(a,c))
 
 #ifndef TCP_TMR_INTERVAL
-#define TCP_TMR_INTERVAL       250  /* The TCP timer interval in milliseconds. */
+#define TCP_TMR_INTERVAL       500/* The TCP timer interval in milliseconds. */
 #endif /* TCP_TMR_INTERVAL */
 
 #ifndef TCP_FAST_INTERVAL
@@ -125,7 +136,8 @@ err_t            tcp_process_refused_data(struct tcp_pcb *pcb);
 #endif /* TCP_FAST_INTERVAL */
 
 #ifndef TCP_SLOW_INTERVAL
-#define TCP_SLOW_INTERVAL      (2*TCP_TMR_INTERVAL)  /* the coarse grained timeout in milliseconds */
+//#define TCP_SLOW_INTERVAL      (2*TCP_TMR_INTERVAL)  /* the coarse grained timeout in milliseconds */
+#define TCP_SLOW_INTERVAL      (TCP_TMR_INTERVAL)  /* the coarse grained timeout in milliseconds */
 #endif /* TCP_SLOW_INTERVAL */
 
 #define TCP_FIN_WAIT_TIMEOUT 20000 /* milliseconds */
@@ -139,11 +151,11 @@ err_t            tcp_process_refused_data(struct tcp_pcb *pcb);
 
 /* Keepalive values, compliant with RFC 1122. Don't change this unless you know what you're doing */
 #ifndef  TCP_KEEPIDLE_DEFAULT
-#define  TCP_KEEPIDLE_DEFAULT     7200000UL /* Default KEEPALIVE timer in milliseconds */
+#define  TCP_KEEPIDLE_DEFAULT     120000UL //7200000UL /* Default KEEPALIVE timer in milliseconds */
 #endif
 
 #ifndef  TCP_KEEPINTVL_DEFAULT
-#define  TCP_KEEPINTVL_DEFAULT    75000UL   /* Default Time between KEEPALIVE probes in milliseconds */
+#define  TCP_KEEPINTVL_DEFAULT    30000UL //75000UL   /* Default Time between KEEPALIVE probes in milliseconds */
 #endif
 
 #ifndef  TCP_KEEPCNT_DEFAULT
@@ -326,6 +338,7 @@ struct tcp_seg {
 extern struct tcp_pcb *tcp_input_pcb;
 extern u32_t tcp_ticks;
 extern u8_t tcp_active_pcbs_changed;
+extern const u8_t tcp_persist_backoff[7];
 
 /* The TCP PCB lists. */
 union tcp_listen_pcbs_t { /* List of all TCP PCBs in LISTEN state. */

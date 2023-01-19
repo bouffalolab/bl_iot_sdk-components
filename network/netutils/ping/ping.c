@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -80,6 +80,9 @@
 #include <cli.h>
 #include <ping.h>
 #include <utils_memp.h>
+#if LWIP_IPV6
+#include <lwip/prot/icmp6.h>
+#endif
 
 #define LOG_DISP       0
 
@@ -109,6 +112,31 @@ static void ping_prepare_echo(struct icmp_echo_hdr *iecho, u16_t len, void *arg)
     iecho->chksum = inet_chksum(iecho, len);
 }
 
+#if LWIP_IPV6
+static void ping6_prepare_echo(struct pbuf *p, u16_t len, void *arg)
+{
+    size_t i;
+    size_t data_len = len - sizeof(struct icmp_echo_hdr);
+    struct icmp_echo_hdr *iecho = (struct icmp_echo_hdr *)p->payload;
+    struct ping_var *env = (struct ping_var *)arg;
+
+    ICMPH_TYPE_SET(iecho, ICMP6_TYPE_EREQ);
+
+    ICMPH_CODE_SET(iecho, 0);
+    iecho->chksum = 0;
+    iecho->id     = env->id;
+    iecho->seqno  = lwip_htons(++env->seq_num);
+
+    for(i = 0; i < data_len; i++) {
+        ((char*)iecho)[sizeof(struct icmp_echo_hdr) + i] = (char)i;
+    }    
+
+    // do checksum in stack
+    env->pcb->chksum_reqd = 1;
+    env->pcb->chksum_offset = 2;
+}
+#endif
+
 /* Ping using the raw ip */
 static u8_t ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr)
 {
@@ -126,11 +154,22 @@ static u8_t ping_recv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_a
     log_info("recv addr %s\r\n", ipaddr_ntoa(addr));
 #endif
 
-    if ((p->tot_len == (PBUF_IP_HLEN + sizeof(struct icmp_echo_hdr)) + env->data_size) && ip_addr_cmp(&env->dest, addr)) {
-        memcpy(&echo_hdr, p->payload + PBUF_IP_HLEN, sizeof(struct icmp_echo_hdr));
+    if (ip_addr_cmp(&env->dest, addr)) {
+        if (p->tot_len == (IP_HLEN + sizeof(struct icmp_echo_hdr)) + env->data_size){
+            memcpy(&echo_hdr, p->payload + IP_HLEN, sizeof(struct icmp_echo_hdr));
+        #if LWIP_IPV6
+        }else if (p->tot_len == (IP6_HLEN + sizeof(struct icmp_echo_hdr)) + env->data_size){
+            memcpy(&echo_hdr, p->payload + IP6_HLEN, sizeof(struct icmp_echo_hdr));
+        #endif
+        }else{
+            return 0;
+        }
         iecho = &echo_hdr;
-
-        if ((iecho->type == 0) && (iecho->code == 0) && (iecho->id == env->id) && env->node_num > 0) {
+        if ((iecho->type == 0
+            #if LWIP_IPV6
+             || iecho->type == ICMP6_TYPE_EREP
+            #endif
+            ) && (iecho->code == 0) && (iecho->id == env->id) && env->node_num > 0) {
             find_hdr = find_and_extract(&env->req_list, iecho->seqno);
 
             if (find_hdr) {
@@ -169,7 +208,13 @@ static void ping_send(struct ping_var *env)
         log_info("env-adress %p\r\n", env);
         log_info("env--dest %s\r\n", ipaddr_ntoa(&env->dest));
 #endif
-        ping_prepare_echo(iecho, (u16_t)ping_size, env);
+        #if LWIP_IPV6
+        if(IP_IS_V6(&env->dest)){
+            ping6_prepare_echo(p, (u16_t)ping_size, env);
+        }
+        else
+        #endif
+            ping_prepare_echo(iecho, (u16_t)ping_size, env);
         time_hdr->ping_seq = iecho->seqno;
 
         raw_sendto(env->pcb, p, &env->dest);
@@ -254,7 +299,12 @@ static int ping_init(void *arg)
 #endif
 
     LOCK_TCPIP_CORE();
-    pcb = raw_new(IP_PROTO_ICMP);
+#if LWIP_IPV6
+    if(IP_IS_V6(&env->dest))
+        pcb = raw_new(IP_PROTO_ICMPV6);
+    else
+#endif
+        pcb = raw_new(IP_PROTO_ICMP);
 
     if (!pcb) {
         UNLOCK_TCPIP_CORE();
@@ -263,7 +313,12 @@ static int ping_init(void *arg)
     }
     env->pcb = pcb;
     raw_recv(pcb, ping_recv, env);
-    raw_bind(pcb, IP_ADDR_ANY);
+    #if LWIP_IPV6
+    if(IP_IS_V6(&env->dest))
+        raw_bind(pcb, IP6_ADDR_ANY);
+    else
+    #endif
+        raw_bind(pcb, IP_ADDR_ANY);
     sys_timeout(0, ping_timeout, env);
     UNLOCK_TCPIP_CORE();
 

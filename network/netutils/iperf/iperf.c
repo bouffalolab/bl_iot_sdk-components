@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -803,7 +803,7 @@ static void iperf_exit_cmd(char *buf, int len, int argc, char **argv)
 {
     exit_flag = 1;
 }
-
+#if 0
 static void iperf_cmd(char *buf, int len, int argc, char **argv)
 {
     iperf_param_t *iperf_param;
@@ -894,7 +894,7 @@ _ERROUT:
     printf("[USAGE]: %s [-s] [-c <host>] [-p <port>] [-u]\r\n", argv[0]);
     return;
 }
-
+#endif
 // STATIC_CLI_CMD_ATTRIBUTE makes this(these) command(s) static
 const static struct cli_command cmds_user[] STATIC_CLI_CMD_ATTRIBUTE = {
     { "ipc", "iperf TCP client", ipc_test_cmd},

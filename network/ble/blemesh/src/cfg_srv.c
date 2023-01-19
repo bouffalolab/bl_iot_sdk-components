@@ -8,7 +8,7 @@
 
 #include <zephyr.h>
 #include <string.h>
-#include <errno.h>
+#include <sys/errno.h>
 #include <stdbool.h>
 #include <types.h>
 #include <util.h>
@@ -37,6 +37,10 @@
 #include "foundation.h"
 #include "friend.h"
 #include "mesh_settings.h"
+
+#if defined(CONFIG_AUTO_PTS)
+#include "testing.h"
+#endif
 
 #define DEFAULT_TTL 7
 
@@ -235,7 +239,11 @@ static u8_t _mod_pub_set(struct bt_mesh_model *model, u16_t pub_addr,
 		return STATUS_SUCCESS;
 	}
 
-	if (!bt_mesh_app_key_find(app_idx)) {
+	if (!bt_mesh_app_key_find(app_idx)
+	#if defined(CONFIG_AUTO_PTS)
+		|| !bt_mesh_model_has_key(model, app_idx)
+	#endif
+		) {
 		return STATUS_INVALID_APPKEY;
 	}
 
@@ -2278,7 +2286,7 @@ static void net_key_update(struct bt_mesh_model *model,
 		return;
 	}
 
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	BT_PTS("[PTS] Key Refresh: Normal -> Phase 1");
 #endif
 
@@ -2538,8 +2546,8 @@ static void mod_app_bind(struct bt_mesh_model *model,
     bt_mesh_mod_bind_cb(mod, ctx->net_idx, key_app_idx);
 #endif /* CONFIG_BT_MESH_MOD_BIND_CB */
 
-    #if defined (CONFIG_BT_TESTING)/* Modified by bouffalo */
-	if (/*IS_ENABLED(CONFIG_BT_TESTING) && */status == STATUS_SUCCESS) {
+    #if defined (CONFIG_AUTO_PTS)/* Modified by bouffalo */
+	if (/*IS_ENABLED(CONFIG_AUTO_PTS) && */status == STATUS_SUCCESS) {
 		bt_test_mesh_model_bound(ctx->addr, mod, key_app_idx);
 	}
     #endif
@@ -2590,11 +2598,11 @@ static void mod_app_unbind(struct bt_mesh_model *model,
 
 	status = mod_unbind(mod, key_app_idx, true);
 
-    #if defined (CONFIG_BT_TESTING)/* Modified by bouffalo */
-	if (/*IS_ENABLED(CONFIG_BT_TESTING) && */status == STATUS_SUCCESS) {
+	#if defined (CONFIG_AUTO_PTS)/* Modified by bouffalo */
+	if (/*IS_ENABLED(CONFIG_AUTO_PTS) && */status == STATUS_SUCCESS) {
 		bt_test_mesh_model_unbound(ctx->addr, mod, key_app_idx);
 	}
-    #endif
+	#endif
 send_status:
 	BT_DBG("status 0x%02x", status);
 	create_mod_app_status(&msg, mod, vnd, elem_addr, key_app_idx, status,
@@ -2902,7 +2910,7 @@ static void krp_set(struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx,
 
 	if (sub->kr_phase == BT_MESH_KR_PHASE_1 &&
 	    phase == BT_MESH_KR_PHASE_2) {
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		BT_PTS("[PTS] Key Refresh: Phase 1 -> Phase 2");
 #endif
 
@@ -2922,7 +2930,7 @@ static void krp_set(struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx,
 		    IS_ENABLED(CONFIG_BT_MESH_FRIEND)) {
 			friend_cred_refresh(ctx->net_idx);
 		}
-#ifdef CONFIG_BT_MESH_PTS
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		BT_PTS("[PTS] Key Refresh: Phase %d -> Normal", sub->kr_phase);
 #endif
 
@@ -3084,7 +3092,7 @@ static void heartbeat_pub_set(struct bt_mesh_model *model,
 		 * has been configured for periodic publishing.
 		 */
 		if (param->period_log && param->count_log) {
-#ifndef CONFIG_BT_MESH_PTS
+#if !(defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS))
 			k_work_submit(&cfg->hb_pub.timer.work);
 #else
 			k_delayed_work_submit(&cfg->hb_pub.timer, 1000);
@@ -3228,6 +3236,15 @@ static void heartbeat_sub_set(struct bt_mesh_model *model,
 	if (!period_ms) {
 		cfg->hb_sub.min_hops = 0U;
 	}
+#if defined(CONFIG_AUTO_PTS)
+	/* MESH/NODE/CFG/HBS/BV-02-C expects us to return previous
+	 * count value and then reset it to 0.
+	 */
+	if (sub_src != BT_MESH_ADDR_UNASSIGNED &&
+	    sub_dst != BT_MESH_ADDR_UNASSIGNED && !sub_period) {
+		cfg->hb_sub.count = 0;
+	}
+#endif /* CONFIG_AUTO_PTS */*/
 }
 
 const struct bt_mesh_model_op bt_mesh_cfg_srv_op[] = {

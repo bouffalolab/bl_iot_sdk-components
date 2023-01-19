@@ -8,7 +8,11 @@
 #include "cli.h"
 #include "bl_port.h"
 #include "ble_cli_cmds.h"
+#if defined(BL702) || defined(BL602)
 #include "ble_lib_api.h"
+#else
+#include "btble_lib_api.h"
+#endif
 #include "l2cap_internal.h"
 #if defined(CONFIG_BLE_MULTI_ADV)
 #include "multi_adv.h"
@@ -59,6 +63,7 @@ static void blecli_scan_filter_size(char *pcWriteBuffer, int xWriteBufferLen, in
 #endif /* BL702 || BL602 */
 #endif
 static void blecli_read_local_address(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+static void blecli_set_local_address(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 #if defined(CONFIG_BT_PERIPHERAL)
 static void blecli_set_adv_channel(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 static void blecli_start_advertise(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
@@ -108,9 +113,9 @@ static void blecli_disable(char *pcWriteBuffer, int xWriteBufferLen, int argc, c
 static void blecli_start_multi_advertise(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 static void blecli_stop_multi_advertise(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 #endif
-#if defined(CONFIG_SET_TX_PWR)
+
 static void blecli_set_tx_pwr(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-#endif
+
 #if defined(CONFIG_HOGP_SERVER)
 static void blecli_hog_srv_notify(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 #endif
@@ -172,6 +177,7 @@ const struct cli_command btStackCmdSet[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"ble_stop_multi_adv", "ble stop multi adv\r\nParameter [instant id]\r\n", blecli_stop_multi_advertise},
 #endif
     {"ble_read_local_address", "ble read local address\r\nParameter [Null]\r\n", blecli_read_local_address},
+    {"ble_set_local_address", "ble set local address\r\nParameter [bt address]\r\n", blecli_set_local_address},
 #endif
 #if defined(CONFIG_BT_CONN)
 #if defined(CONFIG_BT_CENTRAL)
@@ -247,9 +253,8 @@ const struct cli_command btStackCmdSet[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"ble_conn_info", "LE get all connection devices info\r\nParameter [Null]\r\n", blecli_get_all_conn_info},
 #endif//CONFIG_BT_CONN
 
-#if defined(CONFIG_SET_TX_PWR)
     {"ble_set_tx_pwr","Set tx power mode\r\nParameter [mode, 1 octet, value:5,6,7]\r\n", blecli_set_tx_pwr},
-#endif
+        
 #if defined(CONFIG_HOGP_SERVER)
     {"ble_hog_srv_notify", "HOG srv notify\r\nParameter [hid usage] [press]\r\n", blecli_hog_srv_notify},
 #endif
@@ -699,6 +704,31 @@ static void blecli_read_local_address(char *pcWriteBuffer, int xWriteBufferLen, 
 	bt_get_local_ramdon_address(&local_ram_addr);
 	bt_addr_le_to_str(&local_ram_addr, le_addr, sizeof(le_addr));
 	vOutputString("Local random addr : %s\r\n", le_addr);
+}
+
+static void blecli_set_local_address(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+    bt_addr_le_t addr;
+    u8_t  addr_val[6];
+    int   err = -1;
+	
+    if(argc != 2){
+        vOutputString("Number of Parameters is not correct\r\n");
+        return;
+    }
+    get_bytearray_from_string(&argv[1], addr_val,6);
+    reverse_bytearray(addr_val, addr.a.val, 6);
+
+    err = bt_set_local_public_address(addr.a.val);
+    if(err)
+    {
+        vOutputString("Failed to set bt address (err %d) \r\n", err);
+    }
+    else
+    {
+        vOutputString("Set bt address success\r\n");
+    }
+
 }
 
 static void blecli_set_adv_channel(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
@@ -1816,7 +1846,6 @@ static void blecli_get_all_conn_info(char *pcWriteBuffer, int xWriteBufferLen, i
 }
 #endif /* CONFIG_BT_CONN*/
 
-#if defined(CONFIG_SET_TX_PWR)
 static void blecli_set_tx_pwr(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
     u8_t power;
@@ -1833,7 +1862,7 @@ static void blecli_set_tx_pwr(char *pcWriteBuffer, int xWriteBufferLen, int argc
         vOutputString("ble_set_tx_pwr, invalid value, value shall be in [%d - %d]\r\n", 0, 21);
         return;
     }
-    #elif defined(BL702)
+    #elif defined(BL702) || defined(BL616)
     if(power > 14){
         vOutputString("ble_set_tx_pwr, invalid value, value shall be in [%d - %d]\r\n", 0, 14);
         return;
@@ -1849,7 +1878,6 @@ static void blecli_set_tx_pwr(char *pcWriteBuffer, int xWriteBufferLen, int argc
 	}
     
 }
-#endif
 
 #if defined(BFLB_DISABLE_BT)
 static void blecli_disable(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)

@@ -227,6 +227,12 @@ static void clear_friendship(bool force, bool disable)
 	if (lpn_cb && lpn->frnd != BT_MESH_ADDR_UNASSIGNED) {
 		lpn_cb(lpn->frnd, false);
 	}
+	#if defined(CONFIG_AUTO_PTS)
+	if(lpn->frnd != BT_MESH_ADDR_UNASSIGNED){
+		extern void lpn_terminated(uint16_t net_idx, uint16_t friend_addr);
+		lpn_terminated(bt_mesh.sub[0].net_idx, lpn->frnd);
+	}
+	#endif /* CONFIG_AUTO_PTS */
 
 	lpn->frnd = BT_MESH_ADDR_UNASSIGNED;
 	lpn->fsn = 0U;
@@ -271,6 +277,12 @@ static void friend_req_sent(u16_t duration, int err, void *user_data)
 	}
 
 	lpn->adv_duration = duration;
+	#if defined(CONFIG_AUTO_PTS)
+	if(lpn->frnd != BT_MESH_ADDR_UNASSIGNED){
+		extern void lpn_polled(uint16_t net_idx, uint16_t friend_addr, bool retry);
+		lpn_polled(bt_mesh.sub[0].net_idx, lpn->frnd, !!(lpn->req_attempts));
+	}
+	#endif /* CONFIG_AUTO_PTS */
 
 	if (IS_ENABLED(CONFIG_BT_MESH_LPN_ESTABLISHMENT)) {
 		k_delayed_work_submit(&lpn->timer, K_MSEC(FRIEND_REQ_WAIT));
@@ -324,6 +336,10 @@ static void req_sent(u16_t duration, int err, void *user_data)
 	BT_DBG("req 0x%02x duration %u err %d state %s",
 	       lpn->sent_req, duration, err, state2str(lpn->state));
 #endif
+#if defined(CONFIG_AUTO_PTS)
+	BT_PTS("req 0x%02x duration %u err %d state %d",
+			lpn->sent_req, duration, err, lpn->state);
+#endif /* CONFIG_AUTO_PTS */
 
 	if (err) {
 		BT_ERR("Sending request failed (err %d)", err);
@@ -343,6 +359,10 @@ static void req_sent(u16_t duration, int err, void *user_data)
 		k_delayed_work_submit(&lpn->timer,
 				      K_MSEC(LPN_RECV_DELAY - SCAN_LATENCY));
 	} else {
+		#if defined(CONFIG_AUTO_PTS)
+		/* Add by bouffalo when test MESH/NODE/FRND/LPN/BI-01-C */
+		lpn_set_state(BT_MESH_LPN_RECV_DELAY);
+		#endif
 		k_delayed_work_submit(&lpn->timer,
 				      K_MSEC(LPN_RECV_DELAY + duration +
 					     lpn->recv_win));
@@ -974,6 +994,11 @@ int bt_mesh_lpn_friend_update(struct bt_mesh_net_rx *rx,
 		if (lpn_cb) {
 			lpn_cb(lpn->frnd, true);
 		}
+		#if defined(CONFIG_AUTO_PTS)
+		extern void lpn_established(uint16_t net_idx, uint16_t friend_addr,
+					uint8_t queue_size, uint8_t recv_win);
+		lpn_established(bt_mesh.sub[0].net_idx, lpn->frnd, lpn->queue_size, lpn->recv_win);
+		#endif /* CONFIG_AUTO_PTS */
 
 		/* Set initial poll timeout */
 		lpn->poll_timeout = MIN(POLL_TIMEOUT_MAX(lpn),

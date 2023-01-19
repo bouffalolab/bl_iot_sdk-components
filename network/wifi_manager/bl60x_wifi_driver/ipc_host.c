@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -27,6 +27,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <stdio.h>
 #include <string.h>
 #include <utils_list.h>
@@ -49,7 +50,8 @@
 #undef os_printf
 #define os_printf(...) do {} while(0)
 
-extern struct utils_list tx_list_bl;
+extern int internel_cal_size_tx_desc;
+extern int internel_cal_size_tx_hdr;
 
 static const int nx_txdesc_cnt[] =
 {
@@ -62,6 +64,7 @@ static const int nx_txdesc_cnt[] =
     #endif
 };
 
+#if 0
 static const int nx_txdesc_cnt_msk[] =
 {
     NX_TXDESC_CNT0 - 1,
@@ -72,45 +75,24 @@ static const int nx_txdesc_cnt_msk[] =
     NX_TXDESC_CNT4 - 1,
     #endif
 };
+#endif
 
 void ipc_host_init(struct ipc_host_env_tag *env,
                   struct ipc_host_cb_tag *cb,
                   struct ipc_shared_env_tag *shared_env_ptr,
                   void *pthis)
 {
-
-extern int internel_cal_size_tx_desc;
-extern int internel_cal_size_tx_hdr;
     bl_os_printf("[IPC] [TX] Low level size %d, driver size %d, total size %d\r\n",
             internel_cal_size_tx_desc,
             internel_cal_size_tx_hdr,
             internel_cal_size_tx_desc + internel_cal_size_tx_hdr
     );
-    utils_list_init(&tx_list_bl);
-#if 0
-    
-/**
- ****************************************************************************************
- *
- * @file ipc_host.c
- * Copyright (C) Bouffalo Lab 2016-2018
- *
- ****************************************************************************************
- */
 
+#if 1
+    // Reset the IPC Shared environment
     memset(shared_env_ptr, 0, sizeof(struct ipc_shared_env_tag));
-#else
-#if 0
-    unsigned int * dst;
-    unsigned int size;
-    dst = (unsigned int *)shared_env_ptr;
-    size = (unsigned int)sizeof(struct ipc_shared_env_tag);
-    for (i=0; i < size; i+=4)
-    {
-        *dst++ = 0;
-    }
 #endif
-#endif
+
     // Reset the IPC Host environment
     memset(env, 0, sizeof(struct ipc_host_env_tag));
 
@@ -123,19 +105,44 @@ extern int internel_cal_size_tx_hdr;
     // Save the pointer to the register base
     env->pthis = pthis;
 
+#if 0
     // Initialize buffers numbers and buffers sizes needed for DMA Receptions
     env->rx_bufnb = IPC_RXBUF_CNT;
     env->rx_bufsz = IPC_RXBUF_SIZE;
     env->rxdesc_nb = IPC_RXDESC_CNT;
     env->ipc_e2amsg_bufnb = IPC_MSGE2A_BUF_CNT;
     env->ipc_e2amsg_bufsz = sizeof(struct ipc_e2a_msg);
+#endif
 
+#if defined(CFG_CHIP_BL808) || defined(CFG_CHIP_BL606P)
+    // Initialize the pointers to the tx buffer
+    env->txbuf = shared_env_ptr->txbuf;
+#endif
+
+#if 0
     // Initialize the pointers to the hostid arrays
     env->tx_host_id = env->tx_host_id0;
 
     // Initialize the pointers to the TX descriptor arrays
     env->txdesc = shared_env_ptr->txdesc0;
+#endif
     memset((void*)&(shared_env_ptr->txdesc0), 0, sizeof(shared_env_ptr->txdesc0));
+
+    // Initialize the pointers to lists
+    env->list_free    = &shared_env_ptr->list_free;
+    env->list_ongoing = &shared_env_ptr->list_ongoing;
+    env->list_cfm     = &shared_env_ptr->list_cfm;
+
+    // Initialize of lists
+    utils_list_init(env->list_free);
+    utils_list_init(env->list_ongoing);
+    utils_list_init(env->list_cfm);
+
+    // TODO: (NX_TXDESC_CNT0), push all the entries to the free list
+    for(uint8_t i = 0; i < NX_TXDESC_CNT0 ; i++)
+    {
+        utils_list_push_back(env->list_free, (struct utils_list_hdr*)&(shared_env_ptr->txdesc0[i].list_hdr));
+    }
 }
 
 int ipc_host_msg_push(struct ipc_host_env_tag *env, void *msg_buf, uint16_t len)
@@ -212,48 +219,58 @@ static void ipc_host_msgack_handler(struct ipc_host_env_tag *env)
 
 static void ipc_host_tx_cfm_handler(struct ipc_host_env_tag *env, const int queue_idx, const int user_pos)
 {
+    struct txdesc_host *txdesc = NULL;
+    void *host_id = NULL;
+#if 0
+    uint32_t used_idx;
     int ret;
-    bl_custom_tx_callback_t custom_tx_callback;
-    void *custom_tx_callback_arg;
+
     // TX confirmation descriptors have been received
     REG_SW_SET_PROFILING(env->pthis, SW_PROF_IRQ_E2A_TXCFM);
-    while (1) {
-        uint32_t used_idx = env->txdesc_used_idx;
-        void *host_id = env->tx_host_id[used_idx & nx_txdesc_cnt_msk[queue_idx]];
-        struct pbuf *p = (struct pbuf*)host_id;
-        struct bl_txhdr *txhdr;
 
-        // bl_os_log_info("[IRQ-BH] CFM handler host id: %p\r\n", host_id);
-        if (host_id == 0) {
-            // bl_os_log_info("[IRQ-BH] ipc_host_tx_cfm_handler break\r\n");
+    while (1) {
+        used_idx = env->txdesc_used_idx;
+        host_id  = env->tx_host_id[used_idx & nx_txdesc_cnt_msk[queue_idx]];
+
+        // No more to process
+        if (NULL == host_id) {
             break;
         }
 
-        // bl_os_log_info("[IRQ-BH] send_data_cfm cb\r\n");
-
-        txhdr = (struct bl_txhdr*)(((uint32_t)p->payload) + RWNX_HWTXHDR_ALIGN_PADS((uint32_t)p->payload));
-        custom_tx_callback = txhdr->custom_cfm.cb;
-        custom_tx_callback_arg = txhdr->custom_cfm.cb_arg;
-
+        // Tx cfm callback
         ret = env->cb.send_data_cfm(env->pthis, host_id);
         if (ret < 0) {
             break;
         }
-        // Reset the host id in the array
-        env->tx_host_id[used_idx & nx_txdesc_cnt_msk[queue_idx]] = 0;
-        /*current txdesc is confirmed, so increase the idx now*/
-        env->txdesc_used_idx++;
 
-        /*Notify tx status*/
-        if (custom_tx_callback) {
-            custom_tx_callback(custom_tx_callback_arg, ret > 0);
-        }
+        // Reset the host id in the array
+        env->tx_host_id[used_idx & nx_txdesc_cnt_msk[queue_idx]] = NULL;
+
+        // current txdesc is confirmed, so increase the idx now
+        env->txdesc_used_idx++;
 
         REG_SW_SET_PROFILING_CHAN(env->pthis, SW_PROF_CHAN_CTXT_CFM_HDL_BIT);
         REG_SW_CLEAR_PROFILING_CHAN(env->pthis, SW_PROF_CHAN_CTXT_CFM_HDL_BIT);
     }
 
     REG_SW_CLEAR_PROFILING(env->pthis, SW_PROF_IRQ_E2A_TXCFM);
+#else
+    txdesc = (struct txdesc_host *)utils_list_pop_front(env->list_cfm);
+
+    while (txdesc) {
+        host_id = txdesc->host_id;
+
+        // Tx cfm callback, default free
+        env->cb.send_data_cfm(env->pthis, host_id);
+
+        // Reset the host id
+        txdesc->host_id = NULL;
+
+        // Push back to free and get next cfm
+        utils_list_push_back(env->list_free, &txdesc->list_hdr);
+        txdesc = (struct txdesc_host *)utils_list_pop_front(env->list_cfm);
+    }
+#endif
 }
 
 static void ipc_host_radar_handler(struct ipc_host_env_tag *env)
@@ -279,17 +296,34 @@ static void ipc_host_dbg_handler(struct ipc_host_env_tag *env)
     REG_SW_CLEAR_PROFILING(env->pthis, SW_PROF_IRQ_E2A_DBG);
 }
 
-#if 1
-uint32_t used_issue  = 0;
+#if defined(CFG_CHIP_BL808) || defined(CFG_CHIP_BL606P)
+volatile struct txbuf_host *ipc_host_txbuf_get(struct ipc_host_env_tag *env)
+{
+    for (uint8_t i = 0; i < NX_TXDESC_CNT0; i++)
+    {
+        if (0 == env->txbuf[i].flag) {
+            env->txbuf[i].flag = 1;
+            return &(env->txbuf[i]);
+        }
+    }
+
+    return NULL;
+}
+
+void ipc_host_txbuf_free(struct txbuf_host *buf)
+{
+    buf->flag = 0;
+}
 #endif
 
 volatile struct txdesc_host *ipc_host_txdesc_get(struct ipc_host_env_tag *env)
 {
+#if 0
     volatile struct txdesc_host *txdesc_free;
     uint32_t used_idx = env->txdesc_used_idx;
     uint32_t free_idx = env->txdesc_free_idx;
 
-    os_printf("free_idx is %u(%u), used_idx is %u(%u), cnt is %u\r\n",
+    os_printf("[TX] free_idx is %lu(%lu), used_idx is %lu(%lu), cnt is %u\r\n",
         free_idx, 
         free_idx & nx_txdesc_cnt_msk[0],
         used_idx,
@@ -298,7 +332,6 @@ volatile struct txdesc_host *ipc_host_txdesc_get(struct ipc_host_env_tag *env)
     );
     if (used_idx > free_idx) {
         os_printf("[TX] used_idx case found, used:free %u:%u\r\n", used_idx, free_idx);
-        used_issue++;
     }
 
     // Check if a free descriptor is available
@@ -322,6 +355,9 @@ volatile struct txdesc_host *ipc_host_txdesc_get(struct ipc_host_env_tag *env)
     os_printf("txdesc_free is %p\r\n", txdesc_free);
 
     return txdesc_free;
+#else
+    return (volatile struct txdesc_host *)utils_list_pick(env->list_free);
+#endif
 }
 
 int ipc_host_txdesc_left(struct ipc_host_env_tag *env, const int queue_idx, const int user_pos)
@@ -334,9 +370,9 @@ int ipc_host_txdesc_left(struct ipc_host_env_tag *env, const int queue_idx, cons
 
 void ipc_host_txdesc_push(struct ipc_host_env_tag *env, void *host_id)
 {
+#if 0
     uint32_t free_idx = env->txdesc_free_idx & nx_txdesc_cnt_msk[0];
     volatile struct txdesc_host *txdesc_pushed = env->txdesc + free_idx;
-
 
     // Descriptor is now ready
     txdesc_pushed->ready = 0xFFFFFFFF;
@@ -347,10 +383,21 @@ void ipc_host_txdesc_push(struct ipc_host_env_tag *env, void *host_id)
     // Increment the index
     env->txdesc_free_idx++;
 
-    os_printf("use free_idx %u\r\n", free_idx);
+    os_printf("vif %u use free_idx %lu\r\n", vif_type, free_idx);
+#else
+    struct txdesc_host* txdesc = NULL;
 
+    txdesc = (struct txdesc_host*)utils_list_pop_front(env->list_free);
+
+    // Descriptor is now ready
+    txdesc->ready = 0xFFFFFFFF;
+
+    // Save the host id in the environment
+    txdesc->host_id = host_id;
+
+    utils_list_push_back(env->list_ongoing, &txdesc->list_hdr);
+#endif
     // trigger interrupt!!!
-    //REG_SW_SET_PROFILING(env->pthis, CO_BIT(queue_idx+SW_PROF_IRQ_A2E_TXDESC_FIRSTBIT));
     ipc_app2emb_trigger_setf(CO_BIT(IPC_IRQ_A2E_TXDESC_FIRSTBIT));
 }
 
@@ -373,7 +420,8 @@ void ipc_host_irq(struct ipc_host_env_tag *env, uint32_t status)
         spin_lock(&((struct bl_hw *)env->pthis)->tx_lock);
 #endif
         // handle the TX confirmation reception
-        for (i = 0; i < IPC_TXQUEUE_CNT; i++) {
+        // XXX we just use IPC_TXQUEUE_CNT==1 for now
+        for (i = 0; i < 1; i++) {
             uint32_t q_bit = CO_BIT(i + IPC_IRQ_E2A_TXCFM_POS);
             if (status & q_bit) {
                 // handle the confirmation
@@ -385,8 +433,6 @@ void ipc_host_irq(struct ipc_host_env_tag *env, uint32_t status)
         spin_unlock(&((struct bl_hw *)env->pthis)->tx_lock);
 #endif
     }
-    void bl_tx_resend(void);
-    bl_tx_resend();
 
     if (status & IPC_IRQ_E2A_RXDESC) {
         os_printf("[IRQ-BH] IPC_IRQ_E2A_RXDESC\r\n");

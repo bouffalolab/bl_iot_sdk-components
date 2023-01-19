@@ -77,6 +77,7 @@ typedef enum
  *  @{
  */
 
+#define arch_delay_us       BL602_Delay_US
 #define ARCH_Delay_MS       BL602_Delay_MS
 #define ARCH_MemCpy_Fast    BL602_MemCpy_Fast
 /**

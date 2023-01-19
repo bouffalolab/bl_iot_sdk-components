@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -118,4 +118,9 @@ int reset_cmd_handler(void);
 #endif
 #endif
 
+//ble controller debug level
+#define BT_SCHEDULE_DEBUG_MASK  0x00000001
+#define BT_MEM_DEBUG_MASK       0x00000002
+//API to set ble controller debug level.
+void ble_set_controller_debug_level(uint32_t debug_level);
 #endif

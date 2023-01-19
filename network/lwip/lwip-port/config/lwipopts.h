@@ -1,6 +1,8 @@
 #ifndef __LWIPOPTS_H__
 #define __LWIPOPTS_H__
 
+#include "stdbool.h"
+
 /**
  * SYS_LIGHTWEIGHT_PROT==1: if you want inter-task protection for certain
  * critical regions during buffer allocation, deallocation and memory
@@ -67,7 +69,9 @@ a lot of data that needs to be copied, this should be set high. */
 #elif defined(CFG_CHIP_BL606P)
 #define MEM_SIZE                (60*1024)
 #elif defined(CFG_SDIOWIFI)
-#define MEM_SIZE                (24*1024)
+#define MEM_SIZE                (8*1024)
+#elif defined(CFG_NETBUS_WIFI_ENABLE)
+#define MEM_SIZE                (13*1024)
 #else
 #define MEM_SIZE                (8*1024)
 #endif
@@ -99,7 +103,7 @@ a lot of data that needs to be copied, this should be set high. */
 /* NUM of sys_timeout pool*/
 #define MEMP_NUM_SYS_TIMEOUT            (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 8 + 3)
 
-#define MEMP_NUM_NETCONN    (MEMP_NUM_TCP_PCB + MEMP_NUM_UDP_PCB + MEMP_NUM_TCP_PCB_LISTEN) 
+#define MEMP_NUM_NETCONN    (MEMP_NUM_TCP_PCB + MEMP_NUM_UDP_PCB + MEMP_NUM_TCP_PCB_LISTEN)
 
 /* ---------- Pbuf options ---------- */
 /* PBUF_POOL_SIZE: the number of buffers in the pbuf pool. */
@@ -108,13 +112,15 @@ a lot of data that needs to be copied, this should be set high. */
 #define PBUF_POOL_SIZE          200
 #elif defined(CFG_CHIP_BL606P)
 #define PBUF_POOL_SIZE          200
-#elif defined(BL602_MATTER_SUPPORT)
-#define PBUF_POOL_SIZE          16
 #else
 #if defined(CFG_ETHERNET_ENABLE)
 #define PBUF_POOL_SIZE          12
 #else
+#if defined(CFG_USE_WIFI_BR)
+#define PBUF_POOL_SIZE          16
+#else
 #define PBUF_POOL_SIZE          0
+#endif
 #endif
 #endif /*CFG_ETHERNET_ENABLE*/
 #endif
@@ -147,9 +153,9 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* TCP sender buffer space (bytes). */
 #if defined(CFG_CHIP_BL808)
-#define TCP_SND_BUF             (12*TCP_MSS) 
+#define TCP_SND_BUF             (12*TCP_MSS)
 #elif defined(CFG_CHIP_BL606P)
-#define TCP_SND_BUF             (12*TCP_MSS) 
+#define TCP_SND_BUF             (12*TCP_MSS)
 #else
 #ifdef CFG_ETHERNET_ENABLE
 #define TCP_SND_BUF             (11*TCP_MSS)
@@ -266,7 +272,7 @@ a lot of data that needs to be copied, this should be set high. */
   /* CHECKSUM_GEN_UDP==0: Generate checksums by hardware for outgoing UDP packets.*/
   #define CHECKSUM_GEN_UDP                0
   /* CHECKSUM_GEN_TCP==0: Generate checksums by hardware for outgoing TCP packets.*/
-  #define CHECKSUM_GEN_TCP                0 
+  #define CHECKSUM_GEN_TCP                0
   /* CHECKSUM_CHECK_IP==0: Check checksums by hardware for incoming IP packets.*/
   #define CHECKSUM_CHECK_IP               0
   /* CHECKSUM_CHECK_UDP==0: Check checksums by hardware for incoming UDP packets.*/
@@ -323,7 +329,6 @@ a lot of data that needs to be copied, this should be set high. */
 
 //#define LWIP_DEBUG                      0
 
-
 /*
    ---------------------------------
    ---------- OS options ----------
@@ -335,6 +340,8 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCPIP_THREAD_STACKSIZE          1536
 #elif defined(CFG_SDIOWIFI)
 #define TCPIP_THREAD_STACKSIZE          512
+#elif defined(CFG_NETBUS_WIFI_ENABLE)
+#define TCPIP_THREAD_STACKSIZE          1536
 #else
 #define TCPIP_THREAD_STACKSIZE          4000
 #endif /* CFG_ETHERNET_ENABLE */
@@ -343,7 +350,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define DEFAULT_TCP_RECVMBOX_SIZE       50
 #define DEFAULT_ACCEPTMBOX_SIZE         50
 #define DEFAULT_THREAD_STACKSIZE        500
-#define TCPIP_THREAD_PRIO               (configMAX_PRIORITIES - 2) 
+#define TCPIP_THREAD_PRIO               (configMAX_PRIORITIES - 2)
 
 #define LWIP_COMPAT_MUTEX               0
 #if defined(CFG_CHIP_BL808)
@@ -367,7 +374,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define MEMP_MEM_MALLOC                 0
 #define LWIP_SUPPORT_CUSTOM_PBUF        1
 
-#define PBUF_LINK_ENCAPSULATION_HLEN    128u
+#define PBUF_LINK_ENCAPSULATION_HLEN    48u
 
 #define LWIP_RAW                        1
 
@@ -381,15 +388,21 @@ a lot of data that needs to be copied, this should be set high. */
    ---------- MISC. options ----------
    ---------------------------------
 */
+
+extern int * __errno(void);
+#define errno (*__errno())
+
 /**
  * LWIP_RANDOMIZE_INITIAL_LOCAL_PORTS==1: randomize the local port for the first
  * local TCP/UDP pcb (default==0). This can prevent creating predictable port
  * numbers after booting a device.
  */
+#ifndef BL602_MATTER_SUPPORT
 #if defined(__cplusplus)
 extern "C" int bl_rand(void);
 #else
 extern int bl_rand(void);
+#endif
 #endif
 
 #define LWIP_RANDOMIZE_INITIAL_LOCAL_PORTS 1

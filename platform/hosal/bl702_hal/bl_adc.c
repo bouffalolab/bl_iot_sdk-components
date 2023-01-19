@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -33,9 +33,12 @@
 #include <bl_adc.h>
 #include <bl_irq.h>
 #include <bl_efuse.h>
+#include <hosal_dma.h>
 
 
 #define TSEN_SAMPLE_CNT            16
+#define VBAT_SAMPLE_CNT            16
+
 
 static int16_t tsen_refcode;
 
@@ -71,6 +74,7 @@ int bl_adc_tsen_init(void)
     ADC_Reset();
     ADC_Enable();
     ADC_Init(&adcCfg);
+    ADC_Vbat_Disable();
     ADC_Tsen_Init(ADC_TSEN_MOD_INTERNAL_DIODE);
     ADC_Channel_Config(ADC_CHAN_TSEN_P, ADC_CHAN_GND, 0);  // single-ended mode
     ADC_FIFO_Cfg(&adcFifoCfg);
@@ -87,8 +91,9 @@ int bl_adc_tsen_init(void)
 int16_t bl_adc_tsen_get_val(void)
 {
     int i;
-    int32_t sum;
-    int16_t v0, v1, vdelta, temperature;
+    uint32_t sum;
+    uint16_t v0, v1;
+    int16_t vdelta, temperature;
     
     // Get V0
     ADC_SET_TSVBE_LOW();
@@ -96,7 +101,7 @@ int16_t bl_adc_tsen_get_val(void)
     for(i=0; i<TSEN_SAMPLE_CNT; i++){
         ADC_Start();
         while(ADC_Get_FIFO_Count() == 0);
-        sum += (int16_t)ADC_Read_FIFO();
+        sum += (uint16_t)ADC_Read_FIFO();
     }
     v0 = sum / TSEN_SAMPLE_CNT;
     
@@ -106,7 +111,7 @@ int16_t bl_adc_tsen_get_val(void)
     for(i=0; i<TSEN_SAMPLE_CNT; i++){
         ADC_Start();
         while(ADC_Get_FIFO_Count() == 0);
-        sum += (int16_t)ADC_Read_FIFO();
+        sum += (uint16_t)ADC_Read_FIFO();
     }
     v1 = sum / TSEN_SAMPLE_CNT;
     
@@ -120,19 +125,86 @@ int16_t bl_adc_tsen_get_val(void)
 }
 
 
-static uint8_t tsen_dma_ch = 0xFF;
-static bl_adc_tsen_callback_t tsen_event;
-static int16_t tsen_buf[TSEN_SAMPLE_CNT];
-static volatile int tsen_fsm = 0;
+int bl_adc_vbat_init(void)
+{
+    ADC_CFG_Type adcCfg = {
+        .v18Sel=ADC_V18_SEL_1P82V,                      /*!< ADC 1.8V select */
+        .v11Sel=ADC_V11_SEL_1P1V,                       /*!< ADC 1.1V select */
+        .clkDiv=ADC_CLK_DIV_16,                         /*!< Clock divider */
+        .gain1=ADC_PGA_GAIN_1,                          /*!< PGA gain 1 */
+        .gain2=ADC_PGA_GAIN_1,                          /*!< PGA gain 2 */
+        .chopMode=ADC_CHOP_MOD_AZ_PGA_ON,               /*!< ADC chop mode select */
+        .biasSel=ADC_BIAS_SEL_MAIN_BANDGAP,             /*!< ADC current form main bandgap or aon bandgap */
+        .vcm=ADC_PGA_VCM_1V,                            /*!< ADC VCM value */
+        .vref=ADC_VREF_2P0V,                            /*!< ADC voltage reference */
+        .inputMode=ADC_INPUT_SINGLE_END,                /*!< ADC input signal type */
+        .resWidth=ADC_DATA_WIDTH_16_WITH_256_AVERAGE,   /*!< ADC resolution and oversample rate */
+        .offsetCalibEn=0,                               /*!< Offset calibration enable */
+        .offsetCalibVal=0,                              /*!< Offset calibration value */
+    };
+    
+    ADC_FIFO_Cfg_Type adcFifoCfg = {
+        .fifoThreshold = ADC_FIFO_THRESHOLD_1,
+        .dmaEn = DISABLE,
+    };
+    
+    // Set ADC clock to 32M
+    GLB_Set_ADC_CLK(ENABLE, GLB_ADC_CLK_XCLK, 0);
+    
+    // Initialize VBAT
+    ADC_Disable();
+    ADC_Reset();
+    ADC_Enable();
+    ADC_Init(&adcCfg);
+    ADC_Tsen_Disable();
+    ADC_Vbat_Enable();
+    ADC_Channel_Config(ADC_CHAN_VABT_HALF, ADC_CHAN_GND, 0);  // single-ended mode
+    ADC_FIFO_Cfg(&adcFifoCfg);
+    
+    // Skip the first bad sample
+    ADC_Start();
+    while(ADC_Get_FIFO_Count() == 0);
+    ADC_Read_FIFO();
+    
+    return 0;
+}
 
-static void tsen_dma_callback(void)
+float bl_adc_vbat_get_val(void)
 {
     int i;
-    int32_t sum;
-    static int16_t v0;
-    int16_t v1, vdelta, temperature;
+    uint32_t sum;
+    uint16_t vbat;
+    float volt;
     
-    BL_WR_REG(DMA_BASE, DMA_INTTCCLEAR, 1U << tsen_dma_ch);
+    sum = 0;
+    for(i=0; i<VBAT_SAMPLE_CNT; i++){
+        ADC_Start();
+        while(ADC_Get_FIFO_Count() == 0);
+        sum += (uint16_t)ADC_Read_FIFO();
+    }
+    vbat = sum / VBAT_SAMPLE_CNT;
+    
+    // Calculate battery voltage
+    volt = (float)vbat * 4 / 65536;
+    
+    return volt;
+}
+
+
+static int8_t tsen_dma_ch = -1;
+static bl_adc_tsen_callback_t tsen_event;
+static uint16_t tsen_buf[TSEN_SAMPLE_CNT];
+static volatile int tsen_fsm = 0;
+
+static void tsen_dma_callback(void *p_arg, uint32_t flag)
+{
+    int i;
+    uint32_t sum;
+    static uint16_t v0;
+    uint16_t v1;
+    int16_t vdelta, temperature;
+    
+    //BL_WR_REG(DMA_BASE, DMA_INTTCCLEAR, 1U << tsen_dma_ch);
     
     switch(tsen_fsm)
     {
@@ -216,6 +288,7 @@ static void tsen_adc_init(void)
     ADC_Reset();
     ADC_Enable();
     ADC_Init(&adcCfg);
+    ADC_Vbat_Disable();
     ADC_Tsen_Init(ADC_TSEN_MOD_INTERNAL_DIODE);
     ADC_Channel_Config(ADC_CHAN_TSEN_P, ADC_CHAN_GND, 1);  // continuous mode
     ADC_FIFO_Cfg(&adcFifoCfg);
@@ -228,7 +301,7 @@ static void tsen_dma_init(bl_adc_tsen_cfg_t *cfg)
         0,                         /* Destination address of DMA transfer */
         0,                         /* Transfer length, 0~4095, this is burst count */
         DMA_TRNS_P2M,              /* Transfer dir control. 0: Memory to Memory, 1: Memory to peripheral, 2: Peripheral to memory */
-        cfg->tsen_dma_ch,          /* Channel select 0-7 */
+        tsen_dma_ch,               /* Channel select 0-7 */
         DMA_TRNS_WIDTH_16BITS,     /* Transfer width. 0: 8  bits, 1: 16  bits, 2: 32  bits */
         DMA_TRNS_WIDTH_16BITS,     /* Transfer width. 0: 8  bits, 1: 16  bits, 2: 32  bits */
         DMA_BURST_SIZE_1,          /* Number of data items for burst transaction length. Each item width is as same as tansfer width. 0: 1 item, 1: 4 items, 2: 8 items, 3: 16 items */
@@ -242,13 +315,8 @@ static void tsen_dma_init(bl_adc_tsen_cfg_t *cfg)
         DMA_REQ_NONE,              /* Destination peripheral select */
     };
     
-    bl_irq_register(DMA_ALL_IRQn, tsen_dma_callback);
-    bl_irq_enable(DMA_ALL_IRQn);
-    
-    DMA_Enable();
-    DMA_IntMask(cfg->tsen_dma_ch, DMA_INT_ALL, MASK);
-    DMA_IntMask(cfg->tsen_dma_ch, DMA_INT_TCOMPLETED, UNMASK);
     DMA_Channel_Init(&dmaChCfg);
+    hosal_dma_irq_callback_set(tsen_dma_ch, tsen_dma_callback, NULL);
 }
 
 int bl_adc_tsen_dma_init(bl_adc_tsen_cfg_t *cfg)
@@ -257,14 +325,18 @@ int bl_adc_tsen_dma_init(bl_adc_tsen_cfg_t *cfg)
         return -1;
     }
     
-    if(cfg->tsen_dma_ch > 7){
-        return -1;
+    if(tsen_dma_ch < 0){
+        hosal_dma_init();
+        
+        tsen_dma_ch = hosal_dma_chan_request(0);
+        if(tsen_dma_ch < 0){
+            return -1;
+        }
     }
     
     tsen_adc_init();
     tsen_dma_init(cfg);
     
-    tsen_dma_ch = cfg->tsen_dma_ch;
     tsen_event = cfg->tsen_event;
     
     // Get TSEN ref code
@@ -273,7 +345,7 @@ int bl_adc_tsen_dma_init(bl_adc_tsen_cfg_t *cfg)
 
 int bl_adc_tsen_dma_trigger(void)
 {
-    if(tsen_dma_ch == 0xFF){
+    if(tsen_dma_ch < 0){
         return -1;
     }
     
@@ -298,17 +370,17 @@ int bl_adc_tsen_dma_is_busy(void)
 }
 
 
-static uint8_t adc_dma_ch = 0xFF;
+static int8_t adc_dma_ch = -1;
 static uint16_t pcm_frame_size;
 static int16_t *pcm_frame_buf[2];
 static bl_adc_voice_callback_t pcm_frame_event;
 static int pcm_frame_idx;
 
-static void voice_dma_callback(void)
+static void voice_dma_callback(void *p_arg, uint32_t flag)
 {
     int idx = pcm_frame_idx;
     
-    BL_WR_REG(DMA_BASE, DMA_INTTCCLEAR, 1U << adc_dma_ch);
+    //BL_WR_REG(DMA_BASE, DMA_INTTCCLEAR, 1U << adc_dma_ch);
     
     pcm_frame_idx = !pcm_frame_idx;
     DMA_Channel_Update_DstMemcfg(adc_dma_ch, (uint32_t)pcm_frame_buf[pcm_frame_idx], pcm_frame_size);
@@ -321,18 +393,19 @@ static void voice_dma_callback(void)
 
 static void voice_gpio_init(bl_adc_voice_cfg_t *cfg)
 {
+    GLB_GPIO_Type adcPinList[] = {8, 15, 17, 11, 12, 14, 7, 9, 18, 19, 20, 21};
     GLB_GPIO_Cfg_Type gpioCfg;
     
-    gpioCfg.gpioFun = 10;
-    gpioCfg.gpioMode = GPIO_MODE_AF;
+    gpioCfg.gpioFun = GPIO_FUN_ANALOG;
+    gpioCfg.gpioMode = GPIO_MODE_ANALOG;
     gpioCfg.pullType = GPIO_PULL_NONE;
-    gpioCfg.drive = 1;
-    gpioCfg.smtCtrl = 1;
+    gpioCfg.drive = 0;
+    gpioCfg.smtCtrl = 0;
     
-    gpioCfg.gpioPin = cfg->adc_pos_pin;
+    gpioCfg.gpioPin = adcPinList[cfg->adc_pos_ch];
     GLB_GPIO_Init(&gpioCfg);
     
-    gpioCfg.gpioPin = cfg->adc_neg_pin;
+    gpioCfg.gpioPin = adcPinList[cfg->adc_neg_ch];
     GLB_GPIO_Init(&gpioCfg);
 }
 
@@ -360,23 +433,6 @@ static void voice_adc_init(bl_adc_voice_cfg_t *cfg)
         .dmaEn = ENABLE,
     };
     
-    uint8_t adcPins[] = {8, 15, 17, 11, 12, 14, 7, 9, 18, 19, 20, 21};
-    ADC_Chan_Type adcPosCh, adcNegCh;
-    
-    // Get positive channel
-    for(adcPosCh = ADC_CHAN0; adcPosCh <= ADC_CHAN11; adcPosCh++){
-        if(adcPins[adcPosCh] == cfg->adc_pos_pin){
-            break;
-        }
-    }
-    
-    // Get negative channel
-    for(adcNegCh = ADC_CHAN0; adcNegCh <= ADC_CHAN11; adcNegCh++){
-        if(adcPins[adcNegCh] == cfg->adc_neg_pin){
-            break;
-        }
-    }
-    
     // Set ADC clock to 32M
     GLB_Set_ADC_CLK(ENABLE, GLB_ADC_CLK_XCLK, 0);
     
@@ -385,7 +441,8 @@ static void voice_adc_init(bl_adc_voice_cfg_t *cfg)
     ADC_Enable();
     ADC_Init(&adcCfg);
     ADC_Tsen_Disable();
-    ADC_Channel_Config(adcPosCh, adcNegCh, 1);
+    ADC_Vbat_Disable();
+    ADC_Channel_Config(cfg->adc_pos_ch, cfg->adc_neg_ch, 1);
     ADC_FIFO_Cfg(&adcFifoCfg);
     
     // Set pga_vcmi_en = 1 for mic
@@ -399,7 +456,7 @@ static void voice_dma_init(bl_adc_voice_cfg_t *cfg)
         0,                         /* Destination address of DMA transfer */
         0,                         /* Transfer length, 0~4095, this is burst count */
         DMA_TRNS_P2M,              /* Transfer dir control. 0: Memory to Memory, 1: Memory to peripheral, 2: Peripheral to memory */
-        cfg->adc_dma_ch,           /* Channel select 0-7 */
+        adc_dma_ch,                /* Channel select 0-7 */
         DMA_TRNS_WIDTH_16BITS,     /* Transfer width. 0: 8  bits, 1: 16  bits, 2: 32  bits */
         DMA_TRNS_WIDTH_16BITS,     /* Transfer width. 0: 8  bits, 1: 16  bits, 2: 32  bits */
         DMA_BURST_SIZE_1,          /* Number of data items for burst transaction length. Each item width is as same as tansfer width. 0: 1 item, 1: 4 items, 2: 8 items, 3: 16 items */
@@ -413,13 +470,8 @@ static void voice_dma_init(bl_adc_voice_cfg_t *cfg)
         DMA_REQ_NONE,              /* Destination peripheral select */
     };
     
-    bl_irq_register(DMA_ALL_IRQn, voice_dma_callback);
-    bl_irq_enable(DMA_ALL_IRQn);
-    
-    DMA_Enable();
-    DMA_IntMask(cfg->adc_dma_ch, DMA_INT_ALL, MASK);
-    DMA_IntMask(cfg->adc_dma_ch, DMA_INT_TCOMPLETED, UNMASK);
     DMA_Channel_Init(&dmaChCfg);
+    hosal_dma_irq_callback_set(adc_dma_ch, voice_dma_callback, NULL);
 }
 
 int bl_adc_voice_init(bl_adc_voice_cfg_t *cfg)
@@ -428,19 +480,15 @@ int bl_adc_voice_init(bl_adc_voice_cfg_t *cfg)
         return -1;
     }
     
-    if(cfg->adc_pos_pin < 7 || cfg->adc_pos_pin == 10 || cfg->adc_pos_pin == 13 || cfg->adc_pos_pin == 16 || cfg->adc_pos_pin > 21){
+    if(cfg->adc_pos_ch > 11){
         return -1;
     }
     
-    if(cfg->adc_neg_pin < 7 || cfg->adc_neg_pin == 10 || cfg->adc_neg_pin == 13 || cfg->adc_neg_pin == 16 || cfg->adc_neg_pin > 21){
+    if(cfg->adc_neg_ch > 11){
         return -1;
     }
     
-    if(cfg->adc_pos_pin == cfg->adc_neg_pin){
-        return -1;
-    }
-    
-    if(cfg->adc_dma_ch > 7){
+    if(cfg->adc_pos_ch == cfg->adc_neg_ch){
         return -1;
     }
     
@@ -456,11 +504,19 @@ int bl_adc_voice_init(bl_adc_voice_cfg_t *cfg)
         return -1;
     }
     
+    if(adc_dma_ch < 0){
+        hosal_dma_init();
+        
+        adc_dma_ch = hosal_dma_chan_request(0);
+        if(adc_dma_ch < 0){
+            return -1;
+        }
+    }
+    
     voice_gpio_init(cfg);
     voice_adc_init(cfg);
     voice_dma_init(cfg);
     
-    adc_dma_ch = cfg->adc_dma_ch;
     pcm_frame_size = cfg->pcm_frame_size;
     pcm_frame_buf[0] = cfg->pcm_frame_buf[0];
     pcm_frame_buf[1] = cfg->pcm_frame_buf[1];
@@ -471,7 +527,7 @@ int bl_adc_voice_init(bl_adc_voice_cfg_t *cfg)
 
 int bl_adc_voice_start(void)
 {
-    if(adc_dma_ch == 0xFF){
+    if(adc_dma_ch < 0){
         return -1;
     }
     
@@ -486,7 +542,7 @@ int bl_adc_voice_start(void)
 
 int bl_adc_voice_stop(void)
 {
-    if(adc_dma_ch == 0xFF){
+    if(adc_dma_ch < 0){
         return -1;
     }
     

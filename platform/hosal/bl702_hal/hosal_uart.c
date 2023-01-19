@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -30,7 +30,6 @@
 
 #include <bl702_uart.h>
 #include <bl702_glb.h>
-#include <bl702_romdriver.h>
 #include "bl_uart.h"
 #include "bl_irq.h"
 #include "hosal_uart.h"
@@ -51,20 +50,12 @@ static void gpio_init(uint8_t id, uint8_t tx_pin, uint8_t rx_pin, uint8_t cts_pi
     cfg.gpioPin = rx_pin;
     cfg.gpioMode = GPIO_MODE_AF;
     cfg.pullType = GPIO_PULL_UP;
-#if 0//defined(CFG_PDS_OPTIMIZE) || defined(CFG_HBN_OPTIMIZE)
-    RomDriver_GLB_GPIO_Init(&cfg);
-#else
     GLB_GPIO_Init(&cfg);
-#endif
 
     cfg.gpioPin = tx_pin;
     cfg.gpioMode = GPIO_MODE_AF;
     cfg.pullType = GPIO_PULL_UP;
-#if 0//defined(CFG_PDS_OPTIMIZE) || defined(CFG_HBN_OPTIMIZE)
-    RomDriver_GLB_GPIO_Init(&cfg);
-#else
     GLB_GPIO_Init(&cfg);
-#endif
 
     /* select uart gpio function */
     if (id == 0) {

@@ -51,6 +51,15 @@
 #include "lwip/ip6.h"
 #include "lwip/ip6_addr.h"
 
+/**
+* bouffalo lp change
+* TCP_TMR Optimization, only enable tcp_tmr MAX_TCP_ONCE_RUNNING_TIME
+*/
+#include "lwip/timeouts.h"
+#include "FreeRTOS.h"
+#include "timers.h"
+/** bouffalo lp change end */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -275,9 +284,12 @@ struct tcp_pcb {
      as we have to do some math with them */
 
   /* Timers */
-  u8_t polltmr, pollinterval;
+  u32_t polltmr;
+  u8_t pollinterval;
   u8_t last_timer;
   u32_t tmr;
+
+  u32_t fin_wait1_tmr;
 
   /* receiver variables */
   u32_t rcv_nxt;   /* next seqno expected */
@@ -291,8 +303,8 @@ struct tcp_pcb {
 #define LWIP_TCP_SACK_VALID(pcb, idx) ((pcb)->rcv_sacks[idx].left != (pcb)->rcv_sacks[idx].right)
 #endif /* LWIP_TCP_SACK_OUT */
 
-  /* Retransmission timer. */
-  s16_t rtime;
+  /* Retransmission time. */
+  u32_t rtime;
 
   u16_t mss;   /* maximum segment size */
 
@@ -372,8 +384,8 @@ struct tcp_pcb {
   u32_t keep_cnt;
 #endif /* LWIP_TCP_KEEPALIVE */
 
-  /* Persist timer counter */
-  u8_t persist_cnt;
+  /* Last persist probe timestamp */
+  u32_t persist_last;
   /* Persist timer back-off */
   u8_t persist_backoff;
   /* Number of persist probes */
@@ -381,7 +393,12 @@ struct tcp_pcb {
 
   /* KEEPALIVE counter */
   u8_t keep_cnt_sent;
-
+  /**
+   * bouffalo lp change
+   * TCP_TMR Optimization, only enable tcp_tmr MAX_TCP_ONCE_RUNNING_TIME
+   */
+  TimerHandle_t keepalive_os_timer;
+  /** bouffalo lp change end */
 #if LWIP_WND_SCALE
   u8_t snd_scale;
   u8_t rcv_scale;

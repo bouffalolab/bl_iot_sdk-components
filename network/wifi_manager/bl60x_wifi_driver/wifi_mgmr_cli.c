@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -848,9 +848,7 @@ static void wifi_power_saving_set(char *buf, int len, int argc, char **argv)
     ms = atoi(argv[1]);
     bl_os_printf("Setting wifi ps acitve to %d\r\n", ms);
 
-    if (ms > 0) {
-        wifi_mgmr_set_wifi_active_time(ms);
-    }
+    wifi_mgmr_set_wifi_active_time(ms);
 }
 
 static void sniffer_cb(void *env, uint8_t *pkt, int len, struct bl_rx_info *info)

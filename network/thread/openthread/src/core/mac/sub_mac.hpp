@@ -102,28 +102,11 @@ class LinkRaw;
  * addresses and PAN Id.
  *
  */
-
-extern "C" uint32_t otGetSubMacCslReceiveAhead(void);
-extern "C" uint32_t otGetSubMacCslMinWindow(void);
-extern "C" uint8_t otGetSubMacUnitBackoffPeriod(void);
-extern "C" uint8_t otGetSubMacRetxDelayMinBackoffExp(void);
-extern "C" uint8_t otGetSubMacRetxDelayMaxBackoffExp(void);
-extern "C" bool otGetSubMacInfo(otInstance *aInstance, bool *pIsCslActive, uint32_t *pCslLastSync, uint32_t *pCslPeriod, uint8_t *pCslChannel, uint8_t *pCslState, uint8_t *pCslParentAccuracy, uint8_t *pCslParentUncertainty );
-extern "C" bool otSetSubMacInfo(otInstance *aInstance,uint32_t cslLastSync,uint8_t cslState, uint32_t sampleTime);
-extern "C" bool otIsSubMacIdle(otInstance *aInstance);
 class SubMac : public InstanceLocator, private NonCopyable
 {
     friend class Radio::Callbacks;
     friend class LinkRaw;
 
-    friend uint32_t otGetSubMacCslReceiveAhead(void);
-    friend uint32_t otGetSubMacCslMinWindow(void);
-    friend uint8_t otGetSubMacUnitBackoffPeriod(void);
-    friend uint8_t otGetSubMacRetxDelayMinBackoffExp(void);
-    friend uint8_t otGetSubMacRetxDelayMaxBackoffExp(void);
-    friend bool otGetSubMacInfo(otInstance *aInstance, bool *pIsCslActive, uint32_t *pCslLastSync, uint32_t *pCslPeriod, uint8_t *pCslChannel, uint8_t *pCslState, uint8_t *pCslParentAccuracy, uint8_t *pCslParentUncertainty );
-    friend bool otSetSubMacInfo(otInstance *aInstance,uint32_t cslLastSync,uint8_t cslState, uint32_t sampleTime);
-    friend bool otIsSubMacIdle(otInstance *aInstance);
 public:
     static constexpr int8_t kInvalidRssiValue = 127; ///< Invalid Received Signal Strength Indicator (RSSI) value.
 
@@ -545,21 +528,6 @@ public:
      *
      */
     bool IsRadioFilterEnabled(void) const { return mRadioFilterEnabled; }
-#endif
-
-    static void * GetTimerHandler(void);
-#if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
-    static void * GetCslTimerHandler(void);
-    void SetSampleTime(uint32_t sampleTime) {mCslSampleTime = TimeMicro(sampleTime);}
-#endif
-
-    uint8_t GetState(void) {return mState;}
-    // void SetState(uint8_t state) { mState = static_cast<State>(state);}
-#if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
-    bool IsIdle(void) {return mState == kStateDisabled || mState == kStateSleep || mState == kStateCslSample;}
-    void GetCslInfo(uint32_t *pCslLastSync, uint8_t *pCslState);
-#else
-    bool IsIdle(void) {return mState == kStateDisabled || mState == kStateSleep;}
 #endif
 
 private:

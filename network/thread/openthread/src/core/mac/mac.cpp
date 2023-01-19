@@ -2376,43 +2376,5 @@ void Mac::SetRadioFilterEnabled(bool aFilterEnabled)
 }
 #endif
 
-void * Mac::PrepareDataRequest(void)
-{
-    TxFrames &txFrames = mLinks.GetTxFrames();
-    txFrames.SetChannel(mRadioChannel);
-    txFrames.SetMaxCsmaBackoffs(kMaxCsmaBackoffsDirect);
-    txFrames.SetMaxFrameRetries(mMaxFrameRetriesDirect);
-    
-    return Get<DataPollSender>().PrepareDataRequest(txFrames);
-}
-
-extern "C" bool otGetMacInfo(otInstance *aInstance, void ** pframe, uint8_t *pSeq, uint8_t *pChannel) 
-{
-    if (otInstanceIsInitialized(aInstance)) {
-        *pSeq = AsCoreType(aInstance).Get<Mac>().GetDataSequence();
-        *pChannel = AsCoreType(aInstance).Get<Mac>().GetPanChannel();
-
-        *pframe = (void*)AsCoreType(aInstance).Get<Mac>().PrepareDataRequest();
-
-        return true;
-    }
-
-    return false;
-}
-
-extern "C" bool otSetMacInfo(otInstance *aInstance, uint8_t seq) 
-{
-    if (otInstanceIsInitialized(aInstance)) {
-        AsCoreType(aInstance).Get<Mac>().SetDataSequence(seq);
-        return true;
-    }
-
-    return false;
-}
-
-extern "C" uint32_t otGetMacDataPollTimeout(void) 
-{
-    return kDataPollTimeout;
-}
 } // namespace Mac
 } // namespace ot

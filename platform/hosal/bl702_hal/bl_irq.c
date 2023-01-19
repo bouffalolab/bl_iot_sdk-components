@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -325,6 +325,7 @@ struct{
 	uint32_t mcause;
 	uint32_t mepc;
 	uint32_t mtval;
+	uint32_t ra;
 }rval[4];
 int rval_idx;
 #endif /* DBG_RECORD_EXCEP_VAL */
@@ -391,6 +392,7 @@ void exception_entry(uint32_t mcause, uint32_t mepc, uint32_t mtval, uintptr_t *
 	rval[rval_idx&0x3].mcause = mcause;
 	rval[rval_idx&0x3].mepc = mepc;
 	rval[rval_idx&0x3].mtval = mtval;
+	rval[rval_idx&0x3].ra = (uint32_t)tasksp[REG_RA];
 	rval_idx++;
 #endif /* DBG_RECORD_EXCEP_VAL */
 	puts("Exception Entry--->>>\r\n");

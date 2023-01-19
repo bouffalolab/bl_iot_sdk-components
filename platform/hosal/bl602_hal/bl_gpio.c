@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -142,8 +142,10 @@ static int exec_gpio_handler(gpio_ctx_t *pstnode)
 
     if (pstnode->gpio_handler) {
         pstnode->gpio_handler(pstnode);
+        bl_gpio_intmask(pstnode->gpioPin, 0);
         return 0;
     }
+    bl_gpio_intmask(pstnode->gpioPin, 0);
 
     return -1;
 }

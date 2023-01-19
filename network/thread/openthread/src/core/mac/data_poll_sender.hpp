@@ -59,12 +59,9 @@ namespace ot {
  * This class implements the data poll (mac data request command) sender.
  *
  */
-extern "C" void *otGetDataPollingTimerFunctPtr(void);
 
 class DataPollSender : public InstanceLocator, private NonCopyable
 {
-    friend void *otGetDataPollingTimerFunctPtr(void);
-
 public:
     static constexpr uint8_t kDefaultFastPolls  = 8;  ///< Default number of fast poll tx (@sa StartFastPolls).
     static constexpr uint8_t kMaxFastPolls      = 15; ///< Maximum number of fast poll tx allowed.
@@ -258,10 +255,6 @@ public:
      */
     Mac::TxFrame *PrepareDataRequest(Mac::TxFrames &aTxFrames);
 
-    void GetPollingInfo(bool *pRetx, uint32_t* pPollPeriodCurrent, uint32_t *pPollPeriodDefault, uint8_t *pPollQuick, 
-                                        uint8_t *pPollFastRemaining, uint8_t *pPollFailure);
-
-    void SetPollingInfo(bool retxMode, uint32_t pollPeriodCurrent, uint8_t pollQuick, uint8_t pollFastRemaining, uint8_t pollFailure);
 private:
     static constexpr uint8_t kQuickPollsAfterTimeout = 5; // Quick data poll tx in case of back-to-back poll timeouts.
     static constexpr uint8_t kMaxPollRetxAttempts    = OPENTHREAD_CONFIG_FAILED_CHILD_TRANSMISSIONS;

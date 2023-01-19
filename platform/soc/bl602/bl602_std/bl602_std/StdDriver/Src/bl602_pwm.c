@@ -35,6 +35,7 @@
   */
 
 #include "bl602_pwm.h"
+#include "bl602_glb.h"
 
 /** @addtogroup  BL602_Peripheral_Driver
  *  @{
@@ -85,6 +86,7 @@ static intCallback_Type * PWMIntCbfArra[PWM_CH_MAX][PWM_INT_ALL]= {
 #ifndef BL602_USE_HAL_DRIVER
 static BL_Err_Type PWM_IntHandler(IRQn_Type intPeriph);
 #endif
+static void PWM_Calculate_Period_Threshold(uint32_t frequency, float dutyCycle, uint32_t *clkDiv, uint32_t *period, uint32_t *threshold);
 
 /*@} end of group PWM_Private_Fun_Declaration */
 
@@ -136,6 +138,47 @@ static BL_Err_Type PWM_IntHandler(IRQn_Type intPeriph)
     return SUCCESS;
 }
 #endif
+
+/****************************************************************************/ /**
+ * @brief  PWM calculate period and threshold for smart configuration
+ *
+ * @param  frequency: PWM frequency
+ * @param  dutyCycle: PWM duty cycle
+ * @param  clkDiv: PWM clock div
+ * @param  period: PWM period
+ * @param  threshold: PWM threshold for duty cycle
+ *
+ * @return SUCCESS
+ *
+*******************************************************************************/
+static void PWM_Calculate_Period_Threshold(uint32_t frequency, float dutyCycle, uint32_t *clkDiv, uint32_t *period, uint32_t *threshold)
+{
+    if (frequency <= 40) {
+        *clkDiv = 625;
+        *period = 64000 / frequency;
+        *threshold = 640 * dutyCycle / frequency;
+    } else if (frequency <= 78) {
+        *clkDiv = 16;
+        *period = 2500000 / frequency;
+        *threshold = 25000 * dutyCycle / frequency;
+    } else if (frequency <= 155) {
+        *clkDiv = 8;
+        *period = 5000000 / frequency;
+        *threshold = 50000 * dutyCycle / frequency;
+    } else if (frequency <= 310) {
+        *clkDiv = 4;
+        *period = 10000000 / frequency;
+        *threshold = 100000 * dutyCycle / frequency;
+    } else if (frequency <= 620) {
+        *clkDiv = 2;
+        *period = 20000000 / frequency;
+        *threshold = 200000 * dutyCycle / frequency;
+    } else {
+        *clkDiv = 1;
+        *period = 40000000 / frequency;
+        *threshold = 400000 * dutyCycle / frequency;
+    }
+}
 
 /*@} end of group PWM_Private_Functions */
 
@@ -581,7 +624,125 @@ BL_Err_Type PWM_Smart_Configure(PWM_CH_ID_Type ch,uint32_t frequency,uint8_t dut
     return SUCCESS;
 }
 
+/****************************************************************************/ /**
+ * @brief  PWM smart configure according to frequency and duty cycle(float type) function
+ *
+ * @param  ch: PWM channel number
+ * @param  frequency: PWM frequency
+ * @param  dutyCycle: PWM duty cycle(float type)
+ *
+ * @return SUCCESS or TIMEOUT
+ *
+*******************************************************************************/
+BL_Err_Type PWM_Smart_Configure_Float(PWM_CH_ID_Type ch, uint32_t frequency, float dutyCycle)
+{
+    uint32_t tmpVal;
+    uint16_t clkDiv, period, threshold2;
+    uint32_t timeoutCnt = PWM_STOP_TIMEOUT_COUNT;
+    /* Get channel register */
+    uint32_t PWMx = PWM_Get_Channel_Reg(ch);
+
+    if (frequency <= 40) {
+        clkDiv = 625;
+        period = 64000 / frequency;
+        threshold2 = 640 * dutyCycle / frequency;
+    } else if (frequency <= 78) {
+        clkDiv = 16;
+        period = 2500000 / frequency;
+        threshold2 = 25000 * dutyCycle / frequency;
+    } else if (frequency <= 155) {
+        clkDiv = 8;
+        period = 5000000 / frequency;
+        threshold2 = 50000 * dutyCycle / frequency;
+    } else if (frequency <= 310) {
+        clkDiv = 4;
+        period = 10000000 / frequency;
+        threshold2 = 100000 * dutyCycle / frequency;
+    } else if (frequency <= 620) {
+        clkDiv = 2;
+        period = 20000000 / frequency;
+        threshold2 = 200000 * dutyCycle / frequency;
+    } else {
+        clkDiv = 1;
+        period = 40000000 / frequency;
+        threshold2 = 400000 * dutyCycle / frequency;
+    }
+
+    tmpVal = BL_RD_REG(PWMx, PWM_CONFIG);
+    if (BL_GET_REG_BITS_VAL(tmpVal, PWM_REG_CLK_SEL) != PWM_CLK_XCLK) {
+        BL_WR_REG(PWMx, PWM_CONFIG, BL_SET_REG_BIT(tmpVal, PWM_STOP_EN));
+        while (!BL_IS_REG_BIT_SET(BL_RD_REG(PWMx, PWM_CONFIG), PWM_STS_TOP)) {
+            timeoutCnt--;
+            if (timeoutCnt == 0) {
+                return TIMEOUT;
+            }
+        }
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PWM_REG_CLK_SEL, PWM_CLK_XCLK);
+    }
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PWM_OUT_INV, PWM_POL_NORMAL);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PWM_STOP_MODE, PWM_STOP_GRACEFUL);
+    BL_WR_REG(PWMx, PWM_CONFIG, tmpVal);
+
+    /* Config pwm division */
+    BL_WR_REG(PWMx, PWM_CLKDIV, clkDiv);
+
+    /* Config pwm period and duty */
+    BL_WR_REG(PWMx, PWM_PERIOD, period);
+    BL_WR_REG(PWMx, PWM_THRE1, 0);
+    BL_WR_REG(PWMx, PWM_THRE2, threshold2);
+
+    return SUCCESS;
+}
+
 /****************************************************************************//**
+ * @brief  PWM 2 multichannel smart configure according to frequency and duty cycle(float type) function
+ *
+ * @param  ch0: First channel id
+ * @param  pin0: GPIO pin of first channel
+ * @param  frequency0: Frequency of first channel
+ * @param  dutyCycle0: Duty cycle of first channel
+ * @param  ch1: Second channel id
+ * @param  pin1: GPIO pin of Second channel
+ * @param  frequency1: Frequency of Second channel
+ * @param  dutyCycle1: Duty cycle of Second channel
+ *
+ * @return SUCCESS or TIMEOUT
+ *
+*******************************************************************************/
+BL_Err_Type PWM_Smart_Configure_Float_2channels(PWM_CH_ID_Type ch0, uint32_t pin0, uint32_t frequency0, float dutyCycle0, \
+                                                PWM_CH_ID_Type ch1, uint32_t pin1, uint32_t frequency1, float dutyCycle1)
+{
+    uint32_t i, PWMx[2], pwmCfg[2][4];
+    uint32_t volatile *pointer0, *pointer1;
+    static uint32_t firstFlag = 0;
+    GLB_GPIO_Type pins[2] = {pin0, pin1};
+
+    PWM_Calculate_Period_Threshold(frequency0, dutyCycle0, &pwmCfg[0][0], &pwmCfg[0][3], &pwmCfg[0][2]);
+    PWM_Calculate_Period_Threshold(frequency1, dutyCycle1, &pwmCfg[1][0], &pwmCfg[1][3], &pwmCfg[1][2]);
+    PWMx[0] = PWM_Get_Channel_Reg(ch0);
+    PWMx[1] = PWM_Get_Channel_Reg(ch1);
+    
+    pwmCfg[0][1] = 0;
+    pwmCfg[1][1] = 0;
+    
+    if (firstFlag == 0) {
+        GLB_GPIO_Func_Init(GPIO_FUN_PWM, pins, 2);
+        GLB_AHB_Slave1_Reset(BL_AHB_SLAVE1_PWM);
+    }
+    firstFlag = 1;
+
+    pointer0 = (uint32_t*)(PWMx[0]);
+    pointer1 = (uint32_t*)(PWMx[1]);
+    
+    for(i=0;i<4;i++){
+        *pointer0++ = pwmCfg[0][i];
+        *pointer1++ = pwmCfg[1][i];
+    }
+
+    return SUCCESS;
+}
+
+/****************************************************************************/ /**
  * @brief  PWM interrupt function
  *
  * @param  None

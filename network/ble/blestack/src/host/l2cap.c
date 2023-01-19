@@ -1961,9 +1961,12 @@ int bt_l2cap_send_data(struct bt_conn *conn, uint16_t tx_cid, uint8_t *data, uin
      uint8_t *data_ptr;
      struct bt_l2cap_chan *chan = NULL;
 
+     #if defined(CONFIG_BT_BREDR)
      if(conn->type == BT_CONN_TYPE_BR) {
          chan = bt_l2cap_br_lookup_tx_cid(conn, tx_cid);
-     }else if(conn->type == BT_CONN_TYPE_LE){
+     }else 
+     #endif
+     if(conn->type == BT_CONN_TYPE_LE){
          chan = bt_l2cap_le_lookup_tx_cid(conn, tx_cid);
      }
      if(!chan)
@@ -1984,9 +1987,12 @@ int bt_l2cap_disconnect(struct bt_conn *conn, uint16_t tx_cid)
 {
      struct bt_l2cap_chan *chan = NULL;
 
+     #if defined(CONFIG_BT_BREDR)
      if(conn->type == BT_CONN_TYPE_BR) {
          chan = bt_l2cap_br_lookup_tx_cid(conn, tx_cid);
-     }else if(conn->type == BT_CONN_TYPE_LE){
+     }else 
+     #endif
+     if(conn->type == BT_CONN_TYPE_LE){
          chan = bt_l2cap_le_lookup_tx_cid(conn, tx_cid);
      }
     

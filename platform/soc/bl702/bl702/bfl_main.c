@@ -12,6 +12,7 @@
 #include <event_device.h>
 #include <cli.h>
 
+#include <bl702_glb.h>
 #include <bl_sys.h>
 #include <bl_chip.h>
 #include <bl_irq.h>
@@ -34,6 +35,10 @@
 #ifdef SYS_USER_VFS_ROMFS_ENABLE
 #include <bl_romfs.h>
 #endif
+#if defined(CFG_USE_PSRAM)
+#include <bl_psram.h>
+#endif /* CFG_USE_PSRAM */
+
 
 HOSAL_UART_DEV_DECL(uart_stdio, 0, 14, 15, 2000000);
 
@@ -48,6 +53,15 @@ static HeapRegion_t xHeapRegions[] =
     { NULL, 0 }, /* Terminates the array. */
     { NULL, 0 } /* Terminates the array. */
 };
+#if defined(CFG_USE_PSRAM)
+        extern uint8_t _heap3_start;
+        extern uint8_t _heap3_size; // @suppress("Type cannot be resolved")
+        static const HeapRegion_t xHeapRegionsPsram[] =
+        {
+            { &_heap3_start, (unsigned int) &_heap3_size},
+            { NULL, 0 } /* Terminates the array. */
+        };
+#endif /* CFG_USE_PSRAM */
 
 void __attribute__((weak)) vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName )
 {
@@ -156,6 +170,26 @@ static void app_main_entry(void *pvParameters)
     vTaskDelete(NULL);
 }
 
+void __attribute__((weak)) app_aos_init()
+{
+#ifdef SYS_AOS_CLI_ENABLE
+    int fd_console;
+    fd_console = aos_open("/dev/ttyS0", 0);
+    if (fd_console >= 0) {
+        printf("Init CLI with event Driven\r\n");
+        aos_cli_init(0);
+        aos_poll_read_fd(fd_console, aos_cli_event_cb_read_get(), (void*)0x12345678);
+        _cli_init(fd_console);
+    }
+#elif defined (CFG_ZIGBEE_DONGLE_EN)
+    extern void zb_dongle_init(void);
+    zb_dongle_init();
+#elif defined (CFG_OPENTHREAD_CLI_EN)
+    extern void ot_cli_init(void);
+    ot_cli_init();
+#endif
+}
+
 static void aos_loop_proc(void *pvParameters)
 {
 #ifdef SYS_LOOPRT_ENABLE
@@ -195,22 +229,7 @@ static void aos_loop_proc(void *pvParameters)
     aos_loop_init();
 #endif
 
-#ifdef SYS_AOS_CLI_ENABLE
-    int fd_console;
-    fd_console = aos_open("/dev/ttyS0", 0);
-    if (fd_console >= 0) {
-        printf("Init CLI with event Driven\r\n");
-        aos_cli_init(0);
-        aos_poll_read_fd(fd_console, aos_cli_event_cb_read_get(), (void*)0x12345678);
-        _cli_init(fd_console);
-    }
-#elif defined (CFG_ZIGBEE_DONGLE_EN)
-    extern void zb_dongle_init(void);
-    zb_dongle_init();
-#elif defined (CFG_OPENTHREAD_EN)
-    extern void ot_cli_init(void);
-    ot_cli_init();
-#endif
+    app_aos_init();
 
     xTaskCreate(app_main_entry,
             (char*)"main",
@@ -308,6 +327,13 @@ static void system_early_init(void)
     /* To be added... */
     /* board config is set after system is init*/
     hal_board_cfg(0);
+
+#if defined(CFG_USE_PSRAM)
+    bl_psram_init();
+    vPortDefineHeapRegionsPsram(xHeapRegionsPsram);
+    printf("PSRAM Heap %u@%p\r\n",(unsigned int)&_heap3_size, &_heap3_start);
+#endif /*CFG_USE_PSRAM*/
+
 }
 
 void bl702_main()
@@ -323,6 +349,9 @@ void bl702_main()
 
     _dump_boot_info();
 
+    printf("Reset Info %d\r\n", bl_sys_rstinfo_get());
+    printf("CPU %luHz\r\n", SystemCoreClockGet());
+
     printf("Heap %u@%p, %u@%p\r\n",
             (unsigned int)&_heap_size, &_heap_start,
             (unsigned int)&_heap2_size, &_heap2_start
@@ -331,7 +360,7 @@ void bl702_main()
     system_early_init();
 
     puts("[OS] Starting aos_loop_proc task...\r\n");
-    xTaskCreateStatic(aos_loop_proc, (char*)"event_loop", sizeof(aos_loop_proc_stack)/4, NULL, 15, aos_loop_proc_stack, &aos_loop_proc_task);
+    xTaskCreateStatic(aos_loop_proc, (char*)"event_loop", sizeof(aos_loop_proc_stack)/4, NULL, SYS_AOS_LOOP_TASK_PRIORITY, aos_loop_proc_stack, &aos_loop_proc_task);
 
     puts("[OS] Starting OS Scheduler...\r\n");
     vTaskStartScheduler();

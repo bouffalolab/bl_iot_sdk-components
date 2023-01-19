@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -39,10 +39,13 @@
 #include <looprt.h>
 #include <loopset.h>
 #include <bl_gpio.h>
-#include <bl_ir.h>
+//#include <bl_ir.h>
 #include <aos/yloop.h>
 
 #include <loopset_ir.h>
+
+extern uint32_t bl_receivedata(void);
+extern void bl_enable_rx_int(void);
 
 struct loop_evt_handler_holder {
     const struct loop_evt_handler handler;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -181,6 +181,7 @@ int bl_sys_em_config(void)
 
 int bl_sys_early_init(void)
 {
+    int ret;
 #if 0
     // hclk 40 Mhz
     GLB_Set_System_CLK_Div(3,0);
@@ -188,13 +189,17 @@ int bl_sys_early_init(void)
 #else
     // default 80Mhz
 #endif
+
     /* read flash config*/
-    bl_flash_init();
+    if (bl_flash_init() != SUCCESS) {
+      printf("flash init failed!!!\n");
+      while(1);
+    }
 
     /* we ensure that the vdd core voltage is normal(1.2V) and the chip will work normally */
     uint8_t Ldo11VoutSelValue;
     extern BL_Err_Type EF_Ctrl_Read_Ldo11VoutSel_Opt(uint8_t *Ldo11VoutSelValue);
-    
+
     if(0 == EF_Ctrl_Read_Ldo11VoutSel_Opt(&Ldo11VoutSelValue)){
         HBN_Set_Ldo11_Soc_Vout((HBN_LDO_LEVEL_Type)Ldo11VoutSelValue);
     }
@@ -204,7 +209,7 @@ int bl_sys_early_init(void)
 
     extern void freertos_risc_v_trap_handler(void); //freertos_riscv_ram/portable/GCC/RISC-V/portASM.S
     write_csr(mtvec, &freertos_risc_v_trap_handler);
-    
+
     /* reset here for use wtd first then init hwtimer later*/
     GLB_AHB_Slave1_Reset(BL_AHB_SLAVE1_TMR);
     /*debuger may NOT ready don't print anything*/

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -29,21 +29,17 @@
  */
 #ifndef __BL_IR_H__
 #define __BL_IR_H__
-#include <stdint.h>
-uint32_t bl_receivedata(void);
-uint32_t bl_getbitcount(void);
-void bl_enable_rx_int(void);
-int bl_ir_init(int pin, int ctrltype);
-void bl_irmask(int mask);
 
-static inline int bl_ir_get_addr(unsigned int val)
-{
-    return (val & 0xFF);
-}
+#include "bl702_ir.h"
+#include "bl702_glb.h"
 
-static inline int bl_ir_get_cmd(unsigned int val)
-{
-    return ((val & 0xFF0000) >> 16);
-}
+void bl_ir_led_drv_cfg(uint8_t led0_en, uint8_t led1_en);
+void bl_ir_custom_tx_cfg(IR_TxCfg_Type *txCfg, IR_TxPulseWidthCfg_Type *txPWCfg);
+void bl_ir_nec_tx_cfg(void);
+void bl_ir_rc5_tx_cfg(void);
+void bl_ir_swm_tx_cfg(void);
+void bl_ir_nec_tx(uint32_t wdata);
+void bl_ir_rc5_tx(uint32_t wdata);
+void bl_ir_swm_tx(uint16_t *data, uint8_t len);
 
 #endif

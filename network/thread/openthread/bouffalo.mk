@@ -14,6 +14,7 @@ otlib_module_src := \
     api/instance_api.cpp\
     api/link_raw_api.cpp\
     api/logging_api.cpp\
+    api/thread_api.cpp\
     api/random_noncrypto_api.cpp\
     api/tasklet_api.cpp\
     common/binary_search.cpp\
@@ -625,189 +626,6 @@ COMPONENT_SRCDIRS += $(otlib_module_srcdir)
 COMPONENT_ADD_INCLUDEDIRS := $(COMPONENT_ADD_INCLUDEDIRS) $(otlib_module_inc) 
 COMPONENT_PRIV_INCLUDEDIRS :=
 
-# third_party/mbedtls
-otlib := third_party/mbedtls
-otlib_module_srcdir := $(otlib)
-otlib_module_src := \
-      repo/include/mbedtls/aes.h\
-      repo/include/mbedtls/aesni.h\
-      repo/include/mbedtls/arc4.h\
-      repo/include/mbedtls/aria.h\
-      repo/include/mbedtls/asn1.h\
-      repo/include/mbedtls/asn1write.h\
-      repo/include/mbedtls/base64.h\
-      repo/include/mbedtls/bignum.h\
-      repo/include/mbedtls/blowfish.h\
-      repo/include/mbedtls/bn_mul.h\
-      repo/include/mbedtls/camellia.h\
-      repo/include/mbedtls/ccm.h\
-      repo/include/mbedtls/certs.h\
-      repo/include/mbedtls/chacha20.h\
-      repo/include/mbedtls/chachapoly.h\
-      repo/include/mbedtls/check_config.h\
-      repo/include/mbedtls/cipher.h\
-      repo/include/mbedtls/cipher_internal.h\
-      repo/include/mbedtls/cmac.h\
-      repo/include/mbedtls/compat-1.3.h\
-      repo/include/mbedtls/config.h\
-      repo/include/mbedtls/config_psa.h\
-      repo/include/mbedtls/ctr_drbg.h\
-      repo/include/mbedtls/debug.h\
-      repo/include/mbedtls/des.h\
-      repo/include/mbedtls/dhm.h\
-      repo/include/mbedtls/ecdh.h\
-      repo/include/mbedtls/ecdsa.h\
-      repo/include/mbedtls/ecjpake.h\
-      repo/include/mbedtls/ecp.h\
-      repo/include/mbedtls/ecp_internal.h\
-      repo/include/mbedtls/entropy.h\
-      repo/include/mbedtls/entropy_poll.h\
-      repo/include/mbedtls/error.h\
-      repo/include/mbedtls/gcm.h\
-      repo/include/mbedtls/havege.h\
-      repo/include/mbedtls/hkdf.h\
-      repo/include/mbedtls/hmac_drbg.h\
-      repo/include/mbedtls/md.h\
-      repo/include/mbedtls/md2.h\
-      repo/include/mbedtls/md4.h\
-      repo/include/mbedtls/md5.h\
-      repo/include/mbedtls/md_internal.h\
-      repo/include/mbedtls/memory_buffer_alloc.h\
-      repo/include/mbedtls/net.h\
-      repo/include/mbedtls/net_sockets.h\
-      repo/include/mbedtls/nist_kw.h\
-      repo/include/mbedtls/oid.h\
-      repo/include/mbedtls/padlock.h\
-      repo/include/mbedtls/pem.h\
-      repo/include/mbedtls/pk.h\
-      repo/include/mbedtls/pk_internal.h\
-      repo/include/mbedtls/pkcs11.h\
-      repo/include/mbedtls/pkcs12.h\
-      repo/include/mbedtls/pkcs5.h\
-      repo/include/mbedtls/platform.h\
-      repo/include/mbedtls/platform_time.h\
-      repo/include/mbedtls/platform_util.h\
-      repo/include/mbedtls/poly1305.h\
-      repo/include/mbedtls/ripemd160.h\
-      repo/include/mbedtls/rsa.h\
-      repo/include/mbedtls/rsa_internal.h\
-      repo/include/mbedtls/sha1.h\
-      repo/include/mbedtls/sha256.h\
-      repo/include/mbedtls/sha512.h\
-      repo/include/mbedtls/ssl.h\
-      repo/include/mbedtls/ssl_cache.h\
-      repo/include/mbedtls/ssl_ciphersuites.h\
-      repo/include/mbedtls/ssl_cookie.h\
-      repo/include/mbedtls/ssl_internal.h\
-      repo/include/mbedtls/ssl_ticket.h\
-      repo/include/mbedtls/threading.h\
-      repo/include/mbedtls/timing.h\
-      repo/include/mbedtls/version.h\
-      repo/include/mbedtls/x509.h\
-      repo/include/mbedtls/x509_crl.h\
-      repo/include/mbedtls/x509_crt.h\
-      repo/include/mbedtls/x509_csr.h\
-      repo/include/mbedtls/xtea.h\
-      repo/library/aes.c\
-      repo/library/aesni.c\
-      repo/library/arc4.c\
-      repo/library/aria.c\
-      repo/library/asn1parse.c\
-      repo/library/asn1write.c\
-      repo/library/base64.c\
-      repo/library/bignum.c\
-      repo/library/blowfish.c\
-      repo/library/camellia.c\
-      repo/library/ccm.c\
-      repo/library/certs.c\
-      repo/library/chacha20.c\
-      repo/library/chachapoly.c\
-      repo/library/cipher.c\
-      repo/library/cipher_wrap.c\
-      repo/library/cmac.c\
-      repo/library/ctr_drbg.c\
-      repo/library/debug.c\
-      repo/library/des.c\
-      repo/library/dhm.c\
-      repo/library/ecdh.c\
-      repo/library/ecdsa.c\
-      repo/library/ecjpake.c\
-      repo/library/ecp.c\
-      repo/library/ecp_curves.c\
-      repo/library/entropy.c\
-      repo/library/entropy_poll.c\
-      repo/library/error.c\
-      repo/library/gcm.c\
-      repo/library/havege.c\
-      repo/library/hkdf.c\
-      repo/library/hmac_drbg.c\
-      repo/library/md.c\
-      repo/library/md2.c\
-      repo/library/md4.c\
-      repo/library/md5.c\
-      repo/library/memory_buffer_alloc.c\
-      repo/library/net_sockets.c\
-      repo/library/nist_kw.c\
-      repo/library/oid.c\
-      repo/library/padlock.c\
-      repo/library/pem.c\
-      repo/library/pk.c\
-      repo/library/pk_wrap.c\
-      repo/library/pkcs11.c\
-      repo/library/pkcs12.c\
-      repo/library/pkcs5.c\
-      repo/library/pkparse.c\
-      repo/library/pkwrite.c\
-      repo/library/platform.c\
-      repo/library/platform_util.c\
-      repo/library/poly1305.c\
-      repo/library/psa_crypto.c\
-      repo/library/psa_crypto_driver_wrappers.c\
-      repo/library/psa_crypto_se.c\
-      repo/library/psa_crypto_slot_management.c\
-      repo/library/psa_crypto_storage.c\
-      repo/library/psa_its_file.c\
-      repo/library/ripemd160.c\
-      repo/library/rsa.c\
-      repo/library/rsa_internal.c\
-      repo/library/sha1.c\
-      repo/library/sha256.c\
-      repo/library/sha512.c\
-      repo/library/ssl_cache.c\
-      repo/library/ssl_ciphersuites.c\
-      repo/library/ssl_cli.c\
-      repo/library/ssl_cookie.c\
-      repo/library/ssl_msg.c\
-      repo/library/ssl_srv.c\
-      repo/library/ssl_ticket.c\
-      repo/library/ssl_tls.c\
-      repo/library/ssl_tls13_keys.c\
-      repo/library/threading.c\
-      repo/library/timing.c\
-      repo/library/version.c\
-      repo/library/version_features.c\
-      repo/library/x509.c\
-      repo/library/x509_create.c\
-      repo/library/x509_crl.c\
-      repo/library/x509_crt.c\
-      repo/library/x509_csr.c\
-      repo/library/x509write_crt.c\
-      repo/library/x509write_csr.c\
-      repo/library/xtea.c\
-      repo/library/constant_time.c
-
-
-otlib_module_src := $(addprefix $(otlib_module_srcdir)/,${otlib_module_src}) 
-otlib_module_srcdir := $(addprefix $(otlib)/,repo/library)
-
-otlib_module_inc := $(otlib) $(otlib)/repo/include/mbedtls $(otlib)/repo/include
-
-COMPONENT_SRCS += $(otlib_module_src)
-COMPONENT_SRCDIRS += $(otlib_module_srcdir) 
-COMPONENT_ADD_INCLUDEDIRS := $(COMPONENT_ADD_INCLUDEDIRS) $(otlib_module_inc) src
-COMPONENT_PRIV_INCLUDEDIRS :=
-
-
 # third_party/tcplp
 ifeq ($(OPENTHREAD_RADIO), 0)
 otlib := third_party/tcplp
@@ -873,7 +691,6 @@ ifeq ($(CONFIG_OT_OFFICAL), 1)
 otlib_module_src := $(otlib_module_src) main.c
 endif
 
-
 otlib_module_srcdir := $(otlib)/${otlib_module_srcdir}
 otlib_module_src := $(addprefix $(otlib_module_srcdir)/,${otlib_module_src}) 
 
@@ -896,6 +713,86 @@ COMPONENT_SRCS += $(otlib_module_src)
 COMPONENT_SRCDIRS += $(otlib_module_srcdir)
 COMPONENT_ADD_INCLUDEDIRS := $(COMPONENT_ADD_INCLUDEDIRS) $(otlib) $(otlib)/platforms
 
+
+# tests/unit
+ifeq ($(OPENTHREAD_TESTS_UNIT), 1)
+otlib := tests/unit
+otlib_module_srcdir := $(otlib)
+otlib_module_src := \
+    test_address_sanitizer.cpp \
+    test_aes.cpp \
+    test_array.cpp \
+    test_binary_search.cpp \
+    test_checksum.cpp \
+    test_child.cpp \
+    test_child_table.cpp \
+    test_cmd_line_parser.cpp \
+    test_data.cpp \
+    test_dns.cpp \
+    test_dso.cpp \
+    test_ecdsa.cpp \
+    test_flash.cpp \
+    test_hdlc.cpp \
+    test_heap_array.cpp \
+    test_heap.cpp \
+    test_heap_string.cpp \
+    test_hkdf_sha256.cpp \
+    test_hmac_sha256.cpp \
+    test_ip6_header.cpp \
+    test_ip_address.cpp \
+    test_linked_list.cpp \
+    test_link_quality.cpp \
+    test_lowpan.cpp \
+    test_mac_frame.cpp \
+    test_macros.cpp \
+    test_meshcop.cpp \
+    test_message.cpp \
+    test_message_queue.cpp \
+    test_multicast_listeners_table.cpp \
+    test_ndproxy_table.cpp \
+    test_netif.cpp \
+    test_network_data.cpp \
+    test_network_name.cpp \
+    test_pool.cpp \
+    test_priority_queue.cpp \
+    test_pskc.cpp \
+    test_serial_number.cpp \
+    test_smart_ptrs.cpp \
+    test_spinel_decoder.cpp \
+    test_spinel_encoder.cpp \
+    test_string.cpp \
+    test_timer.cpp \
+    test_toolchain.cpp \
+    test_util.cpp \
+    test_platform.cpp \
+    test_toolchain_c.c \
+    test_main.c
+    
+#    test_spinel_buffer.cpp \
+
+
+otlib_module_src := $(addprefix $(otlib_module_srcdir)/,${otlib_module_src}) 
+otlib_module_inc := tests/unit
+
+otlib_module_inc := $(addprefix $(otlib_module_srcdir)/,${otlib_module_inc})
+otlib_module_inc := $(otlib_module_inc) $(otlib)
+otlib_module_srcdir := $(otlib_module_inc)
+
+COMPONENT_ADD_INCLUDEDIRS := $(COMPONENT_ADD_INCLUDEDIRS) $(otlib_module_inc) 
+COMPONENT_PRIV_INCLUDEDIRS :=
+COMPONENT_SRCS += $(otlib_module_src)
+COMPONENT_SRCDIRS += tests/unit
+
+CPPFLAGS += "-Wno-format"
+
+endif
+
+ifeq ($(CONFIG_CHIP_NAME),BL702)
+CPPFLAGS += -DBL702
+endif
+ifeq ($(CONFIG_CHIP_NAME),BL702L)
+CPPFLAGS += -DBL702L
+endif
 
 ## This component's src 
 COMPONENT_OBJS := $(patsubst %.cpp,%.o, $(filter %.cpp,$(COMPONENT_SRCS))) $(patsubst %.c,%.o, $(filter %.c,$(COMPONENT_SRCS))) $(patsubst %.S,%.o, $(filter %.S,$(COMPONENT_SRCS)))

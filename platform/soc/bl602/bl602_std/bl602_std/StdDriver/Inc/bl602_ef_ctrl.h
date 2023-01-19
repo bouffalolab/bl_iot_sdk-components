@@ -171,7 +171,8 @@ typedef struct {
  *  @brief Efuse analog device info type definition
  */
 typedef struct {
-    uint32_t rsvd                                    :  22;    /*!< Reserved */
+    uint32_t rsvd                                    :  19;   /*!< Reserved */
+    uint32_t chip_ver                                :  3;    /*!< chip revision */
     uint32_t customerID                              :  2;    /*!< Efuse customer ID information */
     uint32_t rsvd_info                               :  3;    /*!< Efuse device info extension: 1:BL602C, 2:BL602L, 3:BL602E */
     uint32_t memoryInfo                              :  2;    /*!< Efuse memory info 0:no memory, 1:1MB flash, 2:2MB flash */

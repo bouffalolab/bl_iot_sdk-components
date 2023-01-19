@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -298,7 +298,7 @@ typedef enum wifi_fw_event_id
     /*
      * Section of internal SCAN messages. No SCAN API messages should be defined below this point
      */
-    SCAN_TIMER,
+    SCAN_PROBE_TIMER,
 
     /// MAX number of messages
     SCAN_MAX,
@@ -519,10 +519,13 @@ enum task_mm_cfg {
     TASK_MM_CFG_KEEP_ALIVE_STATUS_ENABLED,
     TASK_MM_CFG_KEEP_ALIVE_TIME_LAST_RECEIVED,
     TASK_MM_CFG_KEEP_ALIVE_PACKET_COUNTER,
+    TASK_MM_CFG_ACCEPT_ALL_BEACON_FOR_STA,
+    TASK_MM_CFG_ACCEPT_ALL_BEACON_FOR_AP,
 };
 
 enum task_sm_cfg {
     TASK_SM_CFG_AUTH_ASSOC_RETRY_LIMIT,
+    TASK_SM_CFG_RECONNECT_TRIGGER_FLAG
 };
 
 enum task_scan_cfg {

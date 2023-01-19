@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -38,9 +38,10 @@
 #include "bl_hbn.h"
 
 volatile bool sys_log_all_enable = true;
+static BL_RST_REASON_E sys_rstinfo = BL_RST_POR;
 ATTR_HBN_NOINIT_SECTION static int wdt_triger_counter;
 
-BL_RST_REASON_E bl_sys_rstinfo_get(void)
+void bl_sys_rstinfo_process(void)
 {
     uint8_t wdt_rst;
     uint8_t hbn_rst;
@@ -51,18 +52,28 @@ BL_RST_REASON_E bl_sys_rstinfo_get(void)
     hbn_rst = BL_GET_REG_BITS_VAL(BL_RD_REG(HBN_BASE,HBN_GLB),HBN_RESET_EVENT);
     pds_rst = BL_GET_REG_BITS_VAL(BL_RD_REG(PDS_BASE,PDS_INT),PDS_RESET_EVENT);
 
+    // clear reset status
+    WDT_ClearResetStatus();
+    HBN_Clear_Reset_Event();
+    PDS_Clear_Reset_Event();
+
     // check reset source
     if(wdt_rst){
-        return BL_RST_WDT;
+        sys_rstinfo = BL_RST_WDT;
     }else if(hbn_rst == 0x19){
-        return BL_RST_BOR;
+        sys_rstinfo = BL_RST_BOR;
     }else if(hbn_rst == 0x08){
-        return BL_RST_HBN;
+        sys_rstinfo = BL_RST_HBN;
     }else if(pds_rst == 0x07){
-        return BL_RST_POR;
+        sys_rstinfo = BL_RST_POR;
     }else{
-        return BL_RST_SOFTWARE;
+        sys_rstinfo = BL_RST_SOFTWARE;
     }
+}
+
+BL_RST_REASON_E bl_sys_rstinfo_get(void)
+{
+    return sys_rstinfo;
 }
 
 void bl_sys_rstinfo_clr(void)
@@ -297,9 +308,9 @@ int bl_sys_default_active_config(void)
 
 int bl_sys_early_init(void)
 {
+    bl_sys_rstinfo_process();
     if(BL_RST_WDT == bl_sys_rstinfo_get()){
         wdt_triger_counter++;
-        bl_sys_rstinfo_clr();
     }
     else{
         wdt_triger_counter = 0;
@@ -307,11 +318,13 @@ int bl_sys_early_init(void)
 
     bl_flash_init();
 
-    extern BL_Err_Type HBN_Aon_Pad_IeSmt_Cfg(uint8_t padCfg);
-    HBN_Aon_Pad_IeSmt_Cfg(0x1F);
+    extern void newlibc_init(void);
+    newlibc_init();
 
     extern void freertos_risc_v_trap_handler(void); //freertos_riscv_ram/portable/GCC/RISC-V/portASM.S
     write_csr(mtvec, &freertos_risc_v_trap_handler);
+
+    HBN_Hw_Pu_Pd_Cfg(DISABLE);
 
     PDS_Trim_RC32M();
     HBN_Trim_RC32K();
@@ -324,6 +337,9 @@ int bl_sys_early_init(void)
     GLB_Set_System_CLK(GLB_DLL_XTAL_32M, GLB_SYS_CLK_DLL144M);
     HBN_Set_XCLK_CLK_Sel(HBN_XCLK_CLK_XTAL);
     GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_96M, 1);
+#else
+    GLB_Set_System_CLK(GLB_DLL_XTAL_32M, GLB_SYS_CLK_XTAL);
+    GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_XCLK, 0);
 #endif
 
     GLB_Set_MTimer_CLK(1, GLB_MTIMER_CLK_BCLK, SystemCoreClockGet()/(GLB_Get_BCLK_Div()+1)/4000000 - 1);

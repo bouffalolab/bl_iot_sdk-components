@@ -81,7 +81,11 @@ extern int bt_gatt_discover_continue(struct bt_conn *conn, struct bt_gatt_discov
 #endif
 #endif /* CONFIG_BT_GATT_CLIENT */
 
+#if defined(CONFIG_BT_GAP_APPEARANCE_WRITABLE)
+static u16_t gap_appearance = CONFIG_BT_DEVICE_APPEARANCE;
+#else
 static const u16_t gap_appearance = CONFIG_BT_DEVICE_APPEARANCE;
+#endif
 
 #if defined(CONFIG_BT_GATT_DYNAMIC_DB)
 static sys_slist_t db;
@@ -136,6 +140,23 @@ static ssize_t read_appearance(struct bt_conn *conn,
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &appearance,
 				 sizeof(appearance));
 }
+
+#if defined(CONFIG_BT_GAP_APPEARANCE_WRITABLE)
+static ssize_t write_appearance(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+			 void *buf, u16_t len, u16_t offset)
+{
+	if (offset) {
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+	}
+
+	if (len > sizeof(u16_t)) {
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+	}
+
+	memcpy(&gap_appearance,(u8_t *)buf,sizeof(gap_appearance));
+	return len;
+}
+#endif
 
 #if defined (CONFIG_BT_GAP_PERIPHERAL_PREF_PARAMS)
 /* This checks if the range entered is valid */
@@ -192,14 +213,24 @@ BT_GATT_SERVICE_DEFINE(_2_gap_svc,
 	/* Require pairing for writes to device name */
 	BT_GATT_CHARACTERISTIC(BT_UUID_GAP_DEVICE_NAME,
 			       BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
+#if defined(CONFIG_AUTO_PTS)
+			       BT_GATT_PERM_WRITE_ENCRYPT |
+#endif /* CONFIG_AUTO_PTS */
 			       BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
 			       read_name, write_name, bt_dev.name),
 #else
 	BT_GATT_CHARACTERISTIC(BT_UUID_GAP_DEVICE_NAME, BT_GATT_CHRC_READ,
 			       BT_GATT_PERM_READ, read_name, NULL, NULL),
 #endif /* CONFIG_BT_DEVICE_NAME_GATT_WRITABLE */
-	BT_GATT_CHARACTERISTIC(BT_UUID_GAP_APPEARANCE, BT_GATT_CHRC_READ,
-			       BT_GATT_PERM_READ, read_appearance, NULL, NULL),
+    #if defined(CONFIG_BT_GAP_APPEARANCE_WRITABLE)
+    BT_GATT_CHARACTERISTIC(BT_UUID_GAP_APPEARANCE, BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
+                   BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
+                   read_appearance, write_appearance, NULL),
+    #else
+    BT_GATT_CHARACTERISTIC(BT_UUID_GAP_APPEARANCE, BT_GATT_CHRC_READ,
+                   BT_GATT_PERM_READ, read_appearance, NULL, NULL),
+    #endif
+
 #if defined(CONFIG_BT_CENTRAL) && defined(CONFIG_BT_PRIVACY)
 	BT_GATT_CHARACTERISTIC(BT_UUID_CENTRAL_ADDR_RES,
 			       BT_GATT_CHRC_READ, BT_GATT_PERM_READ,

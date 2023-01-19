@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -30,6 +30,7 @@
 
 #include <hosal_dma.h>
 #include <bl702_dma.h>
+#include <bl702_glb.h>
 #include <bl702.h>
 #include <bl_dma.h>
 #include "bl_irq.h"
@@ -112,6 +113,8 @@ int hosal_dma_init(void)
     if (gp_hosal_dma_dev->used_chan == NULL) {
         blog_error("no memory !!!\r\n");
     }
+
+    GLB_PER_Clock_UnGate(GLB_AHB_CLOCK_DMA_0);
     DMA_Enable();
     for (i = 0; i < gp_hosal_dma_dev->max_chans; i++) {
         DMA_Channel_Disable(i);

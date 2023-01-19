@@ -56,7 +56,11 @@
 /**
  * BL_BLE_CO_THREAD: combine tx rx thread
  */
+#if defined(CONFIG_AUTO_PTS)
+#define BFLB_BT_CO_THREAD 0
+#else
 #define BFLB_BT_CO_THREAD 1
+#endif
 
 #if (BFLB_BT_CO_THREAD)
 #define CONFIG_BT_CO_TASK_PRIO (configMAX_PRIORITIES - 3)
@@ -603,15 +607,20 @@
 #define BFLB_STATIC_ALLOC_MEM   0
 #endif
 #define CONFIG_BT_SCAN_WITH_IDENTITY 1
+#define CONFIG_BT_DEVICE_NAME_GATT_WRITABLE
+#define CONFIG_BT_GAP_APPEARANCE_WRITABLE
+
 
 #if defined(CONFIG_AUTO_PTS)
+#define BFLB_FIXED_IRK 1
 #define CONFIG_BT_L2CAP_DYNAMIC_CHANNEL
 #define CONFIG_BT_DEVICE_NAME_GATT_WRITABLE 1
 #define CONFIG_BT_GATT_SERVICE_CHANGED 1
-#define CONFIG_BT_GATT_CACHING 1
+//#define CONFIG_BT_GATT_CACHING 1
 #define CONFIG_BT_SCAN_WITH_IDENTITY 1
 //#define CONFIG_BT_ADV_WITH_PUBLIC_ADDR 1
 #define CONFIG_BT_ATT_PREPARE_COUNT 64
+#define CONFIG_BT_TESTING 1
 #endif
 #endif //BFLB_BLE
 
@@ -639,6 +648,7 @@ happens, which cause memory leak issue.*/
   intends to write information to flash.*/
 #define BFLB_BLE_PATCH_SETTINGS_LOAD
 #endif
+#define BFLB_BLE_PATCH_AVOID_CONN_UPDATE_WHEN_PREVIOUS_IS_NOT_OVER
 #define BFLB_BLE_SMP_LOCAL_AUTH
 #define BFLB_BLE_MTU_CHANGE_CB
 #if defined(CFG_BT_RESET)
@@ -663,4 +673,5 @@ BT_SMP_DIST_ENC_KEY bit is not cleared while remote ENC_KEY is received.*/
 
 #define BR_EDR_PTS_TEST 0
 #define BFLB_BLE_ENABLE_TEST_PSM 0
+#define BFLB_BREDR_SCO_TYPE_FIX
 #endif /* BLE_CONFIG_H */

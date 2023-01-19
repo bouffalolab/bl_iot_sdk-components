@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -32,6 +32,7 @@
 
 
 #include "bl_pds.h"
+#include "bl_rtc.h"
 #include <FreeRTOS.h>
 #include <task.h>
 

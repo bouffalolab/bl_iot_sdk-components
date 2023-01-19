@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -603,10 +603,14 @@ int bl_cfg80211_disconnect(struct bl_hw *bl_hw)
     return bl_send_sm_disconnect_req(bl_hw);
 }
 
-void bl_main_event_handle()
+void bl_main_event_handle(int param, struct ke_tx_fc *tx_fc_field)
 {
-    bl_irq_bottomhalf(&wifi_hw);
-    bl_tx_try_flush();
+    if (0 == param)
+    {
+        bl_irq_bottomhalf(&wifi_hw);
+    }
+
+    bl_tx_try_flush(param, tx_fc_field);
 }
 
 void bl_main_lowlevel_init()

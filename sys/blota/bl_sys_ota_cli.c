@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -431,7 +431,7 @@ static void ota_tcp_cmd(char *buf, int len, int argc, char **argv)
     return;
 }
 
-void ota_tcp_server_handle(void)
+void ota_tcp_server_handle(void* arg)
 {
     int sockfd, i;
     int ret;

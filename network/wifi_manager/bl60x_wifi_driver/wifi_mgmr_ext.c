@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -55,6 +55,9 @@
 #include <supplicant_api.h>
 #include <bl_wpa.h>
 
+#ifdef CFG_NETBUS_WIFI_ENABLE
+#include "netbus_mgmr.h"
+#endif
 /*just limit packet len with a reasonable value*/
 #define LEN_PKT_RAW_80211   (480)
 
@@ -188,16 +191,19 @@ static void wifi_eth_sta_enable(struct netif *netif, uint8_t mac[6])
     * The init function pointer must point to a initialization function for
     * your ethernet netif interface. The following code illustrates it's use.*/
 
+    netif->name[0] = 's';
+    netif->name[1] = 't';
+#ifdef CFG_NETBUS_WIFI_ENABLE
+    g_netbus_wifi_mgmr_env.sta_netif = netif;
+#endif
     netifapi_netif_add(netif, &ipaddr, &netmask, &gw, NULL, &bl606a0_wifi_netif_init, &tcpip_input);
 
 #ifdef CONFIG_ENABLE_IPV6_ADDR_CALLBACK
     nd6_set_cb(netif, netif_nd6_callback);
 #endif
 
-    netif->name[0] = 's';
-    netif->name[1] = 't';
-    netif->flags |=  NETIF_FLAG_LINK_UP | NETIF_FLAG_IGMP;
     netifapi_netif_set_default(netif);
+    netifapi_netif_set_link_up(netif);
     netifapi_netif_set_up(netif);
 }
 
@@ -562,10 +568,15 @@ static void wifi_eth_ap_enable(struct netif *netif, uint8_t mac[6])
         memcpy(mac, netif->hwaddr, 6);//overwrite mac address in netif
     }
 
-    netifapi_netif_add(netif, &ipaddr, &netmask, &gw, NULL, &bl606a0_wifi_netif_init, &tcpip_input);
+#ifdef CFG_NETBUS_WIFI_ENABLE
+    g_netbus_wifi_mgmr_env.ap_netif = netif;
+#endif
     netif->name[0] = 'a';
     netif->name[1] = 'p';
+
+    netifapi_netif_add(netif, &ipaddr, &netmask, &gw, NULL, &bl606a0_wifi_netif_init, &tcpip_input);
     netifapi_netif_set_default(netif);
+    netifapi_netif_set_link_up(netif);
     netifapi_netif_set_up(netif);
 }
 
@@ -980,13 +991,13 @@ int wifi_mgmr_set_country_code(char *country_code)
 
 int wifi_mgmr_set_wifi_active_time(uint32_t ms)
 {
-    if (ms >= 100) {
-        bl_os_printf("wifi ps mode set: 1 ~ 99\r\n");
+    if (ms < 15 || ms > 85) {
+        bl_os_printf("Wrong, MUST set wifi ps acitve [20, 80] ms\r\n");
         return -1;
     }
 
-void td_set_tim_time(uint8_t vif_index, uint32_t us);
-    td_set_tim_time(0, ms * 1000);
+    void td_set_tim_time(uint8_t vif_index, uint32_t us);
+    td_set_tim_time(wifiMgmr.wlan_sta.vif_index, ms * 1000);
 
     return 0;
 }

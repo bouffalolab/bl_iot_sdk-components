@@ -8,7 +8,13 @@
 
 
 #define USB_CDC_MONITOR_CNT        3
+#ifndef CFG_USB_CDC_VID
+#define CFG_USB_CDC_VID             0xffff
+#endif
 
+#ifndef CFG_USB_CDC_PID
+#define CFG_USB_CDC_PID             0xffff
+#endif
 
 typedef struct vfs_uart_dev {
     hosal_uart_dev_t uart;
@@ -59,11 +65,11 @@ void usb_cdc_start(int fd_console)
     if(pid==0x0000&&vid==0x0000){
         EF_Ctrl_Get_Chip_PIDVID(&pid,&vid);
         if(pid==0x0000&&vid==0x0000){
-            pid = 0xffff;
-            vid = 0xffff;
+            pid = CFG_USB_CDC_VID;
+            vid = CFG_USB_CDC_PID;
         }
     }
-    
+
     extern uint8_t USBD_FS_DeviceDesc[USB_LEN_DEV_DESC];
     USBD_FS_DeviceDesc[8] = LOBYTE(vid);
     USBD_FS_DeviceDesc[9] = HIBYTE(vid);

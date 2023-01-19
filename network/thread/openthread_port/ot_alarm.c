@@ -14,6 +14,7 @@
 #include <openthread/platform/diag.h>
 #include <openthread_port.h>
 
+#if defined(BL702)
 
 #define OT_ALARM_TIMER_MARGIN                   10   /** 10 us */
 #define OT_ALARM_TIMER_ID                       0
@@ -23,19 +24,17 @@ uint32_t      otAlarm_offset = 0;
 
 static void otPlatALarm_msTimerCallback( TimerHandle_t xTimer ) 
 {
-    OT_NOTIFY(OT_SYSTEM_EVENT_ALARM_MS_EXPIRED);
+    otrNotifyEvent(OT_SYSTEM_EVENT_ALARM_MS_EXPIRED);
 }
 
 void ot_alarmInit(void) 
 {
     otAlarm_timerHandle = xTimerCreate("ot_timer", 1, pdFALSE, (void *)otAlarm_timerHandle, otPlatALarm_msTimerCallback);
 
-    OT_ENTER_CRITICAL();
+    uint32_t tag = otrEnterCrit();
     bl_timer_restore_time(bl_timer_now_us64());
     otAlarm_offset = (uint32_t)bl_timer_now_us64() - bl_timer_get_current_time();
-    OT_EXIT_CRITICAL();
-
-    printf ("ot_alarmInit = %lu\r\n", otAlarm_offset);
+    otrExitCrit(tag);
 }
 
 void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
@@ -51,7 +50,7 @@ void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
         return;
     }
 
-    OT_NOTIFY(OT_SYSTEM_EVENT_ALARM_MS_EXPIRED);
+    otrNotifyEvent(OT_SYSTEM_EVENT_ALARM_MS_EXPIRED);
 }
 
 void otPlatAlarmMilliStop(otInstance *aInstance) 
@@ -78,28 +77,27 @@ uint16_t otPlatTimeGetXtalAccuracy(void)
 
 void otAlarm_microTimerCallback(void) 
 {
-    OT_NOTIFY_ISR(OT_SYSTEM_EVENT_ALARM_US_EXPIRED);
+    otrNotifyEvent(OT_SYSTEM_EVENT_ALARM_US_EXPIRED);
 }
 
 void otPlatAlarmMicroStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
 {
-    OT_ENTER_CRITICAL();
-
+    uint32_t tag = otrEnterCrit();
     uint32_t now = bl_timer_now_us64();
+
     if (aDt > OT_ALARM_TIMER_MARGIN &&  now - aT0 < aDt - OT_ALARM_TIMER_MARGIN) {
 
         bl_timer_start(OT_ALARM_TIMER_ID, aT0 + aDt - otAlarm_offset, otAlarm_microTimerCallback);
         if (bl_timer_get_remaining_time(OT_ALARM_TIMER_ID) <= aDt) {
-            OT_EXIT_CRITICAL();
+            otrExitCrit(tag);
             return;
         }
 
         bl_timer_stop(OT_ALARM_TIMER_ID);
     }
 
-    OT_EXIT_CRITICAL();
-
-    OT_NOTIFY(OT_SYSTEM_EVENT_ALARM_US_EXPIRED);
+    otrExitCrit(tag);
+    otrNotifyEvent(OT_SYSTEM_EVENT_ALARM_US_EXPIRED);
 }
 
 void otPlatAlarmMicroStop(otInstance *aInstance)
@@ -111,6 +109,7 @@ uint32_t otPlatAlarmMicroGetNow(void)
 {
    return bl_timer_now_us64();
 }
+#endif
 
 void ot_alarmTask(ot_system_event_t sevent) 
 {

@@ -33,6 +33,8 @@
 #include "oi_codec_sbc.h"
 #endif
 
+#include "log.h"
+
 static void bredr_connected(struct bt_conn *conn, u8_t err);
 static void bredr_disconnected(struct bt_conn *conn, u8_t reason);
 
@@ -92,6 +94,15 @@ static void bredr_sdp_client_connect(char *p_write_buffer, int write_buffer_len,
 #if CONFIG_BT_A2DP
 static void a2dp_connect(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 #if BR_EDR_PTS_TEST
+static void a2dp_disconnect(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void a2dp_start_discovery(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void a2dp_get_cap(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void a2dp_set_conf(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void a2dp_close_stream(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void a2dp_open_stream(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void a2dp_start_stream(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void a2dp_suspend_stream(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void a2dp_delay_report(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 static void avdtp_set_conf_reject(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 #endif
 #endif
@@ -106,6 +117,7 @@ static void avrcp_get_play_status(char *p_write_buffer, int write_buffer_len, in
 
 #if CONFIG_BT_HFP
 static void hfp_connect(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void hfp_hf_disconnect(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 static void sco_connect(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 static void hfp_answer(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 static void hfp_terminate_call(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
@@ -115,6 +127,14 @@ static void hfp_outgoint_call_last_number_dialed(char *p_write_buffer, int write
 static void hfp_disable_nrec(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 static void hfp_voice_recognition(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 static void hfp_voice_req_phone_num(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void hfp_accept_incoming_caller(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void hfp_set_mic_volume(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void hfp_set_speaker_volume(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void hfp_query_list_calls(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void hfp_response_call(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void hfp_subscriber_number_info(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void hfp_hf_send_indicator(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void hfp_hf_update_indicator(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 #endif
 
 const struct cli_command bredr_cmd_set[] STATIC_CLI_CMD_ATTRIBUTE = {
@@ -140,10 +160,18 @@ const struct cli_command bredr_cmd_set[] STATIC_CLI_CMD_ATTRIBUTE = {
     #if CONFIG_BT_A2DP
     {"a2dp_connect", "", a2dp_connect},
     #if BR_EDR_PTS_TEST
+    {"a2dp_disconnect", "", a2dp_disconnect},
+    {"a2dp_start_disc", "", a2dp_start_discovery},
+    {"a2dp_get_cap", "", a2dp_get_cap},
+    {"a2dp_set_conf", "", a2dp_set_conf},
+    {"a2dp_open_stream", "", a2dp_open_stream},
+    {"a2dp_close_stream", "", a2dp_close_stream},
+    {"a2dp_start_stream", "", a2dp_start_stream},
+    {"a2dp_suspend_stream", "", a2dp_suspend_stream},
+    {"a2dp_delay_report","",a2dp_delay_report},
     {"avdtp_set_conf_reject", "", avdtp_set_conf_reject},
     #endif
     #endif
-
     #if CONFIG_BT_AVRCP
     {"avrcp_connect", "", avrcp_connect},
     {"avrcp_pth_key", "", avrcp_pth_key},
@@ -154,6 +182,7 @@ const struct cli_command bredr_cmd_set[] STATIC_CLI_CMD_ATTRIBUTE = {
 
     #if CONFIG_BT_HFP
     {"hfp_connect", "", hfp_connect},
+    {"hfp_diconnect","",hfp_hf_disconnect},
     {"sco_connect", "", sco_connect},
     {"hfp_answer", "", hfp_answer},
     {"hfp_terminate_call", "", hfp_terminate_call},
@@ -162,7 +191,15 @@ const struct cli_command bredr_cmd_set[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"hfp_outgoint_call_last_number_dialed", "", hfp_outgoint_call_last_number_dialed},
     {"hfp_disable_nrec", "", hfp_disable_nrec},
     {"hfp_voice_recognition", "", hfp_voice_recognition},
-    {"hfp_voice_req_phone_num", "", hfp_voice_req_phone_num},    
+    {"hfp_voice_req_phone_num", "", hfp_voice_req_phone_num},
+    {"hfp_accept_incoming_caller", "", hfp_accept_incoming_caller},
+    {"hfp_set_mic_vol", "", hfp_set_mic_volume},
+    {"hfp_set_spk_vol", "", hfp_set_speaker_volume},
+    {"hfp_query_list_calls","",hfp_query_list_calls},
+    {"hfp_response_call","",hfp_response_call},
+    {"hfp_subs_num_info","",hfp_subscriber_number_info},
+    {"hfp_hf_send_ind","",hfp_hf_send_indicator},
+    {"hfp_hf_update_ind","",hfp_hf_update_indicator},
     #endif
 };
 
@@ -216,7 +253,6 @@ static void bredr_init(char *pcWriteBuffer, int xWriteBufferLen, int argc, char 
     init = true;
     printf("bredr init successfully\n");
 }
-
 
 static void bredr_connected(struct bt_conn *conn, u8_t err)
 {
@@ -545,6 +581,159 @@ static void a2dp_connect(char *p_write_buffer, int write_buffer_len, int argc, c
 }
 
 #if BR_EDR_PTS_TEST
+static void a2dp_disconnect(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_a2dp_disconnect(default_conn);
+    if(ret) {
+        printf("A2dp disconnect successfully.\n");
+    } else {
+        printf("A2dp disconnect fail. ret(%d)\n",ret);
+    }
+}
+
+static void a2dp_start_discovery(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_a2dp_start_discovery(default_conn);
+    if(ret) {
+        printf("A2dp start discovery successfully.\n");
+    } else {
+        printf("A2dp start discovery fail. ret(%d)\n",ret);
+    }
+}
+
+static void a2dp_get_cap(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_a2dp_get_cap(default_conn);
+    if(ret) {
+        printf("A2dp start discovery successfully.\n");
+    } else {
+        printf("A2dp start discovery fail. ret(%d)\n",ret);
+    }
+}
+
+static void a2dp_set_conf(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_a2dp_set_conf(default_conn);
+    if(ret) {
+        printf("A2dp start discovery successfully.\n");
+    } else {
+        printf("A2dp start discovery fail. ret(%d)\n",ret);
+    }
+}
+
+static void a2dp_close_stream(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_a2dp_close_stream(default_conn);
+    if(ret) {
+        printf("A2dp disconnect successfully.\n");
+    } else {
+        printf("A2dp disconnect fail. ret(%d)\n",ret);
+    }
+}
+
+static void a2dp_open_stream(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_a2dp_open_stream(default_conn);
+    if(ret) {
+        printf("A2dp disconnect successfully.\n");
+    } else {
+        printf("A2dp disconnect fail. ret(%d)\n",ret);
+    }
+}
+
+static void a2dp_start_stream(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_a2dp_start_stream(default_conn);
+    if(ret) {
+        printf("A2dp disconnect successfully.\n");
+    } else {
+        printf("A2dp disconnect fail. ret(%d)\n",ret);
+    }
+}
+
+static void a2dp_suspend_stream(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_a2dp_suspend_stream(default_conn);
+    if(ret) {
+        printf("A2dp disconnect successfully.\n");
+    } else {
+        printf("A2dp disconnect fail. ret(%d)\n",ret);
+    }
+}
+
+static void a2dp_delay_report(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_a2dp_delay_report(default_conn);
+    if(ret) {
+        printf("A2dp disconnect successfully.\n");
+    } else {
+        printf("A2dp disconnect fail. ret(%d)\n",ret);
+    }
+}
+
 extern uint8_t reject_set_conf_pts;
 extern uint8_t reject_error_code;
 static void avdtp_set_conf_reject(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
@@ -554,7 +743,6 @@ static void avdtp_set_conf_reject(char *p_write_buffer, int write_buffer_len, in
 }
 
 #endif
-
 #endif
 
 #if CONFIG_BT_AVRCP
@@ -735,23 +923,32 @@ static void hfp_connect(char *p_write_buffer, int write_buffer_len, int argc, ch
 
 static void sco_connect(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
 {
-    struct bt_conn *conn;
-    u8_t  addr_val[6];
-    bt_addr_t peer_addr;
-    char addr_str[18];
-
-    get_bytearray_from_string(&argv[1], addr_val, 6);
-    reverse_bytearray(addr_val, peer_addr.val, 6);
-
-    bt_addr_to_str(&peer_addr, addr_str, sizeof(addr_str));
-    printf("%s, create sco connection with : %s \n", __func__, addr_str);
+    struct bt_conn *conn = NULL;
+    uint8_t sco_type;
 
     if(!default_conn){
         printf("Not connected.\n");
         return;
     }
 
-    conn = bt_conn_create_sco(&peer_addr);
+    get_uint8_from_string(&argv[1], &sco_type);
+
+    if(sco_type == 1){
+        conn = bt_conn_create_sco(&default_conn->br.dst,ESCO_PARAM_S1);
+    }else if(sco_type == 2){
+        conn = bt_conn_create_sco(&default_conn->br.dst,ESCO_PARAM_S2);
+    }else if(sco_type == 3){
+        conn = bt_conn_create_sco(&default_conn->br.dst,ESCO_PARAM_S3);
+    }else if(sco_type == 4){
+        conn = bt_conn_create_sco(&default_conn->br.dst,ESCO_PARAM_S4);
+    }else if(sco_type == 5){
+        conn = bt_conn_create_sco(&default_conn->br.dst,SCO_PARAM_D0);
+    }else if(sco_type == 6){
+        conn = bt_conn_create_sco(&default_conn->br.dst,SCO_PARAM_D1);
+    }else{
+        printf("Invaild type %d\r\n",sco_type);
+    }
+
     if (!conn) {
         printf("sco connect fail.\n");
     } else {
@@ -764,8 +961,8 @@ static void hfp_answer(char *p_write_buffer, int write_buffer_len, int argc, cha
     int err = 0;
     
     if(!default_conn){
-            printf("Not connected.\n");
-            return;
+        printf("Not connected.\n");
+        return;
     }
 
     err = bt_hfp_hf_send_cmd(default_conn, BT_HFP_HF_ATA, NULL);
@@ -875,10 +1072,10 @@ static void hfp_voice_recognition(char *p_write_buffer, int write_buffer_len, in
     uint8_t enable = 0;
 
     get_uint8_from_string(&argv[1], &enable);
-    
+
     if(!default_conn){
-            printf("Not connected.\n");
-            return;
+        printf("Not connected.\n");
+        return;
     }
 
     err = bt_hfp_hf_send_cmd_arg(default_conn, BT_HFP_HF_AT_BVRA, enable);
@@ -894,10 +1091,10 @@ static void hfp_voice_req_phone_num(char *p_write_buffer, int write_buffer_len, 
     uint8_t enable = 0;
 
     get_uint8_from_string(&argv[1], &enable);
-    
+
     if(!default_conn){
-            printf("Not connected.\n");
-            return;
+        printf("Not connected.\n");
+        return;
     }
 
     err = bt_hfp_hf_send_cmd_arg(default_conn, BT_HFP_HF_AT_BINP, enable);
@@ -905,6 +1102,182 @@ static void hfp_voice_req_phone_num(char *p_write_buffer, int write_buffer_len, 
         printf("Fail to send reqeust phone number to the AG AT command with err:%d\r\n", err);
     else
         printf("send reqeust phone number to the AG AT command successfully\r\n");
+}
+
+static void hfp_accept_incoming_caller(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int err = 0;
+    uint8_t call_id = 0;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    get_uint8_from_string(&argv[1], &call_id);
+
+    err = bt_hfp_hf_send_cmd_arg(default_conn, BT_HFP_ACCEPT_INCOMING_CALLER_ID, call_id);
+    if(err)
+        printf("Fail to accept a incoming call err:%d\r\n", err);
+    else
+        printf("Accept a incoming call successfully\r\n");
+}
+
+static void hfp_set_mic_volume(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int err = 0;
+    uint8_t vol = 0;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    get_uint8_from_string(&argv[1], &vol);
+
+    if(vol > 15 ){
+        printf("Volume out of range %d\n",vol);
+        return;
+    }
+
+    err = bt_hfp_hf_send_cmd_arg(default_conn, BT_HFP_SET_MIC_VOL,vol);
+    if(err)
+        printf("Fail to set mic volume err:%d\r\n", err);
+    else
+        printf("Set mic volume successfully\r\n");
+}
+
+
+static void hfp_set_speaker_volume(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int err = 0;
+    uint8_t vol = 0;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    get_uint8_from_string(&argv[1], &vol);
+
+    if(vol > 15 ){
+        printf("Volume out of range %d\n",vol);
+        return;
+    }
+
+    err = bt_hfp_hf_send_cmd_arg(default_conn, BT_HFP_HF_AT_VGS,vol);
+    if(err)
+        printf("Fail to set speaker volume err:%d\r\n", err);
+    else
+        printf("Set speaker volume successfully\r\n");
+}
+
+static void hfp_query_list_calls(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int err = 0;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    err = bt_hfp_hf_send_cmd(default_conn, BT_HFP_QUERY_LIST_CALLS,NULL);
+    if(err)
+        printf("Fail to query the list calls err:%d\r\n", err);
+    else
+        printf("Query the list calls successfully\r\n");
+}
+
+static void hfp_response_call(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int err = 0;
+    uint8_t method = 0;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    get_uint8_from_string(&argv[1], &method);
+    if(method > 2){
+        printf("Unexception %d\n",method);
+        return;
+    }
+    err = bt_hfp_hf_send_cmd_arg(default_conn, BT_HFP_RESPONSE_CALLS,method);
+    if(err)
+        printf("Fail to response a call err:%d\r\n", err);
+    else
+        printf("Response a call successfully\r\n");
+}
+
+static void hfp_subscriber_number_info(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int err = 0;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    err = bt_hfp_hf_send_cmd(default_conn, BT_HFP_SUBSCRIBE_NUM_INFO,NULL);
+    if(err)
+        printf("Fail to response a call err:%d\r\n", err);
+    else
+        printf("Response a call successfully\r\n");
+}
+
+static void hfp_hf_send_indicator(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int err = 0;
+    uint16_t id = 0;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    get_uint16_from_string(&argv[1], &id);
+
+    err = bt_hfp_hf_send_cmd_arg(default_conn, BT_HFP_SEND_INDICATOR,id);
+    if(err)
+        printf("Fail to send a indicator err:%d\r\n", err);
+    else
+        printf("Send a indicato successfully\r\n");
+}
+// 1,Enhanced safety : the value is 0 indicate disable it or 1 enable
+// 2,Battery Level : 0-100
+static void hfp_hf_update_indicator(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    uint16_t val = 0;
+    int err = 0;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    get_uint16_from_string(&argv[1], &val);
+
+    err = bt_hfp_hf_send_cmd_arg(default_conn, BT_HFP_UPDATE_INDICATOR,val);
+    if(err)
+        printf("Fail to update indicator err:%d\r\n", err);
+    else
+        printf("Update indicator successfully\r\n");
+}
+
+static void hfp_hf_disconnect(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int err = 0;
+
+    if(!default_conn){
+        printf("Not connected.\n");
+        return;
+    }
+
+    err = bt_hfp_hf_send_disconnect(default_conn);
+    if(err){
+        printf("hf disconnect fail %d",err);
+    }
 }
 
 #endif

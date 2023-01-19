@@ -8,7 +8,7 @@
 
 #include <zephyr.h>
 #include <string.h>
-#include <errno.h>
+#include <sys/errno.h>
 #include <stdbool.h>
 #include <types.h>
 #include <util.h>
@@ -951,7 +951,7 @@ int bt_mesh_cfg_krp_set(u16_t net_idx, u16_t addr,
 
 	bt_mesh_model_msg_init(&msg, OP_KRP_SET);
 	net_buf_simple_add_le16(&msg, krp->NetKeyIndex);
-	net_buf_simple_add_u8(&msg, krp->Phase);
+	net_buf_simple_add_u8(&msg, krp->Transition);
 
 	err = bt_mesh_model_send(cli->model, &ctx, &msg, NULL, NULL);
 	if (err) {

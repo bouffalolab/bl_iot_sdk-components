@@ -45,17 +45,10 @@
 #include "settings.h"
 #if defined(BFLB_BLE)
 #include "bl_hci_wrapper.h"
+#if defined(BL702) || defined(BL602)
 #include "ble_lib_api.h"
-#if defined(BL602)
-#include "bl602_hbn.h"
-#elif defined(BL702)
-#include "bl702_hbn.h"
-#elif defined(BL606P) || defined(BL616)
-#if defined(CFG_SLEEP)
-#include "bl606p_hbn.h"
-#endif /* CFG_SLEEP */
-#elif defined(BL808)//no bl808_hbn.h currently, comment it out temporarily
-#include "bl808_hbn.h"
+#else
+#include "btble_lib_api.h"
 #endif
 #include "work_q.h"
 #endif
@@ -133,6 +126,13 @@ static u8_t pub_key[64];
 static struct bt_pub_key_cb *pub_key_cb;
 static bt_dh_key_cb_t dh_key_cb;
 #endif /* CONFIG_BT_ECC */
+
+#if defined(CONFIG_AUTO_PTS)
+u8_t* get_pub_key()
+{
+    return pub_key;
+}
+#endif /* CONFIG_AUTO_PTS */
 
 #if defined(CONFIG_BT_BREDR)
 static bt_br_discovery_cb_t *discovery_cb;
@@ -809,6 +809,7 @@ static int le_set_non_resolv_private_addr(u8_t id)
 	}
 
 	nrpa.val[5] &= 0x3f;
+
 	atomic_clear_bit(bt_dev.flags, BT_DEV_RPA_VALID);
 	return set_random_address(&nrpa);
 }
@@ -1995,6 +1996,9 @@ static void le_conn_update_complete(struct net_buf *buf)
 		return;
 	}
 
+#ifdef BFLB_BLE_PATCH_AVOID_CONN_UPDATE_WHEN_PREVIOUS_IS_NOT_OVER
+	atomic_clear_bit(conn->flags, BT_CONN_PARAM_UPDATE_GOING);
+#endif /* BFLB_BLE_PATCH_AVOID_CONN_UPDATE_WHEN_PREVIOUS_IS_NOT_OVER */
 	if (!evt->status) {
 		conn->le.interval = sys_le16_to_cpu(evt->interval);
 		conn->le.latency = sys_le16_to_cpu(evt->latency);
@@ -5108,11 +5112,19 @@ void device_supported_pkt_type(void)
 {
 	/* Device supported features and sco packet types */
 	if (BT_FEAT_HV2_PKT(bt_dev.features)) {
+        #if defined BFLB_BREDR_SCO_TYPE_FIX
+        bt_dev.br.esco_pkt_type |= (HCI_PKT_TYPE_HV2);
+        #else
 		bt_dev.br.esco_pkt_type |= (HCI_PKT_TYPE_ESCO_HV2);
+        #endif
 	}
 
 	if (BT_FEAT_HV3_PKT(bt_dev.features)) {
+        #if defined BFLB_BREDR_SCO_TYPE_FIX
+        bt_dev.br.esco_pkt_type |= (HCI_PKT_TYPE_HV3);
+        #else
 		bt_dev.br.esco_pkt_type |= (HCI_PKT_TYPE_ESCO_HV3);
+        #endif
 	}
 
 	if (BT_FEAT_LMP_ESCO_CAPABLE(bt_dev.features)) {
@@ -5830,9 +5842,6 @@ static int bt_init(void)
 
 #if defined(CONFIG_BT_SMP)
 #if defined(BFLB_BLE_PATCH_SETTINGS_LOAD)
-    #if defined(CFG_SLEEP)
-    if(HBN_Get_Status_Flag() == 0)
-    #endif
     {
         if(!bt_keys_load())
             keys_commit();
@@ -5975,12 +5984,7 @@ int bt_enable(bt_ready_cb_t cb)
 
 #if defined(BFLB_BLE_PATCH_SETTINGS_LOAD)
     if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-        #if defined(CFG_SLEEP)
-        /* When using eflash_loader upprade firmware and softreset, 
-         * HBN_Get_Status_Flag() is 0x594c440b. so comment this line. */
-        //if( HBN_Get_Status_Flag() == 0)
-        #endif
-        	bt_local_info_load();
+        bt_local_info_load();
      }
 #else
     if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
@@ -6117,6 +6121,7 @@ int bt_disable_action(void)
     #if defined(CONFIG_BT_CONN)
     bt_gatt_deinit();
     #endif
+    bt_conn_cb_clear();
     //delete queue, not delete hci_cmd_pool.free/hci_rx_pool.free/acl_tx_pool.free which store released buffers.
     bt_delete_queue(&recv_fifo);
     bt_delete_queue(&g_work_queue_main.fifo);
@@ -7207,6 +7212,29 @@ int bt_get_local_ramdon_address(bt_addr_le_t *adv_addr)
 	bt_addr_le_copy(adv_addr,&bt_dev.random_addr);
 	return err;
 }
+
+int bt_set_local_public_address(u8_t * bt_addr)
+{
+	int err = 0;
+    struct net_buf *rsp;
+    
+    if (!atomic_test_bit(bt_dev.flags, BT_DEV_USER_ID_ADDR)) {
+        /*Set Bluetooth Address*/
+        err = bt_set_bd_addr(( bt_addr_t*)bt_addr);
+        if(err) {
+            return err;
+        }           
+    
+	    /* Read Bluetooth Address */
+		err = bt_hci_cmd_send_sync(BT_HCI_OP_READ_BD_ADDR, NULL, &rsp);
+		if (err) {
+			return err;
+		}
+		read_bdaddr_complete(rsp);
+		net_buf_unref(rsp);
+	}
+	return err;
+}
 #endif
 
 int bt_le_adv_start(const struct bt_le_adv_param *param,
@@ -7628,7 +7656,7 @@ int bt_le_set_chan_map(u8_t chan_map[5])
 	return bt_hci_cmd_send_sync(BT_HCI_OP_LE_SET_HOST_CHAN_CLASSIF,
 				    buf, NULL);
 }
-#if defined(CONFIG_SET_TX_PWR)
+
 int bt_set_tx_pwr(int8_t power)
 {
     struct bt_hci_cp_vs_set_tx_pwr set_param;
@@ -7657,7 +7685,6 @@ int bt_set_tx_pwr(int8_t power)
     
 	return 0;
 }
-#endif
 
 int bt_set_bd_addr(const bt_addr_t *addr)
 {

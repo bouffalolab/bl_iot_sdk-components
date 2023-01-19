@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -27,106 +27,159 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <bl702_ir.h>
-#include <bl702_glb.h>
-#include <bl_irq.h>
-#include <looprt.h> 
-#include <loopset.h>
-#include <loopset_ir.h>
-#include <blog.h>
+#include "bl_ir.h"
 
-static void ir_gpio_init(int pin)
+
+void bl_ir_led_drv_cfg(uint8_t led0_en, uint8_t led1_en)
 {
-    GLB_GPIO_FUNC_Type gpioFuns = 11;
-    GLB_GPIO_Func_Init(gpioFuns, (GLB_GPIO_Type*)&pin, 1);
+    GLB_GPIO_Type pin;
 
-    return;
+    if(led0_en){
+        pin = 22;
+        GLB_GPIO_Func_Init(GPIO_FUN_ANALOG, &pin, 1);
+        GLB_IR_LED_Driver_Output_Enable(pin);
+    }else{
+        pin = 22;
+        GLB_IR_LED_Driver_Output_Disable(pin);
+    }
+
+    if(led1_en){
+        pin = 23;
+        GLB_GPIO_Func_Init(GPIO_FUN_ANALOG, &pin, 1);
+        GLB_IR_LED_Driver_Output_Enable(pin);
+    }else{
+        pin = 23;
+        GLB_IR_LED_Driver_Output_Disable(pin);
+    }
+
+    if(led0_en || led1_en){
+        GLB_IR_LED_Driver_Enable();
+    }else{
+        GLB_IR_LED_Driver_Disable();
+    }
 }
 
-static void ir_init(int pin, int ctrltype)
+void bl_ir_custom_tx_cfg(IR_TxCfg_Type *txCfg, IR_TxPulseWidthCfg_Type *txPWCfg)
 {
-    IR_RxCfg_Type rxcfg = {
-        IR_RX_NEC,      /* Set ir rx mode NEC */
-        ENABLE,         /* Disable signal of input inverse */
-        9000,           /* Pulse width threshold to trigger end condition, 4.5ms @2MHz source clock */
-        3400,           /* Pulse width threshold for logic 0/1 detection, 1.7ms */
-        DISABLE,        /* Disable input de-glitch function */
-        0               /* De-glitch function cycle count */// TODO use De-Glitch
+    /* Run IR at 2M */
+    GLB_PER_Clock_UnGate(GLB_AHB_CLOCK_IR);
+    GLB_Set_IR_CLK(ENABLE, GLB_IR_CLK_SRC_XCLK, 15);
+
+    IR_Disable(IR_TX);
+    IR_TxInit(txCfg);
+    IR_TxPulseWidthConfig(txPWCfg);
+}
+
+void bl_ir_nec_tx_cfg(void)
+{
+    IR_TxCfg_Type txCfg = {
+        32,              /* 32-bit data */
+        DISABLE,         /* Disable signal of tail pulse inverse */
+        ENABLE,          /* Enable signal of tail pulse */
+        DISABLE,         /* Disable signal of head pulse inverse */
+        ENABLE,          /* Enable signal of head pulse */
+        DISABLE,         /* Disable signal of logic 1 pulse inverse */
+        DISABLE,         /* Disable signal of logic 0 pulse inverse */
+        ENABLE,          /* Enable signal of data pulse */
+        ENABLE,          /* Enable signal of output modulation */
+        DISABLE,         /* Disable signal of output inverse */
     };
 
-    ir_gpio_init(pin);
+    IR_TxPulseWidthCfg_Type txPWCfg = {
+        1,   /* Pulse width of logic 0 pulse phase 1, 562.5us @2MHz source clock*/
+        1,   /* Pulse width of logic 0 pulse phase 0 */
+        3,   /* Pulse width of logic 1 pulse phase 1, 1687.5us */
+        1,   /* Pulse width of logic 1 pulse phase 0 */
+        8,   /* Pulse width of head pulse phase 1, 4.5ms */
+        16,  /* Pulse width of head pulse phase 0, 9ms */
+        1,   /* Pulse width of tail pulse phase 1 */
+        1,   /* Pulse width of tail pulse phase 0 */
+        35,  /* Modulation phase 1 width, 37.7kHz, duty=1/3 */
+        18,  /* Modulation phase 0 width, 37.7kHz, duty=1/3 */
+        1125 /* Pulse width unit */
+    };
 
-    GLB_IR_LED_Driver_Enable();
-    GLB_IR_RX_GPIO_Sel(pin);
-
-    IR_Disable(IR_TXRX);
-    IR_RxInit((IR_RxCfg_Type*)&rxcfg);
+    bl_ir_custom_tx_cfg(&txCfg, &txPWCfg);
 }
 
-uint32_t bl_receivedata(void)
-{ 
-    return IR_ReceiveData(IR_WORD_0);
-}
-
-uint32_t bl_get_bitcount(void)
+void bl_ir_rc5_tx_cfg(void)
 {
-    return IR_GetRxDataBitCount();
+    IR_TxCfg_Type txCfg = {
+        13,              /* 13-bit data, head pulse as the first start bit */
+        DISABLE,         /* Disable signal of tail pulse inverse */
+        DISABLE,         /* Disable signal of tail pulse */
+        ENABLE,          /* Enable signal of head pulse inverse */
+        ENABLE,          /* Enable signal of head pulse */
+        ENABLE,          /* Enable signal of logic 1 pulse inverse */
+        DISABLE,         /* Disable signal of logic 0 pulse inverse */
+        ENABLE,          /* Enable signal of data pulse */
+        ENABLE,          /* Enable signal of output modulation */
+        DISABLE,         /* Disable signal of output inverse */
+    };
+
+    IR_TxPulseWidthCfg_Type txPWCfg = {
+        1,   /* Pulse width of logic 0 pulse phase 1, 889us @2MHz source clock*/
+        1,   /* Pulse width of logic 0 pulse phase 0 */
+        1,   /* Pulse width of logic 1 pulse phase 1 */
+        1,   /* Pulse width of logic 1 pulse phase 0 */
+        1,   /* Pulse width of head pulse phase 1 */
+        1,   /* Pulse width of head pulse phase 0 */
+        1,   /* Pulse width of tail pulse phase 1 */
+        1,   /* Pulse width of tail pulse phase 0 */
+        35,  /* Modulation phase 1 width, 37.7kHz, duty=1/3 */
+        18,  /* Modulation phase 0 width, 37.7kHz, duty=1/3 */
+        1778 /* Pulse width unit */
+    };
+
+    bl_ir_custom_tx_cfg(&txCfg, &txPWCfg);
 }
 
-static int data_check(uint32_t data)
+void bl_ir_swm_tx_cfg(void)
 {
-    uint16_t hdata = 0;
-    uint16_t ldata = 0;
+    IR_TxCfg_Type txCfg = {
+        22,                                                  /* Send 22 tx fifo data */
+        DISABLE,                                             /* Don't care when SWM is enabled */
+        DISABLE,                                             /* Don't care when SWM is enabled */
+        DISABLE,                                             /* Don't care when SWM is enabled */
+        DISABLE,                                             /* Don't care when SWM is enabled */
+        DISABLE,                                             /* Don't care when SWM is enabled */
+        DISABLE,                                             /* Don't care when SWM is enabled */
+        DISABLE,                                             /* Don't care when SWM is enabled */
+        ENABLE,                                              /* Enable signal of output modulation */
+        DISABLE,                                             /* Disable signal of output inverse */
+    };
 
-    hdata = ((data >> 24) & 0xff) ^ ((data >> 16) & 0xff);
-    ldata = ((data >> 8) & 0xff) ^ (data & 0xff);
+    IR_TxPulseWidthCfg_Type txPWCfg = {
+        0,                                                   /* Don't care when SWM is enabled */
+        0,                                                   /* Don't care when SWM is enabled */
+        0,                                                   /* Don't care when SWM is enabled */
+        0,                                                   /* Don't care when SWM is enabled */
+        0,                                                   /* Don't care when SWM is enabled */
+        0,                                                   /* Don't care when SWM is enabled */
+        0,                                                   /* Don't care when SWM is enabled */
+        0,                                                   /* Don't care when SWM is enabled */
+        35,                                                  /* Modulation phase 1 width, 37.7kHz, duty=1/3 */
+        18,                                                  /* Modulation phase 0 width, 37.7kHz, duty=1/3 */
+        1778                                                 /* Pulse width unit */
+    };
 
-    if (hdata == 0xff && ldata == 0xff) {
-        return 0;
-    } else {
-        return -1;
-    }
+    bl_ir_custom_tx_cfg(&txCfg, &txPWCfg);
 }
 
-static void ir_interrupt_entry(void)
+void bl_ir_nec_tx(uint32_t wdata)
 {
-    uint32_t data;
-    int flag;
-
-    IR_Disable(IR_RX);
-    IR_IntMask(IR_INT_RX, MASK);
-    IR_ClrIntStatus(IR_INT_RX);
-
-    data = bl_receivedata();
-    flag = data_check(data);
-    if (flag == -1 && data != 0) {
-        blog_debug("invalid data \r\n");
-        IR_Enable(IR_RX);
-        IR_IntMask(IR_INT_RX, UNMASK);
-        return;
-    } else {
-        /*empty here*/
-    }
-
-    //TODO use with irq context
-    ir_async_post();
+    IR_TxSWM(DISABLE);
+    IR_SendCommand(0, wdata);
 }
 
-void bl_enable_rx_int(void)
+void bl_ir_rc5_tx(uint32_t wdata)
 {
-    IR_Enable(IR_RX);
-    IR_IntMask(IR_INT_RX, UNMASK);
-
-    return;
+    IR_TxSWM(DISABLE);
+    IR_SendCommand(0, wdata);
 }
 
-int bl_ir_init(int pin, int ctrltype)
+void bl_ir_swm_tx(uint16_t *data, uint8_t len)
 {
-    ir_init(pin, ctrltype);
-    bl_irq_register(IRRX_IRQn, ir_interrupt_entry);
-    bl_irq_enable(IRRX_IRQn);
-    IR_Enable(IR_RX);
-    IR_IntMask(IR_INT_RX, UNMASK);
-
-    return 0;
+    IR_TxSWM(ENABLE);
+    IR_SWMSendCommand(data, len);
 }

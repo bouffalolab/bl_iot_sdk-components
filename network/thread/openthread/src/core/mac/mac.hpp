@@ -704,10 +704,6 @@ public:
     bool IsRadioFilterEnabled(void) const { return mLinks.GetSubMac().IsRadioFilterEnabled(); }
 #endif
 
-
-    uint8_t GetDataSequence(void) { return mDataSequence; }
-    void SetDataSequence(uint8_t seq) { mDataSequence = seq; }
-    void * PrepareDataRequest(void);
 private:
     static constexpr int8_t   kInvalidRssiValue  = SubMac::kInvalidRssiValue;
     static constexpr uint16_t kMaxCcaSampleCount = OPENTHREAD_CONFIG_CCA_FAILURE_RATE_AVERAGING_WINDOW;

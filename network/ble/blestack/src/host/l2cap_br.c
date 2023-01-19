@@ -774,6 +774,10 @@ static void l2cap_br_conn_req(struct bt_l2cap_br *l2cap, uint8_t ident,
 
 no_chan:
 	l2cap_br_send_conn_rsp(conn, scid, 0, ident, result);
+	if (result == BT_L2CAP_BR_ERR_SEC_BLOCK)
+	{
+		bt_conn_disconnect(conn, BT_HCI_ERR_AUTH_FAIL);
+	}
 }
 
 static void l2cap_br_conf_rsp(struct bt_l2cap_br *l2cap, uint8_t ident,

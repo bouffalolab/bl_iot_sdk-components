@@ -65,9 +65,24 @@ extern "C" {
  * called at a defined interval */
 typedef void (* lwip_cyclic_timer_handler)(void);
 
+/* bouffalo lp change
+ * Add to support enable/disable timer dynamically
+ **/
+typedef enum {
+  LWIP_TIMER_STATUS_IDLE = 0,
+  LWIP_TIMER_STATUS_RUNNING = 1,
+  LWIP_TIMER_STATUS_STOPPING = 2, /* After set to stopping, the statue will change to idle until the last timer timeout */
+} lwip_timer_status_t;
+/* bouffalo lp change end */
+
 /** This struct contains information about a stack-internal timer function
  that has to be called at a defined interval */
 struct lwip_cyclic_timer {
+  /* bouffalo lp change
+   * Add to support enable/disable timer dynamically
+   **/
+  lwip_timer_status_t status;
+  /* bouffalo lp change end */
   u32_t interval_ms;
   lwip_cyclic_timer_handler handler;
 #if LWIP_DEBUG_TIMERNAMES
@@ -77,7 +92,7 @@ struct lwip_cyclic_timer {
 
 /** This array contains all stack-internal cyclic timers. To get the number of
  * timers, use lwip_num_cyclic_timers */
-extern const struct lwip_cyclic_timer lwip_cyclic_timers[];
+extern struct lwip_cyclic_timer lwip_cyclic_timers[];
 /** Array size of lwip_cyclic_timers[] */
 extern const int lwip_num_cyclic_timers;
 
@@ -109,10 +124,20 @@ void sys_timeout_debug(u32_t msecs, sys_timeout_handler handler, void *arg, cons
 void sys_timeout(u32_t msecs, sys_timeout_handler handler, void *arg);
 #endif /* LWIP_DEBUG_TIMERNAMES */
 
+/* bouffalo lp change
+ * Add to support enable/disable timer dynamically
+ */
+void sys_timeouts_set_timer_enable(bool enable, lwip_cyclic_timer_handler handler);
+/* bouffalo lp change end */
+
 void sys_untimeout(sys_timeout_handler handler, void *arg);
 void sys_restart_timeouts(void);
 void sys_check_timeouts(void);
 u32_t sys_timeouts_sleeptime(void);
+
+#if LWIP_TCP
+void tcpip_tmr_compensate_tick(void);
+#endif
 
 #if LWIP_TESTMODE
 struct sys_timeo** sys_timeouts_get_next_timeout(void);

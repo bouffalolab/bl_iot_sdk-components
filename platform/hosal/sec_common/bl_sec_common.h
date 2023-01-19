@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -30,6 +30,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 
 typedef enum {
     BL_SHA1,
@@ -86,3 +87,11 @@ typedef struct bl_sha512_ctx {
     uint64_t tmp[16];
     uint64_t pad[16];
 } bl_sha512_ctx_t;
+
+/*
+ * PSK
+ */
+/// Calculate Wi-Fi PSK
+int bl_sec_psk(const char *password, const void *ssid, size_t ssid_len, void *output);
+/// Test PSK
+int bl_sec_psk_test(void);

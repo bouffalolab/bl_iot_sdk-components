@@ -5,7 +5,7 @@
  */
 
 #include <zephyr.h>
-#include <errno.h>
+#include <sys/errno.h>
 #include <stdlib.h>
 #include <string.h>
 //#include <sys/types.h>
@@ -196,6 +196,29 @@ static struct {
 	bool valid;
 	struct cfg_val cfg;
 } stored_cfg;
+
+#if defined(CONFIG_AUTO_PTS)
+int bt_mesh_settings_set(settings_read_cb read_cb, void *cb_arg,
+			 void *out, size_t read_len)
+{
+	ssize_t len;
+
+	len = read_cb(cb_arg, out, read_len);
+	if (len < 0) {
+		BT_ERR("Failed to read value (err %zd)", len);
+		return len;
+	}
+
+	//BT_HEXDUMP_DBG(out, len, "val");
+
+	if (len != read_len) {
+		BT_ERR("Unexpected value length (%zd != %zu)", len, read_len);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+#endif
 
 static inline int mesh_x_set(settings_read_cb read_cb, void *cb_arg, void *out,
 			     size_t read_len)

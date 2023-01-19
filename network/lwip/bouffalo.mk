@@ -5,6 +5,9 @@ CFLAGS   += -DCFG_ETHERNET_ENABLE
 CPPFLAGS += -DCFG_ETHERNET_ENABLE
 endif
 
+ifeq ($(CONFIG_NETBUS_WIFI_ENABLE),1)
+CFLAGS += -DCFG_NETBUS_WIFI_ENABLE
+endif
 #
 ## These include paths would be exported to project level
 COMPONENT_ADD_INCLUDEDIRS += src/include src/include/compat/posix lwip-port lwip-port/FreeRTOS lwip-port/arch

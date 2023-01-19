@@ -229,14 +229,16 @@ struct bt_hci_cmd_hdr {
 #define BT_IO_NO_INPUT_OUTPUT                   0x03
 
 /* SCO packet types */
-#define HCI_PKT_TYPE_HV1                        0x0020
-#define HCI_PKT_TYPE_HV2                        0x0040
-#define HCI_PKT_TYPE_HV3                        0x0080
+#define HCI_PKT_TYPE_HV1                        0x0001
+#define HCI_PKT_TYPE_HV2                        0x0002
+#define HCI_PKT_TYPE_HV3                        0x0004
 
 /* eSCO packet types */
+#ifndef BFLB_BREDR_SCO_TYPE_FIX
 #define HCI_PKT_TYPE_ESCO_HV1                   0x0001
 #define HCI_PKT_TYPE_ESCO_HV2                   0x0002
 #define HCI_PKT_TYPE_ESCO_HV3                   0x0004
+#endif
 #define HCI_PKT_TYPE_ESCO_EV3                   0x0008
 #define HCI_PKT_TYPE_ESCO_EV4                   0x0010
 #define HCI_PKT_TYPE_ESCO_EV5                   0x0020
@@ -245,10 +247,15 @@ struct bt_hci_cmd_hdr {
 #define HCI_PKT_TYPE_ESCO_2EV5                  0x0100
 #define HCI_PKT_TYPE_ESCO_3EV5                  0x0200
 
-
+#if defined(BFLB_BREDR_SCO_TYPE_FIX)
+#define ESCO_PKT_MASK                           (HCI_PKT_TYPE_ESCO_EV3 | \
+						 HCI_PKT_TYPE_ESCO_EV4 | \
+						 HCI_PKT_TYPE_ESCO_EV5)
+#else
 #define ESCO_PKT_MASK                           (HCI_PKT_TYPE_ESCO_HV1 | \
 						 HCI_PKT_TYPE_ESCO_HV2 | \
 						 HCI_PKT_TYPE_ESCO_HV3)
+#endif
 #define SCO_PKT_MASK                            (HCI_PKT_TYPE_HV1 | \
 						 HCI_PKT_TYPE_HV2 | \
 						 HCI_PKT_TYPE_HV3)

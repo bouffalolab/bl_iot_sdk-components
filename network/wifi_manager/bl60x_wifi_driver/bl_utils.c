@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -44,6 +44,13 @@
 #include "bl_rx.h"
 #include "bl_tx.h"
 #include "bl_cmds.h"
+
+#ifdef CFG_NETBUS_WIFI_ENABLE
+#include <netbus_mgmr.h>
+#include <netbus_utils.h>
+#include <utils_log.h>
+#endif
+
 #undef os_printf
 #define os_printf(...) do {} while(0)
 
@@ -353,9 +360,19 @@ static inline struct pbuf *_handle_frame_from_stack_with_zerocopy(void *swdesc, 
     return h;
 }
 
+#if CFG_NETBUS_WIFI_ENABLE
+void pbuf_cfm_cb(int idx, void *arg)
+{
+    /* printf("pbuf_cfm free %d %p\r\n", idx, arg); */
+void bl60x_firmwre_mpdu_free(void *swdesc_ptr);
+    bl60x_firmwre_mpdu_free(arg);
+}
+#endif
+
 #define MAC_FMT "%02X%02X%02X%02X%02X%02X"
 #define MAC_LIST(arr) (arr)[0], (arr)[1], (arr)[2], (arr)[3], (arr)[4], (arr)[5]
 
+#ifdef LWIP_IPV6
 static int tcpip_src_addr_cmp(struct ethhdr *hdr, uint8_t addr[])
 {
     int i;
@@ -368,6 +385,7 @@ static int tcpip_src_addr_cmp(struct ethhdr *hdr, uint8_t addr[])
 
     return 0;
 }
+#endif
 
 int tcpip_stack_input(void *swdesc, uint8_t status, void *hwhdr, unsigned int msdu_offset, struct wifi_pkt *pkt, uint8_t extra_status)
 {
@@ -453,13 +471,31 @@ int tcpip_stack_input(void *swdesc, uint8_t status, void *hwhdr, unsigned int ms
             }
         }
 #endif
+
+#if CFG_NETBUS_WIFI_ENABLE
+        if (bflbmsg_send_pbuf(&g_netbus_wifi_mgmr_env.trcver_ctx,
+                BF1B_MSG_TYPE_ETH_WIFI_FRAME, BF1B_MSG_ETH_WIFI_FRAME_SUBTYPE_STA_FROM_WIFI_RX,
+                h, extra_status, pbuf_cfm_cb, swdesc)) {
+            /* printf("FRM TX swdesc %p failed\r\n", swdesc); */
+            pbuf_free(h);
+        } else {
+            pbuf_free(h);
+            /* printf("FRM TX swdesc %p\r\n", swdesc); */
+        }
+#else
+
+        #ifdef LWIP_IPV6
         struct ethhdr *hdr = (struct ethhdr *)(skb_payload);
         if (bl_vif->dev && tcpip_src_addr_cmp(hdr, (bl_vif->dev)->hwaddr) && ERR_OK == bl_vif->dev->input(h, bl_vif->dev)) {
+        #else
+        if (bl_vif->dev && ERR_OK == bl_vif->dev->input(h, bl_vif->dev)) {
+        #endif
             //TCP/IP stack will take care of pbuf h
         } else {
             //No none need pbuf h anymore, so free it now
             pbuf_free(h);
         }
+#endif
     }
 
     goto free; // In case of error that label free is defined but not used when PKT_INPUT_HOOK is disabled
@@ -592,7 +628,7 @@ void bl_utils_dump(void)
         bl_os_printf("    [%lu]%p(%p:%08lX)\r\n",
                 (ipc_env->txdesc_used_idx + i) & (NX_TXDESC_CNT0 - 1),
                 p,
-                p ? (void*)(txhdr->host.status_addr) : 0,
+                0,
                 p ? txhdr->status.value : 0
         );
     }

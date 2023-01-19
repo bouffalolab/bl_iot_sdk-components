@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -32,17 +32,15 @@
 
 
 #include "bl702_glb.h"
-#include "bl702_sec_eng.h"
-#include "bl702_sf_cfg.h"
 #include "bl702_sflash.h"
 #include "bl702_romdriver.h"
 
 
-#define ATTR_NOINLINE                   __attribute__((noinline))
-#define ATTR_PDS_SECTION                __attribute__((section(".pds_code." ATTR_UNI_SYMBOL)))
+#define ATTR_NOINLINE              __attribute__((noinline))
+#define ATTR_PDS_SECTION           __attribute__((section(".pds_code." ATTR_UNI_SYMBOL)))
 
-#define PDS_WAKEUP_BY_SLEEP_CNT         1
-#define PDS_WAKEUP_BY_GPIO              2
+#define PDS_WAKEUP_BY_SLEEP_CNT    1
+#define PDS_WAKEUP_BY_GPIO         2
 
 
 void bl_pds_init(void);

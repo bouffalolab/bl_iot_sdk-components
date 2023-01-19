@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -81,7 +81,7 @@ int wifi_mgmr_api_connect(char *ssid, char *passphr, const ap_connect_adv_t *ext
         goto failed;
     } else if (sizeof(profile->psk) == profile->psk_len) {
         memcpy(profile->psk, ext_param->psk, profile->psk_len);
-    } else if (0 == profile->psk_len && profile->passphr_len) {
+    } else if (0 == profile->psk_len && profile->passphr_len && profile->passphr_len >= 8) {
         // Put PSK calculation here, Otherwise it will influence FW Response performance
         if (wifi_mgmr_psk_cal(profile->passphr, profile->ssid, profile->ssid_len, profile->psk)){
             return -1;

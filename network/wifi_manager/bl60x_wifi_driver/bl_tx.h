@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -46,20 +46,16 @@
  ****************************************************************************************
  */
 
-typedef void (*bl_custom_tx_callback_t)(void *cb_arg, bool tx_ok);
+// Customer callback function type definition
+typedef void (*bl_tx_callback_t)(void *cb_arg, bool tx_ok);
 
-struct bl_custom_tx_cfm {
-    bl_custom_tx_callback_t cb;
+// Customer callback
+struct bl_tx_cfm {
+    bl_tx_callback_t cb;
     void *cb_arg;
 };
 
-/**
- * struct bl_txhdr - Stucture to control transimission of packet
- * (Added in skb headroom)
- *
- * @sw_hdr: Information from driver
- * @hw_hdr: Information for/from hardware
- */
+// TX status from FW/HW
 union bl_hw_txstatus {
     struct {
         u32 tx_done            : 1;
@@ -69,17 +65,50 @@ union bl_hw_txstatus {
     };
     u32 value;
 };
+
+/**
+ * struct bl_txhdr - Stucture to control transimission of packet
+ * (Added in skb headroom)
+ *
+ * @item:       List item for list operation
+ * @custom_cfm: Customer callback for TX
+ * @status:     Status for FW/HW to return TX result
+ * @p:          Pbuf from upper tcp/ip stack
+ * @vif_type:   0: VIF_AP, 1: Vif_STA, [2-FF]: other
+ * @repush:     repush counter
+ */
 struct bl_txhdr {
     struct utils_list_hdr item;
-    union bl_hw_txstatus status;
-    uint32_t *p;
-    struct hostdesc host;
-    struct bl_custom_tx_cfm custom_cfm;
+    struct bl_tx_cfm      custom_cfm;
+    union bl_hw_txstatus  status;
+    uint32_t             *p;
+    uint32_t              len      : 16;
+    uint32_t              vif_type : 8;
+    uint32_t              repush   : 8;
 };
 
-err_t bl_output(struct bl_hw *bl_hw, struct netif *netif, struct pbuf *p, int is_sta, struct bl_custom_tx_cfm *custom_cfm);
-int bl_wifi_eth_tx(struct pbuf *p, bool is_sta, struct bl_custom_tx_cfm *custom_cfm);
+/// XXX: put here for now
+struct ke_tx_fc {
+    /// 0: ap, 1: sta
+    uint8_t interface_bits;
+    /// For ap
+    struct {
+        uint8_t sta_bits;
+        uint8_t reason_bits[8];
+    } ap;
+    /// For sta
+    struct {
+        uint8_t reason_bits;
+    } sta;
+};
+
+#ifdef CFG_NETBUS_WIFI_ENABLE
+err_t bl_output(struct bl_hw *bl_hw, struct netif *netif, struct pbuf *p, int is_sta, struct bl_tx_cfm *custom_cfm, uint8_t from_local);
+#else
+err_t bl_output(struct bl_hw *bl_hw, struct netif *netif, struct pbuf *p, int is_sta, struct bl_tx_cfm *custom_cfm);
+#endif
+int bl_wifi_eth_tx(struct pbuf *p, bool is_sta, struct bl_tx_cfm *custom_cfm);
 int bl_txdatacfm(void *pthis, void *host_id);
-void bl_tx_try_flush();
+void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field);
 void bl_irq_handler();
 #endif

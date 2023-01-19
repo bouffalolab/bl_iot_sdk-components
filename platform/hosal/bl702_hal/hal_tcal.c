@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -66,7 +66,6 @@ static void hal_tcal_trigger(void)
 int hal_tcal_init(void)
 {
     bl_adc_tsen_cfg_t tsen_cfg = {
-        .tsen_dma_ch = 0,
         .tsen_event = hal_tcal_callback,
     };
     

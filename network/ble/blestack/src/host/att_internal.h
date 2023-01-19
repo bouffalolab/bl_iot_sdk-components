@@ -14,6 +14,10 @@
 #define BT_ATT_MTU CONFIG_BT_L2CAP_TX_MTU
 #endif
 
+#if defined(CONFIG_AUTO_PTS)
+#define BT_ATT_MTU 23
+#endif
+
 struct bt_att_hdr {
 	u8_t  code;
 } __packed;

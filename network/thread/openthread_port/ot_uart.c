@@ -30,27 +30,33 @@ extern hosal_uart_dev_t uart_stdio;
 
 static void ot_uartCli(char* pcWriteBuffer, int xWriteBufferLen, int argc, char** argv)
 {
-    static char buf[384];
-
-    if (argc) {
-        char *p = buf;
-        for (uint32_t i = 1; i < argc; i ++) {
-            memcpy(p, argv[i], strlen(argv[i]));
-            p += strlen(argv[i]);
-            *p++ = ' ';
-        }
-        p --;
-        *p++ = '\r';
-        *p++ = '\n';
-
-        OT_THREAD_SAFE(
-            otPlatUartReceived((uint8_t *)buf, p - buf);
-        );
+    char* buf = argv[1];
+    int len;
+    if (!argc) {
+        return;
     }
+
+    for(int i = 1; i < argc - 1; ++i){
+        buf[strlen(buf)] = ' ';
+    }
+    len = strlen(buf);
+    buf[len] = '\r';
+
+#ifdef CFG_PREFIX
+    otPlatUartSend((const uint8_t *)CFG_PREFIX, strlen(CFG_PREFIX));
+    otPlatUartSend((const uint8_t *)" ", 1);
+#endif
+    OT_THREAD_SAFE(
+        otPlatUartReceived((uint8_t *)buf, len+1); 
+    );
 }
 
 const struct cli_command otcCliSet[] STATIC_CLI_CMD_ATTRIBUTE = {
+#ifdef CFG_PREFIX
+    { CFG_PREFIX, "orignal openthread command line", ot_uartCli},
+#else
     { "otc", "orignal openthread command line", ot_uartCli},
+#endif
 };
 
 static void ot_uart_cb_read(int fd, void *param)
@@ -167,7 +173,6 @@ otError otPlatUartEnable(void)
 
     memset(&otUart_var, 0, sizeof(otUart_t));
 
-
     return OT_ERROR_NONE;
 }
 
@@ -219,7 +224,7 @@ static int ot_uartRxdCb(void *p_arg)
         len = (otUart_var.start + OT_UART_RX_BUFFSIZE - otUart_var.end) % OT_UART_RX_BUFFSIZE;
         if (otUart_var.recvLen != len) {
             otUart_var.recvLen = len;
-            OT_NOTIFY_ISR(OT_SYSTEM_EVENT_UART_RXD);
+            otrNotifyEvent(OT_SYSTEM_EVENT_UART_RXD);
         }
     }
 
@@ -233,7 +238,7 @@ void ot_uartTask (ot_system_event_t sevent)
     }
 
     if (OT_SYSTEM_EVENT_UART_RXD & sevent) {
-        OT_ENTER_CRITICAL();
+        uint32_t tag = otrEnterCrit();
 
         if (otUart_var.start != otUart_var.end) {
             if (otUart_var.start > otUart_var.end) {
@@ -252,7 +257,7 @@ void ot_uartTask (ot_system_event_t sevent)
 
         otUart_var.start = otUart_var.end = 0;
         otUart_var.recvLen = 0;
-        OT_EXIT_CRITICAL();
+        otrExitCrit(tag);
     }
 }
 #endif

@@ -768,8 +768,6 @@ public:
      */
     static const char *StateToString(State aState);
 
-
-    void SetLinkFailures(uint32_t linkeFailures) {mLinkFailures = linkeFailures;};
 protected:
     /**
      * This method initializes the `Neighbor` object.

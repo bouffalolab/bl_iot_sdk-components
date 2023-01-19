@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -53,6 +53,16 @@ static unsigned int trng_idx = 0;
 static StaticSemaphore_t sha_mutex_buf;
 SemaphoreHandle_t g_bl_sec_sha_mutex = NULL;
 
+static inline void _trng_ht_disable()
+{
+    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t val;
+
+    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_TEST);
+    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_HT_DIS);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_TEST, val);
+}
+
 static inline void _trng_trigger()
 {
     uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
@@ -88,7 +98,7 @@ static inline void wait_trng4feed()
     val = BL_CLR_REG_BIT(val, SEC_ENG_SE_TRNG_TRIG_1T);
     BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, val);
 
-    blog_info("Feed random number is %08lx\r\n", trng_buffer[0]);
+    //blog_info("Feed random number is %08lx\r\n", trng_buffer[0]);
 
     val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
     while (BL_IS_REG_BIT_SET(val, SEC_ENG_SE_TRNG_BUSY)) {
@@ -104,6 +114,8 @@ static inline void wait_trng4feed()
     trng_buffer[5] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_5);
     trng_buffer[6] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_6);
     trng_buffer[7] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_7);
+
+    blog_info("Feed random number is %08lx\r\n", trng_buffer[0]);
 }
 
 uint32_t bl_sec_get_random_word(void)
@@ -178,7 +190,12 @@ void sec_trng_IRQHandler(void)
 int bl_sec_init(void)
 {
     g_bl_sec_sha_mutex = xSemaphoreCreateMutexStatic(&sha_mutex_buf);
+    bl_sec_sha_init();
     bl_sec_pka_init();
+    bl_sec_aes_init();
+
+    /*Disable health test to fix se_trng_0_ht_error, but will reduce security*/
+    _trng_ht_disable();
     _trng_trigger();
     wait_trng4feed();
     /*Trigger again*/
@@ -186,6 +203,10 @@ int bl_sec_init(void)
     wait_trng4feed();
     bl_irq_register(SEC_TRNG_IRQn, sec_trng_IRQHandler);
     bl_irq_enable(SEC_TRNG_IRQn);
+
+#if defined(CONFIG_HW_SEC_ENG_DISABLE)
+    srand(trng_buffer[0]);
+#endif
 
     return 0;
 }

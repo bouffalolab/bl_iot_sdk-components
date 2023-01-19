@@ -1,104 +1,120 @@
 #include <inttypes.h>
 #include <stdio.h>
+#include <string.h>
 
+#ifdef BL702
 #include <bl702.h>
 #include <bl_irq.h>
-#include <lmac154.h>
+#include <bl_timer.h>
 #include <bl_wireless.h>
+#include <lmac154.h>
+#endif
+#ifdef BL702L
+#include <bl702l.h>
+#include <bl_irq.h>
+#include <bl_timer.h>
+#include <bl_wireless.h>
+#include <rom_lmac154_ext.h>
+#endif
 #include <utils_list.h>
 
 #include <openthread/config.h>
-#include <openthread/tasklet.h>
-#include <openthread/platform/time.h>
-#include <openthread/platform/diag.h>
-#include <openthread/platform/radio.h>
+#include <openthread/thread.h>
+#include <platforms/utils/link_metrics.h>
 #include <openthread_port.h>
 
-#include <platforms/utils/mac_frame.h>
+#include <FreeRTOS.h>
+#include <portmacro.h>
+#include <task.h>
+
+#include <ot_internel.h>
+#include <ot_utils_ext.h>
 
 #include OPENTHREAD_PROJECT_CORE_CONFIG_FILE
 
-#define DEBUG_ENABLE 0 
+static otRadio_t                otRadioVar;
+static uint8_t                  otRadio_buffPool[TOTAL_RX_FRAME_SIZE * (OTRADIO_RX_FRAME_BUFFER_NUM + 1) + (ALIGNED_RX_FRAME_SIZE + MAX_ACK_FRAME_SIZE) * 2];
+#ifdef BL702
+otRadio_t                       *otRadioVar_ptr = NULL;
+#endif
+#ifdef BL702L
+extern otRadio_t                *otRadioVar_ptr;
+#endif
 
-#define OTRADIO_MAC_HEADER_ACK_REQUEST_MASK (1 << 5)
-#define OTRADIO_MAX_PSDU                    128
-#define OTRADIO_RX_FRAME_BUFFER_NUM         16
-
-typedef struct _otRadio_rxFrame_t {
-    utils_dlist_t       dlist;
-    otRadioFrame        frame;
-} otRadio_rxFrame_t;
-
-#define ALIGNED_RX_FRAME_SIZE  ((sizeof(otRadio_rxFrame_t) + 3) & 0xfffffffc)
-#define TOTAL_RX_FRAME_SIZE (ALIGNED_RX_FRAME_SIZE + OTRADIO_MAX_PSDU)
-
-typedef struct _otRadio_t {
-    otInstance              *aInstance;
-    utils_dlist_t           rxFrameList;
-    utils_dlist_t           frameList;
-    otRadioFrame            *pTxFrame;
-    otRadioFrame            *pAckFrame;
-    uint32_t                isCoexEnabled;
-
-    uint64_t                tstx;
-    uint64_t                tsIsr;
-
-    uint32_t                dbgRxFrameNum;
-    uint32_t                dbgFrameNum;
-    uint32_t                dbgMaxAckFrameLenth;
-    uint32_t                dbgMaxPendingFrameNum;
-    uint8_t                 buffPool[TOTAL_RX_FRAME_SIZE * (OTRADIO_RX_FRAME_BUFFER_NUM + 2)];
-} otRadio_t;
-
-otRadio_t otRadio_var;
-
-void ot_radioInit(void) 
+void ot_radioInit(otRadio_opt_t opt) 
 {
     otRadio_rxFrame_t *pframe = NULL;
+    otRadioVar_ptr = &otRadioVar;
 
-    memset(&otRadio_var, 0, offsetof(otRadio_t, buffPool));
+    memset(otRadioVar_ptr, 0, sizeof(otRadio_t));
 
-    otRadio_var.pAckFrame = (otRadioFrame *)(otRadio_var.buffPool + TOTAL_RX_FRAME_SIZE);
-    otRadio_var.pAckFrame->mPsdu = ((uint8_t *)otRadio_var.pAckFrame) + ALIGNED_RX_FRAME_SIZE;
+    otRadioVar_ptr->opt.byte = opt.byte;
 
-    OT_ENTER_CRITICAL();
-    utils_dlist_init(&otRadio_var.frameList);
-    utils_dlist_init(&otRadio_var.rxFrameList);
+    uint32_t tag = otrEnterCrit();
+    utils_dlist_init(&otRadioVar_ptr->frameList);
+    utils_dlist_init(&otRadioVar_ptr->rxFrameList);
 
     for (int i = 0; i < OTRADIO_RX_FRAME_BUFFER_NUM; i ++) {
-        pframe = (otRadio_rxFrame_t *) (otRadio_var.buffPool + TOTAL_RX_FRAME_SIZE * (i + 2));
+        pframe = (otRadio_rxFrame_t *) (otRadio_buffPool + TOTAL_RX_FRAME_SIZE * (i + 1));
         pframe->frame.mPsdu = ((uint8_t *)pframe) + ALIGNED_RX_FRAME_SIZE;
-        utils_dlist_add_tail(&pframe->dlist, &otRadio_var.frameList);
+        utils_dlist_add_tail(&pframe->dlist, &otRadioVar_ptr->frameList);
     }
 
-    otRadio_var.dbgFrameNum = OTRADIO_RX_FRAME_BUFFER_NUM;
-    OT_EXIT_CRITICAL();
+    otRadioVar_ptr->pTxAckFrame = (otRadioFrame *)(otRadio_buffPool + TOTAL_RX_FRAME_SIZE * (OTRADIO_RX_FRAME_BUFFER_NUM + 1));
+    otRadioVar_ptr->pTxAckFrame->mPsdu = ((uint8_t *)otRadioVar_ptr->pTxAckFrame) + ALIGNED_RX_FRAME_SIZE;
+    otRadioVar_ptr->pRxAckFrame = (otRadioFrame *)(otRadioVar_ptr->pTxAckFrame->mPsdu + MAX_ACK_FRAME_SIZE);
+    otRadioVar_ptr->pRxAckFrame->mPsdu = ((uint8_t *)otRadioVar_ptr->pRxAckFrame) + ALIGNED_RX_FRAME_SIZE;
+
+    if (opt.bf.isLinkMetricEnable) {
+        otLinkMetrics_init(LMAC154_RADIO_RECEIVE_SENSITIVITY);
+    }
+
+#if (OPENTHREAD_RADIO == 0)
+#ifdef BL702
+    otRadioVar_ptr->ot_findAddresses_ptr = ot_findAddresses_ftd;
+#endif
+#ifdef BL702L
+#ifdef CFG_PDS_ENABLE
+    otRadioVar_ptr->ot_findAddresses_ptr = ot_findAddresses_mtd;
+#else
+    otRadioVar_ptr->ot_findAddresses_ptr = ot_findAddresses_ftd;
+#endif
+#endif
+
+#endif
+    otrExitCrit(tag);
 }
 
 void ot_radioTask(ot_system_event_t trxEvent) 
 {
-    otRadio_rxFrame_t *pframe;
+    otRadio_rxFrame_t   *pframe;
     otRadioFrame        *txframe;
+    uint32_t            tag;
 
     if (!(OT_SYSTEM_EVENT_RADIO_ALL_MASK & trxEvent)) {
         return;
     }
 
-    if (otRadio_var.pTxFrame) {
+    if (otRadioVar_ptr->pTxFrame) {
 
         if ((OT_SYSTEM_EVENT_RADIO_TX_ALL_MASK & trxEvent)) {
-            txframe = otRadio_var.pTxFrame;
-            otRadio_var.pTxFrame = NULL;
-            otRadio_var.tstx = 0;
+            txframe = otRadioVar_ptr->pTxFrame;
+            otRadioVar_ptr->pTxFrame = NULL;
 
             if (trxEvent & OT_SYSTEM_EVENT_RADIO_TX_DONE_NO_ACK_REQ) {
-                otPlatRadioTxDone(otRadio_var.aInstance, txframe, NULL, OT_ERROR_NONE);
+                otPlatRadioTxDone(otRadioVar_ptr->aInstance, txframe, NULL, OT_ERROR_NONE);
             }
             else if (trxEvent & OT_SYSTEM_EVENT_RADIO_TX_ACKED) {
-                otPlatRadioTxDone(otRadio_var.aInstance, txframe, otRadio_var.pAckFrame, OT_ERROR_NONE);
+                otPlatRadioTxDone(otRadioVar_ptr->aInstance, txframe, otRadioVar_ptr->pRxAckFrame, OT_ERROR_NONE);
             }
             else if (trxEvent & OT_SYSTEM_EVENT_RADIO_TX_NO_ACK) {
-                otPlatRadioTxDone(otRadio_var.aInstance, txframe, NULL, OT_ERROR_NO_ACK);
+                otPlatRadioTxDone(otRadioVar_ptr->aInstance, txframe, NULL, OT_ERROR_NO_ACK);
+            }
+            else if (trxEvent & OT_SYSTEM_EVENT_RADIO_TX_ABORT) {
+                otPlatRadioTxDone(otRadioVar_ptr->aInstance, txframe, NULL, OT_ERROR_ABORT);
+            }
+            else if (trxEvent & OT_SYSTEM_EVENT_RADIO_TX_ERROR) {
+                otPlatRadioTxDone(otRadioVar_ptr->aInstance, txframe, NULL, OT_ERROR_CHANNEL_ACCESS_FAILURE);
             }
         }
     }
@@ -106,214 +122,121 @@ void ot_radioTask(ot_system_event_t trxEvent)
     if (trxEvent & OT_SYSTEM_EVENT_RADIO_RX_DONE ) {
 
         pframe = NULL;
-        OT_ENTER_CRITICAL();
-        if (!utils_dlist_empty(&otRadio_var.rxFrameList)) {
-            pframe = (otRadio_rxFrame_t *)otRadio_var.rxFrameList.next;
-            otRadio_var.dbgRxFrameNum --;
+        tag = otrEnterCrit();
+        if (!utils_dlist_empty(&otRadioVar_ptr->rxFrameList)) {
+            pframe = (otRadio_rxFrame_t *)otRadioVar_ptr->rxFrameList.next;
             utils_dlist_del(&pframe->dlist);
         }
-        OT_EXIT_CRITICAL();
+        otrExitCrit(tag);
 
-        configASSERT(pframe);
         if (pframe) {
-            otPlatRadioReceiveDone(otRadio_var.aInstance, &pframe->frame, OT_ERROR_NONE);
+            otPlatRadioReceiveDone(otRadioVar_ptr->aInstance, &pframe->frame, OT_ERROR_NONE);
 
-            OT_ENTER_CRITICAL();
-            utils_dlist_add_tail(&pframe->dlist, &otRadio_var.frameList);
-            otRadio_var.dbgFrameNum ++;
-            OT_EXIT_CRITICAL();
+            tag = otrEnterCrit();
+            utils_dlist_add_tail(&pframe->dlist, &otRadioVar_ptr->frameList);
+            otrExitCrit(tag);
 
-            if (!utils_dlist_empty(&otRadio_var.rxFrameList)) {
+            if (!utils_dlist_empty(&otRadioVar_ptr->rxFrameList)) {
                 /**
                  * [weiyin], issue OT_SYSTEM_EVENT_RADIO_RX_DONE to handle next pending packet
                  */
-                OT_NOTIFY(OT_SYSTEM_EVENT_RADIO_RX_DONE);
+                otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_RX_DONE);
             }
         }
     }
     else if (trxEvent & OT_SYSTEM_EVENT_RADIO_RX_NO_BUFF) {
-        otPlatRadioReceiveDone(otRadio_var.aInstance, NULL, OT_ERROR_NO_BUFS);
+        otPlatRadioReceiveDone(otRadioVar_ptr->aInstance, NULL, OT_ERROR_NO_BUFS);
     }
 }
 
+/************************************ LMAC 15.4 event function ***********************************/
+#if defined(BL702)
+void lmac154_txDoneEvent (lmac154_tx_status_t tx_status)
+{
+    if (otRadioVar_ptr->pTxFrame) {
+        if (LMAC154_TX_STATUS_TX_FINISHED == tx_status) {
+            if (!(otRadioVar_ptr->pTxFrame->mPsdu[0] & LMAC154_FRAME_ACK_REQUEST_MASK)) {
+                otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_DONE_NO_ACK_REQ);
+            }
+        }
+        else {
+            otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_NO_ACK);
+        }
+    }
+}
+
+void lmac154_ackFrameEvent(uint8_t ack_received, uint8_t *rx_buf, uint8_t len)
+{
+    if (otRadioVar_ptr->pTxFrame) {
+        if (rx_buf) {
+            memcpy(otRadioVar_ptr->pRxAckFrame->mPsdu, rx_buf, len);
+            otRadioVar_ptr->pRxAckFrame->mLength = len;
+
+            otRadioVar_ptr->pRxAckFrame->mChannel = lmac154_getChannel() + OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN;
+            otRadioVar_ptr->pRxAckFrame->mInfo.mRxInfo.mRssi = lmac154_getRSSI();
+            otRadioVar_ptr->pRxAckFrame->mInfo.mRxInfo.mLqi = lmac154_getLQI();
+            otRadioVar_ptr->pRxAckFrame->mInfo.mRxInfo.mTimestamp = lmac154_getEventTimeUs(LMAC154_EVENT_TIME_RX_START) + (LMAC154_PREAMBLE_LEN << LMAC154_US_PER_SYMBOL_BITS);
+
+            otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_ACKED);
+        }
+        else {
+            otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_NO_ACK);
+        }
+    }
+}
+
+void lmac154_rxDoneEvent(uint8_t *rx_buf, uint8_t rx_len, uint8_t crc_fail)
+{
+    if (crc_fail) {
+        return;
+    }
+
+    if (lmac154_isRxPromiscuousModeEnabled() && LMAC154_FRAME_IS_ACK_REQ(rx_buf[0])) {
+        lmac154_enableRx();
+    }
+
+    ot_radioEnqueueRecvPacket((uint32_t *)rx_buf, rx_len, true);
+}
+#endif
+
+/*************************** Openthread radio interface implementation ***************************/
+
 otRadioFrame *otPlatRadioGetTransmitBuffer(otInstance *aInstance) 
 {
-    otRadio_var.aInstance = aInstance;
+    otRadioVar_ptr->aInstance = aInstance;
 
-    otRadioFrame * txframe = (otRadioFrame *)otRadio_var.buffPool;
-    txframe->mPsdu = otRadio_var.buffPool + ALIGNED_RX_FRAME_SIZE;
+    otRadioFrame * txframe = (otRadioFrame *)otRadio_buffPool;
+    txframe->mPsdu = otRadio_buffPool + ALIGNED_RX_FRAME_SIZE;
+
+    txframe->mInfo.mTxInfo.mIeInfo = &otRadioVar_ptr->transmitIeInfo;
 
     return txframe;
 }
 
 otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame) 
 {
-    if (otRadio_var.pTxFrame == NULL) {
-        otRadio_var.pTxFrame = aFrame;
-#if OPENTHREAD_CONFIG_MAC_SOFTWARE_RETRANSMIT_ENABLE
-        lmac154_setTxRetry(0);
-#else
-        lmac154_setTxRetry(aFrame->mInfo.mTxInfo.mMaxFrameRetries);
-#endif
-        lmac154_setChannel((lmac154_channel_t)(aFrame->mChannel - OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN));
-        lmac154_triggerTx(aFrame->mPsdu, aFrame->mLength - 2, aFrame->mInfo.mTxInfo.mCsmaCaEnabled);
-        otPlatRadioTxStarted(aInstance, aFrame);
+    int iret = -1;
 
-        otRadio_var.tstx = otPlatTimeGet() / 1000 + 1000;
+    if (otRadioVar_ptr->pTxFrame == NULL) {
 
-#if DEBUG_ENABLE
-        printf("otPlatRadioTransmit = %d @ %lld\r\n", aFrame->mPsdu[2], otPlatTimeGet() / 1000);
-#endif
+        iret = ot_radioSend(aFrame);
+
+        if (iret) {
+            otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_ERROR);
+        }
+        else {
+            otPlatRadioTxStarted(aInstance, aFrame);
+        }
+
         return OT_ERROR_NONE;
     }
-
-#if DEBUG_ENABLE
-    printf("otPlatRadioTransmit = %d, invalid state. %p, %d\r\n", aFrame->mPsdu[2], otRadio_var.pTxFrame, lmac154_getRFState());
-#endif
 
     return OT_ERROR_INVALID_STATE;
 }
 
-
-void lmac154_txDoneEvent (lmac154_tx_status_t tx_status)
-{
-    if (otRadio_var.pTxFrame) {
-        if (LMAC154_TX_STATUS_TX_FINISHED == tx_status) {
-            if (!(otRadio_var.pTxFrame->mPsdu[0] & OTRADIO_MAC_HEADER_ACK_REQUEST_MASK)) {
-#if DEBUG_ENABLE
-                printf("otPlatRadioTransmit_done = %d @ %lld, %x\r\n", otRadio_var.pTxFrame->mPsdu[2], otPlatTimeGet() / 1000, tx_status);
-#endif
-                OT_NOTIFY_ISR(OT_SYSTEM_EVENT_RADIO_TX_DONE_NO_ACK_REQ);
-            }
-        }
-        else {
-#if DEBUG_ENABLE
-            printf("otPlatRadioTransmit_done = %d @ %lld, %x\r\n", otRadio_var.pTxFrame->mPsdu[2], otPlatTimeGet() / 1000, tx_status);
-#endif
-            OT_NOTIFY_ISR(OT_SYSTEM_EVENT_RADIO_TX_NO_ACK);
-        }
-    }
-#if DEBUG_ENABLE
-    else {
-        printf("lmac154_txDoneEvent, %d, invalid\r\n", tx_status);
-    }
-#endif
-}
-
-void lmac154_ackFrameEvent(uint8_t ack_received, uint8_t *rx_buf, uint8_t len)
-{
-    if (otRadio_var.pTxFrame) {
-#if DEBUG_ENABLE
-        printf("otPlatRadioTransmit_done_ack = %d @ %lld\r\n", otRadio_var.pTxFrame->mPsdu[2], otPlatTimeGet() / 1000);
-#endif
-    if (ack_received) {
-        memcpy(otRadio_var.pAckFrame->mPsdu, rx_buf, len);
-        otRadio_var.pAckFrame->mLength = len;
-
-        otRadio_var.pAckFrame->mChannel = lmac154_getChannel() + OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN;
-        otRadio_var.pAckFrame->mInfo.mRxInfo.mRssi = lmac154_getRSSI();
-        otRadio_var.pAckFrame->mInfo.mRxInfo.mLqi = lmac154_getLQI();
-
-        otRadio_var.pAckFrame->mInfo.mRxInfo.mTimestamp = (lmac154_getRxEndSymb() - (len + 1) * 2) * OT_RADIO_SYMBOL_TIME;
-
-        if (otRadio_var.dbgMaxAckFrameLenth < len) {
-            otRadio_var.dbgMaxAckFrameLenth = len;
-        }
-        OT_NOTIFY_ISR(OT_SYSTEM_EVENT_RADIO_TX_ACKED);
-    }
-    else {
-        OT_NOTIFY_ISR(OT_SYSTEM_EVENT_RADIO_TX_NO_ACK);
-    }
-}
-#if DEBUG_ENABLE
-    else {
-        if (rx_buf) {
-            printf("lmac154_txDoneEvent, %d, invalid, seq = %d\r\n", ack_received, rx_buf[2]);
-        }
-        else {
-            printf("lmac154_txDoneEvent, %d, invalid, no_ack\r\n", ack_received);
-        }
-    }
-#endif
-}
-
-static void ot_radioIsr(void) 
-{
-    otRadio_var.tsIsr = otPlatTimeGet();
-    lmac154_getInterruptHandler()();
-}
-
-void lmac154_rxDoneEvent(uint8_t *rx_buf, uint8_t rx_len, uint8_t crc_fail)
-{
-    otRadio_rxFrame_t *p = NULL;
-
-    if (crc_fail) {
-        return;
-    }
-
-    if (lmac154_isRxPromiscuousModeEnabled() && (rx_buf[0] & (1 << 5))) {
-        lmac154_enableRx();
-    }
-
-    UBaseType_t uxSavedInterruptStatus = OT_ENTER_CRITICAL_ISR();
-    if (!utils_dlist_empty(&otRadio_var.frameList)) {
-        p = (otRadio_rxFrame_t *)otRadio_var.frameList.next;
-        otRadio_var.dbgFrameNum --;
-        utils_dlist_del(&p->dlist);
-    }
-    OT_EXIT_CRITICAL_ISR( uxSavedInterruptStatus );
-
-    if (p) {
-        memcpy(p->frame.mPsdu, rx_buf, rx_len);
-        p->frame.mLength = rx_len;
-        p->frame.mChannel = lmac154_getChannel() + OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN;
-        p->frame.mInfo.mRxInfo.mRssi = lmac154_getRSSI();
-        p->frame.mInfo.mRxInfo.mLqi = lmac154_getLQI();
-
-        p->frame.mInfo.mRxInfo.mTimestamp = (lmac154_getRxEndSymb() - (p->frame.mLength + 1) * 2) * OT_RADIO_SYMBOL_TIME;
-
-        p->frame.mInfo.mRxInfo.mAckedWithFramePending = false;
-        if (rx_buf[0] & OTRADIO_MAC_HEADER_ACK_REQUEST_MASK) {
-            otMacAddress addr;
-            uint8_t pending = 0;
-            lmac154_fpt_status_t status = LMAC154_FPT_STATUS_SUCCESS;
-
-            otMacFrameGetSrcAddr(&(p->frame), &addr);
-
-            if (addr.mType == OT_MAC_ADDRESS_TYPE_EXTENDED) {
-                status = lmac154_fptGetLongAddrPending(addr.mAddress.mExtAddress.m8, &pending);
-            }
-            else if (addr.mType == OT_MAC_ADDRESS_TYPE_SHORT) {
-                status = lmac154_fptGetShortAddrPending(addr.mAddress.mShortAddress, &pending);
-            }
-
-            if (status == LMAC154_FPT_STATUS_ADDR_NOT_FOUND || pending) {
-                p->frame.mInfo.mRxInfo.mAckedWithFramePending = 1;
-            }
-        }
-
-        uxSavedInterruptStatus = OT_ENTER_CRITICAL_ISR();
-        utils_dlist_add_tail(&p->dlist, &otRadio_var.rxFrameList);
-        otRadio_var.dbgRxFrameNum ++;
-        if (otRadio_var.dbgMaxPendingFrameNum < otRadio_var.dbgRxFrameNum) {
-            otRadio_var.dbgMaxPendingFrameNum = otRadio_var.dbgRxFrameNum;
-        }
-        OT_EXIT_CRITICAL_ISR( uxSavedInterruptStatus ); 
-
-        OT_NOTIFY_ISR(OT_SYSTEM_EVENT_RADIO_RX_DONE);
-    }
-    else {
-        OT_NOTIFY_ISR(OT_SYSTEM_EVENT_RADIO_RX_NO_BUFF);
-    }
-}
-
 otRadioCaps otPlatRadioGetCaps(otInstance *aInstance) 
 {
-#if OPENTHREAD_CONFIG_MAC_SOFTWARE_RETRANSMIT_ENABLE
-    return OT_RADIO_CAPS_ACK_TIMEOUT | OT_RADIO_CAPS_CSMA_BACKOFF | OT_RADIO_CAPS_SLEEP_TO_TX;
-#else
-    return OT_RADIO_CAPS_ACK_TIMEOUT | OT_RADIO_CAPS_CSMA_BACKOFF | OT_RADIO_CAPS_SLEEP_TO_TX | OT_RADIO_CAPS_TRANSMIT_RETRIES;
-#endif
+    return OT_RADIO_CAPS_ACK_TIMEOUT | OT_RADIO_CAPS_CSMA_BACKOFF | OT_RADIO_CAPS_SLEEP_TO_TX | OT_RADIO_CAPS_TRANSMIT_TIMING | OT_RADIO_CAPS_TRANSMIT_SEC; 
 }
 const char *otPlatRadioGetVersionString(otInstance *aInstance) 
 {
@@ -321,10 +244,16 @@ const char *otPlatRadioGetVersionString(otInstance *aInstance)
 }
 int8_t otPlatRadioGetReceiveSensitivity(otInstance *aInstance) 
 {
-    return -103;
+    return LMAC154_RADIO_RECEIVE_SENSITIVITY;
 }
 void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64) 
 {
+    int index = 0;
+
+    // Set the MAC Address Block Larger (MA-L) formerly called OUI.
+    aIeeeEui64[index++] = (OPENTHREAD_CONFIG_STACK_VENDOR_OUI >> 16) & 0xff;
+    aIeeeEui64[index++] = (OPENTHREAD_CONFIG_STACK_VENDOR_OUI >> 8) & 0xff;
+    aIeeeEui64[index++] = OPENTHREAD_CONFIG_STACK_VENDOR_OUI & 0xff;
     bl_wireless_mac_addr_get(aIeeeEui64);
 }
 
@@ -335,6 +264,7 @@ void otPlatRadioSetPanId(otInstance *aInstance, otPanId aPanId)
 void otPlatRadioSetExtendedAddress(otInstance *aInstance, const otExtAddress *aExtAddress) 
 {
     lmac154_setLongAddr((uint8_t *) aExtAddress->m8);
+    memcpy(otRadioVar_ptr->extAddress.m8, aExtAddress->m8, 8);
 } 
 
 void otPlatRadioSetShortAddress(otInstance *aInstance, otShortAddress aShortAddress) 
@@ -349,16 +279,6 @@ otError otPlatRadioGetTransmitPower(otInstance *aInstance, int8_t *aPower)
 }
 otError otPlatRadioSetTransmitPower(otInstance *aInstance, int8_t aPower) 
 {
-    if (aPower == LMAC154_TX_POWER_0dBm) {
-        aPower = LMAC154_TX_POWER_0dBm;
-    }
-    else if (aPower < LMAC154_TX_POWER_14dBm) {
-        aPower = LMAC154_TX_POWER_10dBm;
-    }
-    else {
-        aPower = LMAC154_TX_POWER_14dBm;
-    }
-
     lmac154_setTxPower(aPower);
     return OT_ERROR_NONE;
 }
@@ -382,13 +302,9 @@ void otPlatRadioSetPromiscuous(otInstance *aInstance, bool aEnable)
 {
     if (aEnable) {
         lmac154_enableRxPromiscuousMode(true, false);
-        // lmac154_disableAckEvent();
-        // lmac154_disableHwAutoTxAck();
     }
     else {
         lmac154_disableRxPromiscuousMode();
-        // lmac154_enableAckEvent();
-        // lmac154_enableHwAutoTxAck();
     }
 }
 
@@ -398,13 +314,38 @@ void otPlatRadioSetMacKey(otInstance *            aInstance,
                           const otMacKeyMaterial *aPrevKey,
                           const otMacKeyMaterial *aCurrKey,
                           const otMacKeyMaterial *aNextKey,
-                          otRadioKeyType          aKeyType){}
+                          otRadioKeyType          aKeyType)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+    OT_UNUSED_VARIABLE(aKeyIdMode);
+    OT_UNUSED_VARIABLE(aKeyType);
 
-void otPlatRadioSetMacFrameCounter(otInstance *aInstance, uint32_t aMacFrameCounter) {}
+    if (aPrevKey && aCurrKey && aNextKey) {
+        uint32_t tag = otrEnterCrit();
+
+        otRadioVar_ptr->macKeyType = aKeyType;
+        otRadioVar_ptr->macKeyId = aKeyId;
+
+        memcpy(&otRadioVar_ptr->previousKey, aPrevKey, sizeof(otMacKeyMaterial));
+        memcpy(&otRadioVar_ptr->currentKey, aCurrKey, sizeof(otMacKeyMaterial));
+        memcpy(&otRadioVar_ptr->nextKey, aNextKey, sizeof(otMacKeyMaterial));
+
+        otrExitCrit(tag);
+    }
+}
+
+void otPlatRadioSetMacFrameCounter(otInstance *aInstance, uint32_t aMacFrameCounter)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+
+    uint32_t tag = otrEnterCrit();
+    otRadioVar_ptr->macFrameCounter = aMacFrameCounter;
+    otrExitCrit(tag);
+}
 
 uint64_t otPlatRadioGetNow(otInstance *aInstance)
 {
-    return UINT64_MAX;
+    return bl_timer_now_us64();
 }
 
 otRadioState otPlatRadioGetState(otInstance *aInstance) 
@@ -412,33 +353,32 @@ otRadioState otPlatRadioGetState(otInstance *aInstance)
     otRadioState state = 0;
     lmac154_rf_state_t rfstate = 0;
 
-    if(lmac154_isDisabled()) 
-    {
+    if(lmac154_isDisabled()) {
         state = OT_RADIO_STATE_DISABLED;
     }
     else {
-        if (otRadio_var.pTxFrame) {
+        if (otRadioVar_ptr->pTxFrame) {
             /** mac layer retring doesn't get done */
             state = OT_RADIO_STATE_TRANSMIT;
         }
         else {
-        rfstate = lmac154_getRFState();
-        switch (rfstate)
-        {
-        case LMAC154_RF_STATE_RX:
-        case LMAC154_RF_STATE_RX_DOING:
-            state = OT_RADIO_STATE_RECEIVE;
-            break;
-            case LMAC154_RF_STATE_TX:
-            state = OT_RADIO_STATE_TRANSMIT;
-            break;
-        case LMAC154_RF_STATE_IDLE:
-            state = OT_RADIO_STATE_SLEEP;
-            break;
-        default:
-            state = OT_RADIO_STATE_INVALID;
+            rfstate = lmac154_getRFState();
+            switch (rfstate)
+            {
+            case LMAC154_RF_STATE_RX:
+            case LMAC154_RF_STATE_RX_DOING:
+                state = OT_RADIO_STATE_RECEIVE;
+                break;
+                case LMAC154_RF_STATE_TX:
+                state = OT_RADIO_STATE_TRANSMIT;
+                break;
+            case LMAC154_RF_STATE_IDLE:
+                state = OT_RADIO_STATE_SLEEP;
+                break;
+            default:
+                state = OT_RADIO_STATE_INVALID;
+            }
         }
-    }
     }
 
     return state;
@@ -446,30 +386,22 @@ otRadioState otPlatRadioGetState(otInstance *aInstance)
 
 otError otPlatRadioEnable(otInstance *aInstance) 
 {
-    uint64_t ex = 0xffffffffffffffff;
+    ot_radioEnable();
 
-    bl_irq_register(M154_IRQn, ot_radioIsr);
-    lmac154_init();
-    otPlatRadioSetCoexEnabled(aInstance, true);
+#ifdef CFG_PDS_ENABLE
+    otPds_setDataPollCsma(CFG_DATA_POLL_CSMA);
+#endif
 
     bl_irq_enable(M154_IRQn);
 
-    /**
-     * [weiyin], reset source address to all 1
-     */
-    lmac154_setPanId(0xffff);
-    lmac154_setShortAddr(0xffff);
-    memset(&ex, 0xff, sizeof(ex));
-    lmac154_setLongAddr((uint8_t *) &ex);
-
-    lmac154_enableFrameTypeFiltering(LMAC154_FRAME_TYPE_BEACON | LMAC154_FRAME_TYPE_DATA | LMAC154_FRAME_TYPE_ACK | LMAC154_FRAME_TYPE_CMD);
-
     return OT_ERROR_NONE;
 }
+
 otError otPlatRadioDisable(otInstance *aInstance) 
 {
     bl_irq_disable(M154_IRQn);
     lmac154_disableRx();
+
     return OT_ERROR_NONE;
 }
 bool otPlatRadioIsEnabled(otInstance *aInstance) 
@@ -480,47 +412,59 @@ bool otPlatRadioIsEnabled(otInstance *aInstance)
 otError otPlatRadioSleep(otInstance *aInstance) 
 {
     lmac154_disableRx();
+
+#if OPENTHREAD_FTD || OPENTHREAD_MTD
+    lmac154_setRxStateWhenIdle(otThreadGetLinkMode(aInstance).mRxOnWhenIdle);
+#endif
+
     return OT_ERROR_NONE;
 }
 otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel) 
 {
     uint8_t ch = aChannel - OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN;
 
-    lmac154_setChannel((lmac154_channel_t)ch);
     lmac154_enableRx();
+    lmac154_setChannel((lmac154_channel_t)ch);
+#if OPENTHREAD_FTD || OPENTHREAD_MTD
+    lmac154_setRxStateWhenIdle(otThreadGetLinkMode(aInstance).mRxOnWhenIdle);
+#endif
+
     return OT_ERROR_NONE;
 }
 
-
 int8_t otPlatRadioGetRssi(otInstance *aInstance) 
 {
-    int8_t rssi =  lmac154_getRSSI();
-    return rssi;
+    int rssi = 127;
+
+    if (lmac154_runCCA(&rssi)) {
+        return 127;
+    }
+
+    return (int8_t)rssi;
 }
-otError otPlatRadioEnergyScan(otInstance *aInstance, uint8_t aScanChannel, uint16_t aScanDuration) 
+otError otPlatRadioEnergyScan(otInstance *aInstance, uint8_t aScanChannel, uint16_t aScanDuration)
 {
-    return OT_ERROR_NOT_IMPLEMENTED;
+    return OT_ERROR_NONE;
 }
-//extern void otPlatRadioEnergyScanDone(otInstance *aInstance, int8_t aEnergyScanMaxRssi) {}
 void otPlatRadioEnableSrcMatch(otInstance *aInstance, bool aEnable) 
 {
     lmac154_fptForcePending(!aEnable);
 }
 otError otPlatRadioAddSrcMatchShortEntry(otInstance *aInstance, otShortAddress aShortAddress) 
 {
-    return lmac154_fptSetShortAddrPending(aShortAddress, 1) == LMAC154_FPT_STATUS_SUCCESS? OT_ERROR_NONE : OT_ERROR_FAILED;
+    return lmac154_fptSetShortAddrPending(aShortAddress, 1) == LMAC154_FPT_STATUS_SUCCESS ? OT_ERROR_NONE:OT_ERROR_NO_ADDRESS;
 }
 otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress) 
 {
-    return lmac154_fptSetLongAddrPending((uint8_t *)aExtAddress->m8, 1) == LMAC154_FPT_STATUS_SUCCESS? OT_ERROR_NONE : OT_ERROR_FAILED;
+    return lmac154_fptSetLongAddrPending((uint8_t *)aExtAddress->m8, 1) == LMAC154_FPT_STATUS_SUCCESS ? OT_ERROR_NONE:OT_ERROR_NO_ADDRESS;
 }
 otError otPlatRadioClearSrcMatchShortEntry(otInstance *aInstance, otShortAddress aShortAddress) 
 {
-    return lmac154_fptRemoveShortAddr(aShortAddress) == LMAC154_FPT_STATUS_SUCCESS ? OT_ERROR_NONE:OT_ERROR_NO_ADDRESS;
+    return lmac154_fptSetShortAddrPending(aShortAddress, 0) == LMAC154_FPT_STATUS_SUCCESS ? OT_ERROR_NONE:OT_ERROR_NO_ADDRESS;
 }
 otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress) 
 {
-    return lmac154_fptRemoveLongAddr((uint8_t *)aExtAddress->m8) == LMAC154_FPT_STATUS_SUCCESS ? OT_ERROR_NONE:OT_ERROR_NO_ADDRESS;
+    return lmac154_fptSetLongAddrPending((uint8_t *)aExtAddress->m8, 0) == LMAC154_FPT_STATUS_SUCCESS ? OT_ERROR_NONE:OT_ERROR_NO_ADDRESS;
 }
 void otPlatRadioClearSrcMatchShortEntries(otInstance *aInstance) 
 {
@@ -564,34 +508,65 @@ otError otPlatRadioSetCoexEnabled(otInstance *aInstance, bool aEnabled)
         lmac154_disableCoex();
     }
 
-    otRadio_var.isCoexEnabled = aEnabled;
+    otRadioVar_ptr->opt.bf.isCoexEnable = aEnabled;
     return OT_ERROR_NONE;
 }
+
 bool otPlatRadioIsCoexEnabled(otInstance *aInstance) 
 {
-    return otRadio_var.isCoexEnabled != 0;
+    return otRadioVar_ptr->opt.bf.isCoexEnable;
 }
-// otError otPlatRadioGetCoexMetrics(otInstance *aInstance, otRadioCoexMetrics *aCoexMetrics) 
-// {
-//     return OT_ERROR_NONE;
-// }
 
+otError otPlatRadioReceiveAt(otInstance *aInstance, uint8_t aChannel, uint32_t aStart, uint32_t aDuration)
+{
+    return OT_ERROR_NOT_IMPLEMENTED;
+}
 
-// otError otPlatRadioReceiveAt(otInstance *aInstance, uint8_t aChannel, uint32_t aStart, uint32_t aDuration);
-// otError otPlatRadioEnableCsl(otInstance *        aInstance,
-//                              uint32_t            aCslPeriod,
-//                              otShortAddress      aShortAddr,
-//                              const otExtAddress *aExtAddr);
-// void otPlatRadioUpdateCslSampleTime(otInstance *aInstance, uint32_t aCslSampleTime);
-// uint8_t otPlatRadioGetCslAccuracy(otInstance *aInstance);
-// uint8_t otPlatRadioGetCslClockUncertainty(otInstance *aInstance);
-// otError otPlatRadioSetChannelMaxTransmitPower(otInstance *aInstance, uint8_t aChannel, int8_t aMaxPower);
+#if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
+otError otPlatRadioEnableCsl(otInstance *        aInstance,
+                             uint32_t            aCslPeriod,
+                             otShortAddress      aShortAddr,
+                             const otExtAddress *aExtAddr)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+    OT_UNUSED_VARIABLE(aShortAddr);
+    OT_UNUSED_VARIABLE(aExtAddr);
 
-// otError otPlatRadioConfigureEnhAckProbing(otInstance *        aInstance,
-//                                           otLinkMetrics       aLinkMetrics,
-//                                           otShortAddress      aShortAddress,
-//                                           const otExtAddress *aExtAddress);
+    otRadioVar_ptr->cslPeriod = aCslPeriod;
 
+    return OT_ERROR_NONE;
+}
 
-// otError otPlatRadioSetRegion(otInstance *aInstance, uint16_t aRegionCode);
-// otError otPlatRadioGetRegion(otInstance *aInstance, uint16_t *aRegionCode);
+void otPlatRadioUpdateCslSampleTime(otInstance *aInstance, uint32_t aCslSampleTime)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+
+    otRadioVar_ptr->cslSampleTime = aCslSampleTime;
+}
+
+OT_TOOL_WEAK uint8_t otPlatRadioGetCslAccuracy(otInstance *aInstance)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+
+    return 20;
+}
+
+OT_TOOL_WEAK uint8_t otPlatRadioGetCslClockUncertainty(otInstance *aInstance)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+
+    return 20;
+}
+#endif
+
+#if OPENTHREAD_CONFIG_MLE_LINK_METRICS_SUBJECT_ENABLE
+otError otPlatRadioConfigureEnhAckProbing(otInstance *         aInstance,
+                                          otLinkMetrics        aLinkMetrics,
+                                          const otShortAddress aShortAddress,
+                                          const otExtAddress * aExtAddress)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+
+    return otLinkMetrics_configEnhAckProbing(aShortAddress, aExtAddress, aLinkMetrics);
+}
+#endif

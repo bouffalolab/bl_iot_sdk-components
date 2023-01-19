@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022 Bouffalolab.
+ * Copyright (c) 2016-2023 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***
@@ -35,13 +35,14 @@
 #include "riscv_encoding.h"
 
 typedef enum {
-    BL_RST_POR = 0,
-    BL_RST_BOR,
-    BL_RST_WDT,
-    BL_RST_HBN,
-    BL_RST_SOFTWARE,
+    BL_RST_POR      = 0,
+    BL_RST_BOR      = 1,
+    BL_RST_WDT      = 2,
+    BL_RST_HBN      = 3,
+    BL_RST_SOFTWARE = 4,
 } BL_RST_REASON_E;
 
+void bl_sys_rstinfo_process(void);
 BL_RST_REASON_E bl_sys_rstinfo_get(void);
 void bl_sys_rstinfo_clr(void);
 int bl_sys_logall_enable(void);

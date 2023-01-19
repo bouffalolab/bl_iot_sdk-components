@@ -7,7 +7,7 @@
  */
 
 #include <zephyr.h>
-#include <errno.h>
+#include <sys/errno.h>
 #include <common/include/atomic.h>
 #include <util.h>
 #include <byteorder.h>
@@ -16,7 +16,8 @@
 #include <bluetooth.h>
 #include <conn.h>
 #include <include/mesh.h>
-#include <uuid.h>
+#include "../../blestack/src/include/bluetooth/uuid.h"
+
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_PROV)
 #define LOG_MODULE_NAME bt_mesh_prov
@@ -213,6 +214,21 @@ static void prov_fail(u8_t reason)
 		prov_send_fail_msg(reason);
 	}
 }
+
+#if defined(CONFIG_AUTO_PTS)
+/* add by bouffalolab */
+void prov_set_method(uint8_t method, uint8_t action, uint8_t size)
+{
+    link.oob_method = method;
+    link.oob_action = action;
+    link.oob_size = size;
+}
+/* add by bouffalolab */
+u8_t* prov_get_auth()
+{
+    return link.auth;
+}
+#endif
 
 static void prov_invite(const u8_t *data)
 {
@@ -674,11 +690,25 @@ static void send_confirm(void)
 
 	prov_buf_init(&cfm, PROV_CONFIRM);
 
-	if (bt_mesh_prov_conf(link.conf_key, link.rand, link.auth,
-			      net_buf_simple_add(&cfm, 16))) {
-		BT_ERR("Unable to generate confirmation value");
-		prov_fail(PROV_ERR_UNEXP_ERR);
-		return;
+	#if defined(CONFIG_AUTO_PTS)
+	if (atomic_test_bit(link.flags, PROVISIONER)) {
+		if (bt_mesh_prov_conf(link.conf_key, link.rand, link.auth,
+				link.conf)) {
+			BT_ERR("Unable to generate confirmation value");
+			prov_fail(PROV_ERR_UNEXP_ERR);
+			return;
+		}
+		net_buf_simple_add_mem(&cfm, link.conf, 16);
+	}
+	else
+	#endif /* CONFIG_AUTO_PTS */
+	{
+		if (bt_mesh_prov_conf(link.conf_key, link.rand, link.auth,
+				net_buf_simple_add(&cfm, 16))) {
+			BT_ERR("Unable to generate confirmation value");
+			prov_fail(PROV_ERR_UNEXP_ERR);
+			return;
+		}
 	}
 
 	if (prov_send(&cfm, NULL)) {
@@ -743,6 +773,25 @@ int bt_mesh_input_string(const char *str)
 
 	return 0;
 }
+
+#if defined(CONFIG_AUTO_PTS)
+/* Add by bouffaloab */
+int bt_mesh_prov_remote_pub_key_set(const uint8_t public_key[64])
+{
+    if (public_key == NULL) {
+            return -EINVAL;
+    }
+    BT_WARN("TDO bt_mesh_prov_remote_pub_key_set");
+    #if 0
+    if (atomic_test_and_set_bit(link.flags, REMOTE_PUB_KEY)) {
+            return -EALREADY;
+    }
+
+    memcpy(link.conf_inputs.pub_key_device, public_key, PDU_LEN_PUB_KEY);
+    #endif
+    return 0;
+}
+#endif /* CONFIG_AUTO_PTS */
 
 /** Add by bouffalo.
  * For provisiooner, Get public key sent callback. When provisionee use public oob key.
@@ -1116,6 +1165,17 @@ static void prov_confirm(const u8_t *data)
 {
 	BT_DBG("Remote Confirm: %s", bt_hex(data, 16));
 
+#if defined(CONFIG_AUTO_PTS)
+	/* MESH/PVNR/PROV/BI-18-C */
+	if (atomic_test_bit(link.flags, PROVISIONER)) {
+		if (!memcmp(data, link.conf, 16)) {
+			BT_ERR("Confirm value is identical to ours, rejecting.");
+			prov_fail(PROV_ERR_CFM_FAILED);
+			return;
+		}
+	}
+#endif /* CONFIG_AUTO_PTS */
+
 	memcpy(link.conf, data, 16);
 
 	/** Add comment by bouffalo.
@@ -1255,7 +1315,12 @@ static void prov_recv(const struct prov_bearer *bearer, void *cb_data,
 
 	if (type >= ARRAY_SIZE(prov_handlers)) {
 		BT_ERR("Unknown provisioning PDU type 0x%02x", type);
+		#if defined(CONFIG_AUTO_PTS)
+		/* MESH/NODE/PROV/BI-15-C */
+		prov_fail(PROV_ERR_NVAL_PDU);
+		#else
 		prov_fail(PROV_ERR_NVAL_FMT);
+		#endif /* CONFIG_AUTO_PTS */
 		return;
 	}
 

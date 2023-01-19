@@ -8,7 +8,7 @@
 
 #include <string.h>
 #include <stdbool.h>
-#include <errno.h>
+#include <sys/errno.h>
 #include <toolchain.h>
 #include <types.h>
 #include <byteorder.h>
@@ -16,7 +16,7 @@
 
 #include <constants.h>
 #include <utils.h>
-#include <aes.h>
+#include <../../blestack/src/common/tinycrypt/include/tinycrypt/aes.h>
 #include <cmac_mode.h>
 #include <ccm_mode.h>
 

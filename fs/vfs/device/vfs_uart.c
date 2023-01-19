@@ -45,14 +45,31 @@ const struct file_ops uart_ops =
     .sync = vfs_uart_sync,
 };
 
+#if defined(BL702L)
+#define CFG_VFS_UART_DMA_ENABLE
+
+extern int hosal_uart_dma_rx_init(hosal_uart_dev_t *uart);
+extern int hosal_uart_dma_rx_start(hosal_uart_dev_t *uart);
+extern int hosal_uart_dma_rx_get_data(hosal_uart_dev_t *uart, uint8_t *buf, uint32_t buf_size);
+#endif
+
 static int __uart_rx_irq(void *p_arg)
 {
+#if defined(CFG_VFS_UART_DMA_ENABLE)
+    uint8_t tmp_buf[128];
+#else
     uint8_t tmp_buf[64];
+#endif
     int length = 0;
     vfs_uart_dev_t *uart = (vfs_uart_dev_t *)p_arg;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
+#if defined(CFG_VFS_UART_DMA_ENABLE)
+    length = hosal_uart_dma_rx_get_data(&uart->uart, tmp_buf, sizeof(tmp_buf));
+    hosal_uart_dma_rx_start(&uart->uart);
+#else
     length = hosal_uart_receive(&uart->uart, tmp_buf, sizeof(tmp_buf));
+#endif
     if (length > 0) {
         xStreamBufferSendFromISR(uart->rx_ringbuf_handle, tmp_buf,
                 length, &xHigherPriorityTaskWoken);
@@ -109,6 +126,11 @@ int vfs_uart_open(inode_t *inode, file_t *fp)
             hosal_uart_callback_set(&uart_dev->uart, HOSAL_UART_RX_CALLBACK,
             		__uart_rx_irq, uart_dev);
             hosal_uart_ioctl(&uart_dev->uart, HOSAL_UART_MODE_SET, (void *)HOSAL_UART_MODE_INT);
+
+#if defined(CFG_VFS_UART_DMA_ENABLE)
+            hosal_uart_dma_rx_init(&uart_dev->uart);
+            hosal_uart_dma_rx_start(&uart_dev->uart);
+#endif
         }
         ret = VFS_SUCCESS;
     } else {
