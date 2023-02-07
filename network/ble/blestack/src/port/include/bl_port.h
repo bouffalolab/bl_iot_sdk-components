@@ -69,6 +69,8 @@ void k_queue_append_list(struct k_queue *queue, void *head, void *tail);
 void *k_queue_get(struct k_queue *queue, s32_t timeout);
 int k_queue_is_empty(struct k_queue *queue);
 int k_queue_get_cnt(struct k_queue *queue);
+void k_queue_append_from_isr(struct k_queue *queue, void *data);
+
 
 struct k_lifo {
     struct k_queue _queue;

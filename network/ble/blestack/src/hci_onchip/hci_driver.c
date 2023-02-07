@@ -287,7 +287,6 @@ static inline struct net_buf *process_hbuf(struct radio_pdu_node_rx *n)
 #endif
 
 #if defined(BFLB_BLE)
-#if (!BFLB_BT_CO_THREAD)
 static void recv_thread(void *p1)
 {
     UNUSED(p1);
@@ -364,7 +363,6 @@ static void recv_thread(void *p1)
 #endif
 	}
 }
-#endif
 #endif
 
 #if !defined(BFLB_BLE)
@@ -467,16 +465,12 @@ static int hci_driver_open(void)
 	hci_init(NULL);
 #endif
 #endif
-#if (!BFLB_BT_CO_THREAD)
     k_fifo_init(&recv_fifo, 20);
-#endif
 #if defined(BFLB_BLE)
-#if (!BFLB_BT_CO_THREAD)
     k_thread_create(&recv_thread_data, "recv_thread",
 			CONFIG_BT_RX_STACK_SIZE/*K_THREAD_STACK_SIZEOF(recv_thread_stack)*/,
 			recv_thread,
 			K_PRIO_COOP(CONFIG_BT_RX_PRIO));
-#endif
 #else
         k_thread_create(&prio_recv_thread_data, prio_recv_thread_stack,
 			K_THREAD_STACK_SIZEOF(prio_recv_thread_stack),
@@ -492,10 +486,6 @@ static int hci_driver_open(void)
 void hci_driver_enque_recvq(struct net_buf *buf)
 {
     net_buf_put(&recv_fifo, buf);
-    #if (BFLB_BT_CO_THREAD)
-    extern struct k_sem g_poll_sem;
-    k_sem_give(&g_poll_sem);
-    #endif
 }
 
 static const struct bt_hci_driver drv = {

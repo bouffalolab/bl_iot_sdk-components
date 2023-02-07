@@ -1920,6 +1920,14 @@ static bool env_cache_cb (env_node_obj_t env, void *arg1, void *arg2)
 void ef_load_env_cache(void) 
 {
     ef_print_env_cb(env_cache_cb);
+
+    int i = 0, cnt = 0;
+    for (i = 0; i < EF_ENV_CACHE_TABLE_SIZE; i++) {
+
+        if (env_cache_table[i].addr != FAILED_ADDR) {
+            cnt ++;
+        }
+    }
 }
 #endif
 

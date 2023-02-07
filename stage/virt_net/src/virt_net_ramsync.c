@@ -69,7 +69,11 @@ struct virt_net_custom_pbuf {
 #define VIRT_NET_RXBUFF_OFFSET (sizeof(struct virt_net_custom_pbuf))
 
 /* 头部的假数据，绕过DMA/SPI FIFO缓存 */
+#if defined(CFG_USE_PSRAM)
+#define VIRT_NET_RXBUFF_CNT (16)
+#else
 #define VIRT_NET_RXBUFF_CNT (4)
+#endif
 #define VIRT_NET_BUFF_SIZE (TP_PAYLOAD_LEN + VIRT_NET_RXBUFF_OFFSET) /* + sizeof(pbuf header) */
 #define VIRT_NET_MAX_PENDING_CMD (4)
 
@@ -85,7 +89,7 @@ static void *sem_context[VIRT_NET_MAX_PENDING_CMD];
 static SemaphoreHandle_t slot_mutex;
 static StaticSemaphore_t xSlotMutexBuffer;
 
-static uint8_t tx_buffer[VIRT_NET_BUFF_SIZE];
+static uint8_t* tx_buffer;
 
 struct virt_net_ramsync {
   struct virt_net vnet;
@@ -103,7 +107,7 @@ struct virt_net_ramsync {
   TimerHandle_t dhcp_timer;
   struct rx_buf_ind rx_buf_ind;
 #if LWIP_IPV6
-    struct dhcp6 vnet_dhcp6;
+  struct dhcp6 vnet_dhcp6;
 #endif
 };
 
@@ -209,7 +213,7 @@ static void netif_status_callback(struct netif *netif) {
 #if LWIP_IPV4
     is_got_ip = !ip4_addr_isany(netif_ip4_addr(netif)) ? 1 : 0;
     if (is_got_ip){
-      blog_info("IP Got, Delete dhcp timer.\r\n");
+      printf("IP Got, Delete dhcp timer.\r\n");
       if (sobj->dhcp_start) {
         xTimerStop(sobj->dhcp_timer, 0);
         xTimerDelete(sobj->dhcp_timer, 0);
@@ -232,7 +236,7 @@ static void netif_status_callback(struct netif *netif) {
     }
   }
   else {
-    blog_info("Interface is down status.\r\n");
+    printf("Interface is down status.\r\n");
   }
 }
 
@@ -316,7 +320,7 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
   struct pkg_protocol_cmd *pkg_cmd = (struct pkg_protocol_cmd *)pkg_header->payload;
   SemaphoreHandle_t sem;
 
-    blog_info("pkg_protocol_cmd cmd:0x%x.\r\n", pkg_cmd->cmd);
+  blog_info("pkg_protocol_cmd cmd:0x%x.\r\n", pkg_cmd->cmd);
   switch (pkg_cmd->cmd) {
   case VIRT_NET_CTRL_AP_CONNECTED_IND:
     {
@@ -757,6 +761,10 @@ static int __virt_net_ramsync_init(virt_net_t obj)
 
 static int __virt_net_ramsync_deinit(virt_net_t *obj) 
 {
+  if(tx_buffer){
+    free(tx_buffer);
+    tx_buffer = NULL;
+  }
   /* TODO */
   return -1;
 }
@@ -797,14 +805,16 @@ virt_net_t virt_net_create(void *ctx)
     goto _errout_1;
   }
 
-#if defined(CFG_USE_PSRAM)
-  sobj->rx_buff = (rx_buff_t)pvPortMalloc(VIRT_NET_BUFF_SIZE * VIRT_NET_RXBUFF_CNT);
-#else
   sobj->rx_buff = (rx_buff_t)malloc(VIRT_NET_BUFF_SIZE * VIRT_NET_RXBUFF_CNT);
-#endif
   if (sobj->rx_buff == NULL) {
     printf("alloc virt_net rx buffer failed\r\n");
     goto _errout_2;
+  }
+
+  tx_buffer = malloc(VIRT_NET_BUFF_SIZE);
+  if(tx_buffer == NULL){
+    printf("Malloc tx_buffer error\r\n");
+    goto _errout_3;
   }
 
   sobj->dhcp_start = 0;
@@ -814,7 +824,7 @@ virt_net_t virt_net_create(void *ctx)
   /* create spi receivce thread */
   if (xTaskCreate(__virt_net_task, "virt_net", 1024 + 256, (void *)sobj, VIRT_NET_TASK_PRI, &sobj->task_virt_net) != pdPASS) {
     printf("create virt_netreceive task failed\r\n");
-    goto _errout_3;
+    goto _errout_4;
   }
 
 #if 0
@@ -839,12 +849,10 @@ virt_net_t virt_net_create(void *ctx)
 
   return &sobj->vnet;
 
-_errout_3:
-#if defined(CFG_USE_PSRAM)
-  vPortFree(sobj->rx_buff);
-#else
+_errout_4:
   free(sobj->rx_buff);
-#endif
+_errout_3:
+  free(tx_buffer);
 _errout_2:
   vSemaphoreDelete(sobj->rx_buf_ind_mutex);
 _errout_1:

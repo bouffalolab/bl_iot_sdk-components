@@ -473,9 +473,17 @@ int tcpip_stack_input(void *swdesc, uint8_t status, void *hwhdr, unsigned int ms
 #endif
 
 #if CFG_NETBUS_WIFI_ENABLE
+        #ifdef LWIP_IPV6
+        struct ethhdr *hdr = (struct ethhdr *)(skb_payload);
+        if (bl_vif->dev && tcpip_src_addr_cmp(hdr, (bl_vif->dev)->hwaddr) &&
+            bflbmsg_send_pbuf(&g_netbus_wifi_mgmr_env.trcver_ctx,
+                BF1B_MSG_TYPE_ETH_WIFI_FRAME, BF1B_MSG_ETH_WIFI_FRAME_SUBTYPE_STA_FROM_WIFI_RX,
+                h, extra_status, pbuf_cfm_cb, swdesc)) {
+        #else
         if (bflbmsg_send_pbuf(&g_netbus_wifi_mgmr_env.trcver_ctx,
                 BF1B_MSG_TYPE_ETH_WIFI_FRAME, BF1B_MSG_ETH_WIFI_FRAME_SUBTYPE_STA_FROM_WIFI_RX,
                 h, extra_status, pbuf_cfm_cb, swdesc)) {
+        #endif
             /* printf("FRM TX swdesc %p failed\r\n", swdesc); */
             pbuf_free(h);
         } else {

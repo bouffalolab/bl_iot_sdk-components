@@ -453,12 +453,6 @@ struct net_buf *net_buf_alloc_len(struct net_buf_pool *pool, size_t size,
 	NET_BUF_DBG("%s():%d: pool %p size %zu timeout %d", func, line, pool,
 		    size, timeout);
 
-    #if (BFLB_BT_CO_THREAD)
-    extern struct k_thread co_thread_data;
-    if(k_is_current_thread(&co_thread_data))
-        timeout = K_NO_WAIT;
-    #endif
-
 	/* We need to lock interrupts temporarily to prevent race conditions
 	 * when accessing pool->uninit_count.
 	 */

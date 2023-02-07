@@ -20,22 +20,10 @@
 #define BT_VOICE_CVSD_16BIT     0x0060
 #define BT_VOICE_MSBC_16BIT     0x0063
 
-#if (BFLB_BT_CO_THREAD)
-enum{
-    BT_CMD_SYNC_NONE =0,
-    BT_CMD_SYNC_TX = 1,
-    BT_CMD_SYNC_TX_DONE = 2
-};
-#endif
-
 /* k_poll event tags */
 enum {
 	BT_EVENT_CMD_TX,
 	BT_EVENT_CONN_TX_QUEUE,
-	#if (BFLB_BT_CO_THREAD)
-    BT_EVENT_RX_QUEUE,
-    BT_EVENT_WORK_QUEUE,
-    #endif
 };
 
 /* bt_dev flags: the flags defined here represent BT controller state */

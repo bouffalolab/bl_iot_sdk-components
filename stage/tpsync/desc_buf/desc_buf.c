@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include <FreeRTOS.h>
 #include <queue.h>
@@ -69,7 +70,7 @@ int desc_deinit(desc_msg_t *q)
     }
 
     while (xQueueReceive(q->hdl, &msg, 0)) {
-        vPortFree(msg.buf);
+        //free(msg.buf);
     }
 
     vQueueDelete(q->hdl);
@@ -88,7 +89,7 @@ int desc_push_tofront(desc_msg_t *q, void *buf, uint32_t len, uint32_t timeout_m
         return -1;
     }
 
-    msg.buf = pvPortMalloc(len);
+    msg.buf = malloc(len);
     if (NULL == msg.buf) {
         return -2;
     }
@@ -115,7 +116,7 @@ int desc_push_toback(desc_msg_t *q, void *buf, uint32_t len, uint32_t timeout_ms
         return -1;
     }
 
-    msg.buf = pvPortMalloc(len);
+    msg.buf = malloc(len);
     if (NULL == msg.buf) {
         return -2;
     }
@@ -159,7 +160,7 @@ int desc_pop(desc_msg_t *q, void *buf, uint32_t *len_p, uint32_t timeout_ms)//ti
         *len_p = msg.len;
     }
 
-    vPortFree(msg.buf);
+    free(msg.buf);
 
     return 0;
 }

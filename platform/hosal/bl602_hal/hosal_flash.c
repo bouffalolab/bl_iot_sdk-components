@@ -79,7 +79,8 @@ int hosal_flash_info_get(hosal_flash_dev_t *p_dev, hosal_logic_partition_t *part
 
 	bl_mtd_info(p_dev->flash_dev, &info);
 
-	partition->partition_description = info.name;
+	//partition->partition_description = info.name;
+	strcpy(partition->partition_description, info.name);
 	partition->partition_start_addr = (uint32_t)info.xip_addr + info.offset;
 	partition->partition_length = info.size;
 

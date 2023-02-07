@@ -575,7 +575,7 @@ sys_timeouts_sleeptime(void)
 /* return true indicate stop tcp timer */
 static bool tcp_timer_calculate_next_wake(u32_t * next_wake_ms)
 {
-  u32_t min_wake_time = (u32_t)-1;
+  s32_t min_wake_time = (s32_t)-1;
   // tcp_tmr stop_condition 1. (Removed)only run MAX_TCP_ONCE_RUNNING_TIME 2min
   //                        2. all active pcb must not have unsent segment
   //                        3. all active pcb must not have unacked segment
@@ -648,13 +648,14 @@ static bool tcp_timer_calculate_next_wake(u32_t * next_wake_ms)
     pcb = pcb->next;
   }
 
-  if (min_wake_time != (u32_t)-1) {
+  if (min_wake_time != (s32_t)-1) {
     if (min_wake_time < TCP_SLOW_INTERVAL) {
       LWIP_DEBUGF(TCP_DEBUG, ("calculate_next_wake: ERROR! min_wake_time = %ldms\n", min_wake_time));
       min_wake_time = TCP_SLOW_INTERVAL;
     }
+    LWIP_ASSERT("calculate_next_wake: Invalid min_wake_time!\n", min_wake_time > 0);
 
-    *next_wake_ms = min_wake_time;
+    *next_wake_ms = (u32_t)min_wake_time;
 
     return false;
   } else {

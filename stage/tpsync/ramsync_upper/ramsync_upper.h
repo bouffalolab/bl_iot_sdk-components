@@ -38,6 +38,8 @@
 #include <queue.h>
 #include <event_groups.h>
 
+#define DONT_CHANGE 0
+
 /* ramsync_upper config macro */
 #define TP_ST_MAGIC              (0x11223344)
 #define TP_TXPAYLOAD_NUM         (2)
@@ -102,10 +104,14 @@ typedef struct __tp_buf {
     /* tx/rx desc hdr */
     desc_msg_t tx_desc;
     desc_msg_t rx_desc;
-
+#if DONT_CHANGE
     /* for rx notify */
     void *emptyslot_evt;
     StaticEventGroup_t xEventGroupBuffer;
+#else
+    SemaphoreHandle_t tx_sem;
+    SemaphoreHandle_t rx_sem;
+#endif
 
     /* calulate crc for rx */
     tp_payload_t rx_cache;

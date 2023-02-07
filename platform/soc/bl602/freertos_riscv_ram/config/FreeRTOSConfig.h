@@ -154,6 +154,7 @@ to exclude the API function. */
 #define INCLUDE_eTaskGetState			1
 #define INCLUDE_xTimerPendFunctionCall	1
 #define INCLUDE_uxTaskGetStackHighWaterMark 1
+#define INCLUDE_xTaskGetHandle                       1
 
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */

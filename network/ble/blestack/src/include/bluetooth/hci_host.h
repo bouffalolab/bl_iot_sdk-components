@@ -2648,10 +2648,6 @@ typedef bool bt_hci_vnd_evt_cb_t(struct net_buf_simple *buf);
   */
 int bt_hci_register_vnd_evt_cb(bt_hci_vnd_evt_cb_t cb);
 
-#if (BFLB_BT_CO_THREAD)
-struct k_thread *bt_get_co_thread(void);
-#endif
-
 #ifdef __cplusplus
 }
 #endif

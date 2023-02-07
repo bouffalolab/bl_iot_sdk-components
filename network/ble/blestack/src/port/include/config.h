@@ -53,24 +53,6 @@
 #define CONFIG_BT_HCI_RX_STACK_SIZE  512
 #endif
 
-/**
- * BL_BLE_CO_THREAD: combine tx rx thread
- */
-#if defined(CONFIG_AUTO_PTS)
-#define BFLB_BT_CO_THREAD 0
-#else
-#define BFLB_BT_CO_THREAD 1
-#endif
-
-#if (BFLB_BT_CO_THREAD)
-#define CONFIG_BT_CO_TASK_PRIO (configMAX_PRIORITIES - 3)
-#if defined(CONFIG_BT_MESH)
-#define CONFIG_BT_CO_STACK_SIZE  3072//2048//1536//1024
-#else
-#define CONFIG_BT_CO_STACK_SIZE  2048//2048//1536//1024
-#endif
-#endif
-
 #ifndef CONFIG_BT_RX_STACK_SIZE
 #if defined(CONFIG_BT_MESH)
 #define CONFIG_BT_RX_STACK_SIZE  3072//2048//1536//1024

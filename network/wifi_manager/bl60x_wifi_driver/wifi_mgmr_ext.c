@@ -348,8 +348,16 @@ int wifi_mgmr_sta_connect_ext(wifi_interface_t *wifi_interface, char *ssid, char
 {
     int ssid_len = ssid ? strlen(ssid) : 0;
     int passphr_len = passphr ? strlen(passphr) : 0;
+    int psk_len = conn_adv_param->psk ? strlen(conn_adv_param->psk) : 0;
 
-    if (!ssid || ssid_len > 32 || (passphr && ((passphr_len < 8 && passphr_len != 5) || passphr_len > 63))) {
+    if (!ssid || ssid_len > 32) {
+        return -1;
+    }
+
+    if ((passphr && conn_adv_param->psk) ||
+        (passphr && ((passphr_len < 8 && passphr_len != 5) || passphr_len > 63)) ||
+        (conn_adv_param->psk && (psk_len != 64)))
+    {
         return -1;
     }
 
@@ -359,11 +367,11 @@ int wifi_mgmr_sta_connect_ext(wifi_interface_t *wifi_interface, char *ssid, char
     return wifi_mgmr_api_connect(ssid, passphr, conn_adv_param);
 }
 
-int wifi_mgmr_sta_connect_mid(wifi_interface_t *wifi_interface, char *ssid, char *psk, char *pmk, uint8_t *mac, uint8_t band, uint8_t chan_id, uint8_t use_dhcp, uint32_t flags)
+int wifi_mgmr_sta_connect_mid(wifi_interface_t *wifi_interface, char *ssid, char *passphrase, char *psk, uint8_t *mac, uint8_t band, uint8_t chan_id, uint8_t use_dhcp, uint32_t flags)
 {
     struct ap_connect_adv ext_param;
 
-    ext_param.psk = pmk;
+    ext_param.psk = psk;
     ext_param.ap_info.type = AP_INFO_TYPE_SUGGEST;
     ext_param.ap_info.time_to_live = 5;
     ext_param.ap_info.bssid = mac;
@@ -375,12 +383,12 @@ int wifi_mgmr_sta_connect_mid(wifi_interface_t *wifi_interface, char *ssid, char
     }
     ext_param.ap_info.use_dhcp = use_dhcp;
     ext_param.flags = flags;
-    return wifi_mgmr_sta_connect_ext(wifi_interface, ssid, psk, &ext_param);
+    return wifi_mgmr_sta_connect_ext(wifi_interface, ssid, passphrase, &ext_param);
 }
 
-int wifi_mgmr_sta_connect(wifi_interface_t *wifi_interface, char *ssid, char *psk, char *pmk, uint8_t *mac, uint8_t band, uint8_t chan_id)
+int wifi_mgmr_sta_connect(wifi_interface_t *wifi_interface, char *ssid, char *passphrase, char *psk, uint8_t *mac, uint8_t band, uint8_t chan_id)
 {
-    return wifi_mgmr_sta_connect_mid(wifi_interface, ssid, psk, pmk, mac, band, chan_id, 1, 0);
+    return wifi_mgmr_sta_connect_mid(wifi_interface, ssid, passphrase, psk, mac, band, chan_id, 1, 0);
 }
 
 int wifi_mgmr_sta_disconnect(void)

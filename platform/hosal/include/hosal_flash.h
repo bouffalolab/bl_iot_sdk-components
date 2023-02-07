@@ -64,7 +64,8 @@ typedef struct hosal_flash_dev {
  * @brief Hal flash partition manage struct
  */
 typedef struct {
-    const char  *partition_description; /**< @brief name */
+    //const char  *partition_description; /**< @brief name */
+    char         partition_description[16]; /**< @brief name */
     uint32_t     partition_start_addr;  /**< @brief start addr */
     uint32_t     partition_length;      /**< @brief length */
     uint32_t     partition_options;     /**< @brief options */

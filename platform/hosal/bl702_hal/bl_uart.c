@@ -40,8 +40,7 @@ void UART1_IRQHandler(void);
 
 //TODO Do in std driver
 #define UART_NUMBER_SUPPORTED   2
-#define UART_FIFO_TX_CNT        (128)
-#define FIFO_TX_SIZE_BURST      (32)
+#define UART_FIFO_TX_CNT        UART_TX_FIFO_SIZE
 static const uint32_t uartAddr[2] = {UART0_BASE, UART1_BASE};
 
 typedef struct bl_uart_notify {

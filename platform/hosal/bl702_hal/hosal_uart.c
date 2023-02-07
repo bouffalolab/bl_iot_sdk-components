@@ -128,8 +128,8 @@ static int __uart_dma_txcfg(hosal_uart_dev_t *uart, hosal_uart_dma_cfg_t *dma_cf
 		DMA_CH0,
 	    DMA_TRNS_WIDTH_8BITS,
 	    DMA_TRNS_WIDTH_8BITS,
-	    DMA_BURST_SIZE_4,
-	    DMA_BURST_SIZE_4,
+	    DMA_BURST_SIZE_1,
+	    DMA_BURST_SIZE_1,
         DISABLE,
         DISABLE,
         0,
@@ -140,8 +140,8 @@ static int __uart_dma_txcfg(hosal_uart_dev_t *uart, hosal_uart_dma_cfg_t *dma_cf
 	};
     UART_FifoCfg_Type fifoCfg =
     {
-        .txFifoDmaThreshold     = 0x10,
-        .rxFifoDmaThreshold     = 0x10,
+        .txFifoDmaThreshold     = 0x01,
+        .rxFifoDmaThreshold     = 0x01,
         .txFifoDmaEnable        = ENABLE,
         .rxFifoDmaEnable        = DISABLE,
     };
@@ -186,8 +186,8 @@ static int __uart_dma_rxcfg(hosal_uart_dev_t *uart, hosal_uart_dma_cfg_t *dma_cf
 		DMA_CH0,
 	    DMA_TRNS_WIDTH_8BITS,
 	    DMA_TRNS_WIDTH_8BITS,
-	    DMA_BURST_SIZE_16,
-	    DMA_BURST_SIZE_16,
+	    DMA_BURST_SIZE_1,
+	    DMA_BURST_SIZE_1,
         DISABLE,
         DISABLE,
         0,
@@ -198,8 +198,8 @@ static int __uart_dma_rxcfg(hosal_uart_dev_t *uart, hosal_uart_dma_cfg_t *dma_cf
 	};
     UART_FifoCfg_Type fifoCfg =
     {
-        .txFifoDmaThreshold     = 0x10,
-        .rxFifoDmaThreshold     = 0x10,
+        .txFifoDmaThreshold     = 0x01,
+        .rxFifoDmaThreshold     = 0x01,
         .txFifoDmaEnable        = DISABLE,
         .rxFifoDmaEnable        = ENABLE,
     };

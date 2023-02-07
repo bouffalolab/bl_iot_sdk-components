@@ -163,7 +163,12 @@ static void __uramsync_reset_logic(tp_uramsync_t *uramsync)
     // need tx_desc rx_desc set empty???
 
     /* for rx notify */
+    #if DONT_CHANGE
     xEventGroupClearBits(uramsync->emptyslot_evt, EVT_EMPTYSLOT_BIT);
+    #else
+    xSemaphoreTake(uramsync->tx_sem, 0);
+    xSemaphoreTake(uramsync->rx_sem, 0);
+    #endif
 
     /* calulate crc for rx */
     memset(&uramsync->rx_cache, 0, sizeof(tp_payload_t));
@@ -261,7 +266,7 @@ static void __ramsync_low_cb(void *arg)
     tp_uramsync_t *uramsync = (tp_uramsync_t *)arg;
 
     BaseType_t xHigherPriorityTaskWoken, xResult;
-
+#if DONT_CHANGE
     if (uramsync->emptyslot_evt) {
         if (xPortIsInsideInterrupt()) {
             xHigherPriorityTaskWoken = pdFALSE;
@@ -282,6 +287,24 @@ static void __ramsync_low_cb(void *arg)
             );
         }
     }
+#else
+    if (uramsync->rx_sem) {
+        if (xPortIsInsideInterrupt()) {
+            xHigherPriorityTaskWoken = pdFALSE;
+            xResult = xSemaphoreGiveFromISR(
+                    uramsync->rx_sem,    /* The event group being updated. */
+                    &xHigherPriorityTaskWoken
+            );
+
+            /* Was the message posted successfully? */
+            if( xResult != pdFAIL ) {
+                portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+            }
+        } else {
+             xSemaphoreGive(uramsync->rx_sem);
+        }
+    }
+#endif
 }
 
 static void __ramsync_low_tx_cb(void *arg)
@@ -289,7 +312,7 @@ static void __ramsync_low_tx_cb(void *arg)
     tp_uramsync_t *uramsync = (tp_uramsync_t *)arg;
 
     BaseType_t xHigherPriorityTaskWoken, xResult;
-
+#if DONT_CHANGE
     if (uramsync->emptyslot_evt) {
         if (xPortIsInsideInterrupt()) {
             xHigherPriorityTaskWoken = pdFALSE;
@@ -309,6 +332,24 @@ static void __ramsync_low_tx_cb(void *arg)
                     EVT_TX_DONE_BIT);           /* The bits being set. */
         }
     }
+#else
+    if (uramsync->tx_sem) {
+        if (xPortIsInsideInterrupt()) {
+            xHigherPriorityTaskWoken = pdFALSE;
+            xResult = xSemaphoreGiveFromISR(
+                    uramsync->tx_sem,    /* The event group being updated. */
+                    &xHigherPriorityTaskWoken
+            );
+
+            /* Was the message posted successfully? */
+            if( xResult != pdFAIL ) {
+                portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+            }
+        } else {
+             xSemaphoreGive(uramsync->tx_sem);
+        }
+    }
+#endif
 }
 
 static void __reset_signal_cb(void *arg)
@@ -598,11 +639,15 @@ static void uramsync_task_tx(void *arg)
         /* ensure empty slot */
         ensure_empty_slot = 0;
         while (1) {
-        	xEventGroupWaitBits(uramsync->emptyslot_evt,
+            #if DONT_CHANGE
+            xEventGroupWaitBits(uramsync->emptyslot_evt,
                              EVT_TX_DONE_BIT,
                              pdTRUE,/* should be cleared before returning */
                              pdTRUE,/* Don't wait for both bits, either bit will do */
                              POLL_UNIT_TIME_MS);//portMAX_DELAY
+            #else
+            xSemaphoreTake(uramsync->tx_sem, POLL_UNIT_TIME_MS);
+            #endif
             for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
                 if (uramsync->tx.payload[i].seq <= uramsync->rx.st.rseq) {
                     // have empty slot
@@ -670,7 +715,11 @@ static void uramsync_task_rx(void *arg)
     uint32_t rseqtmp;
     struct crc32_stream_ctx crc_ctx;
 
+    #if DONT_CHANGE
     EventBits_t uxBits;
+    #else
+    BaseType_t ret;
+    #endif
     int res;
 
     tp_uramsync_t *uramsync = (tp_uramsync_t *)arg;
@@ -697,15 +746,23 @@ static void uramsync_task_rx(void *arg)
                 break;
             }
             while (1) {
+                #if DONT_CHANGE
                 uxBits = xEventGroupWaitBits(uramsync->emptyslot_evt,
                                          EVT_EMPTYSLOT_BIT,
                                          pdTRUE,/* should be cleared before returning */
                                          pdTRUE,/* Don't wait for both bits, either bit will do */
                                          POLL_UNIT_TIME_MS);//portMAX_DELAY
+                #else
+                ret = xSemaphoreTake(uramsync->tx_sem, POLL_UNIT_TIME_MS);
+                #endif
                 if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
                     break;
                 }
+                #if DONT_CHANGE
                 if (uxBits & EVT_EMPTYSLOT_BIT) {
+                #else
+                if (ret == pdPASS){
+                #endif
                     break;
                 }
             }
@@ -808,12 +865,23 @@ int uramsync_init(tp_uramsync_t *uramsync, uint32_t type)
     uramsync->reset_thdr = NULL;
     // init lramsync mem set 0, hw stream
     __ramsync_low_init(uramsync, type);
-
+#if DONT_CHANGE
     uramsync->emptyslot_evt =
         xEventGroupCreateStatic(&uramsync->xEventGroupBuffer);// rx_isr -> rx_task
     if (NULL == uramsync->emptyslot_evt) {
         return -2;
     }
+#else
+    uramsync->tx_sem = xSemaphoreCreateBinary();
+    if(uramsync->tx_sem == NULL){
+        return -2;
+    }
+    uramsync->rx_sem = xSemaphoreCreateBinary();
+    if(uramsync->tx_sem == NULL){
+        vSemaphoreDelete(uramsync->tx_sem);
+        return -2;
+    }
+#endif
 
     desc_init(&uramsync->tx_desc, TP_TXDESC_NUM);
     desc_init(&uramsync->rx_desc, TP_RXDESC_NUM);
@@ -842,7 +910,12 @@ int uramsync_deinit(tp_uramsync_t *uramsync)
     __ramsync_low_deinit(uramsync);
     desc_deinit(&uramsync->tx_desc);
     desc_deinit(&uramsync->rx_desc);
+    #if DONT_CHANGE
     vEventGroupDelete(uramsync->emptyslot_evt);
+    #else
+    vSemaphoreDelete(uramsync->tx_sem);
+    vSemaphoreDelete(uramsync->rx_sem);
+    #endif
 
     /* delete task */
     vTaskDelete(uramsync->tx_thdr);
