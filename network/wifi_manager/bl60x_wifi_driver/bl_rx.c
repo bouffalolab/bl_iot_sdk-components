@@ -51,6 +51,8 @@
 
 #include <bl_os_private.h>
 #define USER_UNUSED(a) ((void)(a))
+void  bl_tx_cntrl_link_up(struct bl_sta *sta);
+void  bl_tx_cntrl_link_down(struct bl_sta *sta);
 
 static wifi_event_sm_connect_ind_cb_t cb_sm_connect_ind;
 static void* cb_sm_connect_ind_env;
@@ -628,7 +630,6 @@ static int bl_rx_sm_connect_ind(struct bl_hw *bl_hw,
                                          struct ipc_e2a_msg *msg)
 {
     struct sm_connect_ind *ind = (struct sm_connect_ind *)msg->param;
-    struct bl_sta *sta;
     struct wifi_event_sm_connect_ind ind_new;
     struct bl_vif *bl_vif = NULL;
 
@@ -647,7 +648,7 @@ static int bl_rx_sm_connect_ind(struct bl_hw *bl_hw,
             ind->bssid.array[4],
             ind->bssid.array[5]
     );
-    bl_os_printf("[RX]   vif_idx %u\r\n", ind->vif_idx);
+    bl_os_printf("[RX]   vif_idx %u\r\n", BL_VIF_STA);
     bl_os_printf("[RX]   ap_idx %u\r\n", ind->ap_idx);
     bl_os_printf("[RX]   ch_idx %u\r\n", ind->ch_idx);
     bl_os_printf("[RX]   qos %u\r\n", ind->qos);
@@ -661,15 +662,6 @@ static int bl_rx_sm_connect_ind(struct bl_hw *bl_hw,
     bl_os_printf("[RX]   center_freq1 %u\r\n", (unsigned int)ind->center_freq1);
     bl_os_printf("[RX]   center_freq2 %u\r\n", (unsigned int)ind->center_freq2);
     bl_os_printf("[RX]   tlv_ptr first %p\r\n", ind->connect_diagnose.first);
-
-    if (0 == ind->status_code) {
-        bl_hw->sta_idx = ind->ap_idx;
-        bl_hw->is_up = 1;
-        sta = &(bl_hw->sta_table[bl_hw->sta_idx]);
-        sta->qos = ind->qos;
-    } else {
-        bl_hw->is_up = 0;
-    }
     RWNX_DBG(RWNX_FN_LEAVE_STR);
 
     memset(&ind_new, 0, sizeof(ind_new));
@@ -681,7 +673,7 @@ static int bl_rx_sm_connect_ind(struct bl_hw *bl_hw,
     ind_new.bssid[3] = ind->bssid.array[3];
     ind_new.bssid[4] = ind->bssid.array[4];
     ind_new.bssid[5] = ind->bssid.array[5];
-    ind_new.vif_idx = ind->vif_idx;
+    ind_new.vif_idx = BL_VIF_STA;
     ind_new.ap_idx = ind->ap_idx;
     ind_new.ch_idx = ind->ch_idx;
     ind_new.qos = ind->qos;
@@ -697,14 +689,25 @@ static int bl_rx_sm_connect_ind(struct bl_hw *bl_hw,
         cb_sm_connect_ind(cb_sm_connect_ind_env, &ind_new);
     }
 
+    bl_vif = &(bl_hw->vif_table[BL_VIF_STA]);
     if (ind->status_code) {
-        /*empty here*/
-        //XXX no netif_set_link_down here?
+        if (bl_hw->vif_table[BL_VIF_STA].links_num)
+        {
+            bl_hw->vif_table[BL_VIF_STA].links_num--;
+            bl_hw->vif_table[BL_VIF_STA].fc_chan = 0;
+
+            int fixed_sta_idx = bl_hw->vif_table[BL_VIF_STA].fixed_sta_idx;
+            struct bl_sta *sta = &(bl_hw->sta_table[fixed_sta_idx]);
+            sta->is_used = 0;
+            bl_tx_cntrl_link_down(sta);
+
+            if (bl_vif->dev){
+                netifapi_netif_set_link_down(bl_vif->dev);
+            }
+        }
     } else {
-        bl_vif = &(bl_hw->vif_table[ind->vif_idx]);
         if (bl_vif && bl_vif->dev) {
             netifapi_netif_set_link_up(bl_vif->dev);
-            netifapi_netif_set_default(bl_vif->dev);
 #ifdef BL602_MATTER_SUPPORT
             netif_create_ip6_linklocal_address(bl_vif->dev, 1);
             bl_vif->dev->ip6_autoconfig_enabled = 1;
@@ -726,6 +729,7 @@ static int bl_rx_sm_disconnect_ind(struct bl_hw *bl_hw,
     struct sm_disconnect_ind *ind  = (struct sm_disconnect_ind*)msg->param;
     struct wifi_event_sm_disconnect_ind ind_new;
     struct bl_vif *bl_vif = NULL;
+    struct bl_sta *sta;
     ip4_addr_t addr_any;
 
     RWNX_DBG(RWNX_FN_ENTRY_STR);
@@ -735,22 +739,38 @@ static int bl_rx_sm_disconnect_ind(struct bl_hw *bl_hw,
               "       status_code %u\r\n"
               "       802.11 reason_code %u\r\n", ind->status_code, ind->reason_code);
     bl_os_printf("[RX]   disconnect reason: %s\r\n", wifi_mgmr_get_sm_status_code_str(ind->status_code));
-    bl_os_printf("[RX]   vif_idx %u\r\n", ind->vif_idx);
+    bl_os_printf("[RX]   vif_idx %u\r\n", BL_VIF_STA);
     bl_os_printf("[RX]   ft_over_ds %u\r\n", ind->ft_over_ds);
     bl_os_printf("[RX]   tlv_ptr first %p\r\n", ind->connect_diagnose.first);
+
+    if (bl_hw->vif_table[BL_VIF_STA].links_num == 0)
+    {
+        bl_os_printf("[WF] Error: illegal sm_sta_del, links_num is 0!\r\n");
+        return -1;
+    }
+
+    int fixed_sta_idx = bl_hw->vif_table[BL_VIF_STA].fixed_sta_idx;
+    sta = &(bl_hw->sta_table[fixed_sta_idx]);
+    if (sta->is_used)
+    {
+        bl_hw->vif_table[BL_VIF_STA].links_num--;
+        bl_hw->vif_table[BL_VIF_STA].fc_chan = 0;
+
+        sta->is_used = 0;
+        bl_tx_cntrl_link_down(sta);
+    }
 
     if (cb_sm_disconnect_ind) {
         memset(&ind_new, 0, sizeof(ind_new));
         ind_new.status_code = ind->status_code;
         ind_new.reason_code = ind->reason_code;
-        ind_new.vif_idx = ind->vif_idx;
+        ind_new.vif_idx = BL_VIF_STA;
         ind_new.ft_over_ds = ind->ft_over_ds;
         ind_new.connect_diagnose = ind->connect_diagnose;
         cb_sm_disconnect_ind(cb_sm_disconnect_ind_env, &ind_new);
     }
 
-    //TODO check vif_idx valid?
-    bl_vif = &(bl_hw->vif_table[ind->vif_idx]);
+    bl_vif = &(bl_hw->vif_table[BL_VIF_STA]);
     if (bl_vif && bl_vif->dev) {
         netifapi_netif_set_link_down(bl_vif->dev);
         netifapi_netif_set_addr(bl_vif->dev, &addr_any, &addr_any, &addr_any);
@@ -759,9 +779,38 @@ static int bl_rx_sm_disconnect_ind(struct bl_hw *bl_hw,
     return 0;
 }
 
+static int bl_rx_sm_sta_add_ind(struct bl_hw *bl_hw,
+                                struct bl_cmd *cmd,
+                                struct ipc_e2a_msg *msg)
+{
+    struct sm_sta_add_ind *ind = (struct sm_sta_add_ind *)msg->param;
+    struct bl_sta *sta;
+
+    if (bl_hw->vif_table[BL_VIF_STA].links_num > 0)
+    {
+        bl_os_printf("[WF] Error: illegal sm_sta_add, sta_idx: %d\r\n", ind->ap_idx);
+        return -1;
+    }
+
+    bl_hw->vif_table[BL_VIF_STA].links_num++;
+    bl_hw->vif_table[BL_VIF_STA].fc_chan = 0;
+    bl_hw->vif_table[BL_VIF_STA].fixed_sta_idx = ind->ap_idx;
+
+    sta = &(bl_hw->sta_table[ind->ap_idx]);
+    sta->sta_idx = ind->ap_idx;
+    sta->vif_idx = BL_VIF_STA;
+    sta->qos     = ind->qos;
+    sta->fc_ps   = 0;
+    sta->is_used = 1;
+    bl_tx_cntrl_link_up(sta);
+
+    return 0;
+}
+
 const static msg_cb_fct sm_hdlrs[MSG_I(SM_MAX)] = {
     [MSG_I(SM_CONNECT_IND)]    = bl_rx_sm_connect_ind,
     [MSG_I(SM_DISCONNECT_IND)] = bl_rx_sm_disconnect_ind,
+    [MSG_I(SM_STA_ADD_IND)]    = bl_rx_sm_sta_add_ind,
 };
 
 static int bl_rx_apm_sta_add_ind(struct bl_hw *bl_hw, struct bl_cmd *cmd, struct ipc_e2a_msg *msg)
@@ -779,29 +828,60 @@ static int bl_rx_apm_sta_add_ind(struct bl_hw *bl_hw, struct bl_cmd *cmd, struct
             ind->sta_addr.array[4] & 0xFF,
             ind->sta_addr.array[5] & 0xFF
     );
+    bl_os_printf("[WF]    vif_idx %u\r\n", BL_VIF_AP);
+    bl_os_printf("[WF]    sta_idx %u\r\n", ind->sta_idx);
     bl_os_log_info("[WF]    tsflo: 0x%lx\r\n", ind->tsflo);
     bl_os_log_info("[WF]    tsfhi: 0x%lx\r\n", ind->tsfhi);
     bl_os_log_info("[WF]    rssi: %d\r\n", ind->rssi);
     bl_os_log_info("[WF]    data rate: 0x%x\r\n", ind->data_rate);
 
-    bl_os_printf("[WF]    vif_idx %u\r\n", ind->vif_idx);
-    bl_os_printf("[WF]    sta_idx %u\r\n", ind->sta_idx);
-    if (ind->sta_idx < sizeof(bl_hw->sta_table)/sizeof(bl_hw->sta_table[0])) {
-        sta = &(bl_hw->sta_table[ind->sta_idx]);
-        if (sta->is_used) {
-            bl_os_log_info("-------------------------Warning: sta_idx already used: %d\r\n", ind->sta_idx);
-        }
-        memcpy(sta->sta_addr.array, ind->sta_addr.array, 6);
-        sta->sta_idx = ind->sta_idx;
-        sta->vif_idx = ind->vif_idx;
-        sta->is_used = 1;
-        sta->rssi = ind->rssi;
-        sta->tsflo = ind->tsflo;
-        sta->tsfhi = ind->tsfhi;
-        sta->data_rate = ind->data_rate;
-    } else {
-        bl_os_printf("[WF]    ------ Potential illegal sta_idx\r\n");
+    if (ind->sta_idx >= NX_REMOTE_STA_STORE_MAX)
+    {
+        bl_os_printf("[WF]    Error: Potential illegal sta_idx: %d\r\n", ind->sta_idx);
+        return -1;
     }
+
+    sta = &(bl_hw->sta_table[ind->sta_idx]);
+    if (sta->is_used) {
+        bl_os_log_info("[WF]    Warning: sta_idx already used: %d\r\n", ind->sta_idx);
+    }
+    memcpy(sta->sta_addr.array, ind->sta_addr.array, 6);
+    sta->qos       = !!(ind->flags & STA_QOS_CAPA);
+    sta->sta_idx   = ind->sta_idx;
+    sta->vif_idx   = BL_VIF_AP;
+    sta->rssi      = ind->rssi;
+    sta->tsflo     = ind->tsflo;
+    sta->tsfhi     = ind->tsfhi;
+    sta->data_rate = ind->data_rate;
+    sta->fc_ps     = 0;
+    sta->is_used   = 1;
+    bl_tx_cntrl_link_up(sta);
+
+    /* APM first link, set BC/MC sta */
+    if (!bl_hw->vif_table[BL_VIF_AP].links_num)
+    {
+        bl_hw->vif_table[BL_VIF_AP].fc_chan = 0;
+
+        int fixed_sta_idx = bl_hw->vif_table[BL_VIF_AP].fixed_sta_idx;
+        sta = &(wifi_hw.sta_table[fixed_sta_idx]);
+        if (!(ind->flags & STA_QOS_CAPA))
+        {
+            sta->qos = 0;
+        }
+        sta->fc_ps = 0;
+        sta->is_used = 1;
+        bl_tx_cntrl_link_up(sta);
+        bl_hw->vif_table[BL_VIF_AP].links_num++;
+        if (bl_hw->vif_table[BL_VIF_AP].dev)
+        {
+            netifapi_netif_set_link_up(bl_hw->vif_table[BL_VIF_AP].dev);
+        }
+    }
+    else
+    {
+        bl_hw->vif_table[BL_VIF_AP].links_num++;
+    }
+
     aos_post_event(EV_WIFI, CODE_WIFI_ON_AP_STA_ADD, ind->sta_idx);
 
     return 0;
@@ -818,15 +898,38 @@ static int bl_rx_apm_sta_del_ind(struct bl_hw *bl_hw, struct bl_cmd *cmd, struct
     bl_os_printf("[WF]    reason_code %u\r\n", ind->reason_code);
     bl_os_printf("[RX]    disconnect reason: %s\r\n", wifi_mgmr_get_apm_status_code_str(ind->status_code));
 
-    if (ind->sta_idx < sizeof(bl_hw->sta_table)/sizeof(bl_hw->sta_table[0])) {
-        sta = &(bl_hw->sta_table[ind->sta_idx]);
-        if (0 == sta->is_used) {
-            bl_os_log_info("[WF]    -------------------------Warning: sta_idx already empty: %d\r\n", ind->sta_idx);
-        }
-        sta->is_used = 0;
-    } else {
-        bl_os_printf("[WF]    --------- Potential illegal sta_idx\r\n");
+    if ((ind->sta_idx >= NX_REMOTE_STA_STORE_MAX) ||
+        (bl_hw->vif_table[BL_VIF_AP].links_num == 0))
+    {
+        bl_os_printf("[WF]    Error: Potential illegal sta_idx: %d, or no link_num\r\n", ind->sta_idx);
+        return -1;
     }
+
+    sta = &(bl_hw->sta_table[ind->sta_idx]);
+    if (0 == sta->is_used) {
+        bl_os_log_info("[WF]    Warning: sta_idx already empty: %d\r\n", ind->sta_idx);
+    }
+    sta->is_used = 0;
+    bl_tx_cntrl_link_down(sta);
+
+    /* APM last link */
+    bl_hw->vif_table[BL_VIF_AP].links_num--;
+    bl_os_printf("[WF]    links_num %u\r\n", bl_hw->vif_table[BL_VIF_AP].links_num);
+    if (!bl_hw->vif_table[BL_VIF_AP].links_num)
+    {
+        bl_hw->vif_table[BL_VIF_AP].fc_chan = 0;
+
+        int fixed_sta_idx = bl_hw->vif_table[BL_VIF_AP].fixed_sta_idx;
+        sta = &(wifi_hw.sta_table[fixed_sta_idx]);
+        sta->is_used = 0;
+        bl_tx_cntrl_link_down(sta);
+
+        if (bl_hw->vif_table[BL_VIF_AP].dev)
+        {
+            netifapi_netif_set_link_down(bl_hw->vif_table[BL_VIF_AP].dev);
+        }
+    }
+
     aos_post_event(EV_WIFI, CODE_WIFI_ON_AP_STA_DEL, ind->sta_idx);
 
     return 0;

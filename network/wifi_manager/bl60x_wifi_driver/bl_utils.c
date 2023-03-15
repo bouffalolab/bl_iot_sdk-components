@@ -92,21 +92,22 @@ static void my_pbuf_free_custom_fake(struct pbuf *p)
     /*nothing needs to be done for tailed pbuf*/
 }
 
-static inline struct bl_vif *bl_rx_get_vif(int vif_idx)
+static inline struct bl_vif *bl_rx_get_vif(int sta_idx)
 {
     struct bl_vif *bl_vif = NULL;
+    struct bl_sta *bl_sta = NULL;
     struct bl_hw *bl_hw = &wifi_hw;
 
-    if (vif_idx == 0xFF) {
-        list_for_each_entry(bl_vif, &bl_hw->vifs, list) {
-            if (bl_vif->up)
-                return bl_vif;
-        }
+    if (sta_idx >= NX_REMOTE_STA_STORE_MAX)
+    {
         return NULL;
-    } else if (vif_idx < NX_VIRT_DEV_MAX) {
-        bl_vif = &(bl_hw->vif_table[vif_idx]);
-        if (!bl_vif || !bl_vif->up)
-            return NULL;
+    }
+
+    bl_sta = &bl_hw->sta_table[sta_idx];
+    bl_vif = &(bl_hw->vif_table[bl_sta->vif_idx]);
+    if (!bl_vif->up)
+    {
+        return NULL;
     }
 
     return bl_vif;
@@ -404,7 +405,7 @@ int tcpip_stack_input(void *swdesc, uint8_t status, void *hwhdr, unsigned int ms
         goto end;
     }
 
-    bl_vif = bl_rx_get_vif(hw_rxhdr->flags_vif_idx);
+    bl_vif = bl_rx_get_vif(hw_rxhdr->flags_sta_idx);
     skb_payload = (uint32_t*)((uint32_t)(skb) + msdu_offset);
 
     if (hw_rxhdr->flags_is_80211_mpdu) {
@@ -554,26 +555,18 @@ void bl_sec_tbtt_ind(void *pthis)
 //FIXME TODO use cache?
 int bl_utils_idx_lookup(struct bl_hw *bl_hw, uint8_t *mac)
 {
-    int i;
     struct bl_sta *sta;
 
-    for (i = 0; i < sizeof(bl_hw->sta_table)/sizeof(bl_hw->sta_table[0]); i++) {
+    for (int i = 0; i < NX_REMOTE_STA_STORE_MAX; i++) {
         sta = &(bl_hw->sta_table[i]);
-        if (0 == sta->is_used) {
-            /*empty entry*/
-            continue;
-        }
-        if (memcmp(sta->sta_addr.array, mac, 6)) {
-            /*NOT match*/
-            continue;
-        } else {
-            /*mac address found*/
-            break;
+
+        if ((sta->is_used) &&
+            (0 == memcmp(sta->sta_addr.array, mac, 6))) {
+            return i;
         }
     }
 
-    //FIXME use 0x0A for un-valid sta_idx?
-    return (sizeof(bl_hw->sta_table)/sizeof(bl_hw->sta_table[0])) == i ? wifi_hw.ap_bcmc_idx : i;
+    return -1;
 }
 
 static struct ipc_host_env_tag *ipc_env;
@@ -589,7 +582,7 @@ int bl_ipc_init(struct bl_hw *bl_hw, struct ipc_shared_env_tag *ipc_shared_mem)
     cb.recv_msg_ind    = NULL;
     cb.recv_msgack_ind = bl_msgackind;
     cb.recv_dbg_ind    = bl_dbgind;
-    cb.send_data_cfm   = bl_txdatacfm;
+    cb.send_data_cfm   = bl_tx_cfm;
     cb.prim_tbtt_ind   = bl_prim_tbtt_ind;
     cb.sec_tbtt_ind    = bl_sec_tbtt_ind;
 

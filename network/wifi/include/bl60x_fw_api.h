@@ -417,6 +417,10 @@ typedef enum wifi_fw_event_id
     SM_CONNECT_ABORT_CFM,
     /// Timeout message for requiring a SA Query Response from AP
     SM_SA_QUERY_TIMEOUT_IND,
+    /// Indicates add AP info
+    SM_STA_ADD_IND,
+    /// Request for send pending auth or assoc
+    SM_CONNECT_AUTH_ASSOC_REQ,
     /// MAX number of messages
     SM_MAX,
 } ke_msg_id_t;

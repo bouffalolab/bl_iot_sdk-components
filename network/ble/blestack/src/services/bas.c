@@ -72,7 +72,7 @@ u8_t bt_gatt_bas_get_battery_level(void)
 	return battery_level;
 }
 
-int bt_gatt_bas_set_battery_level(u8_t level)
+int bt_gatt_bas_set_battery_level(struct bt_conn *conn, u8_t level)
 {
 	int rc;
 
@@ -82,7 +82,7 @@ int bt_gatt_bas_set_battery_level(u8_t level)
 
 	battery_level = level;
 
-	rc = bt_gatt_notify(NULL, &bas.attrs[1], &level, sizeof(level));
+	rc = bt_gatt_notify(conn, &bas.attrs[1], &level, sizeof(level));
 
 	return rc == -ENOTCONN ? 0 : rc;
 }

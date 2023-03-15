@@ -309,7 +309,7 @@ static bool stateGlobalGuard_disable_autoreconnect( void *ch, struct event *even
     if (&stateDisconnect == wifiMgmr.m.currentState) {
         bl_os_printf("Disable Autoreconnect in Disconnec State\r\n");
         bl_os_printf(DEBUG_HEADER "Removing STA interface...\r\n");
-        bl_main_if_remove(wifiMgmr.wlan_sta.vif_index);
+        bl_main_if_remove(BL_VIF_STA);
         return true;
     }
     /*we need set disable now for future use*/
@@ -554,9 +554,8 @@ static bool stateGlobalGuard_AP(void *ev, struct event *event )
     }
     ap = (wifi_mgmr_ap_msg_t*)msg->data;
 
-    netifapi_netif_set_link_up(&(wifiMgmr.wlan_ap.netif));
-void dhcpd_start(struct netif *netif);
     if (ap->use_dhcp_server) {
+        void dhcpd_start(struct netif *netif);
         netifapi_netif_common(&(wifiMgmr.wlan_ap.netif), dhcpd_start, NULL);
     }
 
@@ -568,7 +567,7 @@ void dhcpd_start(struct netif *netif);
     bl_os_printf(DEBUG_HEADER "start AP with ssid %s;\r\n", ap->ssid);
     bl_os_printf(DEBUG_HEADER "              pwd  %s;\r\n", ap->psk);
     bl_os_printf(DEBUG_HEADER "              channel  %ld;\r\n", ap->channel);
-    bl_main_apm_start(ap->ssid, ap->psk, ap->channel, wifiMgmr.wlan_ap.vif_index, ap->hidden_ssid, wifiMgmr.ap_bcn_int);
+    bl_main_apm_start(ap->ssid, ap->psk, ap->channel, ap->hidden_ssid, wifiMgmr.ap_bcn_int);
     wifiMgmr.inf_ap_enabled = 1;
     if (ap->use_dhcp_server) {
         wifiMgmr.dns_server = dns_server_init();
@@ -593,10 +592,12 @@ static bool stateGlobalGuard_stop(void *ev, struct event *event )
     bl_os_printf(DEBUG_HEADER "Removing and deauth all sta client...\r\n");
     bl_main_apm_remove_all_sta();
     bl_os_printf(DEBUG_HEADER "Stoping AP interface...\r\n");
-    bl_main_apm_stop(wifiMgmr.wlan_ap.vif_index);
+    bl_main_apm_stop();
     bl_os_printf(DEBUG_HEADER "Removing AP interface...\r\n");
-    bl_main_if_remove(wifiMgmr.wlan_ap.vif_index);
+    bl_main_if_remove(BL_VIF_AP);
     bl_os_printf(DEBUG_HEADER "Stopping DHCP on AP interface...\r\n");
+
+    // netifapi_netif_set_addr(&(wifiMgmr.wlan_ap.netif), NULL, NULL, NULL);
 err_t dhcp_server_stop(struct netif *netif);
     netifapi_netif_common(&(wifiMgmr.wlan_ap.netif), NULL, dhcp_server_stop);
     bl_os_printf(DEBUG_HEADER "Removing ETH interface ...\r\n");
@@ -1124,16 +1125,13 @@ static void stateConnectedIPNoExit(void *stateData, struct event *event )
 
 static void stateConnectedIPNoAction_disconn( void *oldStateData, struct event *event, void *newStateData)
 {
-    ip4_addr_t addr_ipaddr;
-
-    ip4_addr_set_any(&addr_ipaddr);
     bl_os_printf(DEBUG_HEADER "State Action ###%s### --->>> ###%s###\r\n",
             (char*)oldStateData,
             (char*)newStateData
     );
 
     wifi_netif_dhcp_stop(&(wifiMgmr.wlan_sta.netif));
-    netifapi_netif_set_addr(&(wifiMgmr.wlan_sta.netif), &addr_ipaddr, &addr_ipaddr, &addr_ipaddr);
+    netifapi_netif_set_addr(&(wifiMgmr.wlan_sta.netif), NULL, NULL, NULL);
 }
 
 const static struct state stateConnectedIPNo = {
@@ -1192,7 +1190,7 @@ static bool stateConnectedIPYesGuard_rcconfig( void *ch, struct event *event )
     }
 
     bl_os_printf(DEBUG_HEADER "rate config, use sta_idx 0, rate_config %04X\r\n", (unsigned int)(msg->data1));
-    bl_main_rate_config(wifi_hw.sta_idx, (uint32_t)msg->data1);
+    bl_main_rate_config(wifi_hw.vif_table[BL_VIF_STA].fixed_sta_idx, (uint32_t)msg->data1);
     /*will never trigger state change, since we just want to trigger the guard*/
     return false;
 }
@@ -1200,15 +1198,12 @@ static bool stateConnectedIPYesGuard_rcconfig( void *ch, struct event *event )
 static void stateConnectedIPYes_action( void *oldStateData, struct event *event,
       void *newStateData )
 {
-    ip4_addr_t addr_ipaddr;
-
-    ip4_addr_set_any(&addr_ipaddr);
     bl_os_printf(DEBUG_HEADER "State Action ###%s### --->>> ###%s###\r\n",
             (char*)oldStateData,
             (char*)newStateData
     );
     wifi_netif_dhcp_stop(&(wifiMgmr.wlan_sta.netif));
-    netifapi_netif_set_addr(&(wifiMgmr.wlan_sta.netif), &addr_ipaddr, &addr_ipaddr, &addr_ipaddr);
+    netifapi_netif_set_addr(&(wifiMgmr.wlan_sta.netif), NULL, NULL, NULL);
 }
 
 static void stateConnectedIPYes_enter( void *stateData, struct event *event )
@@ -1350,7 +1345,7 @@ static void stateDisconnect_action_idle( void *oldStateData, struct event *event
             (char*)newStateData
     );
     bl_os_printf(DEBUG_HEADER "Removing STA interface...\r\n");
-    bl_main_if_remove(wifiMgmr.wlan_sta.vif_index);
+    bl_main_if_remove(BL_VIF_STA);
 }
 
 static void disconnect_retry(void *data)

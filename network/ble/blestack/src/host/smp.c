@@ -275,6 +275,18 @@ static bool oobd_present;
 static bool sc_supported;
 static const u8_t *sc_public_key;
 
+#if defined(BFLB_BLE_SMP_SC_ONLY)
+static bool force_smp_sc_only_flag = 0;
+void bt_smp_set_sc_only(bool sc_only)
+{
+    if(!sc_supported){
+        BT_ERR("Not support sc");
+        return;
+    }
+
+    force_smp_sc_only_flag = sc_only;
+}
+#endif
 #if defined(BFLB_BLE_SMP_LOCAL_AUTH)
 #define SMP_INVALID_AUTH 0xFF
 u8_t local_auth = SMP_INVALID_AUTH;
@@ -3039,18 +3051,25 @@ static u8_t smp_pairing_req(struct bt_smp *smp, struct net_buf *buf)
 	}
 
 	if ((IS_ENABLED(CONFIG_BT_SMP_SC_ONLY) ||
-	     conn->required_sec_level == BT_SECURITY_L4) &&
-		smp->method == JUST_WORKS) {
+		#if defined(BFLB_BLE_SMP_SC_ONLY)
+		force_smp_sc_only_flag ||
+		#endif
+		conn->required_sec_level == BT_SECURITY_L4) &&
+		smp->method == JUST_WORKS){
 		return BT_SMP_ERR_AUTH_REQUIREMENTS;
 	}
 
 	if ((IS_ENABLED(CONFIG_BT_SMP_SC_ONLY) ||
+		#if defined(BFLB_BLE_SMP_SC_ONLY)
+		force_smp_sc_only_flag ||
+		#endif
 	     conn->required_sec_level == BT_SECURITY_L4) &&
 	       get_encryption_key_size(smp) != BT_SMP_MAX_ENC_KEY_SIZE) {
 		return BT_SMP_ERR_ENC_KEY_SIZE;
 	}
 
-	if ((DISPLAY_FIXED(smp) || smp->method == JUST_WORKS) &&
+	if ((DISPLAY_FIXED(smp) || smp->method == JUST_WORKS || 
+	    smp->method == PASSKEY_DISPLAY) &&
 	    !atomic_test_bit(smp->flags, SMP_FLAG_SEC_REQ) &&
 	    bt_auth && bt_auth->pairing_confirm) {
 	   

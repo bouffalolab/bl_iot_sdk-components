@@ -106,12 +106,16 @@ int hosal_dma_init(void)
     gp_hosal_dma_dev = calloc(sizeof(hosal_dma_dev_t), 1);
     if (gp_hosal_dma_dev == NULL) {
         blog_error("no memory !!!\r\n");
+        return -1;
     }
 
     gp_hosal_dma_dev->max_chans = DMA_CH_MAX;
     gp_hosal_dma_dev->used_chan = calloc(sizeof(struct hosal_dma_chan) * DMA_CH_MAX, 1);
     if (gp_hosal_dma_dev->used_chan == NULL) {
         blog_error("no memory !!!\r\n");
+        free(gp_hosal_dma_dev);
+        gp_hosal_dma_dev = NULL;
+        return -1;
     }
 
     GLB_PER_Clock_UnGate(GLB_AHB_CLOCK_DMA_0);
@@ -255,7 +259,9 @@ int hosal_dma_finalize(void)
 
     DMA_Disable();
     bl_irq_disable(DMA_ALL_IRQn);
+    free(gp_hosal_dma_dev->used_chan);
     free(gp_hosal_dma_dev);
+    gp_hosal_dma_dev = NULL;
     return 0;
 }
 

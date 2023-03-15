@@ -75,31 +75,6 @@ int bl_onchiphci_send_2_controller(struct net_buf *buf)
             opcode = sys_le16_to_cpu(chdr->opcode);
             //move buf to the payload
             net_buf_pull(buf, sizeof(struct bt_hci_cmd_hdr));
-            switch(opcode)
-            {
-                //ble refer to hci_cmd_desc_tab_le, for the ones of which dest_ll is BLE_CTRL
-                case BT_HCI_OP_LE_CONN_UPDATE:
-                case BT_HCI_OP_LE_READ_CHAN_MAP:
-                case BT_HCI_OP_LE_READ_REMOTE_FEATURES:
-                case BT_HCI_OP_LE_START_ENCRYPTION:
-                case BT_HCI_OP_LE_LTK_REQ_REPLY:
-                case BT_HCI_OP_LE_LTK_REQ_NEG_REPLY:
-                case BT_HCI_OP_LE_CONN_PARAM_REQ_REPLY:
-                case BT_HCI_OP_LE_CONN_PARAM_REQ_NEG_REPLY:
-                case BT_HCI_OP_LE_SET_DATA_LEN:
-                case BT_HCI_OP_LE_READ_PHY:
-                case BT_HCI_OP_LE_SET_PHY:
-                //bredr identify link id, according to dest_id
-                case BT_HCI_OP_READ_REMOTE_FEATURES:
-                case BT_HCI_OP_READ_REMOTE_EXT_FEATURES:
-                case BT_HCI_OP_READ_ENCRYPTION_KEY_SIZE:
-                {
-                    //dest_id is connectin handle
-                    dest_id = buf->data[0];
-                }
-                default:
-                    break;
-            }
             pkt.p.hci_cmd.opcode = opcode;
             pkt.p.hci_cmd.param_len = chdr->param_len;
             pkt.p.hci_cmd.params = buf->data;

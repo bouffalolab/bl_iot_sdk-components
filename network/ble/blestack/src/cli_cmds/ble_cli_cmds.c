@@ -75,6 +75,12 @@ static void blecli_tp_start(char *pcWriteBuffer, int xWriteBufferLen, int argc, 
 #if defined(CONFIG_BT_CONN)
 #if defined(CONFIG_BT_CENTRAL)
 static void blecli_connect(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+#if defined(CONFIG_BT_WHITELIST)
+static void blecli_auto_connect(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+static void blecli_whitelist_add(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+static void blecli_whitelist_rem(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+static void blecli_whitelist_clear(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+#endif /* CONFIG_BT_WHITELIST */
 #endif
 static void blecli_disconnect(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 static void blecli_select_conn(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
@@ -184,6 +190,19 @@ const struct cli_command btStackCmdSet[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"ble_connect", "ble Connect remote device\r\n\
      Parameter [Address type, 0:ADDR_PUBLIC, 1:ADDR_RAND, 2:ADDR_RPA_OR_PUBLIC, 3:ADDR_RPA_OR_RAND]\r\n\
      [Address value, e.g.112233AABBCC]\r\n", blecli_connect},
+#if defined(CONFIG_BT_WHITELIST)
+    {"ble_auto_connect", "ble Connect remote device\r\n\
+    Parameter [Address type, 0:ADDR_PUBLIC, 1:ADDR_RAND, 2:ADDR_RPA_OR_PUBLIC, 3:ADDR_RPA_OR_RAND]\r\n\
+    [Address value, e.g.112233AABBCC]\r\n", blecli_auto_connect},
+    {"ble_whitelist_add", "Add white list\r\n\
+    Parameter [Address type, 0:ADDR_PUBLIC, 1:ADDR_RAND, 2:ADDR_RPA_OR_PUBLIC, 3:ADDR_RPA_OR_RAND]\r\n\
+    [Address value, e.g.112233AABBCC]\r\n", blecli_whitelist_add},
+    {"ble_whitelist_rem", "Remove white list\r\n\
+    Parameter [Address type, 0:ADDR_PUBLIC, 1:ADDR_RAND, 2:ADDR_RPA_OR_PUBLIC, 3:ADDR_RPA_OR_RAND]\r\n\
+    [Address value, e.g.112233AABBCC]\r\n", blecli_whitelist_rem},
+    {"ble_whitelist_clear", "Clear white list\r\n\
+    Parameter []\r\n", blecli_whitelist_clear},
+#endif /* CONFIG_BT_WHITELIST */
 #endif
     {"ble_disconnect", "Disconnect remote device\r\n\
     Parameter [Address type, 0:ADDR_PUBLIC, 1:ADDR_RAND, 2:ADDR_RPA_OR_PUBLIC, 3:ADDR_RPA_OR_RAND]\r\n\
@@ -402,10 +421,6 @@ static void disconnected(struct bt_conn *conn, u8_t reason)
 #endif
 
     if (default_conn == conn) {
-        #if defined(CONFIG_BT_CENTRAL)
-        if(conn->role == BT_HCI_ROLE_MASTER)
-            bt_conn_unref(conn);
-        #endif
         default_conn = NULL;
     }
 }
@@ -579,7 +594,11 @@ static void blecli_set_device_name(char *pcWriteBuffer, int xWriteBufferLen, int
 static void blecli_tp_start(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
     extern u8_t tp_start;
-    
+    if(argc != 2){
+        vOutputString("Number of Parameters is not correct\r\n");
+        return;
+    }
+
     get_uint8_from_string(&argv[1], &tp_start);
     if( tp_start == 1 ){
         vOutputString("Ble Throughput enable\r\n");
@@ -963,6 +982,99 @@ static void blecli_connect(char *pcWriteBuffer, int xWriteBufferLen, int argc, c
     }
 }
 
+#if defined(CONFIG_BT_WHITELIST)
+static void blecli_auto_connect(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+	int err;
+	unsigned char enable = 0U;
+	struct bt_le_conn_param param = {
+		.interval_min =  BT_GAP_INIT_CONN_INT_MIN,
+		.interval_max =  BT_GAP_INIT_CONN_INT_MAX,
+		.latency = 0,
+		.timeout = 400,
+	};
+	/*Auto connect whitelist device, enable : 0x01, disable : 0x02*/
+	get_uint8_from_string(&argv[1], &enable);
+
+	if(enable == 0x01){
+		err = bt_conn_create_auto_le(&param);
+		if(err){
+			vOutputString("Auto connect failed (err = [%d])\r\n",err);
+			return;
+		}else{
+			vOutputString("Auto connection is succeed\r\n");
+		}
+	}else if(enable == 0x02){
+		err = bt_conn_create_auto_stop();
+		if(err){
+			vOutputString("Auto connection stop (err = [%d])\r\n",err);
+			return ;
+		}
+	}
+}
+
+static void blecli_whitelist_add(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+	bt_addr_le_t waddr;
+	int 		err;
+	u8_t 		val[6];
+
+	if(argc != 3){
+		printf("Number of Parameters is not correct (argc = [%d])\r\n",argc);
+		return;
+	}
+	// 0:ADDR_PUBLIC, 1:ADDR_RAND, 2:ADDR_RPA_OR_PUBLIC, 3:ADDR_RPA_OR_RAND*
+	get_uint8_from_string(&argv[1], &waddr.type);
+	get_bytearray_from_string(&argv[2], val,6);
+
+	reverse_bytearray(val, waddr.a.val, 6);
+
+	err = bt_le_whitelist_add(&waddr);
+	if(err){
+		printf("Failed to add device to whitelist (err = [%d])\r\n",err);
+	}
+}
+
+static void blecli_whitelist_rem(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+	bt_addr_le_t waddr;
+	int 		err;
+	u8_t 		val[6];
+
+	if(argc != 3){
+		printf("Number of Parameters is not correct (argc = [%d])\r\n",argc);
+		return;
+	}
+
+	get_uint8_from_string(&argv[1], &waddr.type);
+	get_bytearray_from_string(&argv[2], val,6);
+
+	reverse_bytearray(val, waddr.a.val, 6);
+
+	err = bt_le_whitelist_rem(&waddr);
+	if(err){
+		printf("Failed to add device to whitelist (err = [%d])\r\n",err);
+	}
+}
+
+static void blecli_whitelist_clear(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+	bt_addr_le_t waddr;
+	int 		err;
+	u8_t 		val[6];
+
+	if(argc != 1){
+		printf("Number of Parameters is not correct (argc = [%d])\r\n",argc);
+		return;
+	}
+
+	err = bt_le_whitelist_clear();
+	if(err){
+		printf("Clear white list device failed (err = [%d])\r\n",err);
+	}
+}
+#endif /* CONFIG_BT_WHITELIST */
+
 #endif //#if defined(CONFIG_BT_CENTRAL)
 
 static void blecli_disconnect(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
@@ -1026,8 +1138,8 @@ static void blecli_select_conn(char *pcWriteBuffer, int xWriteBufferLen, int arg
         return;
     }
 
-    if(default_conn){
-        bt_conn_unref(default_conn);
+    if(conn){
+        bt_conn_unref(conn);
     }
 
     default_conn = conn;

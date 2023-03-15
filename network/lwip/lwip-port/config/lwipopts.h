@@ -65,7 +65,7 @@ a lot of data that needs to be copied, this should be set high. */
 #elif defined(CFG_SDIOWIFI)
 #define MEM_SIZE                (8*1024)
 #elif defined(CFG_NETBUS_WIFI_ENABLE)
-#define MEM_SIZE                (13*1024)
+#define MEM_SIZE                (12*1024)
 #else
 #define MEM_SIZE                (8*1024)
 #endif
@@ -336,6 +336,10 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCPIP_THREAD_STACKSIZE          512
 #elif defined(CFG_NETBUS_WIFI_ENABLE)
 #define TCPIP_THREAD_STACKSIZE          1536
+#elif defined(CFG_USE_WIFI_BR)
+#define TCPIP_THREAD_STACKSIZE          1536
+#elif defined(CFG_TCPIP_STACKSIZE)
+#define TCPIP_THREAD_STACKSIZE          CFG_TCPIP_STACKSIZE
 #else
 #define TCPIP_THREAD_STACKSIZE          4000
 #endif /* CFG_ETHERNET_ENABLE */

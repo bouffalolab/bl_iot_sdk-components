@@ -122,5 +122,11 @@ int reset_cmd_handler(void);
 #define BT_SCHEDULE_DEBUG_MASK  0x00000001
 #define BT_MEM_DEBUG_MASK       0x00000002
 //API to set ble controller debug level.
-void ble_set_controller_debug_level(uint32_t debug_level);
+void ble_controller_set_debug_level(uint32_t debug_level);
+/*if users want to trace memory allocation in controller, do below steps after bt initialization completes.
+  #1.call ble_controller_trace_malloc_init to deliver an
+  allocated buffer to store the entries of memory allocation info in controller, the recommended value of
+  buffer size is 6k(512 entries).
+  #2.call ble_set_controller_debug_level to set BT_MEM_DEBUG_MASK.*/
+void ble_controller_trace_malloc_init(void *buffer, uint32_t size);
 #endif

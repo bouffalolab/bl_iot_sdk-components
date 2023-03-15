@@ -2,7 +2,7 @@
 #define BLE_CONFIG_H
 
 #include "FreeRTOSConfig.h"
-
+#include "bl_timer.h"
 /**
  * CONFIG_BLUETOOTH: Enable the bluetooh stack
  */
@@ -619,8 +619,6 @@ happens, which cause memory leak issue.*/
 #if defined(CONFIG_BT_GATT_DYNAMIC_DB)
 #define BFLB_BLE_DYNAMIC_SERVICE
 #endif
-/*The flag @conn_ref is not clean up after disconnect*/
-//#define BFLB_BLE_PATCH_CLEAN_UP_CONNECT_REF
 #if !defined(CONFIG_AUTO_PTS)
 /*To avoid sevice changed indication sent at the very beginning, without any new service added.*/
 #define BFLB_BLE_PATCH_SET_SCRANGE_CHAGD_ONLY_IN_CONNECTED_STATE
@@ -653,7 +651,14 @@ BT_SMP_DIST_ENC_KEY bit is not cleared while remote ENC_KEY is received.*/
 #define BFLB_BLE_DISCOVER_ONGOING
 #endif
 
+#define BFLB_BLE_SET_LOCAL_ATT_MTU_SIZE
+#if defined(CONFIG_BT_SMP)
+#define BFLB_BLE_SMP_SC_ONLY
+#endif
+
 #define BR_EDR_PTS_TEST 0
 #define BFLB_BLE_ENABLE_TEST_PSM 0
 #define BFLB_BREDR_SCO_TYPE_FIX
+#define BFLB_BLE_PATCH_FORCE_UPDATE_GAP_DEVICE_NAME
+
 #endif /* BLE_CONFIG_H */

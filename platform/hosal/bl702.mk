@@ -35,6 +35,7 @@ COMPONENT_SRCS := bl702_hal/bl_adc.c \
                   bl702_hal/hal_hbn.c \
                   bl702_hal/hal_hwtimer.c \
                   bl702_hal/hal_pds.c \
+                  bl702_hal/hal_spi_flash.c \
                   bl702_hal/hal_sys.c \
                   bl702_hal/hal_tcal.c \
                   bl702_hal/hosal_adc.c \

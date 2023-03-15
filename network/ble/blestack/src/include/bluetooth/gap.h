@@ -79,6 +79,8 @@ extern "C" {
 #define BT_GAP_INIT_CONN_INT_MIN                0x0018  /* 30 ms    */
 #define BT_GAP_INIT_CONN_INT_MAX                0x0028  /* 50 ms    */
 
+void bt_gap_set_local_device_appearance(u16_t device_appearance);
+
 #ifdef __cplusplus
 }
 #endif

@@ -158,7 +158,7 @@ struct hostdesc
     /// Interface Id
     uint8_t vif_idx;
     /// VIF type
-    uint8_t vif_type; // 0: AP, 1: STA, [2-FF]:Other
+    uint8_t vif_type; // 0: STA, 1: AP, [2-FF]:Other
     /// Station Id (0xFF if station is unknown)
     uint8_t staid;
     /// TX flags

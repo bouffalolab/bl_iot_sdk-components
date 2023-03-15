@@ -95,15 +95,9 @@ extern volatile u8_t event_flag;
 static struct bt_att bt_req_pool[CONFIG_BT_MAX_CONN];
 static struct bt_att_req cancel;
 
-
-#if defined(CONFIG_BLE_AT_CMD)
-static u16_t mtu_size = BT_ATT_MTU;
-void set_mtu_size(u16_t size)
-{
-	mtu_size = size;
-}
+#if defined(BFLB_BLE_SET_LOCAL_ATT_MTU_SIZE)
+static u16_t local_mtu_size = BT_ATT_MTU;
 #endif
-
 
 static void att_req_destroy(struct bt_att_req *req)
 {
@@ -284,7 +278,11 @@ static u8_t att_mtu_req(struct bt_att *att, struct net_buf *buf)
 		return BT_ATT_ERR_UNLIKELY;
 	}
 
+	#if defined(BFLB_BLE_SET_LOCAL_ATT_MTU_SIZE)
+	mtu_server = local_mtu_size;
+	#else
 	mtu_server = BT_ATT_MTU;
+	#endif
 
 	BT_DBG("Server MTU %u", mtu_server);
 
@@ -433,7 +431,11 @@ static u8_t att_mtu_rsp(struct bt_att *att, struct net_buf *buf)
 		return att_handle_rsp(att, NULL, 0, BT_ATT_ERR_INVALID_PDU);
 	}
 
+	#if defined(BFLB_BLE_SET_LOCAL_ATT_MTU_SIZE)
+	att->chan.rx.mtu = MIN(mtu, local_mtu_size);
+	#else
 	att->chan.rx.mtu = MIN(mtu, BT_ATT_MTU);
+	#endif
 
 	/* BLUETOOTH SPECIFICATION Version 4.2 [Vol 3, Part F] page 484:
 	 *
@@ -2451,6 +2453,18 @@ u16_t bt_att_get_mtu(struct bt_conn *conn)
 	/* tx and rx MTU shall be symmetric */
 	return att->chan.tx.mtu;
 }
+
+#if defined(BFLB_BLE_SET_LOCAL_ATT_MTU_SIZE)
+void bt_att_set_mtu(u16_t mtu)
+{
+	if(mtu > 0 && mtu <= BT_ATT_MTU){
+		local_mtu_size = mtu;
+	}else{
+		BT_ERR("Invalid MTU size %d",mtu);
+	}
+}
+#endif
+
 
 int bt_att_send(struct bt_conn *conn, struct net_buf *buf, bt_conn_tx_cb_t cb,
 		void *user_data)

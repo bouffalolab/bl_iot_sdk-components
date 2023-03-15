@@ -839,7 +839,7 @@ int __attribute__((optimize("O1"))) vsnprintf(char *buffer, size_t n, const char
 #ifdef SYS_BIG_DEBUG_BUFFER
 static char string[2048];
 #else
-static char string[512];
+static char string[256];
 #endif
 
 int vsprintf(char *buffer, const char *format, va_list ap)

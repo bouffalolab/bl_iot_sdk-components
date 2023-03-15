@@ -87,6 +87,7 @@ struct ap_connect_adv {
 #define WIFI_CONNECT_STOP_SCAN_CURRENT_CHANNEL_IF_TARGET_AP_FOUND (1 << 8)
 #define WIFI_CONNECT_PMF_CAPABLE                                  (1 << 9)
 #define WIFI_CONNECT_PMF_REQUIRED                                 (1 << 10)
+#define WIFI_CONNECT_DEFAULT                                      (1 << 31)
     uint32_t flags;
 };
 

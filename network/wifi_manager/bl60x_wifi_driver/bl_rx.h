@@ -210,7 +210,6 @@ typedef struct
 
 extern const u8 legrates_lut[];
 
-int bl_txdatacfm(void *pthis, void *hostid);
 void bl_prim_tbtt_ind(void *pthis);
 void bl_sec_tbtt_ind(void *pthis);
 void bl_rx_handle_msg(struct bl_hw *bl_hw, struct ipc_e2a_msg *msg);

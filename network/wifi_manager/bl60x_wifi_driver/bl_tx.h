@@ -74,41 +74,44 @@ union bl_hw_txstatus {
  * @custom_cfm: Customer callback for TX
  * @status:     Status for FW/HW to return TX result
  * @p:          Pbuf from upper tcp/ip stack
- * @vif_type:   0: VIF_AP, 1: Vif_STA, [2-FF]: other
- * @repush:     repush counter
+ * @vif_type:   0: STA, 1: AP, [2-F]:Other
+ * @sta_id:     staid, here range is [0-f]
+ * @repush:     Repush counter
  */
 struct bl_txhdr {
     struct utils_list_hdr item;
     struct bl_tx_cfm      custom_cfm;
     union bl_hw_txstatus  status;
     uint32_t             *p;
-    uint32_t              len      : 16;
-    uint32_t              vif_type : 8;
-    uint32_t              repush   : 8;
+    uint16_t              len      : 16;
+    uint16_t              vif_type : 4;
+    uint16_t              sta_id   : 4;
+    uint16_t              repush   : 8;
 };
 
 /// XXX: put here for now
 struct ke_tx_fc {
-    /// 0: ap, 1: sta
-    uint8_t interface_bits;
+    /// 0: sta, 1: ap
+    uint8_t vif_bits;
     /// For ap
     struct {
-        uint8_t sta_bits;
-        uint8_t reason_bits[8];
+        uint8_t fc_chan;
+        uint8_t fc_ps_sta_bits;
     } ap;
     /// For sta
     struct {
-        uint8_t reason_bits;
+        uint8_t fc_chan;
+        uint8_t fc_ps;
     } sta;
 };
 
 #ifdef CFG_NETBUS_WIFI_ENABLE
-err_t bl_output(struct bl_hw *bl_hw, struct netif *netif, struct pbuf *p, int is_sta, struct bl_tx_cfm *custom_cfm, uint8_t from_local);
+err_t bl_output(struct bl_hw *bl_hw, int is_sta, struct pbuf *p, struct bl_tx_cfm *custom_cfm, uint8_t from_local);
 #else
-err_t bl_output(struct bl_hw *bl_hw, struct netif *netif, struct pbuf *p, int is_sta, struct bl_tx_cfm *custom_cfm);
+err_t bl_output(struct bl_hw *bl_hw, int is_sta, struct pbuf *p, struct bl_tx_cfm *custom_cfm);
 #endif
-int bl_wifi_eth_tx(struct pbuf *p, bool is_sta, struct bl_tx_cfm *custom_cfm);
-int bl_txdatacfm(void *pthis, void *host_id);
-void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field);
-void bl_irq_handler();
+int   bl_tx_cfm(void *pthis, void *host_id);
+void  bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field);
+void  bl_tx_cntrl_link_up(struct bl_sta *sta);
+void  bl_tx_cntrl_link_down(struct bl_sta *sta);
 #endif

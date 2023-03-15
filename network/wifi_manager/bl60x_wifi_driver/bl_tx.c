@@ -45,131 +45,156 @@
 #define DESC_DONE_TX_BIT           (1 << 31)
 #define DESC_DONE_SW_TX_BIT        (1 << 30)
 
-enum {
-    TX_READY           = (0),
-    TX_PAUSED_FOR_PS   = (1 << 0),
-    TX_PAUSED_FOR_CHAN = (1 << 1),
-};
+#define IS_BC_MC(byte)             ((byte) & 0x01)
+#define BIT_VIF(idx)               (1 << (idx))
+#define BIT_STA(idx)               (1 << (idx))
 
+/* Trigger Flag */
+static uint32_t tx_cntrl_sta_trigger = 0;
+static uint32_t tx_cntrl_sta_trigger_pending = 0;
 extern struct bl_hw wifi_hw;
 int internel_cal_size_tx_hdr = sizeof(struct bl_txhdr);
-static struct {
-    struct utils_list waiting_list;
-    struct utils_list pending_list;
-    uint8_t state;
-} tx_cntrl[NX_VIRT_DEV_MAX] = {0};
 
+void  bl_irq_handler(void);
 #ifdef CFG_NETBUS_WIFI_ENABLE
 int update_tx_pbuf_free_cnt_to_scratch_reg(void);
 #endif
 
-static int bl_check_tx_ok(uint8_t vif_type, uint8_t is_groupcast, uint32_t value)
+static void bl_tx_cntrl_purge_check(struct bl_sta *sta, uint8_t only_check)
 {
-    /* TODO: More bit to check */
+    if (!utils_list_is_empty(&sta->pending_list) ||
+        !utils_list_is_empty(&sta->waiting_list))
+    {
+        if (only_check)
+        {
+            /* Only check */
+            bl_os_printf("[TX] Have remaining packets when checking!\n\r");
+        }
+        else
+        {
+            /* Purging, trigger tx and let fw cfm to handle packets */
+            bl_os_enter_critical();
+            bl_irq_handler();
+            tx_cntrl_sta_trigger |= BIT_STA(sta->sta_idx);
+            bl_os_exit_critical();
+        }
+    }
+}
+
+static inline int bl_tx_cntrl_check_fc(struct bl_sta *sta)
+{
+    return ((0 == sta->fc_ps) &&
+            (0 == wifi_hw.vif_table[sta->vif_idx].fc_chan));
+}
+
+static uint32_t bl_tx_cntrl_update_fc(struct ke_tx_fc *tx_fc_field)
+{
+    uint32_t sta_trigger = 0, fixed_sta_idx;
+
+    /* FW fc  trigger: consider interface/sta_id/reason */
+    for (uint8_t i = 0; i < 2; i++)
+    {
+        if (tx_fc_field->vif_bits & BIT_VIF(i))
+        {
+            /* VIF_STA */
+            if (i == 0)
+            {
+                fixed_sta_idx = wifi_hw.vif_table[BL_VIF_STA].fixed_sta_idx;
+                if (tx_fc_field->sta.fc_chan)
+                {
+                    wifi_hw.vif_table[BL_VIF_STA].fc_chan = 0;
+                }
+                if (tx_fc_field->sta.fc_ps)
+                {
+                    wifi_hw.sta_table[fixed_sta_idx].fc_ps = 0;
+                }
+                sta_trigger |= BIT_STA(fixed_sta_idx);
+            }
+            /* VIF_AP (Broadcast + Remote STAs) */
+            else
+            {
+                fixed_sta_idx = wifi_hw.vif_table[BL_VIF_AP].fixed_sta_idx;
+                if (tx_fc_field->ap.fc_chan)
+                {
+                    wifi_hw.vif_table[BL_VIF_AP].fc_chan = 0;
+                    sta_trigger |= BIT_STA(fixed_sta_idx);
+                }
+                sta_trigger |= tx_fc_field->ap.fc_ps_sta_bits;
+            }
+        }
+    }
+
+    return sta_trigger;
+}
+
+static int bl_tx_cntrl_get_sta_id(int is_sta, int is_broadcast, struct mac_addr *addr)
+{
+    struct bl_sta* sta;
+    int ap_idx = -1, bcmc_sta_idx = -1, links_num;
+
+    /* For STA */
+    if (is_sta)
+    {
+        links_num = wifi_hw.vif_table[BL_VIF_STA].links_num;
+        ap_idx    = wifi_hw.vif_table[BL_VIF_STA].fixed_sta_idx;
+        sta       = &wifi_hw.sta_table[ap_idx];
+        return ((links_num && sta->is_used) ? sta->sta_idx : -1);
+    }
+
+    /* For AP */
+    links_num = wifi_hw.vif_table[BL_VIF_AP].links_num;
+    if (0 == links_num)
+    {
+        return -1;
+    }
+
+    /* BC/MC */
+    if (is_broadcast)
+    {
+        bcmc_sta_idx = wifi_hw.vif_table[BL_VIF_AP].fixed_sta_idx;
+        sta          = &wifi_hw.sta_table[bcmc_sta_idx];
+        return (sta->is_used ? sta->sta_idx : -1);
+    }
+
+    /* UC */
+    for (int i = 0; i < NX_REMOTE_STA_STORE_MAX; i++)
+    {
+        /* Skip ap_idx and bcmc_sta_idx */
+        if (i == bcmc_sta_idx || i == ap_idx)
+        {
+            continue;
+        }
+
+        sta = &wifi_hw.sta_table[i];
+        if ((sta->is_used) &&
+            (0 == memcmp(&sta->sta_addr, addr, sizeof(struct mac_addr))))
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+static int bl_tx_check_ret(uint8_t is_sta, uint8_t is_groupcast, uint32_t value)
+{
     /* For handled packet, whether handled OK */
-    if (1 == vif_type) {
+    if (is_sta) {
         if (value & FRAME_SUCCESSFUL_TX_BIT) {
             return 1;
         }
     } else {
-        if (!is_groupcast) {
-            if (value & FRAME_SUCCESSFUL_TX_BIT) {
-                return 1;
-            }
-        } else {
-            if (value & DESC_DONE_TX_BIT) {
-                return 1;
-            }
+        if ((!is_groupcast && (value & FRAME_SUCCESSFUL_TX_BIT)) ||
+            (is_groupcast  && (value & DESC_DONE_TX_BIT)))
+        {
+            return 1;
         }
     }
 
     return 0;
 }
 
-int bl_txdatacfm(void *pthis, void *host_id)
-{
-    struct bl_txhdr *txhdr = NULL;
-    struct bl_tx_cfm custom_cfm;
-    struct ethhdr *eth = NULL;
-    union bl_hw_txstatus bl_txst;
-    uint8_t vif_type = 0, is_groupcast = 0, tx_vif_id = 0;
-    int ret = 0;
-
-    /* ATTENTION: About return value
-     * 1. return ( -1), only for unhandled pakcet (status==0)
-     * 2. return (>=0), handled packet, if there is a cb
-     *    a. unicast, MUST FRAME_SUCCESSFUL_TX_BIT, return (1), other to c.
-     *    b. groupcast, MUST DESC_DONE_TX_BIT, return (1), other to c.
-     *    c. return (0)
-     */
-#if defined(CFG_CHIP_BL808) || defined(CFG_CHIP_BL606P)
-    /* Host_id is txdesc_host->eth_packet */
-    void *buf = ((struct txbuf_host*)host_id)->buf;
-    txhdr = (struct bl_txhdr*)(buf + RWNX_HWTXHDR_ALIGN_PADS((uint32_t)buf));
-    eth = (struct ethhdr *)((uint32_t)buf + PBUF_LINK_ENCAPSULATION_HLEN);
-#else
-    /* Host_id is pbuf */
-    struct pbuf *p = (struct pbuf*)host_id;
-    txhdr = (struct bl_txhdr*)(((uint32_t)p->payload) + RWNX_HWTXHDR_ALIGN_PADS((uint32_t)p->payload));
-    eth = (struct ethhdr *)(((uint32_t)p->payload) + PBUF_LINK_ENCAPSULATION_HLEN);
-#endif
-
-    /* Read status in the TX control header */
-    bl_txst = txhdr->status;
-    if (bl_txst.value == 0) {
-        bl_os_printf("[TX] FW return status is NULL!!!\n\r");
-    }
-
-    /* whether is sta and is_groupcast */
-    vif_type = txhdr->vif_type;
-    tx_vif_id = (NX_VIRT_DEV_MAX > 1) ? vif_type : 0;
-    if (0 == vif_type) {
-        is_groupcast = (eth->h_dest[0] & 0x01) ? 1 : 0;
-    }
-
-    /* Get tx result */
-    ret = bl_check_tx_ok(vif_type, is_groupcast, bl_txst.value);
-
-    /* Try to re-push it to the first of tx_list, if not handle OK */
-    /* TODO: only consider tx pause reason (chan, ps) for now */
-    do {
-        if ((!ret) && (txhdr->repush < 2))
-        {
-            if (bl_txst.value & RETRY_LIMIT_REACHED_BIT)
-            {
-            } else if (bl_txst.value & FRAME_REPUSHABLE_CHAN_BIT) {
-                tx_cntrl[tx_vif_id].state = TX_PAUSED_FOR_CHAN;
-            } else if (bl_txst.value & FRAME_REPUSHABLE_PS_BIT) {
-                tx_cntrl[tx_vif_id].state = TX_PAUSED_FOR_PS;
-            } else {
-                break;
-            }
-
-            txhdr->repush++;
-            utils_list_push_back(&tx_cntrl[tx_vif_id].pending_list, &(txhdr->item));
-            return 0;
-        }
-    } while (0);
-
-    /* Get customer cb param */
-    custom_cfm = txhdr->custom_cfm;
-
-    /* Release buf */
-#if defined(CFG_CHIP_BL808) || defined(CFG_CHIP_BL606P)
-    ipc_host_txbuf_free((struct txbuf_host *)host_id);
-#else
-    pbuf_free(p);
-#endif
-
-    /* Notify tx status */
-    if (custom_cfm.cb) {
-        custom_cfm.cb(custom_cfm.cb_arg, ret > 0);
-    }
-
-    return ret;
-}
-
-static void bl_tx_push(struct bl_hw *bl_hw, struct txdesc_host *txdesc_host, void *ptxbuf, struct bl_txhdr *txhdr)
+static void bl_tx_push(struct bl_sta* sta, struct txdesc_host *txdesc_host, void *ptxbuf, struct bl_txhdr *txhdr)
 {
     struct hostdesc *host = NULL;
     struct ethhdr *ethhdr = NULL;
@@ -209,14 +234,12 @@ static void bl_tx_push(struct bl_hw *bl_hw, struct txdesc_host *txdesc_host, voi
     memcpy(&host->eth_src_addr, ethhdr->h_source, ETH_ALEN);
     host->ethertype   = ethhdr->h_proto;
     host->vif_type    = txhdr->vif_type;
-    host->flags       = 0;
     host->packet_len  = txhdr->len - link_offset_len;
+    host->vif_idx     = wifi_hw.vif_table[sta->vif_idx].vif_idx;
+    host->staid       = sta->sta_idx;
+    host->tid         = (sta->qos ? 0 : 0xFF);
     host->packet_addr = (uint32_t)(0x11111111); // FIXME we use this magic for unvaild packet_addr
-#if 0
-    /* Fill-in staid and tid later in ipc_emb */
-    host->staid;
-    host->tid;
-#endif
+    host->flags       = 0;
 
     /* 
      * Buffer transfer and descriptor tranform
@@ -315,38 +338,105 @@ static void bl_tx_push(struct bl_hw *bl_hw, struct txdesc_host *txdesc_host, voi
     host->pbuf_addr   = (uint32_t)buf_ptr;
 
     /* IPC push */
-    ipc_host_txdesc_push(bl_hw->ipc_env, buf_ptr);
+    ipc_host_txdesc_push(wifi_hw.ipc_env, buf_ptr);
 
 #ifdef CFG_BL_STATISTIC
-    bl_hw->stats.cfm_balance++;
+    wifi_hw.stats.cfm_balance++;
 #endif
 }
 
-static void bl_tx_flow_control(struct ke_tx_fc *tx_fc_field)
+int bl_tx_cfm(void *pthis, void *host_id)
 {
-    /* TODO:
-     * LWIP   trigger: todo
-     * FW cfm trigger: todo
-     * FW fc  trigger: consider interface/reason for now,
-     *                 consider interface/staid/ac/reason for future
-     */
-    uint16_t tx_vif_id = 0;
+    struct bl_txhdr *txhdr = NULL;
+    struct ethhdr     *eth = NULL;
+    struct bl_sta     *sta = NULL;
+    struct bl_vif     *vif = NULL;
+    struct bl_tx_cfm custom_cfm;
+    int ret = 0, links_num;
+    uint32_t value;
 
-    for (uint8_t i = 0; i < 2; i++)
-    {
-        if (tx_fc_field->interface_bits & (1 << i))
-        {
-            tx_vif_id = (NX_VIRT_DEV_MAX > 1) ? i : 0;
-            if (i == 0)
-            {
-                tx_cntrl[tx_vif_id].state &= ~(tx_fc_field->ap.reason_bits[0]);
-            }
-            else
-            {
-                tx_cntrl[tx_vif_id].state &= ~(tx_fc_field->sta.reason_bits);
-            }
-        }
+    /* ATTENTION: About return value
+     * 1. return ( -1), only for unhandled pakcet (status==0)
+     * 2. return (>=0), handled packet, if there is a cb
+     *    a. unicast, MUST FRAME_SUCCESSFUL_TX_BIT, return (1), other to c.
+     *    b. groupcast, MUST DESC_DONE_TX_BIT, return (1), other to c.
+     *    c. return (0)
+     */
+#if defined(CFG_CHIP_BL808) || defined(CFG_CHIP_BL606P)
+    /* Host_id is txdesc_host->eth_packet */
+    void *buf = ((struct txbuf_host*)host_id)->buf;
+    txhdr = (struct bl_txhdr*)(buf + RWNX_HWTXHDR_ALIGN_PADS((uint32_t)buf));
+    eth = (struct ethhdr *)((uint32_t)buf + PBUF_LINK_ENCAPSULATION_HLEN);
+#else
+    /* Host_id is pbuf */
+    struct pbuf *p = (struct pbuf*)host_id;
+    txhdr = (struct bl_txhdr*)(((uint32_t)p->payload) + RWNX_HWTXHDR_ALIGN_PADS((uint32_t)p->payload));
+    eth = (struct ethhdr *)(((uint32_t)p->payload) + PBUF_LINK_ENCAPSULATION_HLEN);
+#endif
+
+    /* Read status in the TX control header */
+    value = txhdr->status.value;
+    if (value == 0) {
+        bl_os_printf("[TX] FW return status is NULL!!!\n\r");
     }
+
+    /* Get tx result */
+    ret = bl_tx_check_ret(txhdr->vif_type, IS_BC_MC(eth->h_dest[0]), value);
+
+    /* Get sta id and links_num */
+    sta = &wifi_hw.sta_table[txhdr->sta_id];
+    links_num = wifi_hw.vif_table[sta->vif_idx].links_num;
+
+    do {
+        /* Try to repush it, if not handle OK, Check whether
+         * can repush it (sta is still valid, ret,...)
+         */
+        if ((ret) || (txhdr->repush >= 3) || (links_num == 0) || (!sta->is_used))
+        {
+            break;
+        }
+
+        vif = &wifi_hw.vif_table[sta->vif_idx];
+
+        /* If try repush, will cause more pakcet out-of-order but less loss
+         * If not,        will cause less pakcet out-of-order but more loss
+         */
+        if (value & RETRY_LIMIT_REACHED_BIT)
+        {
+            tx_cntrl_sta_trigger_pending |= BIT_STA(sta->sta_idx);
+        } else if (value & FRAME_REPUSHABLE_CHAN_BIT) {
+            vif->fc_chan = 1;
+        } else if (value & FRAME_REPUSHABLE_PS_BIT) {
+            sta->fc_ps = 1;
+        } else {
+            break;
+        }
+
+        txhdr->repush++;
+        utils_list_push_back(&sta->pending_list, &(txhdr->item));
+
+        return 0;
+    } while (0);
+
+    /* Get customer cb param */
+    custom_cfm = txhdr->custom_cfm;
+
+    /* Release buf */
+#if defined(CFG_CHIP_BL808) || defined(CFG_CHIP_BL606P)
+    ipc_host_txbuf_free((struct txbuf_host *)host_id);
+#else
+    pbuf_free(p);
+#endif
+
+    /* Re-trigger this sta tx */
+    tx_cntrl_sta_trigger_pending |= BIT_STA(sta->sta_idx);
+
+    /* Notify tx status */
+    if (custom_cfm.cb) {
+        custom_cfm.cb(custom_cfm.cb_arg, ret > 0);
+    }
+
+    return ret;
 }
 
 void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
@@ -354,22 +444,40 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
     struct txdesc_host *txdesc_host = NULL;
     struct bl_txhdr          *txhdr = NULL;
     void                     *txbuf = NULL;
+    struct bl_sta              *sta = NULL;
+    uint32_t sta_trigger = 0;
 
     /* Whether need to manipulate flow control */
     if (param && tx_fc_field)
     {
-        bl_tx_flow_control(tx_fc_field);
+        sta_trigger = bl_tx_cntrl_update_fc(tx_fc_field);
     }
 
-    // TX
-    for (uint8_t i = 0; i < NX_VIRT_DEV_MAX; i++)
+    /* Get trigger flags and clear */
+    sta_trigger |= tx_cntrl_sta_trigger_pending;
+    tx_cntrl_sta_trigger_pending = 0;
+    bl_os_enter_critical();
+    sta_trigger |= tx_cntrl_sta_trigger;
+    tx_cntrl_sta_trigger = 0;
+    bl_os_exit_critical();
+
+    // TX: Walking through all STAs
+    for (uint8_t i = 0; i < NX_REMOTE_STA_STORE_MAX; i++)
     {
-        // whether paused
-        if (tx_cntrl[i].state != TX_READY) {
+        /* Whether has trigger */
+        if (!sta_trigger)
+        {
+            break;
+        }
+
+        /* whether can TX, only check flow control */
+        sta = &wifi_hw.sta_table[i];
+        if (!((sta_trigger & BIT_STA(i)) && bl_tx_cntrl_check_fc(sta)))
+        {
             continue;
         }
 
-        if (!utils_list_is_empty(&tx_cntrl[i].pending_list))
+        if (!utils_list_is_empty(&sta->pending_list))
         {
             while (1)
             {
@@ -382,18 +490,18 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
                 }
 
                 /* First get packet from pending list */
-                txhdr = (struct bl_txhdr *)utils_list_pop_front(&tx_cntrl[i].pending_list);
+                txhdr = (struct bl_txhdr *)utils_list_pop_front(&sta->pending_list);
                 if (!txhdr)
                 {
                     break;
                 }
 
                 /* Just push */
-                bl_tx_push(&wifi_hw, txdesc_host, (void*)txhdr->p, txhdr);
+                bl_tx_push(sta, txdesc_host, (void*)txhdr->p, txhdr);
             }
         }
 
-        if (!utils_list_is_empty(&tx_cntrl[i].waiting_list))
+        if (!utils_list_is_empty(&sta->waiting_list))
         {
             while (1)
             {
@@ -416,7 +524,7 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
 #endif
                 /* Get packet */
                 bl_os_enter_critical();
-                txhdr = (struct bl_txhdr *)utils_list_pop_front(&tx_cntrl[i].waiting_list);
+                txhdr = (struct bl_txhdr *)utils_list_pop_front(&sta->waiting_list);
                 bl_os_exit_critical();
                 if (!txhdr)
                 {
@@ -427,36 +535,45 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
                 }
 
                 /* Packet push */
-                bl_tx_push(&wifi_hw, txdesc_host, (void*)txbuf, txhdr);
+                bl_tx_push(sta, txdesc_host, (void*)txbuf, txhdr);
             }
         }
     }
+
+    /* Reset trigger flags */
 }
 
 #ifdef CFG_NETBUS_WIFI_ENABLE
-err_t bl_output(struct bl_hw *bl_hw, struct netif *netif, struct pbuf *p, int is_sta, struct bl_tx_cfm *custom_cfm, uint8_t from_local)
+err_t bl_output(struct bl_hw *bl_hw, int is_sta, struct pbuf *p, struct bl_tx_cfm *custom_cfm, uint8_t from_local)
 #else
-err_t bl_output(struct bl_hw *bl_hw, struct netif *netif, struct pbuf *p, int is_sta, struct bl_tx_cfm *custom_cfm)
+err_t bl_output(struct bl_hw *bl_hw, int is_sta, struct pbuf *p, struct bl_tx_cfm *custom_cfm)
 #endif
 {
-    struct ethhdr  *ethhdr = NULL;
-    struct bl_txhdr *txhdr = NULL;
-    uint16_t align_offset = 0, link_desc_len = 0, tx_vif_id = 0;
+    struct ethhdr  *ethhdr;
+    struct bl_txhdr *txhdr;
+    struct bl_sta    *sta;
+    int sta_id;
+    uint16_t align_offset, link_desc_len;
 
     /* NULL protection */
-    if (!bl_hw || !netif || !p)
+    if (!bl_hw || !p)
     {
         bl_os_printf("[TX] NULL parameters!\r\n");
         return ERR_CONN;
     }
 
+    /* Get ethernet header first */
     ethhdr = (struct ethhdr *)(p->payload);
 
-    /* Avoid call output when Wi-Fi is not ready */
-    if (!(NETIF_FLAG_LINK_UP & netif->flags) && (ethhdr->h_proto != 0x8e88)) {
-        bl_os_printf("[TX] wifi is down, return now\r\n");
-        return ERR_CONN;
+    /* Get sta_id */
+    sta_id = bl_tx_cntrl_get_sta_id(is_sta, IS_BC_MC(ethhdr->h_dest[0]), (struct mac_addr*)ethhdr->h_dest);
+    if (sta_id < 0)
+    {
+        bl_os_printf("[TX] Cant find valid sta_id, drop! (is_sta: %d, is_bc_mc: %d, proto: %04x)\r\n",
+                     is_sta, IS_BC_MC(ethhdr->h_dest[0]), ethhdr->h_proto);
+        return ERR_IF;
     }
+    sta = &wifi_hw.sta_table[sta_id];
 
     /* Make room in the header for tx */
     if (pbuf_header(p, PBUF_LINK_ENCAPSULATION_HLEN)) {
@@ -484,10 +601,10 @@ err_t bl_output(struct bl_hw *bl_hw, struct netif *netif, struct pbuf *p, int is
     if (custom_cfm) {
         memcpy(&txhdr->custom_cfm, custom_cfm, sizeof(*custom_cfm));
     }
-    txhdr->status.value = 0;
+    txhdr->p        = (uint32_t*)p; // XXX pattention to this filed
+    txhdr->len      = p->tot_len;
     txhdr->vif_type = is_sta;
-    txhdr->p = (uint32_t*)p; // XXX pattention to this filed
-    txhdr->len = p->tot_len;
+    txhdr->sta_id   = sta_id;
 
     /* Ref this pbuf to avoid pbuf release */
 #ifdef CFG_NETBUS_WIFI_ENABLE
@@ -499,15 +616,27 @@ err_t bl_output(struct bl_hw *bl_hw, struct netif *netif, struct pbuf *p, int is
 #endif
 
     /* Push packet into waiting_list */
-    tx_vif_id = (NX_VIRT_DEV_MAX > 1) ? txhdr->vif_type : 0;
     bl_os_enter_critical();
-    utils_list_push_back(&tx_cntrl[tx_vif_id].waiting_list, &(txhdr->item));
-    if (TX_READY == tx_cntrl[tx_vif_id].state)
+    utils_list_push_back(&sta->waiting_list, &(txhdr->item));
+    /* Whether trigger irq */
+    if (bl_tx_cntrl_check_fc(sta))
     {
-        /* Trigger irq */
         bl_irq_handler();
     }
+    tx_cntrl_sta_trigger |= BIT_STA(sta_id);
     bl_os_exit_critical();
 
     return ERR_OK;
+}
+
+void bl_tx_cntrl_link_up(struct bl_sta *sta)
+{
+    /* Check pending_list and waiting_list */
+    bl_tx_cntrl_purge_check(sta, 1);
+}
+
+void bl_tx_cntrl_link_down(struct bl_sta *sta)
+{
+    /* Purge pending_list and waiting_list */
+    bl_tx_cntrl_purge_check(sta, 0);
 }

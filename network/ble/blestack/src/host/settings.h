@@ -29,6 +29,7 @@ int bt_settings_init(void);
 #define NV_LOCAL_IRK       "LOCAL_IRK"
 #define NV_KEY_POOL        "KEY_POOL"
 #define NV_IMG_info        "IMG_INFO"
+#define NV_ATVV_CCC        "ATVV_CCC"
 
 int bt_settings_get_bin(const char *key, u8_t *value, size_t exp_len, size_t *real_len);
 int bt_settings_set_bin(const char *key, const u8_t *value, size_t length);

@@ -967,6 +967,10 @@ bool bt_gatt_is_subscribed(struct bt_conn *conn,
  */
 u16_t bt_gatt_get_mtu(struct bt_conn *conn);
 
+#if defined(BFLB_BLE_SET_LOCAL_ATT_MTU_SIZE)
+void bt_gatt_set_mtu(u16_t size);
+#endif
+
 /** @} */
 
 /**
@@ -1379,6 +1383,9 @@ typedef void (*bt_gatt_mtu_changed_cb_t)(struct bt_conn *conn, int mtu);
 void bt_gatt_register_mtu_callback(bt_gatt_mtu_changed_cb_t cb);
 #endif
 #if defined(CONFIG_BT_GATT_CLIENT)
+#if defined(BFLB_BLE_DISCOVER_ONGOING)
+void bt_gatt_discover_status_set(uint8_t status);
+#endif
 #if defined(BFLB_BLE_NOTIFY_ALL)
 typedef void(*bt_notification_all_cb_t)(struct bt_conn *conn, u16_t handle,const void *data, u16_t length);
 void bt_gatt_register_notification_callback(bt_notification_all_cb_t cb);
@@ -1437,6 +1444,16 @@ struct customer_svc_list{
     uint16_t svc_idx;
     sys_snode_t node;
 };
+
+/** @brief Get a Dynamic attrubute hanle(chrc_handle,vaule_handle,descriptor)
+ *
+ *  @return Registered handle value of characteristic or descriptor attribute.
+ *    eg. if you want get its handle after calling the function bt_gatts_add_serv_attr or 
+      bt_gatts_add_char or bt_gatts_add_desc,you can call the funciton. 
+      of course,  the actual handle is bt_gatts_get_dync_attr_handle() + bt_gatt_get_last_handle().
+ *    
+ */
+uint16_t bt_gatts_get_dync_attr_handle(void);
 
 /** @brief Add service
  *

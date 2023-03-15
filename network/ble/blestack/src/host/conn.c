@@ -160,6 +160,11 @@ static void notify_connected(struct bt_conn *conn)
 		}
 	}
 
+	if(conn->err && (conn->role == BT_HCI_ROLE_MASTER))
+	{	   
+	    bt_conn_unref(conn);
+	}
+
 	if (conn->type == BT_CONN_TYPE_LE && !conn->err) {
 		bt_gatt_connected(conn);
 	}
@@ -184,6 +189,10 @@ void notify_disconnected(struct bt_conn *conn)
 		if (cb->disconnected) {
 			cb->disconnected(conn, conn->err);
 		}
+	}
+	if(conn->role == BT_HCI_ROLE_MASTER)
+	{
+	    bt_conn_unref(conn);
 	}
 }
 
@@ -1623,15 +1632,6 @@ static void conn_cleanup(struct bt_conn *conn)
 	bt_conn_reset_rx_state(conn);
 
     k_delayed_work_submit(&conn->update_work, K_NO_WAIT);
-    
-	#ifdef BFLB_BLE_PATCH_FREE_ALLOCATED_BUFFER_IN_OS
-    k_queue_free(&conn->tx_queue._queue);
-   // k_queue_free(&conn->tx_notify._queue);
-    conn->tx_queue._queue.hdl = NULL;
-    //conn->tx_notify._queue.hdl = NULL;
-    if(conn->update_work.timer.timer.hdl)
-        k_delayed_work_del_timer(&conn->update_work);
-    #endif
 }
 
 int bt_conn_prepare_events(struct k_poll_event events[])
@@ -1662,6 +1662,14 @@ int bt_conn_prepare_events(struct k_poll_event events[])
 		}
 
 		BT_DBG("Adding conn %p to poll list", conn);
+
+		/* when bt_conn_set_state set state to BT_CONN_CONNECTED. There is a risk the state is 
+		 * set, but tx_queue isn't init.
+		 */
+		 if(conn->tx_queue._queue.hdl == 0){
+			BT_WARN("conn %x tx_queue is not vaild", conn);
+			continue;
+		}
 
 		k_poll_event_init(&events[ev_count],
 				  K_POLL_TYPE_FIFO_DATA_AVAILABLE,
@@ -2721,6 +2729,19 @@ struct bt_conn *bt_conn_lookup_id(u8_t id)
 	}
 
 	return bt_conn_ref(conn);
+}
+
+struct bt_conn *bt_conn_get(u8_t id)
+{ 
+	struct bt_conn *conn;
+	if (id >= ARRAY_SIZE(conns)) {
+		return NULL;
+	}
+	conn = &conns[id];
+	if (!atomic_get(&conn->ref)) {
+		return NULL;
+	}
+    return conn;
 }
 
 int bt_conn_init(void)

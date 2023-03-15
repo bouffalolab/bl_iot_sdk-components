@@ -1153,6 +1153,17 @@ struct sm_disconnect_ind
     struct sm_tlv_list connect_diagnose;
 };
 
+/// Structure containing the parameters of the @ref SM_STA_ADD_IND message.
+struct sm_sta_add_ind
+{
+    /// Index of the VIF for which the association process is complete
+    uint8_t vif_idx;
+    /// Index of the STA entry allocated for the AP
+    uint8_t ap_idx;
+    /// Flag indicating if the AP is supporting QoS
+    bool qos;
+};
+
 /// Structure containing the parameters of the @ref SM_CONNECT_ABORT_REQ message.
 struct sm_connect_abort_req
 {

@@ -258,7 +258,7 @@ static int cmd_mgr_msgind(struct bl_cmd_mgr *cmd_mgr, struct ipc_e2a_msg *msg, m
             (cmd->flags & RWNX_CMD_FLAG_WAIT_CFM)) {
             bl_os_log_debug("[IPC] Found cb %p for cmd %p , msg id %08X\r\n", cb, cmd, msg->id);
             if (!cb || (cb && !cb(bl_hw, cmd, msg))) {
-                bl_os_log_debug("[IPC] NOT handed by static handler, cb %p\r\n", cb);
+                bl_os_log_debug("[IPC] MSG is handed by static handler, cb %p\r\n", cb);
                 found = true;
                 cmd->flags &= ~RWNX_CMD_FLAG_WAIT_CFM;
 
@@ -274,7 +274,7 @@ static int cmd_mgr_msgind(struct bl_cmd_mgr *cmd_mgr, struct ipc_e2a_msg *msg, m
 
                 break;
             } else {
-                bl_os_log_debug("[IPC] MSG is handled by static handler\r\n");
+                bl_os_log_debug("[IPC] MSG is NOT handled by static handler\r\n");
             }
         }
     }

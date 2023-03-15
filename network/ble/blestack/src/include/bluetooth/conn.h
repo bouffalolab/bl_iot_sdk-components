@@ -384,6 +384,7 @@ static inline int __deprecated bt_conn_security(struct bt_conn *conn,
  *  @return Encryption key size.
  */
 u8_t bt_conn_enc_key_size(struct bt_conn *conn);
+struct bt_conn *bt_conn_get(u8_t id);
 
 enum bt_security_err {
 	/** Security procedure successful. */

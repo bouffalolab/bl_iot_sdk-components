@@ -1156,8 +1156,12 @@ static void hci_disconn_complete(struct net_buf *buf)
 
 	bt_conn_unref(conn);
 
-#if defined(BFLB_BLE_PATCH_CLEAN_UP_CONNECT_REF)
-	atomic_clear(&conn->ref);
+#ifdef BFLB_BLE_PATCH_FREE_ALLOCATED_BUFFER_IN_OS
+    k_queue_free(&conn->tx_queue._queue);
+    conn->tx_queue._queue.hdl = NULL;
+    if(conn->update_work.timer.timer.hdl){
+        k_delayed_work_del_timer(&conn->update_work);
+    }
 #endif
 
 #if defined(BFLB_RELEASE_CMD_SEM_IF_CONN_DISC)
@@ -4502,7 +4506,7 @@ static void le_read_buffer_size_complete(struct net_buf *buf)
 		return;
 	}
 
-	BT_DBG("ACL LE buffers: pkts %u mtu %u", rp->le_max_num, bt_dev.le.mtu);
+	BT_WARN("ACL LE buffers: pkts %u mtu %u,CONFIG_BT_L2CAP_TX_BUF_COUNT=%d", rp->le_max_num, bt_dev.le.mtu, CONFIG_BT_L2CAP_TX_BUF_COUNT);
 
 	k_sem_init(&bt_dev.le.pkts, rp->le_max_num, rp->le_max_num);
 }
@@ -6392,6 +6396,27 @@ static inline bool ad_has_name(const struct bt_data *ad, size_t ad_len)
 	return false;
 }
 
+#if defined(BFLB_BLE_PATCH_FORCE_UPDATE_GAP_DEVICE_NAME)
+static inline int bt_le_name_update(const struct bt_data *ad, size_t ad_len)
+{
+	char name[CONFIG_BT_DEVICE_NAME_MAX] = { 0 };
+	int i,ret=-1;
+
+	if(ad_has_name(ad,ad_len)){
+		for (i = 0; i < ad_len; i++) {
+			if (ad[i].type == BT_DATA_NAME_COMPLETE ||
+			    ad[i].type == BT_DATA_NAME_SHORTENED) {
+				strncpy(name,(char*)ad[i].data,ad[i].data_len);
+				ret = bt_set_name(name);
+			}
+		}
+	}
+
+	return ret;
+}
+#endif
+
+
 static int le_adv_update(const struct bt_data *ad, size_t ad_len,
 			 const struct bt_data *sd, size_t sd_len,
 			 bool connectable, bool use_name)
@@ -6447,6 +6472,16 @@ static int le_adv_update(const struct bt_data *ad, size_t ad_len,
 			return err;
 		}
 	}
+
+	#if defined(BFLB_BLE_PATCH_FORCE_UPDATE_GAP_DEVICE_NAME)
+	if(sd){
+		if(bt_le_name_update(sd,sd_len)){
+			if(ad){
+				bt_le_name_update(ad,ad_len);
+			}
+		}
+	}
+	#endif
 
 	return 0;
 }
@@ -6835,14 +6870,15 @@ int set_adv_param(const struct bt_le_adv_param *param)
             else if(param->addr_type == BT_ADDR_TYPE_NON_RPA)
                 err = le_set_non_resolv_private_addr(param->id);
             #else
-			err = le_set_private_addr(param->id);
+			//err = le_set_private_addr(param->id);
             #endif//CONFIG_BT_STACK_PTS
             #if defined(CONFIG_BT_STACK_PTS)
 			if(param->addr_type == BT_ADDR_LE_PUBLIC)
 				set_param.own_addr_type = BT_ADDR_LE_PUBLIC;
 			else
 			#endif
-			    set_param.own_addr_type = BT_ADDR_LE_RANDOM;
+			    //set_param.own_addr_type = BT_ADDR_LE_RANDOM;
+			    set_param.own_addr_type = BT_ADDR_LE_PUBLIC;
             #endif
 		}
 
@@ -6851,6 +6887,7 @@ int set_adv_param(const struct bt_le_adv_param *param)
 		}
 
 		set_param.type = BT_LE_ADV_NONCONN_IND;
+		
 		
 	}
 

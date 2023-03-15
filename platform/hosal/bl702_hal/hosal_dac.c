@@ -42,7 +42,7 @@
 #define LLI_BUFF_SIZE           2048
 
 #define DAC_RANGE_MIN           200000
-#define DAC_RANGE_MAX           1800000   /* for 602 ,dac is 10 bits , data range is 0 ～ 1023 ---> 0.2V ~ 1.8V */
+#define DAC_RANGE_MAX           1800000   /* for 702 ,dac is 10 bits , data range is 0 ~ 1023 ---> 0.2V ~ 1.8V */
 
 int hosal_dac_init(hosal_dac_dev_t *dac)
 {
@@ -58,26 +58,12 @@ int hosal_dac_init(hosal_dac_dev_t *dac)
     };
 
     GLB_GPIP_DAC_Cfg_Type dac_cfg = {
-        .refSel = GLB_DAC_REF_SEL_INTERNAL,         /*602 only support GLB_DAC_REF_SEL_INTERNAL*/
+        .refSel = GLB_DAC_REF_SEL_INTERNAL,         /*702 only support GLB_DAC_REF_SEL_INTERNAL*/
         .resetChanA = ENABLE,
         .resetChanB = ENABLE,
         .div = DAC_CLK_DIV_16,
         .dmaEn = DISABLE,
         .dmaFmt = GPIP_DAC_DMA_FORMAT_0
-    };
-
-    GLB_GPIP_DAC_ChanA_Cfg_Type chA_cfg = {
-        .chanCovtEn = ENABLE,
-        .outputEn = ENABLE,
-        .chanEn = DISABLE,
-        .src = GPIP_DAC_ChanA_SRC_REG
-    };
-
-    GLB_GPIP_DAC_ChanB_Cfg_Type chB_cfg = {
-        .chanCovtEn = ENABLE,
-        .outputEn = ENABLE,
-        .chanEn = DISABLE,
-        .src = GPIP_DAC_ChanB_SRC_REG
     };
 
     if (NULL == dac || dac->port != 0) {
@@ -93,13 +79,14 @@ int hosal_dac_init(hosal_dac_dev_t *dac)
     dac_pin = dac->config.pin;
 
     if (GLB_GPIO_PIN_11 == dac_pin) {
-        gpio_cfg.gpioPin = GLB_GPIO_PIN_7;
+        gpio_cfg.gpioPin = GLB_GPIO_PIN_11;
         gpio_cfg.gpioFun = GPIO11_FUN_GPIP_CH_3;
     }
     if (GLB_GPIO_PIN_17 == dac_pin) {
-    gpio_cfg.gpioPin = GLB_GPIO_PIN_17;
-    gpio_cfg.gpioFun = GPIO17_FUN_GPIP_CH_2_PSW_IRRCV;
+        gpio_cfg.gpioPin = GLB_GPIO_PIN_17;
+        gpio_cfg.gpioFun = GPIO17_FUN_GPIP_CH_2_PSW_IRRCV;
     }
+
     if (8000 == dac->config.freq) {
         dac_cfg.div = DAC_CLK_DIV_64;
     } else if (16000 == dac->config.freq) {
@@ -117,30 +104,36 @@ int hosal_dac_init(hosal_dac_dev_t *dac)
 
     GLB_GPIO_Init(&gpio_cfg);
     GLB_GPIP_DAC_Init(&dac_cfg);
-    GLB_Set_DAC_CLK(ENABLE, GLB_DAC_CLK_PLL_32M, 0x40);
+    GLB_Set_DAC_CLK(ENABLE, GLB_DAC_CLK_XCLK, 0x40);
 
-    if (GLB_GPIO_PIN_11 == dac_pin) {
-        GLB_GPIP_DAC_Set_ChanA_Config(&chA_cfg);
-    }
-    if (GLB_GPIO_PIN_17 == dac_pin) {
-    GLB_GPIP_DAC_Set_ChanB_Config(&chB_cfg);
-    }
     return 0;
 }
 
 int hosal_dac_start(hosal_dac_dev_t *dac)
 {
+    GLB_GPIP_DAC_ChanA_Cfg_Type chA_cfg = {
+        .chanCovtEn = ENABLE,
+        .outputEn = ENABLE,
+        .chanEn = ENABLE,
+        .src = GPIP_DAC_ChanA_SRC_REG
+    };
+
+    GLB_GPIP_DAC_ChanB_Cfg_Type chB_cfg = {
+        .chanCovtEn = ENABLE,
+        .outputEn = ENABLE,
+        .chanEn = ENABLE,
+        .src = GPIP_DAC_ChanB_SRC_REG
+    };
+
     if (NULL == dac || dac->port != 0) {
         blog_error("parameter is error!\r\n");
         return -1;
     }
 
     if (GLB_GPIO_PIN_11 == dac->config.pin) {
-        GPIP_Set_DAC_ChanA_SRC_SEL(GPIP_DAC_ChanA_SRC_REG);
-        GPIP_DAC_ChanA_Enable();
+        GLB_GPIP_DAC_Set_ChanA_Config(&chA_cfg);
     } else if (GLB_GPIO_PIN_17 == dac->config.pin) {
-        GPIP_Set_DAC_ChanB_SRC_SEL(GPIP_DAC_ChanB_SRC_REG);
-        GPIP_DAC_ChanB_Enable();
+        GLB_GPIP_DAC_Set_ChanB_Config(&chB_cfg);
     } else
     {}
 
@@ -255,9 +248,23 @@ int hosal_dac_dma_start(hosal_dac_dev_t *dac, uint32_t *data, uint32_t size)
     uint32_t remainder;
     struct DMA_Control_Reg dmactrl;
     DMA_LLI_Ctrl_Type *plli_list;
+    
+    GLB_GPIP_DAC_ChanA_Cfg_Type chA_cfg = {
+        .chanCovtEn = ENABLE,
+        .outputEn = ENABLE,
+        .chanEn = ENABLE,
+        .src = GPIP_DAC_ChanA_SRC_DMA
+    };
+
+    GLB_GPIP_DAC_ChanB_Cfg_Type chB_cfg = {
+        .chanCovtEn = ENABLE,
+        .outputEn = ENABLE,
+        .chanEn = ENABLE,
+        .src = GPIP_DAC_ChanB_SRC_DMA
+    };
 
     DMA_LLI_Cfg_Type lli_cfg = {
-        DMA_TRNS_P2M,
+        DMA_TRNS_M2P,
         DMA_REQ_NONE,
         DMA_REQ_GPADC1,
     };
@@ -279,8 +286,8 @@ int hosal_dac_dma_start(hosal_dac_dev_t *dac, uint32_t *data, uint32_t size)
     hosal_dma_irq_callback_set(dac->dma_chan, dac_dma_irq_handler, dac);
 
     /* for dma Linked list */
-    count = size / 4 / LLI_BUFF_SIZE;
-    remainder = size % LLI_BUFF_SIZE;
+    count = size / 2 / LLI_BUFF_SIZE;
+    remainder = size / 2 % LLI_BUFF_SIZE;
 
     if (remainder != 0) {
         count = count + 1;
@@ -288,12 +295,14 @@ int hosal_dac_dma_start(hosal_dac_dev_t *dac, uint32_t *data, uint32_t size)
 
     dmactrl.SBSize = DMA_BURST_SIZE_1;
     dmactrl.DBSize = DMA_BURST_SIZE_1;
-    dmactrl.SWidth = DMA_TRNS_WIDTH_32BITS;
-    dmactrl.DWidth = DMA_TRNS_WIDTH_32BITS;
+    dmactrl.SWidth = DMA_TRNS_WIDTH_16BITS;
+    dmactrl.DWidth = DMA_TRNS_WIDTH_16BITS;
     dmactrl.Prot = 0;
     dmactrl.SLargerD = 0;
+
     plli_list = pvPortMalloc(sizeof(DMA_LLI_Ctrl_Type) * count);
     memset(plli_list, 0 , sizeof(DMA_LLI_Ctrl_Type) * count);
+    
     dac->priv = plli_list;
 
     if (NULL == plli_list) {
@@ -320,7 +329,7 @@ int hosal_dac_dma_start(hosal_dac_dev_t *dac, uint32_t *data, uint32_t size)
 
         dmactrl.SI = DMA_MINC_ENABLE;
         dmactrl.DI = DMA_MINC_DISABLE;
-        plli_list[i].srcDmaAddr = (uint32_t)(data + i * LLI_BUFF_SIZE);
+        plli_list[i].srcDmaAddr = (uint32_t)((uint16_t *)data + i * LLI_BUFF_SIZE);
         plli_list[i].destDmaAddr = 0x40002048;
         plli_list[i].dmaCtrl = dmactrl;
         if (i != 0) {
@@ -336,20 +345,18 @@ int hosal_dac_dma_start(hosal_dac_dev_t *dac, uint32_t *data, uint32_t size)
     DMA_LLI_Update(dac->dma_chan, (uint32_t)plli_list);
 
     if (GLB_GPIO_PIN_11 == dac->config.pin) {
-        GPIP_DAC_ChanA_Enable();
-        GPIP_Set_DAC_ChanA_SRC_SEL(GPIP_DAC_ChanA_SRC_DMA);
+        GLB_GPIP_DAC_Set_ChanA_Config(&chA_cfg);
         GPIP_Set_DAC_DMA_TX_FORMAT_SEL(GPIP_DAC_DMA_FORMAT_0);
         GPIP_Set_DAC_DMA_TX_Enable();
-        
     } else if (GLB_GPIO_PIN_17 == dac->config.pin) {
-        GPIP_DAC_ChanB_Enable();
-        GPIP_Set_DAC_ChanB_SRC_SEL(GPIP_DAC_ChanB_SRC_DMA);
+        GLB_GPIP_DAC_Set_ChanB_Config(&chB_cfg);
         GPIP_Set_DAC_DMA_TX_FORMAT_SEL(GPIP_DAC_DMA_FORMAT_0);
         GPIP_Set_DAC_DMA_TX_Enable();
-        
     } else{}
+
     return 0;
 }
+
 int hosal_dac_dma_stop(hosal_dac_dev_t *dac)
 {
     if (NULL == dac || dac->port != 0) {
@@ -377,13 +384,7 @@ int hosal_dac_finalize(hosal_dac_dev_t *dac)
         blog_error("parameter is error!\r\n");
         return -1;
     }
-
-    if (GLB_GPIO_PIN_11 == dac->config.pin) {
-        GPIP_DAC_ChanA_Disable();
-    } else if (GLB_GPIO_PIN_17 == dac->config.pin) {
-        GPIP_DAC_ChanB_Disable();
-    } else{}
-
+   
     if (NULL != dac->priv) {
         vPortFree(dac->priv);
         dac->priv = NULL;

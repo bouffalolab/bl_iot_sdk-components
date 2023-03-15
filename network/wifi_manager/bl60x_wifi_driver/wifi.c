@@ -183,7 +183,7 @@ err_t wifi_tx(struct netif *netif, struct pbuf* p)
         taskHandle_output = bl_os_task_get_current_task();
     }
     wlan = container_of(netif, struct wlan_netif, netif);
-    return bl_output(bl606a0_sta.bl_hw, netif, p, 0 == wlan->mode, &custom_cfm, from_local);
+    return bl_output(bl606a0_sta.bl_hw, (0 == wlan->mode), p, &custom_cfm, from_local);
 }
 
 #else
@@ -253,23 +253,17 @@ static err_t wifi_tx(struct netif *netif, struct pbuf* p)
         taskHandle_output = bl_os_task_get_current_task();
     }
     wlan = container_of(netif, struct wlan_netif, netif);
-    return bl_output(bl606a0_sta.bl_hw, netif, p, 0 == wlan->mode, &custom_cfm);
+    return bl_output(bl606a0_sta.bl_hw, (0 == wlan->mode), p, &custom_cfm);
 }
 #endif
 
 int bl_wifi_eth_tx(struct pbuf *p, bool is_sta, struct bl_tx_cfm *custom_cfm)
 {
     err_t ret;
-    struct netif *iface;
-    if (is_sta) {
-        iface = wifi_mgmr_sta_netif_get();
-    } else {
-        iface = wifi_mgmr_ap_netif_get();
-    }
 #ifdef CFG_NETBUS_WIFI_ENABLE
-    ret = bl_output(bl606a0_sta.bl_hw, iface, p, is_sta, custom_cfm, 1);
+    ret = bl_output(bl606a0_sta.bl_hw, is_sta, p, custom_cfm, 1);
 #else
-    ret = bl_output(bl606a0_sta.bl_hw, iface, p, is_sta, custom_cfm);
+    ret = bl_output(bl606a0_sta.bl_hw, is_sta, p, custom_cfm);
 #endif
     if (ret == ERR_OK) {
         return 0;

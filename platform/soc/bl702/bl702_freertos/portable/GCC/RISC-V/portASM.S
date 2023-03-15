@@ -147,6 +147,31 @@ freertos_risc_v_trap_handler:
 	csrr t0, mstatus					/* Required for MPIE bit. */
 	store_x t0, 29 * portWORD_SIZE( sp )
 
+#if 1
+	csrr t0, mcause
+	srli t1, t0, __riscv_xlen - 1		/* 1 - interrupt, 0 - exception */
+	bne t1, x0, exception_not_nested
+
+	csrr t0, mepc
+	la t1, exception_not_nested
+	bltu t0, t1, exception_not_nested
+	la t1, is_exception
+	bgeu t0, t1, exception_not_nested
+
+exception_nested:
+	j exception_nested
+
+exception_not_nested:
+#endif
+
+#if 1
+	li t0, 0x0FFFFFFF
+	and t1, sp, t0
+	li t0, 0x02010000
+invalid_sp:
+	bltu t1, t0, invalid_sp				/* Assert if ($sp & 0x0FFFFFFF) < 0x02010000 */
+#endif
+
 	portasmSAVE_ADDITIONAL_REGISTERS	/* Defined in freertos_risc_v_chip_specific_extensions.h to save any registers unique to the RISC-V implementation. */
 
     load_x  t0, pTrapNetCounter

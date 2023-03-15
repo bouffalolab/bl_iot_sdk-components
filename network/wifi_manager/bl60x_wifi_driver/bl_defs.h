@@ -34,6 +34,7 @@
 #include "ipc_shared.h"
 #include "bl_cmds.h"
 #include "bl_mod_params.h"
+#include <utils_list.h>
 
 #define ETH_ALEN    6       
 /**
@@ -58,6 +59,7 @@
 #define IEEE80211_MAX_AMPDU_BUF 0x40
 #define NX_VIRT_DEV_MAX CFG_VIRT_DEV_MAX
 #define NX_REMOTE_STA_MAX CFG_STA_MAX
+#define NX_REMOTE_STA_STORE_MAX (CFG_VIRT_DEV_MAX+CFG_STA_MAX)
 #define CONFIG_USER_MAX 1
 #define cpu_to_le16(v16) (v16)
 #define cpu_to_le32(v32) (v32)
@@ -195,18 +197,21 @@ struct net_device_stats {
  * Structure used to save information relative to the managed stations.
  */
 struct bl_sta {
+    struct utils_list waiting_list;
+    struct utils_list pending_list;
     struct mac_addr sta_addr;
     u8 is_used;
     u8 sta_idx;             /* Identifier of the station */
-    u8 vif_idx;             /* Identifier of the VIF (fw id) the station
+    u8 vif_idx;             /* Identifier of the VIF (not fw id) the station
                                belongs to */
     u8 vlan_idx;            /* Identifier of the VLAN VIF (fw id) the station
                                belongs to (= vif_idx if no vlan in used) */
-    uint8_t qos;
-    int8_t rssi;
-    uint8_t data_rate;
-    uint32_t tsflo;
-    uint32_t tsfhi;
+    u8 fc_ps;
+    u8 qos;
+    s8 rssi;
+    u8 data_rate;
+    u32 tsflo;
+    u32 tsfhi;
 };
 
 /**
@@ -244,44 +249,61 @@ struct bl_vif {
     struct netif *dev;
     bool up;                    /* Indicate if associated netdev is up
                                    (i.e. Interface is created at fw level) */
+    u8 vif_idx;
+    u8 links_num;
+    u8 fixed_sta_idx;
+    u8 fc_chan;
+
+#if 0
     union
     {
         struct
         {
-            struct bl_sta *ap; /* Pointer to the peer STA entry allocated for
-                                    the AP */
-            struct bl_sta *tdls_sta; /* Pointer to the TDLS station */
+            u8 sta_idx;                /* Index of the AP which connected with */
         } sta;
         struct
         {
             struct list_head sta_list; /* List of STA connected to the AP */
-            u8 bcmc_index;             /* Index of the BCMC sta to use */
+            u8 bcmc_idx;               /* Index of the BCMC sta to use */
         } ap;
         struct
         {
-            struct bl_vif *master;   /* pointer on master interface */
+            struct bl_vif *master;     /* pointer on master interface */
             struct bl_sta *sta_4a;
         } ap_vlan;
     };
+#endif
+};
+
+enum bl_vif_id {
+    BL_VIF_STA = 0,
+    BL_VIF_AP  = NX_VIRT_DEV_MAX-1,
 };
 
 struct bl_hw {
-    int is_up;
+    /* WiFi Manager state machine context */
     struct bl_cmd_mgr cmd_mgr;
-    struct ipc_host_env_tag *ipc_env;           /* store the IPC environment */
-    struct list_head vifs;
-    struct bl_vif vif_table[NX_VIRT_DEV_MAX + NX_REMOTE_STA_MAX]; /* indexed with fw id */
-    struct bl_sta sta_table[NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX];
-    unsigned long drv_flags;
-    struct bl_mod_params *mod_params;
-    struct ieee80211_sta_ht_cap ht_cap;
-    int vif_index_sta;
-    int vif_index_ap;
 
-    /*custom added id*/
-    int sta_idx;
-    int ap_bcmc_idx;
+    /* Store the IPC environment */
+    struct ipc_host_env_tag *ipc_env;
+
+    /* Vifs which is used (NOT used) */
+    struct list_head vifs;
+
+    /* Store Vifs, VIF_STA (0) | VIF_AP (NX_VIRT_DEV_MAX-1) */
+    struct bl_vif vif_table[NX_VIRT_DEV_MAX];
+
+    /* Store STAs, indexed with fw id */
+    struct bl_sta sta_table[NX_REMOTE_STA_STORE_MAX];
+
+    /* Default configuration */
+    struct bl_mod_params *mod_params;
+
+    /* Default HT capability */
+    struct ieee80211_sta_ht_cap ht_cap;
+
 #ifdef CFG_BL_STATISTIC
+    /* Some statistics */
     struct bl_stats       stats;
 #endif
 };
@@ -289,7 +311,7 @@ struct bl_hw {
 struct ethhdr {
     unsigned char   h_dest[ETH_ALEN];   /* destination eth addr */
     unsigned char   h_source[ETH_ALEN]; /* source ether addr    */
-    __be16      h_proto;        /* packet type ID field */
+    __be16          h_proto;            /* packet type ID field */
 } __attribute__((packed));
 
 /// Definitions of the RF bands

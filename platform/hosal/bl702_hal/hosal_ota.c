@@ -281,3 +281,133 @@ int hosal_ota_read(uint32_t offset, uint8_t *buf, uint32_t buf_len)
     return bl_mtd_read(ota_parm->mtd_handle, offset, buf_len, buf);
 }
 
+int hosal_ota_check(void)
+{
+    if (ota_parm == NULL) {
+        printf("please start ota first\r\n");
+        return -1;
+    }
+    uint32_t bin_size; 
+   
+    if (ota_parm->file_size <= 32) {
+        bl_mtd_close(ota_parm->mtd_handle);
+        free(ota_parm);
+        ota_parm = NULL;
+        return -1;
+    }
+
+    bin_size = ota_parm->file_size - 32;
+
+#define CHECK_IMG_BUF_SIZE   512
+    uint8_t sha_check[32] = {0};
+    uint8_t dst_sha[32] = {0};
+    uint32_t read_size;
+    iot_sha256_context sha256_ctx;
+    int i, offset = 0;
+    uint8_t *r_buf;
+
+    r_buf = malloc(CHECK_IMG_BUF_SIZE);
+    if (r_buf == NULL) {
+        bl_mtd_close(ota_parm->mtd_handle);
+        free(ota_parm);
+        ota_parm = NULL;
+        printf("malloc error\r\n");
+        return -1;
+    }
+
+    utils_sha256_init(&sha256_ctx);
+    utils_sha256_starts(&sha256_ctx);
+
+    memset(sha_check, 0, 32);
+    memset(dst_sha , 0, 32);
+    offset = 0;
+    while (offset < bin_size) {
+        (bin_size - offset >= CHECK_IMG_BUF_SIZE) ? (read_size = CHECK_IMG_BUF_SIZE):(read_size = bin_size - offset);
+        if (bl_mtd_read(ota_parm->mtd_handle, offset, read_size, r_buf)) {
+            printf("mtd read failed\r\n");
+            bl_mtd_close(ota_parm->mtd_handle);
+            free(ota_parm);
+            ota_parm = NULL;
+            free(r_buf);
+            return -1;
+        }
+        
+        utils_sha256_update(&sha256_ctx, (const uint8_t *)r_buf, read_size);
+        offset += read_size;
+    }
+
+    utils_sha256_finish(&sha256_ctx, sha_check);
+    free(r_buf);
+
+    bl_mtd_read(ota_parm->mtd_handle, offset, 32, dst_sha);
+    for (i = 0; i < 32; i++) {
+        printf("%02X", dst_sha[i]);
+    }
+    puts("\r\nHeader SET SHA256 Checksum:");
+    for (i = 0; i < 32; i++) {
+        printf("%02X", sha_check[i]);
+    }
+
+    if (memcmp(sha_check, (const void *)dst_sha, 32) != 0) {
+        printf("sha256 check error\r\n");
+        bl_mtd_close(ota_parm->mtd_handle);
+        free(ota_parm);
+        ota_parm = NULL;
+        utils_sha256_free(&sha256_ctx);
+        return -1;
+    }
+
+    utils_sha256_free(&sha256_ctx);
+
+    return 0;
+}
+int hosal_ota_apply(uint8_t auto_reset)
+{
+    if (ota_parm == NULL) {
+        printf("please start ota first\r\n");
+        return -1;
+    }
+    uint32_t bin_size; 
+    HALPartition_Entry_Config ptEntry;
+   
+    if (ota_parm->file_size <= 32) {
+        bl_mtd_close(ota_parm->mtd_handle);
+        free(ota_parm);
+        ota_parm = NULL;
+        return -1;
+    }
+
+    bin_size = ota_parm->file_size - 32;
+
+    if (hal_boot2_get_active_entries(BOOT2_PARTITION_TYPE_FW, &ptEntry)) {
+        printf("PtTable_Get_Active_Entries fail\r\n");
+        bl_mtd_close(ota_parm->mtd_handle);
+        free(ota_parm);
+        ota_parm = NULL;
+        return -1;
+    }
+    printf("[OTA] prepare OTA partition info\r\n");
+
+    ptEntry.len = bin_size;
+    printf("[OTA] [TCP] Update PARTITION, partition len is %lu\r\n", ptEntry.len);
+    hal_boot2_update_ptable(&ptEntry);
+    bl_mtd_close(ota_parm->mtd_handle);
+    free(ota_parm);
+    ota_parm = NULL;
+    
+    if (auto_reset) {
+        hal_reboot();
+    }
+    
+    return 0;
+}
+void hosal_ota_abort(void)
+{
+    if (ota_parm != NULL) 
+    {
+        bl_mtd_close(ota_parm->mtd_handle);
+        free(ota_parm);
+        ota_parm = NULL;
+    }
+
+}

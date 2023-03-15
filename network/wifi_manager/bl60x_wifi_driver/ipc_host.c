@@ -420,8 +420,7 @@ void ipc_host_irq(struct ipc_host_env_tag *env, uint32_t status)
         spin_lock(&((struct bl_hw *)env->pthis)->tx_lock);
 #endif
         // handle the TX confirmation reception
-        // XXX we just use IPC_TXQUEUE_CNT==1 for now
-        for (i = 0; i < 1; i++) {
+        for (i = 0; i < IPC_TXQUEUE_CNT; i++) {
             uint32_t q_bit = CO_BIT(i + IPC_IRQ_E2A_TXCFM_POS);
             if (status & q_bit) {
                 // handle the confirmation

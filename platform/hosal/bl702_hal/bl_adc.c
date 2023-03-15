@@ -172,22 +172,20 @@ int bl_adc_vbat_init(void)
 float bl_adc_vbat_get_val(void)
 {
     int i;
-    uint32_t sum;
-    uint16_t vbat;
-    float volt;
+    float sum;
+    uint32_t val;
+    ADC_Result_Type result;
     
     sum = 0;
     for(i=0; i<VBAT_SAMPLE_CNT; i++){
         ADC_Start();
         while(ADC_Get_FIFO_Count() == 0);
-        sum += (uint16_t)ADC_Read_FIFO();
+        val = ADC_Read_FIFO();
+        ADC_Parse_Result(&val, 1, &result);
+        sum += result.volt * 2;
     }
-    vbat = sum / VBAT_SAMPLE_CNT;
     
-    // Calculate battery voltage
-    volt = (float)vbat * 4 / 65536;
-    
-    return volt;
+    return sum / VBAT_SAMPLE_CNT;
 }
 
 
@@ -314,6 +312,10 @@ static void tsen_dma_init(bl_adc_tsen_cfg_t *cfg)
         DMA_REQ_GPADC0,            /* Source peripheral select */
         DMA_REQ_NONE,              /* Destination peripheral select */
     };
+    
+    GLB_PER_Clock_UnGate(GLB_AHB_CLOCK_DMA_0);
+    DMA_Enable();
+    bl_irq_enable(DMA_ALL_IRQn);
     
     DMA_Channel_Init(&dmaChCfg);
     hosal_dma_irq_callback_set(tsen_dma_ch, tsen_dma_callback, NULL);
@@ -469,6 +471,10 @@ static void voice_dma_init(bl_adc_voice_cfg_t *cfg)
         DMA_REQ_GPADC0,            /* Source peripheral select */
         DMA_REQ_NONE,              /* Destination peripheral select */
     };
+    
+    GLB_PER_Clock_UnGate(GLB_AHB_CLOCK_DMA_0);
+    DMA_Enable();
+    bl_irq_enable(DMA_ALL_IRQn);
     
     DMA_Channel_Init(&dmaChCfg);
     hosal_dma_irq_callback_set(adc_dma_ch, voice_dma_callback, NULL);

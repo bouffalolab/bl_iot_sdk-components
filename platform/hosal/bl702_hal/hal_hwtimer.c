@@ -144,8 +144,8 @@ hw_timer_t *hal_hwtimer_create(uint32_t period, hw_t handler, int repeat)
     }
     
     bl_irq_ctx_get(TIMER_CH0_IRQn, (void **)&pstctx);
-    if( xSemaphoreTake(pstctx->hwtimer_mux, portMAX_DELAY) == pdTRUE ) {
-        blog_info("get mux success \r\n");
+    if( xSemaphoreTake(pstctx->hwtimer_mux, portMAX_DELAY) != pdTRUE ) {
+        blog_error("get mux failed \r\n");
     }
 
     TIMER_IntMask(HW_TIMER_CHANNEL, TIMER_INT_ALL, MASK); 
@@ -169,8 +169,8 @@ int hal_hwtimer_delete(hw_timer_t *pstnode)
     struct hw_timer_ctx *pstctx;
     
     bl_irq_ctx_get(TIMER_CH0_IRQn, (void **)&pstctx);
-    if( xSemaphoreTake(pstctx->hwtimer_mux, portMAX_DELAY) == pdTRUE ) {
-        blog_info("get mux success \r\n");
+    if( xSemaphoreTake(pstctx->hwtimer_mux, portMAX_DELAY) != pdTRUE ) {
+        blog_error("get mux failed \r\n");
     }
 
     TIMER_IntMask(HW_TIMER_CHANNEL, TIMER_INT_ALL, MASK);
@@ -207,8 +207,8 @@ int hal_hwtimer_change_period(hw_timer_t *pstnode, uint32_t period)
     }
 
     bl_irq_ctx_get(TIMER_CH0_IRQn, (void **)&pstctx);
-    if( xSemaphoreTake(pstctx->hwtimer_mux, portMAX_DELAY) == pdTRUE ) {
-        blog_info("get mux success \r\n");
+    if( xSemaphoreTake(pstctx->hwtimer_mux, portMAX_DELAY) != pdTRUE ) {
+        blog_error("get mux failed \r\n");
     }
 
     TIMER_IntMask(HW_TIMER_CHANNEL, TIMER_INT_ALL, MASK);

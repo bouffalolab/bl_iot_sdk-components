@@ -203,7 +203,6 @@ static void wifi_eth_sta_enable(struct netif *netif, uint8_t mac[6])
 #endif
 
     netifapi_netif_set_default(netif);
-    netifapi_netif_set_link_up(netif);
     netifapi_netif_set_up(netif);
 }
 
@@ -354,8 +353,7 @@ int wifi_mgmr_sta_connect_ext(wifi_interface_t *wifi_interface, char *ssid, char
         return -1;
     }
 
-    if ((passphr && conn_adv_param->psk) ||
-        (passphr && ((passphr_len < 8 && passphr_len != 5) || passphr_len > 63)) ||
+    if ((passphr && ((passphr_len < 8 && passphr_len != 5) || passphr_len > 63)) ||
         (conn_adv_param->psk && (psk_len != 64)))
     {
         return -1;
@@ -382,13 +380,13 @@ int wifi_mgmr_sta_connect_mid(wifi_interface_t *wifi_interface, char *ssid, char
         ext_param.ap_info.freq = phy_channel_to_freq(ext_param.ap_info.band, chan_id);
     }
     ext_param.ap_info.use_dhcp = use_dhcp;
-    ext_param.flags = flags;
+    ext_param.flags = (flags & WIFI_CONNECT_DEFAULT) ? (flags | WIFI_CONNECT_PMF_CAPABLE) : (flags);
     return wifi_mgmr_sta_connect_ext(wifi_interface, ssid, passphrase, &ext_param);
 }
 
 int wifi_mgmr_sta_connect(wifi_interface_t *wifi_interface, char *ssid, char *passphrase, char *psk, uint8_t *mac, uint8_t band, uint8_t chan_id)
 {
-    return wifi_mgmr_sta_connect_mid(wifi_interface, ssid, passphrase, psk, mac, band, chan_id, 1, 0);
+    return wifi_mgmr_sta_connect_mid(wifi_interface, ssid, passphrase, psk, mac, band, chan_id, 1, WIFI_CONNECT_DEFAULT);
 }
 
 int wifi_mgmr_sta_disconnect(void)
@@ -584,7 +582,6 @@ static void wifi_eth_ap_enable(struct netif *netif, uint8_t mac[6])
 
     netifapi_netif_add(netif, &ipaddr, &netmask, &gw, NULL, &bl606a0_wifi_netif_init, &tcpip_input);
     netifapi_netif_set_default(netif);
-    netifapi_netif_set_link_up(netif);
     netifapi_netif_set_up(netif);
 }
 
@@ -875,7 +872,13 @@ int wifi_mgmr_scan_adv(void *data, scan_complete_cb_t cb, uint16_t *channels, ui
 
     scan_params->scan_mode = scan_mode;
     scan_params->duration_scan = duration_scan;
-    memcpy(scan_params->bssid, bssid, ETH_ALEN);
+
+    if (bssid) {
+        memcpy(scan_params->bssid, bssid, ETH_ALEN);
+    } else {
+        memset(scan_params->bssid, 0xff, ETH_ALEN);
+    }
+
     scan_params->channel_num = channel_num;
     if (channel_num) {
         memcpy(scan_params->channels, channels, sizeof(uint16_t) * channel_num);
@@ -999,13 +1002,14 @@ int wifi_mgmr_set_country_code(char *country_code)
 
 int wifi_mgmr_set_wifi_active_time(uint32_t ms)
 {
-    if (ms < 15 || ms > 85) {
-        bl_os_printf("Wrong, MUST set wifi ps acitve [20, 80] ms\r\n");
+    if (ms < 10 || ms > 80) {
+        bl_os_printf("Wrong, MUST set wifi ps acitve [10, 80] ms\r\n");
         return -1;
     }
 
     void td_set_tim_time(uint8_t vif_index, uint32_t us);
-    td_set_tim_time(wifiMgmr.wlan_sta.vif_index, ms * 1000);
+    extern struct bl_hw wifi_hw;
+    td_set_tim_time(wifi_hw.vif_table[BL_VIF_STA].vif_idx, ms * 1000);
 
     return 0;
 }

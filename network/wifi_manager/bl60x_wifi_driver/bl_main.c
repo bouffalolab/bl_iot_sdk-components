@@ -290,7 +290,10 @@ int bl_main_beacon_interval_set(uint16_t beacon_int)
 int bl_main_if_remove(uint8_t vif_index)
 {
     bl_os_printf("[WF] MM_REMOVE_IF_REQ Sending with vif_index %u...\r\n", vif_index);
-    bl_send_remove_if(&wifi_hw, vif_index);
+    bl_send_remove_if(&wifi_hw, wifi_hw.vif_table[vif_index].vif_idx);
+
+    /* TODO: Dont care wifi_hw.vifs */
+    memset(&wifi_hw.vif_table[vif_index], 0, sizeof(struct bl_vif));
     bl_os_printf("[WF] MM_REMOVE_IF_REQ Done\r\n");
     return 0;
 }
@@ -322,7 +325,7 @@ int bl_main_get_channel_nums()
 int bl_main_if_add(int is_sta, struct netif *netif, uint8_t *vif_index)
 {
     struct mm_add_if_cfm add_if_cfm;
-    int error = 0;
+    int error, vif_id;
 
     bl_os_printf("[WF] MM_ADD_IF_REQ Sending: %s\r\n", is_sta ? "STA" : "AP");
     error = bl_send_add_if(
@@ -341,45 +344,58 @@ int bl_main_if_add(int is_sta, struct netif *netif, uint8_t *vif_index)
         RWNX_PRINT_CFM_ERR(add_if);
         return -EIO;
     }
-    /* Save the index retrieved from LMAC */
-    if (is_sta) {
-        wifi_hw.vif_index_sta = add_if_cfm.inst_nbr;
-    } else {
-        wifi_hw.vif_index_ap = add_if_cfm.inst_nbr;
-    }
-    *vif_index = add_if_cfm.inst_nbr;
 
-    bl_os_printf("[WF] vif_index from LAMC is %d\r\n", *vif_index);
-    wifi_hw.vif_table[add_if_cfm.inst_nbr].dev = netif;
-    wifi_hw.vif_table[add_if_cfm.inst_nbr].up = 1;
+    /* Save the index retrieved from LMAC */
+    /* TODO: Dont care wifi_hw.vifs */
+    vif_id = (is_sta) ? (BL_VIF_STA) : (BL_VIF_AP);
+    wifi_hw.vif_table[vif_id].vif_idx   = add_if_cfm.inst_nbr;
+    wifi_hw.vif_table[vif_id].dev       = netif;
+    wifi_hw.vif_table[vif_id].up        = 1;
+    wifi_hw.vif_table[vif_id].links_num = 0;
+
+    *vif_index = vif_id;
+    bl_os_printf("[WF] vif_index from LAMC is %d, vif_id: %d\r\n", add_if_cfm.inst_nbr, vif_id);
 
     return error;
 }
 
-int bl_main_apm_start(char *ssid, char *password, int channel, uint8_t vif_index, uint8_t hidden_ssid, uint16_t bcn_int)
+int bl_main_apm_start(char *ssid, char *password, int channel, uint8_t hidden_ssid, uint16_t bcn_int)
 {
     int error = 0;
+    struct bl_vif *vif;
+    struct bl_sta *sta;
     struct apm_start_cfm start_ap_cfm;
 
     memset(&start_ap_cfm, 0, sizeof(start_ap_cfm));
-    bl_os_printf("[WF] APM_START_REQ Sending with vif_index %u\r\n", vif_index);
-    error = bl_send_apm_start_req(&wifi_hw, &start_ap_cfm, ssid, password, channel, vif_index, hidden_ssid, bcn_int);
+    vif = &(wifi_hw.vif_table[BL_VIF_AP]);
+
+    bl_os_printf("[WF] APM_START_REQ Sending with vif_index %u\r\n", BL_VIF_AP);
+    error = bl_send_apm_start_req(&wifi_hw, &start_ap_cfm, ssid, password, channel, vif->vif_idx, hidden_ssid, bcn_int);
     bl_os_printf("[WF] APM_START_REQ Done\r\n");
     bl_os_printf("[WF] status is %02X\r\n", start_ap_cfm.status);
-    bl_os_printf("[WF] vif_idx is %02X\r\n", start_ap_cfm.vif_idx);
+    bl_os_printf("[WF] vif_idx is %02X\r\n", BL_VIF_AP);
     bl_os_printf("[WF] ch_idx is %02X\r\n", start_ap_cfm.ch_idx);
     bl_os_printf("[WF] bcmc_idx is %02X\r\n", start_ap_cfm.bcmc_idx);
-    wifi_hw.ap_bcmc_idx = start_ap_cfm.bcmc_idx;
+
+    /* Set some default value for bcmc_sta */
+    wifi_hw.vif_table[BL_VIF_AP].fixed_sta_idx = start_ap_cfm.bcmc_idx;
+    sta = &(wifi_hw.sta_table[start_ap_cfm.bcmc_idx]);
+    sta->vif_idx = BL_VIF_AP;
+    sta->sta_idx = start_ap_cfm.bcmc_idx;
+    sta->qos = 1;
 
     return error;
 }
 
-int bl_main_apm_stop(uint8_t vif_index)
+int bl_main_apm_stop(void)
 {
     int error = 0;
+    struct bl_vif *vif;
 
-    bl_os_printf("[WF] APM_STOP_REQ Sending with vif_index %u\r\n", vif_index);
-    error = bl_send_apm_stop_req(&wifi_hw, vif_index);
+    vif = &(wifi_hw.vif_table[BL_VIF_AP]);
+
+    bl_os_printf("[WF] APM_STOP_REQ Sending with vif_index %u\r\n", BL_VIF_AP);
+    error = bl_send_apm_stop_req(&wifi_hw, vif->vif_idx);
     bl_os_printf("[WF] APM_STOP_REQ Done\r\n");
 
     return error;
@@ -429,19 +445,19 @@ int bl_main_apm_sta_info_get(struct wifi_apm_sta_info *apm_sta_info, uint8_t idx
 int bl_main_apm_sta_delete(uint8_t sta_idx)
 {
     struct bl_hw *bl_hw = &wifi_hw;
+    struct bl_vif *vif;
     struct bl_sta *sta;
     struct apm_sta_del_cfm sta_del_cfm;
-    uint8_t vif_idx = 0;
 
     sta = &(bl_hw->sta_table[sta_idx]);
     if (sta == NULL)
         return -1;
 
     memset(&sta_del_cfm, 0, sizeof(struct apm_sta_del_cfm));
-    vif_idx = sta->vif_idx;
-    bl_os_printf("[WF] APM_STA_DEL_REQ: sta_idx = %u, vif_idx = %u\r\n", sta_idx, vif_idx);
+    vif = &bl_hw->vif_table[sta->vif_idx];
+    bl_os_printf("[WF] APM_STA_DEL_REQ: sta_idx = %u, vif_idx = %u\r\n", sta_idx, BL_VIF_AP);
 
-    bl_send_apm_sta_del_req(bl_hw, &sta_del_cfm, sta_idx, vif_idx);
+    bl_send_apm_sta_del_req(bl_hw, &sta_del_cfm, sta_idx, vif->vif_idx);
     if (sta_del_cfm.status != 0) {
         bl_os_log_info("del sta failure, cfm status = 0x%x\r\n", sta_del_cfm.status);
         return -1;

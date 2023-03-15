@@ -76,7 +76,7 @@ typedef enum {
 typedef enum {
     PT_ENTRY_FW_CPU0,                       /*!< Partition entry type:CPU0 firmware */
     PT_ENTRY_FW_CPU1,                       /*!< Partition entry type:CPU1 firmware */
-    PT_ENTRY_MAX=5,                         /*!< Partition entry type:Max */
+    PT_ENTRY_MAX=6,                         /*!< Partition entry type:Max */
 }PtTable_Entry_Type;
 
 /**
