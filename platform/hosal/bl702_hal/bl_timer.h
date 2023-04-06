@@ -35,6 +35,10 @@
 #define BL_TIMER_CH_NUM                2
 #define BL_TIMER_US_PER_TICK           1
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 typedef void (*bl_timer_cb_t)(void);
 
 void bl_timer_init(void);
@@ -53,5 +57,9 @@ void bl_timer_restore_events(uint8_t run_expired);
 uint32_t bl_timer_now_us(void);
 void bl_timer_delay_us(uint32_t us);
 uint64_t bl_timer_now_us64(void);
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif
