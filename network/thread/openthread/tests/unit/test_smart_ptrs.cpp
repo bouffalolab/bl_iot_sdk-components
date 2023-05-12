@@ -94,10 +94,10 @@ void TestOwnedPtr(void)
     TestObject obj2;
     TestObject obj3;
 
-    printf("\r\n====================================================================================\r\n");
-    printf("Testing `OwnedPtr`\r\n");
+    printf("\n====================================================================================\n");
+    printf("Testing `OwnedPtr`\n");
 
-    printf("\r\n - Default constructor (null pointer)");
+    printf("\n - Default constructor (null pointer)");
 
     {
         OwnedPtr<TestObject> ptr;
@@ -105,7 +105,7 @@ void TestOwnedPtr(void)
         VerifyPointer(ptr, nullptr);
     }
 
-    printf("\r\n - Constructor taking ownership of an object");
+    printf("\n - Constructor taking ownership of an object");
     obj1.ResetTestFlags();
 
     {
@@ -116,7 +116,7 @@ void TestOwnedPtr(void)
 
     VerifyOrQuit(obj1.WasFreed());
 
-    printf("\r\n - Move constructor taking over from another");
+    printf("\n - Move constructor taking over from another");
     obj1.ResetTestFlags();
 
     {
@@ -129,7 +129,7 @@ void TestOwnedPtr(void)
 
     VerifyOrQuit(obj1.WasFreed());
 
-    printf("\r\n - `Free()` method");
+    printf("\n - `Free()` method");
     obj1.ResetTestFlags();
 
     {
@@ -148,7 +148,7 @@ void TestOwnedPtr(void)
         VerifyPointer(ptr, nullptr);
     }
 
-    printf("\r\n - `Reset()` method");
+    printf("\n - `Reset()` method");
     obj1.ResetTestFlags();
     obj2.ResetTestFlags();
     obj3.ResetTestFlags();
@@ -176,7 +176,7 @@ void TestOwnedPtr(void)
     VerifyOrQuit(obj2.WasFreed());
     VerifyOrQuit(obj3.WasFreed());
 
-    printf("\r\n - Self `Reset()`");
+    printf("\n - Self `Reset()`");
     obj1.ResetTestFlags();
 
     {
@@ -194,7 +194,7 @@ void TestOwnedPtr(void)
 
     VerifyOrQuit(obj1.WasFreed());
 
-    printf("\r\n - Move assignment (operator `=`)");
+    printf("\n - Move assignment (operator `=`)");
     obj1.ResetTestFlags();
     obj2.ResetTestFlags();
     obj3.ResetTestFlags();
@@ -236,7 +236,7 @@ void TestOwnedPtr(void)
 
     VerifyOrQuit(obj1.WasFreed());
 
-    printf("\r\n - Self move assignment (operator `=`)");
+    printf("\n - Self move assignment (operator `=`)");
     obj1.ResetTestFlags();
 
     {
@@ -257,7 +257,7 @@ void TestOwnedPtr(void)
 
     VerifyOrQuit(obj1.WasFreed());
 
-    printf("\r\n - `Release()` method");
+    printf("\n - `Release()` method");
     obj1.ResetTestFlags();
 
     {
@@ -274,7 +274,7 @@ void TestOwnedPtr(void)
         VerifyPointer(ptr, nullptr);
     }
 
-    printf("\r\n\r\n-- PASS\r\n");
+    printf("\n\n-- PASS\n");
 }
 
 void TestRetainPtr(void)
@@ -283,14 +283,14 @@ void TestRetainPtr(void)
     TestObject obj2;
     TestObject obj3;
 
-    printf("\r\n====================================================================================\r\n");
-    printf("Testing `RetainPtr`\r\n");
+    printf("\n====================================================================================\n");
+    printf("Testing `RetainPtr`\n");
 
     VerifyOrQuit(obj1.GetRetainCount() == 0);
     VerifyOrQuit(obj2.GetRetainCount() == 0);
     VerifyOrQuit(obj3.GetRetainCount() == 0);
 
-    printf("\r\n - Default constructor (null pointer)");
+    printf("\n - Default constructor (null pointer)");
 
     {
         RetainPtr<TestObject> ptr;
@@ -298,7 +298,7 @@ void TestRetainPtr(void)
         VerifyPointer(ptr, nullptr);
     }
 
-    printf("\r\n - Constructor taking over management of an object");
+    printf("\n - Constructor taking over management of an object");
     obj1.ResetTestFlags();
 
     {
@@ -309,7 +309,7 @@ void TestRetainPtr(void)
 
     VerifyOrQuit(obj1.WasFreed());
 
-    printf("\r\n - Two constructed `RetainPtr`s of the same object");
+    printf("\n - Two constructed `RetainPtr`s of the same object");
     obj1.ResetTestFlags();
 
     {
@@ -322,7 +322,7 @@ void TestRetainPtr(void)
 
     VerifyOrQuit(obj1.WasFreed());
 
-    printf("\r\n - Copy constructor");
+    printf("\n - Copy constructor");
     obj1.ResetTestFlags();
 
     {
@@ -335,7 +335,7 @@ void TestRetainPtr(void)
 
     VerifyOrQuit(obj1.WasFreed());
 
-    printf("\r\n - `Reset()` method");
+    printf("\n - `Reset()` method");
     obj1.ResetTestFlags();
     obj2.ResetTestFlags();
     obj3.ResetTestFlags();
@@ -362,7 +362,7 @@ void TestRetainPtr(void)
     VerifyOrQuit(obj2.WasFreed());
     VerifyOrQuit(obj3.WasFreed());
 
-    printf("\r\n - Self `Reset()`");
+    printf("\n - Self `Reset()`");
     obj1.ResetTestFlags();
 
     {
@@ -380,7 +380,7 @@ void TestRetainPtr(void)
 
     VerifyOrQuit(obj1.WasFreed());
 
-    printf("\r\n - Assignment `=`");
+    printf("\n - Assignment `=`");
     obj1.ResetTestFlags();
     obj2.ResetTestFlags();
 
@@ -427,7 +427,7 @@ void TestRetainPtr(void)
     VerifyOrQuit(obj1.WasFreed());
     VerifyOrQuit(obj2.WasFreed());
 
-    printf("\r\n - Self assignment `=`");
+    printf("\n - Self assignment `=`");
     obj1.ResetTestFlags();
 
     {
@@ -450,7 +450,7 @@ void TestRetainPtr(void)
 
     VerifyOrQuit(obj1.WasFreed());
 
-    printf("\r\n - `Release()` method");
+    printf("\n - `Release()` method");
     obj1.ResetTestFlags();
 
     {
@@ -468,15 +468,15 @@ void TestRetainPtr(void)
     VerifyOrQuit(!obj1.WasFreed());
     VerifyOrQuit(obj1.GetRetainCount() == 1);
 
-    printf("\r\n\r\n-- PASS\r\n");
+    printf("\n\n-- PASS\n");
 }
 
 } // namespace ot
 
-extern "C" int test_smart_ptrs(void)
+int main(void)
 {
     ot::TestOwnedPtr();
     ot::TestRetainPtr();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }

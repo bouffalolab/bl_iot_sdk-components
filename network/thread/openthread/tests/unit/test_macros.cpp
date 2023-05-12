@@ -162,13 +162,13 @@ exit:
     VerifyOrQuit(!reachedEnd && didAction, "VerifyOrExit() failed");
 }
 
-extern "C" int test_macros(void)
+int main(void)
 {
     TestMacros();
     TestVerifyOrExitSuccessNoAction();
     TestVerifyOrExitFailureNoAction();
     TestVerifyOrExitSuccessWithAction();
     TestVerifyOrExitFailureWithAction();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

@@ -155,10 +155,6 @@ static void ReceiveTask(const uint8_t *aBuf, uint16_t aBufLength)
 
         case '\r':
             Output(CRNL, sizeof(CRNL));
-            if (sRxLength < kRxBufferSize - 1)
-            {
-                sRxBuffer[sRxLength++] = static_cast<char>(*aBuf);
-            }
             sRxBuffer[sRxLength] = '\0';
             IgnoreError(ProcessCommand());
             break;

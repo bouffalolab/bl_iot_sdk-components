@@ -186,6 +186,7 @@ void I2C_SetSclSync(I2C_ID_Type i2cNo, uint8_t enable);
 void I2C_Init(I2C_ID_Type i2cNo, I2C_Direction_Type direct, I2C_Transfer_Cfg *cfg);
 BL_Sts_Type I2C_IsBusy(I2C_ID_Type i2cNo);
 BL_Sts_Type I2C_TransferEndStatus(I2C_ID_Type i2cNo);
+BL_Sts_Type I2C_TransferNackStatus(I2C_ID_Type i2cNo);
 BL_Err_Type I2C_MasterSendBlocking(I2C_ID_Type i2cNo, I2C_Transfer_Cfg *cfg);
 BL_Err_Type I2C_MasterReceiveBlocking(I2C_ID_Type i2cNo, I2C_Transfer_Cfg *cfg);
 void I2C_IntMask(I2C_ID_Type i2cNo, I2C_INT_Type intType, BL_Mask_Type intMask);

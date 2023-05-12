@@ -61,7 +61,6 @@
 /** @defgroup  CLOCK_Private_Variables
  *  @{
  */
-static Clock_Cfg_Type clkCfg;
 
 /*@} end of group CLOCK_Private_Variables */
 

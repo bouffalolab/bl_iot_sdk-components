@@ -81,7 +81,6 @@ int dma_open(struct device *dev, uint16_t oflag)
 
     /* Disable all interrupt */
     DMA_IntMask(dma_device->ch, DMA_INT_ALL, MASK);
-    /* Enable uart interrupt*/
     CPU_Interrupt_Disable(DMA_ALL_IRQn);
 
     DMA_Disable();
@@ -103,8 +102,9 @@ int dma_open(struct device *dev, uint16_t oflag)
     DMA_Enable();
 
     Interrupt_Handler_Register(DMA_ALL_IRQn, DMA0_IRQ);
-    /* Enable uart interrupt*/
+    /* Enable dma interrupt*/
     CPU_Interrupt_Enable(DMA_ALL_IRQn);
+    dlist_init(&dma_device->lli_list);
     return 0;
 }
 /**
@@ -124,14 +124,12 @@ int dma_control(struct device *dev, int cmd, void *args)
             /* Dma interrupt configuration */
             DMA_IntMask(dma_device->ch, DMA_INT_TCOMPLETED, UNMASK);
             DMA_IntMask(dma_device->ch, DMA_INT_ERR, UNMASK);
-
             break;
 
         case DEVICE_CTRL_CLR_INT:
             /* Dma interrupt configuration */
             DMA_IntMask(dma_device->ch, DMA_INT_TCOMPLETED, MASK);
             DMA_IntMask(dma_device->ch, DMA_INT_ERR, MASK);
-
             break;
 
         case DEVICE_CTRL_GET_INT:
@@ -210,65 +208,6 @@ int dma_register(enum dma_index_type index, const char *name)
     return device_register(dev, name);
 }
 
-static BL_Err_Type dma_scan_unregister_device(uint8_t *allocate_index)
-{
-    struct device *dev;
-    dlist_t *node;
-    uint8_t dma_index = 0;
-    uint32_t dma_handle[DMA_MAX_INDEX];
-
-    for (dma_index = 0; dma_index < DMA_MAX_INDEX; dma_index++) {
-        dma_handle[dma_index] = 0xff;
-    }
-
-    /* get registered dma handle list*/
-    dlist_for_each(node, device_get_list_header())
-    {
-        dev = dlist_entry(node, struct device, list);
-
-        if (dev->type == DEVICE_CLASS_DMA) {
-            dma_handle[(((uint32_t)dev - (uint32_t)dmax_device) / sizeof(dma_device_t)) % DMA_MAX_INDEX] = SET;
-        }
-    }
-
-    for (dma_index = 0; dma_index < DMA_MAX_INDEX; dma_index++) {
-        if (dma_handle[dma_index] == 0xff) {
-            *allocate_index = dma_index;
-            return SUCCESS;
-        }
-    }
-
-    return ERROR;
-}
-
-int dma_allocate_register(const char *name)
-{
-    struct device *dev;
-    uint8_t index;
-
-    if (DMA_MAX_INDEX == 0) {
-        return -DEVICE_EINVAL;
-    }
-
-    if (dma_scan_unregister_device(&index) == ERROR) {
-        return -DEVICE_ENOSPACE;
-    }
-
-    dev = &(dmax_device[index].parent);
-
-    dev->open = dma_open;
-    dev->close = dma_close;
-    dev->control = dma_control;
-    // dev->write = dma_write;
-    // dev->read = dma_read;
-
-    dev->status = DEVICE_UNREGISTER;
-    dev->type = DEVICE_CLASS_DMA;
-    dev->handle = NULL;
-
-    return device_register(dev, name);
-}
-
 /**
  * @brief
  *
@@ -286,7 +225,6 @@ int dma_reload(struct device *dev, uint32_t src_addr, uint32_t dst_addr, uint32_
     uint32_t actual_transfer_len = 0;
     uint32_t actual_transfer_offset = 0;
     dma_control_data_t dma_ctrl_cfg;
-    bool intr = false;
 
     dma_device_t *dma_device = (dma_device_t *)dev;
 
@@ -323,7 +261,6 @@ int dma_reload(struct device *dev, uint32_t src_addr, uint32_t dst_addr, uint32_
     }
 
     dma_ctrl_cfg = (dma_control_data_t)(BL_RD_REG(dma_channel_base[dma_device->id][dma_device->ch], DMA_CONTROL));
-    intr = dma_ctrl_cfg.bits.I;
 
     malloc_count = actual_transfer_len / 4095;
     remain_len = actual_transfer_len % 4095;
@@ -335,14 +272,13 @@ int dma_reload(struct device *dev, uint32_t src_addr, uint32_t dst_addr, uint32_
     dma_device->lli_cfg = (dma_lli_ctrl_t *)realloc(dma_device->lli_cfg, sizeof(dma_lli_ctrl_t) * malloc_count);
 
     if (dma_device->lli_cfg) {
+        dma_ctrl_cfg.bits.TransferSize = 4095;
+        dma_ctrl_cfg.bits.I = 0;
         /*transfer_size will be integer multiple of 4095*n or 4095*2*n or 4095*4*n,(n>0) */
         for (uint32_t i = 0; i < malloc_count; i++) {
             dma_device->lli_cfg[i].src_addr = src_addr;
             dma_device->lli_cfg[i].dst_addr = dst_addr;
             dma_device->lli_cfg[i].nextlli = 0;
-
-            dma_ctrl_cfg.bits.TransferSize = 4095;
-            dma_ctrl_cfg.bits.I = 0;
 
             if (dma_ctrl_cfg.bits.SI) {
                 src_addr += actual_transfer_offset;
@@ -356,7 +292,7 @@ int dma_reload(struct device *dev, uint32_t src_addr, uint32_t dst_addr, uint32_
                 if (remain_len) {
                     dma_ctrl_cfg.bits.TransferSize = remain_len;
                 }
-                dma_ctrl_cfg.bits.I = intr;
+                dma_ctrl_cfg.bits.I = 1;
 
                 if (dma_device->transfer_mode == DMA_LLI_CYCLE_MODE) {
                     dma_device->lli_cfg[i].nextlli = (uint32_t)&dma_device->lli_cfg[0];
@@ -379,6 +315,159 @@ int dma_reload(struct device *dev, uint32_t src_addr, uint32_t dst_addr, uint32_
 #endif
     return 0;
 }
+
+struct dma_lli_info *dma_lli_node_alloc(struct device *dev, uint32_t lli_count)
+{
+    struct dma_lli_info *lli_info;
+    dma_lli_ctrl_t *lli_cfg;
+
+    dma_device_t *dma_device = (dma_device_t *)dev;
+
+    lli_info = (struct dma_lli_info *)malloc(sizeof(struct dma_lli_info));
+    lli_cfg = (dma_lli_ctrl_t *)malloc(sizeof(dma_lli_ctrl_t) * lli_count);
+    memset(lli_info, 0, sizeof(struct dma_lli_info));
+    memset(lli_cfg, 0, sizeof(dma_lli_ctrl_t) * lli_count);
+    lli_info->llihead = (dma_lli_ctrl_t *)&lli_cfg[0];
+    lli_info->lli_count = lli_count;
+    dlist_insert_before(&dma_device->lli_list, &(lli_info->list));
+    return lli_info;
+}
+
+void dma_lli_node_freeall(struct device *dev)
+{
+    struct dma_lli_info *lli_info;
+    dlist_t *node;
+
+    dma_device_t *dma_device = (dma_device_t *)dev;
+
+    dlist_for_each(node, &dma_device->lli_list)
+    {
+        lli_info = dlist_entry(node, struct dma_lli_info, list);
+        free(lli_info->llihead);
+        free(lli_info);
+    }
+
+    dlist_init(&dma_device->lli_list);
+}
+
+int dma_lli_node_update(struct device *dev, struct dma_lli_info *lli_info, uint32_t src_addr, uint32_t dst_addr, uint32_t transfer_size)
+{
+    uint32_t malloc_count;
+    uint32_t remain_len;
+    uint32_t actual_transfer_len = 0;
+    uint32_t actual_transfer_offset = 0;
+    dma_control_data_t dma_ctrl_cfg;
+    dma_lli_ctrl_t *lli_cfg;
+
+    dma_device_t *dma_device = (dma_device_t *)dev;
+
+    dma_ctrl_cfg = (dma_control_data_t)(BL_RD_REG(dma_channel_base[dma_device->id][dma_device->ch], DMA_CONTROL));
+
+    if (lli_info == NULL) {
+        return -1;
+    }
+
+    switch (dma_ctrl_cfg.bits.SWidth) {
+        case DMA_TRANSFER_WIDTH_8BIT:
+            actual_transfer_offset = 4064;
+            actual_transfer_len = transfer_size;
+            break;
+        case DMA_TRANSFER_WIDTH_16BIT:
+            if (transfer_size % 2) {
+                return -1;
+            }
+            actual_transfer_offset = 4064 << 1;
+            actual_transfer_len = transfer_size >> 1;
+            break;
+        case DMA_TRANSFER_WIDTH_32BIT:
+            if (transfer_size % 4) {
+                return -1;
+            }
+            actual_transfer_offset = 4064 << 2;
+            actual_transfer_len = transfer_size >> 2;
+            break;
+
+        default:
+            return -1;
+            break;
+    }
+
+    malloc_count = actual_transfer_len / 4064 + 1;
+    remain_len = actual_transfer_len % 4064;
+
+    /* The maximum transfer capacity of the last node is 4095 */
+    if (malloc_count > 1 && remain_len < (4095 - 4064)) {
+        malloc_count--;
+        remain_len += 4064;
+    }
+
+    if (malloc_count > lli_info->lli_count) {
+        return -2;
+    }
+
+    lli_cfg = lli_info->llihead;
+
+    dma_ctrl_cfg.bits.TransferSize = 4064;
+    dma_ctrl_cfg.bits.I = 0;
+    /*transfer_size will be integer multiple of 4064*n or 4064*2*n or 4064*4*n,(n>0) */
+    for (uint32_t i = 0; i < malloc_count; i++) {
+        lli_cfg[i].src_addr = src_addr;
+        lli_cfg[i].dst_addr = dst_addr;
+        lli_cfg[i].nextlli = 0;
+
+        if (dma_ctrl_cfg.bits.SI) {
+            src_addr += actual_transfer_offset;
+        }
+
+        if (dma_ctrl_cfg.bits.DI) {
+            dst_addr += actual_transfer_offset;
+        }
+
+        if (i == malloc_count - 1) {
+            dma_ctrl_cfg.bits.TransferSize = remain_len;
+            dma_ctrl_cfg.bits.I = 1;
+        }
+
+        if (i) {
+            lli_cfg[i - 1].nextlli = (uint32_t)(uintptr_t)&lli_cfg[i];
+        }
+
+        lli_cfg[i].cfg = dma_ctrl_cfg;
+    }
+
+    lli_info->llitail = (dma_lli_ctrl_t *)&lli_cfg[malloc_count - 1];
+
+    return 0;
+}
+
+void dma_lli_node_append(struct dma_lli_info *last, struct dma_lli_info *next)
+{
+    last->llitail->nextlli = (uint32_t)(uintptr_t)next->llihead;
+}
+
+int dma_lli_start(struct device *dev)
+{
+    dma_device_t *dma_device = (dma_device_t *)dev;
+    struct dma_lli_info *lli_info;
+
+    if (!dlist_len(&dma_device->lli_list)) {
+        return -1;
+    }
+
+    DMA_Channel_Disable(dma_device->ch);
+
+    lli_info = dlist_first_entry(&dma_device->lli_list, struct dma_lli_info, list);
+
+    BL_WR_REG(dma_channel_base[dma_device->id][dma_device->ch], DMA_SRCADDR, lli_info->llihead->src_addr);
+    BL_WR_REG(dma_channel_base[dma_device->id][dma_device->ch], DMA_DSTADDR, lli_info->llihead->dst_addr);
+    BL_WR_REG(dma_channel_base[dma_device->id][dma_device->ch], DMA_LLI, lli_info->llihead->nextlli);
+    BL_WR_REG(dma_channel_base[dma_device->id][dma_device->ch], DMA_CONTROL, lli_info->llihead->cfg.WORD);
+
+    DMA_Channel_Enable(dma_device->ch);
+
+    return 0;
+}
+
 
 /**
  * @brief

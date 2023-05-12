@@ -28,6 +28,10 @@
 
 #include <easyflash.h>
 
+#ifdef USE_UTILS_CRC
+#include <utils_crc.h>
+#endif
+
 static const uint32_t crc32_table[] =
 {
     0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
@@ -86,6 +90,10 @@ static const uint32_t crc32_table[] =
  */
 uint32_t ef_calc_crc32(uint32_t crc, const void *buf, size_t size)
 {
+#ifdef USE_UTILS_CRC
+    (void)crc32_table;
+    return utils_crc32_accumulate(crc, buf, size);
+#else
     const uint8_t *p;
 
     p = (const uint8_t *)buf;
@@ -96,4 +104,5 @@ uint32_t ef_calc_crc32(uint32_t crc, const void *buf, size_t size)
     }
 
     return crc ^ ~0U;
+#endif
 }

@@ -118,6 +118,20 @@ typedef enum {
 }lmac154_eventTimeType_t;
 
 typedef enum {
+    LMAC154_RX_REJECT_CRC_ERR            = 0x00000001, // will reject packets that CRC check error
+    LMAC154_RX_REJECT_FRAME_TYPE_RVSD    = 0x00000002, // will reject packets that the value of frame type filed is reserved in 802.15.4 spec
+    LMAC154_RX_REJECT_FRAME_VER_RVSD     = 0x00000004, // will reject packets that the value of frame version filed is reserved in 802.15.4 spec
+    LMAC154_RX_REJECT_DST_ADDR_M_RVSD    = 0x00000008, // will reject packets that the value of dest address mode filed is reserved in 802.15.4 spec
+    LMAC154_RX_REJECT_SRC_ADDR_M_RVSD    = 0x00000010, // will reject packets that the value of src address mode filed is reserved in 802.15.4 spec
+    LMAC154_RX_REJECT_DST_PANID_MISMATCH = 0x00000020, // will reject packets that the value of dest PANID does not match with local device
+    LMAC154_RX_REJECT_DST_ADDR_MISMATCH  = 0x00000040, // will reject packets that the value of dest address does not match with local device
+    LMAC154_RX_REJECT_SRC_PANID_MISMATCH = 0x00000080, // will reject packets that the value of src PANID does not match with local device
+
+    LMAC154_RX_REJECT_NONE               = 0x00000000, // will not reject all packets above
+    LMAC154_RX_REJECT_ALL                = 0x000000ff, // will reject all packets above
+}lmac154_rx_reject_policy_t;
+
+typedef enum {
     LMAC154_RX_ACCEPT_CRC_ERR            = 0x00000001, // able to receive packets that CRC check error
     LMAC154_RX_ACCEPT_FRAME_TYPE_RVSD    = 0x00000002, // able to receive packets that the value of frame type filed is reserved in 802.15.4 spec 
     LMAC154_RX_ACCEPT_FRAME_VER_RVSD     = 0x00000004, // able to receive packets that the value of frame version filed is reserved in 802.15.4 spec 
@@ -271,6 +285,18 @@ uint32_t lmac154_is2ndStackEnabled(void);
  *
 *******************************************************************************/
 uint32_t lmac154_isDisabled(void);
+
+
+/****************************************************************************//**
+ * @brief  Monitor the hardware state
+ *         Call this function periodically (1ms recommended) if needed
+ *
+ * @param  None
+ *
+ * @return None
+ *
+*******************************************************************************/
+void lmac154_monitor(void);
 
 
 /****************************************************************************//**
@@ -742,6 +768,29 @@ void lmac154_enableFrameTypeFiltering(uint8_t frame_types);
 *******************************************************************************/
 void lmac154_disableFrameTypeFiltering(void);
 
+
+/****************************************************************************//**
+ * @brief  Set rx reject policy
+ *
+ * @param policy : enum lmac154_rx_reject_policy_t
+ *
+ * @return None
+ *
+*******************************************************************************/
+void lmac154_setRxRejectPolicy(lmac154_rx_reject_policy_t policy);
+
+
+/****************************************************************************//**
+ * @brief  Get rx reject policy
+ *
+ * @param None
+ *
+ * @return Rx reject policy
+ *
+*******************************************************************************/
+lmac154_rx_reject_policy_t lmac154_getRxRejectPolicy(void);
+
+
 /****************************************************************************//**
  * @brief  set rx accept policy
  *         
@@ -753,6 +802,7 @@ void lmac154_disableFrameTypeFiltering(void);
 *******************************************************************************/
 void lmac154_setRxAcceptPolicy(lmac154_rx_accept_policy_t policy);
 
+
 /****************************************************************************//**
  * @brief  get rx accept policy
  *         
@@ -763,6 +813,7 @@ void lmac154_setRxAcceptPolicy(lmac154_rx_accept_policy_t policy);
  *
 *******************************************************************************/
 lmac154_rx_accept_policy_t lmac154_getRxAcceptPolicy(void);
+
 
 /****************************************************************************//**
  * @brief  Set external PA

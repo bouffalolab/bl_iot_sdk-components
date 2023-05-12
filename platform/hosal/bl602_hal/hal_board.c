@@ -584,7 +584,7 @@ static void update_poweroffset_config_rftv(uint32_t tlv_addr, const char *pw_mod
                         /*incremental mode*/
                         blog_debug("Use pwr offset from f in incremental mode\r\n");
                         for (j = 0; j < sizeof(poweroffset); j++) {
-                            poweroffset[j] = (poweroffset_tmp[j] - 10)*4;
+                            poweroffset[j] += (poweroffset_tmp[j] - 10)*4;
                         }
                     }
                     goto break_scan;

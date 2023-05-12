@@ -43,6 +43,7 @@
 #include "common/instance.hpp"
 #include "common/locator_getters.hpp"
 #include "common/log.hpp"
+#include "common/num_utils.hpp"
 #include "common/random.hpp"
 #include "net/checksum.hpp"
 #include "net/ip6.hpp"
@@ -71,8 +72,8 @@ static_assert(offsetof(Tcp::Listener, mTcbListen) == 0, "mTcbListen field in otT
 
 Tcp::Tcp(Instance &aInstance)
     : InstanceLocator(aInstance)
-    , mTimer(aInstance, Tcp::HandleTimer)
-    , mTasklet(aInstance, Tcp::HandleTasklet)
+    , mTimer(aInstance)
+    , mTasklet(aInstance)
     , mEphemeralPort(kDynamicPortMin)
 {
     OT_UNUSED_VARIABLE(mEphemeralPort);
@@ -233,7 +234,11 @@ Error Tcp::Endpoint::ReceiveByReference(const otLinkedBuffer *&aBuffer)
 
 Error Tcp::Endpoint::ReceiveContiguify(void)
 {
-    return kErrorNotImplemented;
+    struct tcpcb &tp = GetTcb();
+
+    cbuf_contiguify(&tp.recvbuf, tp.reassbmp);
+
+    return kErrorNone;
 }
 
 Error Tcp::Endpoint::CommitReceive(size_t aNumBytes, uint32_t aFlags)
@@ -431,7 +436,7 @@ bool Tcp::Endpoint::FirePendingTimers(TimeMilli aNow, bool &aHasFutureTimer, Tim
             else
             {
                 aHasFutureTimer       = true;
-                aEarliestFutureExpiry = OT_MIN(aEarliestFutureExpiry, expiry);
+                aEarliestFutureExpiry = Min(aEarliestFutureExpiry, expiry);
             }
         }
     }
@@ -844,20 +849,13 @@ exit:
     return success;
 }
 
-void Tcp::HandleTimer(Timer &aTimer)
-{
-    OT_ASSERT(&aTimer == &aTimer.Get<Tcp>().mTimer);
-    LogDebg("Main TCP timer expired");
-    aTimer.Get<Tcp>().ProcessTimers();
-}
-
-void Tcp::ProcessTimers(void)
+void Tcp::HandleTimer(void)
 {
     TimeMilli now = TimerMilli::GetNow();
     bool      pendingTimer;
     TimeMilli earliestPendingTimerExpiry;
 
-    OT_ASSERT(!mTimer.IsRunning());
+    LogDebg("Main TCP timer expired");
 
     /*
      * The timer callbacks could potentially set/reset/cancel timers.
@@ -911,13 +909,6 @@ restart:
     {
         LogDebg("Did not reset main TCP timer");
     }
-}
-
-void Tcp::HandleTasklet(Tasklet &aTasklet)
-{
-    OT_ASSERT(&aTasklet == &aTasklet.Get<Tcp>().mTasklet);
-    LogDebg("TCP tasklet invoked");
-    aTasklet.Get<Tcp>().ProcessCallbacks();
 }
 
 void Tcp::ProcessCallbacks(void)
@@ -1125,7 +1116,7 @@ void tcplp_sys_log(const char *aFormat, ...)
     vsnprintf(buffer, sizeof(buffer), aFormat, args);
     va_end(args);
 
-    LogDebg(buffer);
+    LogDebg("%s", buffer);
 }
 
 void tcplp_sys_panic(const char *aFormat, ...)

@@ -106,8 +106,7 @@ private:
 
     void HandleNotifierEvents(Events aEvents);
 
-    static void HandleTimer(Timer &aTimer);
-    void        HandleTimer(void);
+    void HandleTimer(void);
 
     static void HandleCoapResponse(void *               aContext,
                                    otMessage *          aMessage,
@@ -115,18 +114,19 @@ private:
                                    Error                aResult);
     void        HandleCoapResponse(Error aResult);
 
-    static void HandleSynchronizeDataTask(Tasklet &aTasklet);
-
     void SynchronizeServerData(void);
 #if OPENTHREAD_FTD && OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE && OPENTHREAD_CONFIG_BORDER_ROUTER_REQUEST_ROUTER_ROLE
     void ScheduleRouterRoleUpgradeIfEligible(void);
     void HandleTimeTick(void);
 #endif
 
-    TimerMilli mTimer;
-    Tasklet    mSynchronizeDataTask;
-    uint32_t   mNextDelay;
-    bool       mWaitingForResponse : 1;
+    using SynchronizeDataTask = TaskletIn<Notifier, &Notifier::SynchronizeServerData>;
+    using DelayTimer          = TimerMilliIn<Notifier, &Notifier::HandleTimer>;
+
+    DelayTimer          mTimer;
+    SynchronizeDataTask mSynchronizeDataTask;
+    uint32_t            mNextDelay;
+    bool                mWaitingForResponse : 1;
 
 #if OPENTHREAD_FTD && OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE && OPENTHREAD_CONFIG_BORDER_ROUTER_REQUEST_ROUTER_ROLE
     bool    mDidRequestRouterRoleUpgrade : 1;

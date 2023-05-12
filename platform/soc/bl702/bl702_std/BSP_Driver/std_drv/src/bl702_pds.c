@@ -202,6 +202,7 @@ BL_Err_Type ATTR_TCM_SECTION PDS_Set_Pad_Config(PDS_PAD_PIN_Type pin, PDS_PAD_CF
 *******************************************************************************/
 BL_Err_Type ATTR_TCM_SECTION PDS_App_Enable(PDS_CTL_Type *cfg, PDS_CTL4_Type *cfg4, uint32_t pdsSleepCnt)
 {
+    uint32_t tmpVal=0;
     /* PDS sleep time 1~PDS_WARMUP_LATENCY_CNT <=> error */
     /* PDS sleep time >PDS_WARMUP_LATENCY_CNT <=> correct */
     if ((pdsSleepCnt) && (pdsSleepCnt <= PDS_WARMUP_LATENCY_CNT)) {
@@ -217,6 +218,15 @@ BL_Err_Type ATTR_TCM_SECTION PDS_App_Enable(PDS_CTL_Type *cfg, PDS_CTL4_Type *cf
 
     /* PDS_CTL config */
     if (cfg->pdsStart) {
+        /* clear pds int */
+        tmpVal = BL_RD_REG(PDS_BASE, PDS_INT);
+        tmpVal = BL_SET_REG_BIT(tmpVal, PDS_CR_PDS_INT_CLR);
+        BL_WR_REG(PDS_BASE, PDS_INT, tmpVal);
+
+        tmpVal = BL_RD_REG(PDS_BASE, PDS_INT);
+        tmpVal = BL_CLR_REG_BIT(tmpVal, PDS_CR_PDS_INT_CLR);
+        BL_WR_REG(PDS_BASE, PDS_INT, tmpVal);
+
         BL_WR_REG(PDS_BASE, PDS_CTL, (*(uint32_t *)cfg & ~(1 << 0)));
         BL_WR_REG(PDS_BASE, PDS_CTL, (*(uint32_t *)cfg | (1 << 0)));
     } else {

@@ -83,6 +83,8 @@ aos_loop_t aos_loop_init(void)
     ctx = pvPortMalloc(sizeof(*g_main_ctx));
     if (ctx) {
         memset(ctx, 0, sizeof(*g_main_ctx));
+    } else {
+        return NULL;
     }
     if (!g_main_ctx) {
         g_main_ctx = ctx;

@@ -9,6 +9,32 @@
 
 void otPlatReset(otInstance *aInstance) 
 {
+#if CFG_USE_PSRAM
+
+extern uint8_t _heap_size; // @suppress("Type cannot be resolved")
+extern uint8_t _heap2_size; // @suppress("Type cannot be resolved")
+extern uint8_t _heap3_size; // @suppress("Type cannot be resolved")
+extern unsigned int xPortGetMinimumEverFreeHeapSize( void );
+extern unsigned int xPortGetMinimumEverFreeHeapSizePsram( void );
+
+    printf ("otPlatReset sram = %u/%u, psram = %u/%u\r\n", 
+        (unsigned int) &_heap_size + (unsigned int) &_heap2_size - xPortGetMinimumEverFreeHeapSize(), 
+        (unsigned int) &_heap_size + (unsigned int) &_heap2_size,
+        (unsigned int) &_heap3_size - xPortGetMinimumEverFreeHeapSizePsram(),
+        (unsigned int) &_heap3_size);
+
+    vTaskDelay(500);
+#else
+extern uint8_t _heap_size; // @suppress("Type cannot be resolved")
+extern uint8_t _heap2_size; // @suppress("Type cannot be resolved")
+extern unsigned int xPortGetMinimumEverFreeHeapSize( void );
+
+    printf ("otPlatReset sram = %u/%u\r\n", 
+        (unsigned int) &_heap_size + (unsigned int) &_heap2_size - xPortGetMinimumEverFreeHeapSize(), 
+        (unsigned int) &_heap_size + (unsigned int) &_heap2_size);
+    
+    vTaskDelay(500);
+#endif
     bl_sys_reset_por();
 }
 

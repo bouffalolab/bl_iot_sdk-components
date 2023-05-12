@@ -207,9 +207,9 @@ void TestNetifMulticastAddresses(void)
 
 } // namespace ot
 
-extern "C" int test_netif(void)
+int main(void)
 {
     ot::TestNetifMulticastAddresses();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

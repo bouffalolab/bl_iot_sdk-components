@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
         stack_array[i] = i;
     }
 
-    printf("stack_array[%d] = %d\r\n", array_index, stack_array[array_index]);
+    printf("stack_array[%d] = %d\n", array_index, stack_array[array_index]);
 
     return 0;
 }

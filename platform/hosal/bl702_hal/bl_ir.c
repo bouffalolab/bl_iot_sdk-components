@@ -28,6 +28,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "bl_ir.h"
+#include "bl_irq.h"
+
+
+static void bl_ir_irq(void)
+{
+    IR_Disable(IR_TX);
+    IR_IntMask(IR_INT_TX, MASK);
+    IR_ClrIntStatus(IR_INT_TX);
+
+    bl_ir_swm_tx_done_callback();
+}
 
 
 void bl_ir_led_drv_cfg(uint8_t led0_en, uint8_t led1_en)
@@ -134,10 +145,14 @@ void bl_ir_rc5_tx_cfg(void)
     bl_ir_custom_tx_cfg(&txCfg, &txPWCfg);
 }
 
-void bl_ir_swm_tx_cfg(void)
+void bl_ir_swm_tx_cfg(float freq_hz, float duty_cycle)
 {
+    uint16_t mod_width = (uint16_t)(2000000 / freq_hz);
+    uint8_t mod_width_0 = (uint8_t)(mod_width * duty_cycle + 0.5);
+    uint8_t mod_width_1 = mod_width - mod_width_0;
+
     IR_TxCfg_Type txCfg = {
-        22,                                                  /* Send 22 tx fifo data */
+        1,                                                   /* Number of pulse */
         DISABLE,                                             /* Don't care when SWM is enabled */
         DISABLE,                                             /* Don't care when SWM is enabled */
         DISABLE,                                             /* Don't care when SWM is enabled */
@@ -158,12 +173,15 @@ void bl_ir_swm_tx_cfg(void)
         0,                                                   /* Don't care when SWM is enabled */
         0,                                                   /* Don't care when SWM is enabled */
         0,                                                   /* Don't care when SWM is enabled */
-        35,                                                  /* Modulation phase 1 width, 37.7kHz, duty=1/3 */
-        18,                                                  /* Modulation phase 0 width, 37.7kHz, duty=1/3 */
-        1778                                                 /* Pulse width unit */
+        mod_width_1,                                         /* Modulation phase 1 width */
+        mod_width_0,                                         /* Modulation phase 0 width */
+        1125                                                 /* Pulse width unit */
     };
 
     bl_ir_custom_tx_cfg(&txCfg, &txPWCfg);
+
+    bl_irq_register(IRTX_IRQn, bl_ir_irq);
+    bl_irq_enable(IRTX_IRQn);
 }
 
 void bl_ir_nec_tx(uint32_t wdata)
@@ -178,8 +196,46 @@ void bl_ir_rc5_tx(uint32_t wdata)
     IR_SendCommand(0, wdata);
 }
 
-void bl_ir_swm_tx(uint16_t *data, uint8_t len)
+void bl_ir_swm_tx(int pw_unit, int pw_mul, int out_level)
 {
+    uint32_t tmpVal;
+    uint32_t pwVal;
+
+    if(pw_unit > 4096){
+        pw_unit = 4096;
+    }
+
+    if(pw_unit < 1){
+        pw_unit = 1;
+    }
+
+    if(pw_mul > 16){
+        pw_mul = 16;
+    }
+
+    if(pw_mul < 1){
+        pw_mul = 1;
+    }
+
+    tmpVal = BL_RD_REG(IR_BASE, IRTX_PULSE_WIDTH);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_PW_UNIT, pw_unit - 1);
+    BL_WR_REG(IR_BASE, IRTX_PULSE_WIDTH, tmpVal);
+
+    tmpVal = BL_RD_REG(IR_BASE, IRTX_CONFIG);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_MOD_EN, !!out_level);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_OUT_INV, !out_level);
+    BL_WR_REG(IR_BASE, IRTX_CONFIG, tmpVal);
+
+    pwVal = (pw_mul - 1) & 0x0F;
+    BL_WR_REG(IR_BASE, IRTX_SWM_PW_0, pwVal);
+
+    IR_ClrIntStatus(IR_INT_TX);
+    IR_IntMask(IR_INT_TX, UNMASK);
     IR_TxSWM(ENABLE);
-    IR_SWMSendCommand(data, len);
+    IR_Enable(IR_TX);
+}
+
+__attribute__((weak)) void bl_ir_swm_tx_done_callback(void)
+{
+    
 }

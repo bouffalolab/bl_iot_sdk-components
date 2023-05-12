@@ -71,11 +71,11 @@ uint8_t adc_check_channel_status(uint8_t *pos_list, uint8_t *neg_list, uint16_t 
         }
 
         if (GLB_GPIO_Get_Fun(channel_io_reference_table[pos_list[i]]) != GPIO_FUN_ANALOG) {
-            return ERROR;
+            return -1;
         }
     }
 
-    return SUCCESS;
+    return 0;
 }
 /**
  * @brief
@@ -136,7 +136,7 @@ int adc_open(struct device *dev, uint16_t oflag)
     ADC_Init(&adc_cfg);
 
     ADC_FIFO_Cfg(&adc_fifo_cfg);
-
+    ADC_IntClr(ADC_INT_ADC_READY);
     return 0;
 }
 /**
@@ -211,15 +211,9 @@ int adc_control(struct device *dev, int cmd, void *args)
             break;
         }
 
-        case DEVICE_CTRL_GET_INT:
-            break;
-
-        case DEVICE_CTRL_CONFIG:
-            break;
-
         case DEVICE_CTRL_ADC_CHANNEL_CONFIG:
             if (adc_channel_cfg->num == 1) {
-                ADC_Channel_Config(*adc_channel_cfg->pos_channel, *adc_channel_cfg->neg_channel, adc_device->continuous_conv_mode);
+                ADC_Channel_Config(adc_channel_cfg->pos_channel[0], adc_channel_cfg->neg_channel[0], adc_device->continuous_conv_mode);
                 rlt = adc_check_channel_status(adc_channel_cfg->pos_channel, adc_channel_cfg->neg_channel, 1);
             } else {
                 ADC_Scan_Channel_Config(adc_channel_cfg->pos_channel, adc_channel_cfg->neg_channel, adc_channel_cfg->num, adc_device->continuous_conv_mode);
@@ -285,8 +279,7 @@ int adc_control(struct device *dev, int cmd, void *args)
         case DEVICE_CTRL_ADC_DATA_PARSE: {
             adc_data_parse_t *parse = (adc_data_parse_t *)args;
             ADC_Parse_Result(parse->input, parse->num, (ADC_Result_Type *)parse->output);
-        }
-        break;
+        } break;
         default:
             break;
     }

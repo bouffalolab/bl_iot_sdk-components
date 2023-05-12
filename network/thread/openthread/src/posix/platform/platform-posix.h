@@ -49,6 +49,7 @@
 #include <openthread/instance.h>
 #include <openthread/ip6.h>
 #include <openthread/logging.h>
+#include <openthread/nat64.h>
 #include <openthread/openthread-system.h>
 #include <openthread/platform/time.h>
 
@@ -243,7 +244,7 @@ void platformUartProcess(const fd_set *aReadFdSet, const fd_set *aWriteFdSet, co
  * @param[in]   aInterfaceName  A pointer to Thread network interface name.
  *
  */
-void platformNetifInit(const char *aInterfaceName);
+void platformNetifInit(otPlatformConfig *aPlatformConfig);
 
 /**
  * This function sets up platform netif.
@@ -446,6 +447,11 @@ extern char gNetifName[IFNAMSIZ];
  *
  */
 extern unsigned int gNetifIndex;
+
+/**
+ * The CIDR for NAT64
+ */
+extern otIp4Cidr gNat64Cidr;
 
 /**
  * This function initializes platform Backbone network.

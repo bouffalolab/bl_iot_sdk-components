@@ -763,7 +763,7 @@ BL_Err_Type GLB_Set_DAC_CLK(uint8_t enable, GLB_DAC_CLK_Type clkSel, uint8_t div
 /*----------*/
 BL_Err_Type GLB_Set_DIG_CLK_Sel(GLB_DIG_CLK_Type clkSel);
 BL_Err_Type GLB_Set_DIG_512K_CLK(uint8_t enable, uint8_t compensation, uint8_t div);
-BL_Err_Type GLB_Set_DIG_32K_CLK(uint8_t enable, uint8_t compensation, uint8_t div);
+BL_Err_Type GLB_Set_DIG_32K_CLK(uint8_t enable, uint8_t compensation, uint16_t div);
 /*----------*/
 BL_Err_Type GLB_Set_BT_Coex_Signal(uint8_t enable, GLB_BT_BANDWIDTH_Type bandWidth,
                                    uint8_t pti, uint8_t channel);
@@ -811,6 +811,8 @@ GLB_GPIO_INT_CONTROL_Type GLB_Get_GPIO_Int2CtlMod(GLB_GPIO_Type gpioPin);
 BL_Err_Type GLB_GPIO_INT0_IRQHandler_Install(void);
 BL_Err_Type GLB_GPIO_INT0_Callback_Install(GLB_GPIO_Type gpioPin, intCallback_Type *cbFun);
 BL_Err_Type GLB_GPIO_INT0_Callback_Install2(GLB_GPIO_Type gpioPin, intCallback_Type *cbFun);
+/*----------*/
+BL_Err_Type GLB_Switch_System_CLK(GLB_DLL_XTAL_Type xtalType,GLB_SYS_CLK_Type clkFreq, uint8_t hclkDiv,uint8_t bclkDiv);
 /*----------*/;
 
 /*@} end of group GLB_Public_Functions */

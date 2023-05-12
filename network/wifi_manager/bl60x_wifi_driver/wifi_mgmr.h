@@ -36,7 +36,11 @@
 #include "lmac_mac.h"
 #include "bl_os_private.h"
 
+#ifdef CFG_NETBUS_WIFI_ENABLE
+#define WIFI_MGMR_SCAN_ITEMS_MAX (30)
+#else
 #define WIFI_MGMR_SCAN_ITEMS_MAX (50)
+#endif
 #define WIFI_MGMR_PROFILES_MAX (2)
 #define WIFI_MGMR_MQ_MSG_COUNT (10)
 
@@ -361,6 +365,7 @@ char *wifi_mgmr_auth_to_str(uint8_t auth);
 char *wifi_mgmr_cipher_to_str(uint8_t cipher);
 int wifi_mgmr_api_fw_tsen_reload(void);
 int wifi_mgmr_scan_beacon_save( wifi_mgmr_scan_item_t *scan );
+int wifi_mgmr_api_fw_powersaving_get(void);
 
 static inline int wifi_mgmr_scan_item_is_timeout(wifi_mgmr_t *mgmr, wifi_mgmr_scan_item_t *item)
 {

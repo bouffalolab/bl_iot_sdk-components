@@ -37,62 +37,67 @@
 #define __HAL_BOOT2_H__
 
 #ifdef __cplusplus
-extern "C"{
+extern "C" {
 #endif
 
 #include "hal_common.h"
 #include "bl702_sflash.h"
 #include "bl702_glb.h"
+#include "bl702_uart.h"
+#include "bl702_clock.h"
+#include "bl702_sec_eng.h"
 
 #define BL_TCM_BASE           BL702_TCM_BASE
 #define BL_SYS_CLK_PLL        GLB_SYS_CLK_DLL144M
 #define BL_SFLASH_CLK         GLB_SFLASH_CLK_72M
 #define HAL_PLL_CFG_MAGICCODE "PCFG"
 
-#define HAL_BOOT2_PK_HASH_SIZE                256 / 8
-#define HAL_BOOT2_IMG_HASH_SIZE               256 / 8
-#define HAL_BOOT2_ECC_KEYXSIZE                256 / 8
-#define HAL_BOOT2_ECC_KEYYSIZE                256 / 8
-#define HAL_BOOT2_SIGN_MAXSIZE                (2048 / 8)
-#define HAL_BOOT2_DEADBEEF_VAL                0xdeadbeef
-#define HAL_BOOT2_CPU0_MAGIC                  "BFNP"
-#define HAL_BOOT2_CPU1_MAGIC                  "BFAP"
-#define HAL_BOOT2_CP_FLAG                     0x02
-#define HAL_BOOT2_MP_FLAG                     0x01
-#define HAL_BOOT2_SP_FLAG                     0x00
+#define HAL_BOOT2_PK_HASH_SIZE  256 / 8
+#define HAL_BOOT2_IMG_HASH_SIZE 256 / 8
+#define HAL_BOOT2_ECC_KEYXSIZE  256 / 8
+#define HAL_BOOT2_ECC_KEYYSIZE  256 / 8
+#define HAL_BOOT2_SIGN_MAXSIZE  (2048 / 8)
+#define HAL_BOOT2_DEADBEEF_VAL  0xdeadbeef
+#define HAL_BOOT2_CPU0_MAGIC    "BFNP"
+#define HAL_BOOT2_CPU1_MAGIC    "BFAP"
+#define HAL_BOOT2_CP_FLAG       0x02
+#define HAL_BOOT2_MP_FLAG       0x01
+#define HAL_BOOT2_SP_FLAG       0x00
 
 #define HAL_BOOT2_SUPPORT_DECOMPRESS          1 /* 1 support decompress, 0 not support */
 #define HAL_BOOT2_SUPPORT_USB_IAP             0 /* 1 support decompress, 0 not support */
 #define HAL_BOOT2_SUPPORT_EFLASH_LOADER_RAM   1 /* 1 support decompress, 0 not support */
-#define HAL_BOOT2_SUPPORT_EFLASH_LOADER_FLASH 0 /* 1 support decompress, 0 not support */
+#define HAL_BOOT2_SUPPORT_EFLASH_LOADER_FLASH 1 /* 1 support decompress, 0 not support */
+#define HAL_BOOT2_SUPPORT_SIGN_ENCRYPT        1 /* 1 support sign and encrypt, 0 not support */
 
-#define HAL_BOOT2_CPU_GROUP_MAX               1
-#define HAL_BOOT2_CPU_MAX                     1
-#define HAL_BOOT2_RAM_IMG_COUNT_MAX           0
+#define HAL_BOOT2_CPU_GROUP_MAX     1
+#define HAL_BOOT2_CPU_MAX           1
+#define HAL_BOOT2_RAM_IMG_COUNT_MAX 0
 
-#define HAL_BOOT2_FW_IMG_OFFSET_AFTER_HEADER  4*1024  
-#define HAL_BOOT2_MFG_START_REQUEST_OFFSET    8*1024  
+#define HAL_BOOT2_FW_IMG_OFFSET_AFTER_HEADER 4 * 1024
+#define HAL_BOOT2_MFG_START_REQUEST_OFFSET   8 * 1024
+#define UART_FIFO_MAX_LEN        128
+#define UART_DEFAULT_RTO_TIMEOUT 100
 typedef struct
 {
-    uint8_t encrypted[HAL_BOOT2_CPU_GROUP_MAX];
-    uint8_t sign[HAL_BOOT2_CPU_GROUP_MAX];
+    uint32_t encrypted[HAL_BOOT2_CPU_GROUP_MAX];
+    uint32_t sign[HAL_BOOT2_CPU_GROUP_MAX];
     uint8_t hbn_check_sign;
     uint8_t rsvd[1];
     uint8_t chip_id[8];
-    uint8_t pk_hash_cpu0[HAL_BOOT2_PK_HASH_SIZE];
-    uint8_t pk_hash_cpu1[HAL_BOOT2_PK_HASH_SIZE];
+    uint32_t pk_hash_cpu0[HAL_BOOT2_PK_HASH_SIZE];
+    uint32_t pk_hash_cpu1[HAL_BOOT2_PK_HASH_SIZE];
     uint8_t uart_download_cfg;
     uint8_t sf_pin_cfg;
     uint8_t keep_dbg_port_closed;
     uint8_t boot_pin_cfg;
 } boot2_efuse_hw_config;
 
-struct __attribute__((packed, aligned(4))) hal_flash_config 
-{
+struct __attribute__((packed, aligned(4))) hal_flash_config {
     uint32_t magicCode; /*'FCFG'*/
     SPI_Flash_Cfg_Type cfg;
     uint32_t crc32;
-} ;
+};
 
 typedef struct
 {
@@ -112,7 +117,6 @@ typedef struct
     hal_sys_clk_config cfg;
     uint32_t crc32;
 } hal_pll_config;
-
 
 struct __attribute__((packed, aligned(4))) hal_basic_cfg_t {
     uint32_t sign_type          : 2; /* [1: 0]   for sign */
@@ -136,31 +140,29 @@ struct __attribute__((packed, aligned(4))) hal_basic_cfg_t {
     uint32_t dcache_invalid     : 1; /* [30] dcache invalid */
     uint32_t fpga_halt_release  : 1; /* [31] FPGA halt release function */
 
-    uint32_t group_image_offset;     /* flash controller offset */
-    uint32_t aes_region_len;         /* aes region length */
+    uint32_t group_image_offset; /* flash controller offset */
+    uint32_t aes_region_len;     /* aes region length */
 
-    uint32_t img_len_cnt;            /* image length or segment count */
-    uint32_t hash[8];                /* hash of the image */
+    uint32_t img_len_cnt; /* image length or segment count */
+    uint32_t hash[8];     /* hash of the image */
 };
 
 struct __attribute__((packed, aligned(4))) hal_cpu_cfg_t {
-    uint8_t config_enable;          /* coinfig this cpu */
-    uint8_t halt_cpu;               /* halt this cpu */
-    uint8_t cache_enable  : 1;      /* cache setting */
-    uint8_t cache_wa      : 1;      /* cache setting */
-    uint8_t cache_wb      : 1;      /* cache setting */
-    uint8_t cache_wt      : 1;      /* cache setting */
-    uint8_t cache_way_dis : 4;      /* cache setting */
+    uint8_t config_enable;     /* coinfig this cpu */
+    uint8_t halt_cpu;          /* halt this cpu */
+    uint8_t cache_enable  : 1; /* cache setting */
+    uint8_t cache_wa      : 1; /* cache setting */
+    uint8_t cache_wb      : 1; /* cache setting */
+    uint8_t cache_wt      : 1; /* cache setting */
+    uint8_t cache_way_dis : 4; /* cache setting */
     uint8_t rsvd;
 
-    uint32_t image_address_offset;  /* image address on flash */
-    uint32_t boot_entry;            /* entry point of the m0 image */
-    uint32_t msp_val;               /* msp value */
+    uint32_t image_address_offset; /* image address on flash */
+    uint32_t boot_entry;           /* entry point of the m0 image */
+    uint32_t msp_val;              /* msp value */
 };
 
-
-struct  hal_bootheader_t
-{
+struct hal_bootheader_t {
     uint32_t magicCode; /*'BFXP'*/
     uint32_t rivison;
     struct hal_flash_config flash_cfg;
@@ -208,7 +210,7 @@ struct  hal_bootheader_t
     uint32_t rsv1;
     uint32_t rsv2;
     uint32_t crc32;
-} ;
+};
 
 typedef struct
 {
@@ -220,7 +222,7 @@ typedef struct
 
     struct hal_cpu_cfg_t cpu_cfg[HAL_BOOT2_CPU_MAX];
 
-    uint8_t aes_iv[16 + 4];                         //iv in boot header
+    uint8_t aes_iv[16 + 4]; //iv in boot header
 
     uint8_t eckye_x[HAL_BOOT2_ECC_KEYXSIZE];  //ec key in boot header
     uint8_t eckey_y[HAL_BOOT2_ECC_KEYYSIZE];  //ec key in boot header
@@ -236,11 +238,10 @@ extern boot2_efuse_hw_config g_efuse_cfg;
 extern uint8_t g_ps_mode;
 extern uint32_t g_user_hash_ignored;
 extern struct device *dev_check_hash;
-
-
+extern SEC_Eng_SHA256_Ctx sha_ctx;
 
 void hal_boot2_init_clock(void);
-uint32_t hal_boot2_custom(void);
+uint32_t hal_boot2_custom(void *custom_param);
 void hal_boot2_reset_sec_eng(void);
 void hal_boot2_sw_system_reset(void);
 void hal_boot2_set_psmode_status(uint32_t flag);
@@ -260,14 +261,15 @@ void hal_boot2_debug_uart_gpio_deinit(void);
 int32_t hal_boot_parse_bootheader(boot2_image_config *boot_img_cfg, uint8_t *data);
 void hal_boot2_clean_cache(void);
 BL_Err_Type hal_boot2_set_cache(uint8_t cont_read, boot2_image_config *boot_img_cfg);
-void hal_boot2_get_ram_img_cnt(char* img_name[],uint32_t *ram_img_cnt );
-void hal_boot2_get_img_info(uint8_t *data, uint32_t *image_offset, uint32_t *img_len,uint8_t **hash);
+void hal_boot2_get_ram_img_cnt(char *img_name[], uint32_t *ram_img_cnt);
+void hal_boot2_get_img_info(uint8_t *data, uint32_t *image_offset, uint32_t *img_len, uint8_t **hash);
 void hal_boot2_release_cpu(uint32_t core, uint32_t boot_addr);
 uint32_t hal_boot2_get_xip_addr(uint32_t flash_addr);
 uint32_t hal_boot2_get_grp_count(void);
 uint32_t hal_boot2_get_cpu_count(void);
 uint32_t hal_boot2_get_feature_flag(void);
 uint32_t hal_boot2_get_bootheader_offset(void);
+int32_t hal_boot2_get_app_version_from_efuse(uint8_t *version);
 #ifdef __cplusplus
 }
 #endif

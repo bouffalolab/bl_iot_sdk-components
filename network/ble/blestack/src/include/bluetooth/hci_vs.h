@@ -133,7 +133,7 @@ struct bt_hci_cp_vs_set_scan_req_reports {
 } __packed;
 #endif //BFLB_BLE
 
-#if defined(BL616)
+#if defined(BL616) || defined(BL702L)
 #define BT_HCI_OP_VS_SET_TX_PWR             BT_OP(BT_OGF_VS, 0x0073)
 #else
 #define BT_HCI_OP_VS_SET_TX_PWR             BT_OP(BT_OGF_VS, 0x0061)
@@ -323,6 +323,18 @@ struct bt_hci_evt_mesh_scanning_report {
 	u8_t num_reports;
 	struct bt_hci_evt_mesh_scan_report reports[0];
 } __packed;
+
+#define HCI_VS_BT_A2DP_STATUS_CMD_OPCODE        BT_OP(BT_OGF_VS, 0x0076)
+struct bt_hci_cp_vs_set_a2dp_status {
+    u16_t conhdl;
+    u8_t status;
+}__packed;
+
+#define HCI_VS_BT_A2DP_DUTY_CYCLE_CMD_OPCODE    BT_OP(BT_OGF_VS, 0x0077)
+struct hci_vsc_set_a2dp_duty_cycle_cmd {
+    u8_t duty_cycle;
+}__packed;
+
 
 #ifdef __cplusplus
 }

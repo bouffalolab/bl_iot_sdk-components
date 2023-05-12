@@ -121,6 +121,8 @@ static int __uart_tx_irq(void *p_arg)
     return 0;
 }
 
+hosal_uart_dev_t *g_vfs_uart = NULL;
+
 int vfs_uart_open(inode_t *inode, file_t *fp)
 {
     int ret = -1;                /* return value */
@@ -133,6 +135,7 @@ int vfs_uart_open(inode_t *inode, file_t *fp)
         if (fp->node->refs == 1) {
             /* get the device pointer. */
             uart_dev = (vfs_uart_dev_t *)(fp->node->i_arg);
+            g_vfs_uart = &uart_dev->uart;
 
             aos_mutex_new((aos_mutex_t*)&(uart_dev->mutex));
             uart_dev->rx_ringbuf_handle = xStreamBufferCreate(uart_dev->rx_buf_size, 1);

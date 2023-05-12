@@ -356,27 +356,27 @@ void TestBuffer(void)
     ncpBuffer.SetFrameAddedCallback(FrameAddedCallback, &sContext);
     ncpBuffer.SetFrameRemovedCallback(FrameRemovedCallback, &sContext);
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 1: Check initial buffer state");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 1: Check initial buffer state");
 
     VerifyOrQuit(ncpBuffer.IsEmpty(), "Not empty after init.");
     VerifyOrQuit(ncpBuffer.InFrameGetLastTag() == Spinel::Buffer::kInvalidTag, "Incorrect tag after init.");
     VerifyOrQuit(ncpBuffer.OutFrameGetTag() == Spinel::Buffer::kInvalidTag, "Incorrect OutFrameTag after init.");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 2: Write and read a single frame");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 2: Write and read a single frame");
 
     WriteTestFrame1(ncpBuffer, Spinel::Buffer::kPriorityLow);
-    DumpBuffer("\r\nBuffer after frame1 (low priority)", buffer, kTestBufferSize);
-    printf("\r\nFrameLen is %u", ncpBuffer.OutFrameGetLength());
+    DumpBuffer("\nBuffer after frame1 (low priority)", buffer, kTestBufferSize);
+    printf("\nFrameLen is %u", ncpBuffer.OutFrameGetLength());
     VerifyAndRemoveFrame1(ncpBuffer);
 
     WriteTestFrame1(ncpBuffer, Spinel::Buffer::kPriorityHigh);
-    DumpBuffer("\r\nBuffer after frame1 (high priority)", buffer, kTestBufferSize);
-    printf("\r\nFrameLen is %u", ncpBuffer.OutFrameGetLength());
+    DumpBuffer("\nBuffer after frame1 (high priority)", buffer, kTestBufferSize);
+    printf("\nFrameLen is %u", ncpBuffer.OutFrameGetLength());
     VerifyAndRemoveFrame1(ncpBuffer);
 
-    printf("\r\nIterations: ");
+    printf("\nIterations: ");
 
     // Always add as low priority.
     for (j = 0; j < kTestIterationAttemps; j++)
@@ -411,24 +411,24 @@ void TestBuffer(void)
         VerifyOrQuit(ncpBuffer.IsEmpty(), "IsEmpty() is incorrect when buffer is empty.");
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 3: Multiple frames write and read (same priority)");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 3: Multiple frames write and read (same priority)");
 
     WriteTestFrame2(ncpBuffer, Spinel::Buffer::kPriorityLow);
     WriteTestFrame3(ncpBuffer, Spinel::Buffer::kPriorityLow);
     WriteTestFrame2(ncpBuffer, Spinel::Buffer::kPriorityLow);
     WriteTestFrame2(ncpBuffer, Spinel::Buffer::kPriorityLow);
 
-    DumpBuffer("\r\nBuffer after multiple frames", buffer, kTestBufferSize);
+    DumpBuffer("\nBuffer after multiple frames", buffer, kTestBufferSize);
 
     VerifyAndRemoveFrame2(ncpBuffer);
     VerifyAndRemoveFrame3(ncpBuffer);
     VerifyAndRemoveFrame2(ncpBuffer);
     VerifyAndRemoveFrame2(ncpBuffer);
 
-    printf("\r\nIterations: ");
+    printf("\nIterations: ");
 
     // Repeat this multiple times.
     for (j = 0; j < kTestIterationAttemps; j++)
@@ -452,10 +452,10 @@ void TestBuffer(void)
         VerifyOrQuit(ncpBuffer.IsEmpty(), "IsEmpty() is incorrect when buffer is empty.");
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 4: Multiple frames write and read (mixed priority)");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 4: Multiple frames write and read (mixed priority)");
 
     WriteTestFrame2(ncpBuffer, Spinel::Buffer::kPriorityLow);
     WriteTestFrame3(ncpBuffer, Spinel::Buffer::kPriorityHigh);
@@ -507,12 +507,12 @@ void TestBuffer(void)
     VerifyAndRemoveFrame4(ncpBuffer);
     VerifyAndRemoveFrame1(ncpBuffer);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 5: Frame discard when buffer full and partial read restart");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 5: Frame discard when buffer full and partial read restart");
 
-    printf("\r\nIterations: ");
+    printf("\nIterations: ");
 
     for (j = 0; j < kTestIterationAttemps; j++)
     {
@@ -563,10 +563,10 @@ void TestBuffer(void)
         VerifyOrQuit(ncpBuffer.IsEmpty(), "IsEmpty() is incorrect when buffer is empty.");
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 6: Clear() and empty buffer method tests");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 6: Clear() and empty buffer method tests");
 
     WriteTestFrame1(ncpBuffer, Spinel::Buffer::kPriorityLow);
 
@@ -592,10 +592,10 @@ void TestBuffer(void)
     VerifyOrQuit(ncpBuffer.OutFrameGetLength() == 0,
                  "OutFrameGetLength() returned non-zero length when buffer is empty.");
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 7: OutFrameRead() in parts\r\n");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 7: OutFrameRead() in parts\n");
 
     ncpBuffer.InFrameBegin(Spinel::Buffer::kPriorityLow);
     SuccessOrQuit(ncpBuffer.InFrameFeedData(sMottoText, sizeof(sMottoText)));
@@ -618,30 +618,30 @@ void TestBuffer(void)
 
     SuccessOrQuit(ncpBuffer.OutFrameRemove());
 
-    printf("\r\n -- PASS\r\n");
+    printf("\n -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 8: Remove a frame without reading it first");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 8: Remove a frame without reading it first");
 
     WriteTestFrame1(ncpBuffer, Spinel::Buffer::kPriorityLow);
     WriteTestFrame2(ncpBuffer, Spinel::Buffer::kPriorityLow);
     VerifyOrQuit(ncpBuffer.OutFrameGetLength() == kTestFrame1Size);
     SuccessOrQuit(ncpBuffer.OutFrameRemove());
     VerifyAndRemoveFrame2(ncpBuffer);
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 9: Check length when front frame gets changed (a higher priority frame is added)");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 9: Check length when front frame gets changed (a higher priority frame is added)");
     WriteTestFrame1(ncpBuffer, Spinel::Buffer::kPriorityLow);
     VerifyOrQuit(ncpBuffer.OutFrameGetLength() == kTestFrame1Size);
     WriteTestFrame3(ncpBuffer, Spinel::Buffer::kPriorityHigh);
     VerifyOrQuit(ncpBuffer.OutFrameGetLength() == kTestFrame3Size);
     VerifyAndRemoveFrame3(ncpBuffer);
     VerifyAndRemoveFrame1(ncpBuffer);
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 10: Active out frame remaining unchanged when a higher priority frame is written while reading it");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 10: Active out frame remaining unchanged when a higher priority frame is written while reading it");
     WriteTestFrame1(ncpBuffer, Spinel::Buffer::kPriorityLow);
     VerifyOrQuit(ncpBuffer.OutFrameGetLength() == kTestFrame1Size);
     SuccessOrQuit(ncpBuffer.OutFrameBegin());
@@ -687,10 +687,10 @@ void TestBuffer(void)
     VerifyAndRemoveFrame3(ncpBuffer);
     VerifyAndRemoveFrame2(ncpBuffer);
     VerifyAndRemoveFrame4(ncpBuffer);
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\n Test 11: Read and remove in middle of an active input frame write");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\n Test 11: Read and remove in middle of an active input frame write");
     WriteTestFrame1(ncpBuffer, Spinel::Buffer::kPriorityLow);
     ncpBuffer.InFrameBegin(Spinel::Buffer::kPriorityHigh);
     SuccessOrQuit(ncpBuffer.InFrameFeedData(sOpenThreadText, sizeof(sOpenThreadText)));
@@ -714,10 +714,10 @@ void TestBuffer(void)
     VerifyOrQuit(ncpBuffer.IsEmpty());
     SuccessOrQuit(ncpBuffer.InFrameEnd());
     VerifyAndRemoveFrame4(ncpBuffer);
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\n Test 12: Check returned error status");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\n Test 12: Check returned error status");
     WriteTestFrame1(ncpBuffer, Spinel::Buffer::kPriorityLow);
     ncpBuffer.InFrameBegin(Spinel::Buffer::kPriorityHigh);
     VerifyOrQuit(ncpBuffer.InFrameFeedData(buffer, sizeof(buffer)) == OT_ERROR_NO_BUFS);
@@ -745,10 +745,10 @@ void TestBuffer(void)
     WriteTestFrame1(ncpBuffer, Spinel::Buffer::kPriorityHigh);
     VerifyAndRemoveFrame1(ncpBuffer);
     VerifyOrQuit(ncpBuffer.IsEmpty());
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\n Test 13: Ensure we can utilize the full buffer size when frames removed during write");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\n Test 13: Ensure we can utilize the full buffer size when frames removed during write");
     WriteTestFrame1(ncpBuffer, Spinel::Buffer::kPriorityHigh);
     WriteTestFrame2(ncpBuffer, Spinel::Buffer::kPriorityLow);
     ncpBuffer.InFrameBegin(Spinel::Buffer::kPriorityHigh);
@@ -766,11 +766,11 @@ void TestBuffer(void)
     SuccessOrQuit(ncpBuffer.InFrameFeedData(buffer, sizeof(buffer) - 4));
     SuccessOrQuit(ncpBuffer.InFrameEnd());
     SuccessOrQuit(ncpBuffer.OutFrameRemove());
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\n Test 14: Test InFrameOverwrite ");
-    printf("\r\nIterations: ");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\n Test 14: Test InFrameOverwrite ");
+    printf("\nIterations: ");
 
     for (j = 0; j < kTestIterationAttemps; j++)
     {
@@ -812,11 +812,11 @@ void TestBuffer(void)
         VerifyOrQuit(ncpBuffer.InFrameGetPosition(pos2) == OT_ERROR_INVALID_STATE);
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\n Test 15: Test InFrameReset()");
-    printf("\r\nIterations: ");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\n Test 15: Test InFrameReset()");
+    printf("\nIterations: ");
 
     for (j = 0; j < kTestIterationAttemps; j++)
     {
@@ -854,7 +854,7 @@ void TestBuffer(void)
         SuccessOrQuit(ncpBuffer.OutFrameRemove());
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
     testFreeInstance(sInstance);
 }
@@ -1047,7 +1047,7 @@ void TestFuzzBuffer(void)
         }
     }
 
-    printf("\r\n -- PASS\r\n");
+    printf("\n -- PASS\n");
 
     testFreeInstance(sInstance);
 }
@@ -1055,10 +1055,10 @@ void TestFuzzBuffer(void)
 } // namespace Spinel
 } // namespace ot
 
-extern "C" int test_spinel_buffer(void)
+int main(void)
 {
     ot::Spinel::TestBuffer();
     ot::Spinel::TestFuzzBuffer();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }

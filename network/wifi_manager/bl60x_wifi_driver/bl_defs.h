@@ -253,6 +253,7 @@ struct bl_vif {
     u8 links_num;
     u8 fixed_sta_idx;
     u8 fc_chan;
+    u8 sta_ps;                 /* Only for VIF_STA for now */
 
 #if 0
     union

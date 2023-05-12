@@ -306,6 +306,7 @@ int bl_dma_irq_register(int channel, void *tc_handler, void *interr_handler, voi
     pstnode = pvPortMalloc(sizeof(struct dma_node)); 
     if (pstnode == NULL) {
         blog_error("malloc dma node failed. \r\n");
+        return -1;
     }
     pstnode->channel = channel;
     pstnode->tc_handler = tc_handler;

@@ -39,6 +39,7 @@
 #include <stdint.h>
 
 #include <openthread/message.h>
+#include <openthread/nat64.h>
 #include <openthread/platform/messagepool.h>
 
 #include "common/as_core_type.hpp"
@@ -252,7 +253,8 @@ private:
     } mBuffer;
 };
 
-static_assert(sizeof(Buffer) >= kBufferSize, "Buffer size if not valid");
+static_assert(sizeof(Buffer) >= kBufferSize,
+              "Buffer size is not valid. Increase OPENTHREAD_CONFIG_MESSAGE_BUFFER_SIZE.");
 
 /**
  * This class represents a message.
@@ -279,7 +281,8 @@ public:
         kType6lowpan      = 1, ///< A 6lowpan frame
         kTypeSupervision  = 2, ///< A child supervision frame.
         kTypeMacEmptyData = 3, ///< An empty MAC data frame.
-        kTypeOther        = 4, ///< Other (data) message.
+        kTypeIp4          = 4, ///< A full uncompressed IPv4 packet, for NAT64.
+        kTypeOther        = 5, ///< Other (data) message.
     };
 
     /**
@@ -663,6 +666,24 @@ public:
     }
 
     /**
+     * This method appends bytes from a given `Data` instance to the end of the message.
+     *
+     * On success, this method grows the message by the size of the appended data.
+     *
+     * @tparam    kDataLengthType   Determines the data length type (`uint8_t` or `uint16_t`).
+     *
+     * @param[in] aData      A reference to `Data` to append to the message.
+     *
+     * @retval kErrorNone    Successfully appended the bytes from @p aData.
+     * @retval kErrorNoBufs  Insufficient available buffers to grow the message.
+     *
+     */
+    template <DataLengthType kDataLengthType> Error AppendData(const Data<kDataLengthType> &aData)
+    {
+        return AppendBytes(aData.GetBytes(), aData.GetLength());
+    }
+
+    /**
      * This method reads bytes from the message.
      *
      * @param[in]  aOffset  Byte offset within the message to begin reading.
@@ -805,6 +826,23 @@ public:
         static_assert(!TypeTraits::IsPointer<ObjectType>::kValue, "ObjectType must not be a pointer");
 
         WriteBytes(aOffset, &aObject, sizeof(ObjectType));
+    }
+
+    /**
+     * This method writes bytes from a given `Data` instance to the message.
+     *
+     * This method will not resize the message. The given data to write MUST fit within the existing message buffer
+     * (from the given offset @p aOffset up to the message's length).
+     *
+     * @tparam     kDataLengthType   Determines the data length type (`uint8_t` or `uint16_t`).
+     *
+     * @param[in]  aOffset    Byte offset within the message to begin writing.
+     * @param[in]  aData      The `Data` to write to the message.
+     *
+     */
+    template <DataLengthType kDataLengthType> void WriteData(uint16_t aOffset, const Data<kDataLengthType> &aData)
+    {
+        WriteBytes(aOffset, aData.GetBytes(), aData.GetLength());
     }
 
     /**
@@ -1088,7 +1126,7 @@ public:
     /**
      * This method returns the average RSS (Received Signal Strength) associated with the message.
      *
-     * @returns The current average RSS value (in dBm) or OT_RADIO_RSSI_INVALID if no average is available.
+     * @returns The current average RSS value (in dBm) or `Radio::kInvalidRssi` if no average is available.
      *
      */
     int8_t GetAverageRss(void) const { return GetMetadata().mRssAverager.GetAverage(); }
@@ -1468,6 +1506,7 @@ class PriorityQueue : private Clearable<PriorityQueue>
     friend class Message;
     friend class MessageQueue;
     friend class MessagePool;
+    friend class Clearable<PriorityQueue>;
 
 public:
     typedef otMessageQueueInfo Info; ///< This struct represents info (number of messages/buffers) about a queue.
@@ -1647,7 +1686,7 @@ public:
     /**
      * This method returns the number of free buffers.
      *
-     * @returns The number of free buffers.
+     * @returns The number of free buffers, or 0xffff (UINT16_MAX) if number is unknown.
      *
      */
     uint16_t GetFreeBufferCount(void) const;
@@ -1655,7 +1694,7 @@ public:
     /**
      * This method returns the total number of buffers.
      *
-     * @returns The total number of buffers.
+     * @returns The total number of buffers, or 0xffff (UINT16_MAX) if number is unknown.
      *
      */
     uint16_t GetTotalBufferCount(void) const;

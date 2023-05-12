@@ -27,7 +27,6 @@
 #include "hal_rtc.h"
 #include "hal_flash.h"
 #include "risc-v/Core/Include/clic.h"
-#include "bl702_romdriver.h"
 
 /* Cache Way Disable, will get from l1c register */
 uint8_t cacheWayDisable = 0;
@@ -945,6 +944,8 @@ ATTR_TCM_SECTION void pm_pds_mode_enter(enum pm_pds_sleep_level pds_level, uint3
         case PM_PDS_LEVEL_31:
             pPdsCfg = &pdsCfgLevel31;
             break;
+        default:
+            return;
     }
 
 #if PM_PDS_FLASH_POWER_OFF
@@ -1230,8 +1231,8 @@ ATTR_TCM_SECTION void pm_hbn_mode_enter(enum pm_hbn_sleep_level hbn_level, uint8
     BL_WR_REG(HBN_BASE, HBN_CTL, tmpVal);
 
     while (1) {
-        BL702_Delay_MS(1000);
-        RomDriver_GLB_SW_POR_Reset();
+        arch_delay_ms(100);
+        GLB_SW_POR_Reset();
     }
 }
 

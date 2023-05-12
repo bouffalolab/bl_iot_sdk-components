@@ -341,10 +341,10 @@ void TestMessageQueueOtApis(void)
     testFreeInstance(sInstance);
 }
 
-extern "C" int test_message_queue(void)
+int main(void)
 {
     TestMessageQueue();
     TestMessageQueueOtApis();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

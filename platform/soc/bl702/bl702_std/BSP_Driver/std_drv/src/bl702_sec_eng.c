@@ -209,7 +209,7 @@ static intCallback_Type *secEngIntCbfArra[SEC_ENG_INT_ALL] = { NULL };
 *******************************************************************************/
 void Sec_Eng_SHA256_Init(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Type shaNo, SEC_ENG_SHA_Type shaType, uint32_t shaTmpBuf[16], uint32_t padding[16])
 {
-    uint32_t SHAx = SEC_ENG_BASE + SEC_ENG_SHA_OFFSET;
+    uint32_t SHAx = SEC_ENG_BASE;
     uint32_t tmpVal;
 
     /* Check the parameters */
@@ -217,9 +217,9 @@ void Sec_Eng_SHA256_Init(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Type shaNo, 
     CHECK_PARAM(IS_SEC_ENG_SHA_TYPE(shaType));
 
     /* Deal SHA control register to set SHA mode */
-    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_CTRL);
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_MODE, shaType);
-    BL_WR_REG(SHAx, SEC_ENG_SE_SHA_CTRL, tmpVal);
+    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_0_MODE, shaType);
+    BL_WR_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL, tmpVal);
 
     /* Clear context */
     memset(shaCtx, 0, sizeof(SEC_Eng_SHA256_Ctx));
@@ -245,20 +245,20 @@ void Sec_Eng_SHA256_Init(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Type shaNo, 
 *******************************************************************************/
 void Sec_Eng_SHA_Start(SEC_ENG_SHA_ID_Type shaNo)
 {
-    uint32_t SHAx = SEC_ENG_BASE + SEC_ENG_SHA_OFFSET;
+    uint32_t SHAx = SEC_ENG_BASE;
     uint32_t tmpVal;
 
     /* Check the parameters */
     CHECK_PARAM(IS_SEC_ENG_SHA_ID_TYPE(shaNo));
 
     /* Set SHA enable */
-    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_CTRL);
+    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL);
 
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_SHA_EN);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_SHA_0_EN);
     /* Hash sel 0 for new start */
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_SHA_HASH_SEL);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_SHA_0_HASH_SEL);
 
-    BL_WR_REG(SHAx, SEC_ENG_SE_SHA_CTRL, tmpVal);
+    BL_WR_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL, tmpVal);
 }
 
 /****************************************************************************/ /**
@@ -274,7 +274,7 @@ void Sec_Eng_SHA_Start(SEC_ENG_SHA_ID_Type shaNo)
 *******************************************************************************/
 BL_Err_Type Sec_Eng_SHA256_Update(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Type shaNo, const uint8_t *input, uint32_t len)
 {
-    uint32_t SHAx = SEC_ENG_BASE + SEC_ENG_SHA_OFFSET;
+    uint32_t SHAx = SEC_ENG_BASE;
     uint32_t tmpVal;
     uint32_t fill;
     uint32_t left;
@@ -285,16 +285,16 @@ BL_Err_Type Sec_Eng_SHA256_Update(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Typ
     }
 
     do {
-        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_CTRL);
+        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL);
         timeoutCnt--;
 
         if (timeoutCnt == 0) {
             return TIMEOUT;
         }
-    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_BUSY));
+    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_0_BUSY));
 
     /* SHA need set se_sha_sel to 1 to keep the last SHA state */
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_HASH_SEL, shaCtx->shaFeed);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_0_HASH_SEL, shaCtx->shaFeed);
 
     left = shaCtx->total[0] & 0x3F;
     fill = 64 - left;
@@ -309,14 +309,14 @@ BL_Err_Type Sec_Eng_SHA256_Update(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Typ
     if (left && len >= fill) {
         BL702_MemCpy_Fast((void *)((uint8_t *)shaCtx->shaBuf + left), input, fill);
         /* Set data source address */
-        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_MSA, (uint32_t)shaCtx->shaBuf);
+        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_0_MSA, (uint32_t)shaCtx->shaBuf);
 
         /* Set data length */
-        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_MSG_LEN, 1);
-        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_CTRL, tmpVal);
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_0_MSG_LEN, 1);
+        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL, tmpVal);
         /* Trigger */
-        tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_SHA_TRIG_1T);
-        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_CTRL, tmpVal);
+        tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_SHA_0_TRIG_1T);
+        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL, tmpVal);
 
         shaCtx->shaFeed = 1;
         input += fill;
@@ -332,25 +332,25 @@ BL_Err_Type Sec_Eng_SHA256_Update(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Typ
         timeoutCnt = SEC_ENG_SHA_BUSY_TIMEOUT_COUNT;
 
         do {
-            tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_CTRL);
+            tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL);
             timeoutCnt--;
 
             if (timeoutCnt == 0) {
                 return TIMEOUT;
             }
-        } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_BUSY));
+        } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_0_BUSY));
 
         /* SHA need set se_sha_sel to 1 to keep the last sha state */
-        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_HASH_SEL, shaCtx->shaFeed);
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_0_HASH_SEL, shaCtx->shaFeed);
 
         /* Fill data */
-        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_MSA, (uint32_t)input);
+        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_0_MSA, (uint32_t)input);
 
-        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_MSG_LEN, fill);
-        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_CTRL, tmpVal);
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_0_MSG_LEN, fill);
+        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL, tmpVal);
 
-        tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_SHA_TRIG_1T);
-        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_CTRL, tmpVal);
+        tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_SHA_0_TRIG_1T);
+        BL_WR_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL, tmpVal);
 
         input += (fill * 64);
         shaCtx->shaFeed = 1;
@@ -361,13 +361,13 @@ BL_Err_Type Sec_Eng_SHA256_Update(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Typ
         timeoutCnt = SEC_ENG_SHA_BUSY_TIMEOUT_COUNT;
 
         do {
-            tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_CTRL);
+            tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL);
             timeoutCnt--;
 
             if (timeoutCnt == 0) {
                 return TIMEOUT;
             }
-        } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_BUSY));
+        } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_0_BUSY));
 
         /* Copy left data into temp buffer */
         BL702_MemCpy_Fast((void *)((uint8_t *)shaCtx->shaBuf + left), input, len);
@@ -377,13 +377,13 @@ BL_Err_Type Sec_Eng_SHA256_Update(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Typ
     timeoutCnt = SEC_ENG_SHA_BUSY_TIMEOUT_COUNT;
 
     do {
-        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_CTRL);
+        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL);
         timeoutCnt--;
 
         if (timeoutCnt == 0) {
             return TIMEOUT;
         }
-    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_BUSY));
+    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_0_BUSY));
 
     return SUCCESS;
 }
@@ -405,7 +405,7 @@ BL_Err_Type Sec_Eng_SHA256_Finish(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Typ
     uint8_t shaMode;
     uint8_t msgLen[8];
     uint8_t *p = (uint8_t *)hash;
-    uint32_t SHAx = SEC_ENG_BASE + SEC_ENG_SHA_OFFSET;
+    uint32_t SHAx = SEC_ENG_BASE;
     uint32_t tmpVal;
     uint32_t timeoutCnt = SEC_ENG_SHA_BUSY_TIMEOUT_COUNT;
 
@@ -414,13 +414,13 @@ BL_Err_Type Sec_Eng_SHA256_Finish(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Typ
 
     /* Wait finished */
     do {
-        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_CTRL);
+        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL);
         timeoutCnt--;
 
         if (timeoutCnt == 0) {
             return TIMEOUT;
         }
-    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_BUSY));
+    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_0_BUSY));
 
     high = (shaCtx->total[0] >> 29) | (shaCtx->total[1] << 3);
     low = (shaCtx->total[0] << 3);
@@ -437,13 +437,13 @@ BL_Err_Type Sec_Eng_SHA256_Finish(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Typ
     timeoutCnt = SEC_ENG_SHA_BUSY_TIMEOUT_COUNT;
 
     do {
-        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_CTRL);
+        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL);
         timeoutCnt--;
 
         if (timeoutCnt == 0) {
             return TIMEOUT;
         }
-    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_BUSY));
+    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_0_BUSY));
 
     BL702_MemCpy_Fast(shaCtx->shaPadding, msgLen, 8);
     Sec_Eng_SHA256_Update(shaCtx, shaNo, (uint8_t *)shaCtx->shaPadding, 8);
@@ -452,57 +452,57 @@ BL_Err_Type Sec_Eng_SHA256_Finish(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Typ
     timeoutCnt = SEC_ENG_SHA_BUSY_TIMEOUT_COUNT;
 
     do {
-        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_CTRL);
+        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL);
         timeoutCnt--;
 
         if (timeoutCnt == 0) {
             return TIMEOUT;
         }
-    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_BUSY));
+    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_SHA_0_BUSY));
 
-    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_CTRL);
-    shaMode = (SEC_ENG_SHA_Type)BL_GET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_MODE);
+    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL);
+    shaMode = (SEC_ENG_SHA_Type)BL_GET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_SHA_0_MODE);
     /* Copy SHA value */
-    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_HASH_L_0);
+    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_HASH_L_0);
     *p++ = (tmpVal & 0xff);
     *p++ = ((tmpVal >> 8) & 0xff);
     *p++ = ((tmpVal >> 16) & 0xff);
     *p++ = ((tmpVal >> 24) & 0xff);
-    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_HASH_L_1);
+    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_HASH_L_1);
     *p++ = (tmpVal & 0xff);
     *p++ = ((tmpVal >> 8) & 0xff);
     *p++ = ((tmpVal >> 16) & 0xff);
     *p++ = ((tmpVal >> 24) & 0xff);
-    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_HASH_L_2);
+    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_HASH_L_2);
     *p++ = (tmpVal & 0xff);
     *p++ = ((tmpVal >> 8) & 0xff);
     *p++ = ((tmpVal >> 16) & 0xff);
     *p++ = ((tmpVal >> 24) & 0xff);
-    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_HASH_L_3);
+    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_HASH_L_3);
     *p++ = (tmpVal & 0xff);
     *p++ = ((tmpVal >> 8) & 0xff);
     *p++ = ((tmpVal >> 16) & 0xff);
     *p++ = ((tmpVal >> 24) & 0xff);
-    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_HASH_L_4);
+    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_HASH_L_4);
     *p++ = (tmpVal & 0xff);
     *p++ = ((tmpVal >> 8) & 0xff);
     *p++ = ((tmpVal >> 16) & 0xff);
     *p++ = ((tmpVal >> 24) & 0xff);
 
     if (shaMode == SEC_ENG_SHA224 || shaMode == SEC_ENG_SHA256) {
-        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_HASH_L_5);
+        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_HASH_L_5);
         *p++ = (tmpVal & 0xff);
         *p++ = ((tmpVal >> 8) & 0xff);
         *p++ = ((tmpVal >> 16) & 0xff);
         *p++ = ((tmpVal >> 24) & 0xff);
-        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_HASH_L_6);
+        tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_HASH_L_6);
         *p++ = (tmpVal & 0xff);
         *p++ = ((tmpVal >> 8) & 0xff);
         *p++ = ((tmpVal >> 16) & 0xff);
         *p++ = ((tmpVal >> 24) & 0xff);
 
         if (shaMode == SEC_ENG_SHA256) {
-            tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_HASH_L_7);
+            tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_HASH_L_7);
             *p++ = (tmpVal & 0xff);
             *p++ = ((tmpVal >> 8) & 0xff);
             *p++ = ((tmpVal >> 16) & 0xff);
@@ -511,10 +511,10 @@ BL_Err_Type Sec_Eng_SHA256_Finish(SEC_Eng_SHA256_Ctx *shaCtx, SEC_ENG_SHA_ID_Typ
     }
 
     /* Disable SHA engine*/
-    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_CTRL);
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_SHA_HASH_SEL);
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_SHA_EN);
-    BL_WR_REG(SHAx, SEC_ENG_SE_SHA_CTRL, tmpVal);
+    tmpVal = BL_RD_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_SHA_0_HASH_SEL);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_SHA_0_EN);
+    BL_WR_REG(SHAx, SEC_ENG_SE_SHA_0_CTRL, tmpVal);
 
     return SUCCESS;
 }
@@ -836,7 +836,7 @@ BL_Err_Type Sec_Eng_SHA256_Link_Finish(SEC_Eng_SHA256_Link_Ctx *shaCtx, SEC_ENG_
 *******************************************************************************/
 BL_Err_Type Sec_Eng_AES_Init(SEC_Eng_AES_Ctx *aesCtx, SEC_ENG_AES_ID_Type aesNo, SEC_ENG_AES_Type aesType, SEC_ENG_AES_Key_Type keyType, SEC_ENG_AES_EnDec_Type enDecType)
 {
-    uint32_t AESx = SEC_ENG_BASE + SEC_ENG_AES_OFFSET;
+    uint32_t AESx = SEC_ENG_BASE;
     uint32_t tmpVal;
     uint32_t timeoutCnt = SEC_ENG_AES_BUSY_TIMEOUT_COUNT;
 
@@ -848,36 +848,36 @@ BL_Err_Type Sec_Eng_AES_Init(SEC_Eng_AES_Ctx *aesCtx, SEC_ENG_AES_ID_Type aesNo,
 
     /* Wait finished */
     do {
-        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_CTRL);
+        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_CTRL);
         timeoutCnt--;
 
         if (timeoutCnt == 0) {
             return TIMEOUT;
         }
-    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_AES_BUSY));
+    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_AES_0_BUSY));
 
     /* Set AES mode type*/
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_BLOCK_MODE, aesType);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_BLOCK_MODE, aesType);
 
     /* Set AES key type */
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_MODE, keyType);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_MODE, keyType);
 
     /* Set AES encryption or decryption */
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_DEC_EN, enDecType);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_DEC_EN, enDecType);
 
     /* Clear dec_key_sel to select new key */
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_DEC_KEY_SEL);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_0_DEC_KEY_SEL);
 
     /* Clear aes iv sel to select new iv */
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_IV_SEL);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_0_IV_SEL);
 
     /* Clear AES interrupt */
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_AES_INT_CLR_1T);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_AES_0_INT_CLR_1T);
 
     /* Enable AES */
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_AES_EN);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_AES_0_EN);
 
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_CTRL, tmpVal);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_CTRL, tmpVal);
 
     /* Clear AES context */
     memset(aesCtx, 0, sizeof(SEC_Eng_AES_Ctx));
@@ -902,12 +902,12 @@ BL_Err_Type Sec_Eng_AES_Init(SEC_Eng_AES_Ctx *aesCtx, SEC_ENG_AES_ID_Type aesNo,
 *******************************************************************************/
 void Sec_Eng_AES_Enable_BE(SEC_ENG_AES_ID_Type aesNo)
 {
-    uint32_t AESx = SEC_ENG_BASE + SEC_ENG_AES_OFFSET;
+    uint32_t AESx = SEC_ENG_BASE;
 
     /* Check the parameters */
     CHECK_PARAM(IS_SEC_ENG_AES_ID_TYPE(aesNo));
 
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_ENDIAN, 0x0f);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_ENDIAN, 0x0f);
 
 #ifndef BFLB_USE_HAL_DRIVER
     Interrupt_Handler_Register(SEC_AES_IRQn, SEC_AES_IRQHandler);
@@ -924,12 +924,12 @@ void Sec_Eng_AES_Enable_BE(SEC_ENG_AES_ID_Type aesNo)
 *******************************************************************************/
 void Sec_Eng_AES_Enable_LE(SEC_ENG_AES_ID_Type aesNo)
 {
-    uint32_t AESx = SEC_ENG_BASE + SEC_ENG_AES_OFFSET;
+    uint32_t AESx = SEC_ENG_BASE;
 
     /* Check the parameters */
     CHECK_PARAM(IS_SEC_ENG_AES_ID_TYPE(aesNo));
 
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_ENDIAN, 0x00);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_ENDIAN, 0x00);
 
 #ifndef BFLB_USE_HAL_DRIVER
     Interrupt_Handler_Register(SEC_AES_IRQn, SEC_AES_IRQHandler);
@@ -1064,16 +1064,16 @@ BL_Err_Type Sec_Eng_AES_Link_Work(SEC_ENG_AES_ID_Type aesNo, uint32_t linkAddr, 
 *******************************************************************************/
 void Sec_Eng_AES_Set_Hw_Key_Src(SEC_ENG_AES_ID_Type aesNo, uint8_t src)
 {
-    uint32_t AESx = SEC_ENG_BASE + SEC_ENG_AES_OFFSET;
+    uint32_t AESx = SEC_ENG_BASE;
     uint32_t tmpVal;
 
     /* Check the parameters */
     CHECK_PARAM(IS_SEC_ENG_AES_ID_TYPE(aesNo));
 
-    tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_SBOOT);
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_SBOOT_KEY_SEL, src);
+    tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_SBOOT);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_SBOOT_KEY_SEL, src);
 
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_SBOOT, tmpVal);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_SBOOT, tmpVal);
 }
 
 /****************************************************************************/ /**
@@ -1089,7 +1089,7 @@ void Sec_Eng_AES_Set_Hw_Key_Src(SEC_ENG_AES_ID_Type aesNo, uint8_t src)
 *******************************************************************************/
 void Sec_Eng_AES_Set_Key_IV(SEC_ENG_AES_ID_Type aesNo, SEC_ENG_AES_Key_Src_Type keySrc, const uint8_t *key, const uint8_t *iv)
 {
-    uint32_t AESx = SEC_ENG_BASE + SEC_ENG_AES_OFFSET;
+    uint32_t AESx = SEC_ENG_BASE;
     uint32_t tmpVal;
     uint32_t keyType;
 
@@ -1098,64 +1098,64 @@ void Sec_Eng_AES_Set_Key_IV(SEC_ENG_AES_ID_Type aesNo, SEC_ENG_AES_Key_Src_Type 
     CHECK_PARAM(IS_SEC_ENG_AES_KEY_SRC_TYPE(keySrc));
 
     /* Set IV */
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_IV_3, __REV(BL_RDWD_FRM_BYTEP(iv)));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_IV_3, __REV(BL_RDWD_FRM_BYTEP(iv)));
     iv += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_IV_2, __REV(BL_RDWD_FRM_BYTEP(iv)));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_IV_2, __REV(BL_RDWD_FRM_BYTEP(iv)));
     iv += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_IV_1, __REV(BL_RDWD_FRM_BYTEP(iv)));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_IV_1, __REV(BL_RDWD_FRM_BYTEP(iv)));
     iv += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_IV_0, __REV(BL_RDWD_FRM_BYTEP(iv)));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_IV_0, __REV(BL_RDWD_FRM_BYTEP(iv)));
     iv += 4;
 
     /* Select hardware key */
     if (keySrc == SEC_ENG_AES_KEY_HW) {
-        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_CTRL);
-        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_HW_KEY_EN, SEC_ENG_AES_KEY_HW);
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_CTRL, tmpVal);
+        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_CTRL);
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_HW_KEY_EN, SEC_ENG_AES_KEY_HW);
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_CTRL, tmpVal);
 
-        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_KEY_SEL_0);
-        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_KEY_SEL_0, *key);
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_SEL_0, tmpVal);
+        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_KEY_SEL_0);
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_KEY_SEL_0, *key);
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_SEL_0, tmpVal);
 
-        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_KEY_SEL_1);
-        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_KEY_SEL_1, *key);
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_SEL_1, tmpVal);
+        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_KEY_SEL_1);
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_KEY_SEL_1, *key);
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_SEL_1, tmpVal);
 
         return;
     }
 
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_7, __REV(BL_RDWD_FRM_BYTEP(key)));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_7, __REV(BL_RDWD_FRM_BYTEP(key)));
     key += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_6, __REV(BL_RDWD_FRM_BYTEP(key)));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_6, __REV(BL_RDWD_FRM_BYTEP(key)));
     key += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_5, __REV(BL_RDWD_FRM_BYTEP(key)));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_5, __REV(BL_RDWD_FRM_BYTEP(key)));
     key += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_4, __REV(BL_RDWD_FRM_BYTEP(key)));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_4, __REV(BL_RDWD_FRM_BYTEP(key)));
     key += 4;
 
-    tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_CTRL);
-    keyType = BL_GET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_MODE);
+    tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_CTRL);
+    keyType = BL_GET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_MODE);
 
     if (keyType == (uint32_t)SEC_ENG_AES_KEY_192BITS) {
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_3, __REV(BL_RDWD_FRM_BYTEP(key)));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_3, __REV(BL_RDWD_FRM_BYTEP(key)));
         key += 4;
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_2, __REV(BL_RDWD_FRM_BYTEP(key)));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_2, __REV(BL_RDWD_FRM_BYTEP(key)));
         key += 4;
     } else if (keyType == (uint32_t)SEC_ENG_AES_KEY_256BITS || keyType == (uint32_t)SEC_ENG_AES_DOUBLE_KEY_128BITS) {
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_3, __REV(BL_RDWD_FRM_BYTEP(key)));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_3, __REV(BL_RDWD_FRM_BYTEP(key)));
         key += 4;
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_2, __REV(BL_RDWD_FRM_BYTEP(key)));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_2, __REV(BL_RDWD_FRM_BYTEP(key)));
         key += 4;
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_1, __REV(BL_RDWD_FRM_BYTEP(key)));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_1, __REV(BL_RDWD_FRM_BYTEP(key)));
         key += 4;
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_0, __REV(BL_RDWD_FRM_BYTEP(key)));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_0, __REV(BL_RDWD_FRM_BYTEP(key)));
         key += 4;
     }
 
     /* Select software key */
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_HW_KEY_EN, SEC_ENG_AES_KEY_SW);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_HW_KEY_EN, SEC_ENG_AES_KEY_SW);
 
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_CTRL, tmpVal);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_CTRL, tmpVal);
 }
 
 /****************************************************************************/ /**
@@ -1171,7 +1171,7 @@ void Sec_Eng_AES_Set_Key_IV(SEC_ENG_AES_ID_Type aesNo, SEC_ENG_AES_Key_Src_Type 
 *******************************************************************************/
 void Sec_Eng_AES_Set_Key_IV_BE(SEC_ENG_AES_ID_Type aesNo, SEC_ENG_AES_Key_Src_Type keySrc, const uint8_t *key, const uint8_t *iv)
 {
-    uint32_t AESx = SEC_ENG_BASE + SEC_ENG_AES_OFFSET;
+    uint32_t AESx = SEC_ENG_BASE;
     uint32_t tmpVal;
     uint32_t keyType;
 
@@ -1180,64 +1180,64 @@ void Sec_Eng_AES_Set_Key_IV_BE(SEC_ENG_AES_ID_Type aesNo, SEC_ENG_AES_Key_Src_Ty
     CHECK_PARAM(IS_SEC_ENG_AES_KEY_SRC_TYPE(keySrc));
 
     /* Set IV */
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_IV_0, BL_RDWD_FRM_BYTEP(iv));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_IV_0, BL_RDWD_FRM_BYTEP(iv));
     iv += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_IV_1, BL_RDWD_FRM_BYTEP(iv));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_IV_1, BL_RDWD_FRM_BYTEP(iv));
     iv += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_IV_2, BL_RDWD_FRM_BYTEP(iv));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_IV_2, BL_RDWD_FRM_BYTEP(iv));
     iv += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_IV_3, BL_RDWD_FRM_BYTEP(iv));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_IV_3, BL_RDWD_FRM_BYTEP(iv));
     iv += 4;
 
     /* Select hardware key */
     if (keySrc == SEC_ENG_AES_KEY_HW) {
-        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_CTRL);
-        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_HW_KEY_EN, SEC_ENG_AES_KEY_HW);
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_CTRL, tmpVal);
+        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_CTRL);
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_HW_KEY_EN, SEC_ENG_AES_KEY_HW);
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_CTRL, tmpVal);
 
-        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_KEY_SEL_0);
-        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_KEY_SEL_0, *key);
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_SEL_0, tmpVal);
+        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_KEY_SEL_0);
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_KEY_SEL_0, *key);
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_SEL_0, tmpVal);
 
-        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_KEY_SEL_1);
-        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_KEY_SEL_1, *key);
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_SEL_1, tmpVal);
+        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_KEY_SEL_1);
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_KEY_SEL_1, *key);
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_SEL_1, tmpVal);
 
         return;
     }
 
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_0, BL_RDWD_FRM_BYTEP(key));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_0, BL_RDWD_FRM_BYTEP(key));
     key += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_1, BL_RDWD_FRM_BYTEP(key));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_1, BL_RDWD_FRM_BYTEP(key));
     key += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_2, BL_RDWD_FRM_BYTEP(key));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_2, BL_RDWD_FRM_BYTEP(key));
     key += 4;
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_3, BL_RDWD_FRM_BYTEP(key));
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_3, BL_RDWD_FRM_BYTEP(key));
     key += 4;
 
-    tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_CTRL);
-    keyType = BL_GET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_MODE);
+    tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_CTRL);
+    keyType = BL_GET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_MODE);
 
     if (keyType == (uint32_t)SEC_ENG_AES_KEY_192BITS) {
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_4, BL_RDWD_FRM_BYTEP(key));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_4, BL_RDWD_FRM_BYTEP(key));
         key += 4;
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_5, BL_RDWD_FRM_BYTEP(key));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_5, BL_RDWD_FRM_BYTEP(key));
         key += 4;
     } else if (keyType == (uint32_t)SEC_ENG_AES_KEY_256BITS || keyType == (uint32_t)SEC_ENG_AES_DOUBLE_KEY_128BITS) {
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_4, BL_RDWD_FRM_BYTEP(key));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_4, BL_RDWD_FRM_BYTEP(key));
         key += 4;
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_5, BL_RDWD_FRM_BYTEP(key));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_5, BL_RDWD_FRM_BYTEP(key));
         key += 4;
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_6, BL_RDWD_FRM_BYTEP(key));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_6, BL_RDWD_FRM_BYTEP(key));
         key += 4;
-        BL_WR_REG(AESx, SEC_ENG_SE_AES_KEY_7, BL_RDWD_FRM_BYTEP(key));
+        BL_WR_REG(AESx, SEC_ENG_SE_AES_0_KEY_7, BL_RDWD_FRM_BYTEP(key));
         key += 4;
     }
 
     /* Select software key */
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_HW_KEY_EN, SEC_ENG_AES_KEY_SW);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_HW_KEY_EN, SEC_ENG_AES_KEY_SW);
 
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_CTRL, tmpVal);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_CTRL, tmpVal);
 }
 
 /****************************************************************************/ /**
@@ -1277,7 +1277,7 @@ void Sec_Eng_AES_Set_Counter_Byte(SEC_ENG_AES_ID_Type aesNo, SEC_ENG_AES_Counter
 *******************************************************************************/
 BL_Err_Type Sec_Eng_AES_Crypt(SEC_Eng_AES_Ctx *aesCtx, SEC_ENG_AES_ID_Type aesNo, const uint8_t *in, uint32_t len, uint8_t *out)
 {
-    uint32_t AESx = SEC_ENG_BASE + SEC_ENG_AES_OFFSET;
+    uint32_t AESx = SEC_ENG_BASE;
     uint32_t tmpVal;
     uint32_t timeoutCnt = SEC_ENG_AES_BUSY_TIMEOUT_COUNT;
 
@@ -1287,50 +1287,50 @@ BL_Err_Type Sec_Eng_AES_Crypt(SEC_Eng_AES_Ctx *aesCtx, SEC_ENG_AES_ID_Type aesNo
 
     /* Wait finished */
     do {
-        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_CTRL);
+        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_CTRL);
         timeoutCnt--;
 
         if (timeoutCnt == 0) {
             return TIMEOUT;
         }
-    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_AES_BUSY));
+    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_AES_0_BUSY));
 
     /* Clear trigger */
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_TRIG_1T);
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_CTRL, tmpVal);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_0_TRIG_1T);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_CTRL, tmpVal);
 
     /* Set input and output address */
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_MSA, (uint32_t)in);
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_MDA, (uint32_t)out);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_MSA, (uint32_t)in);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_MDA, (uint32_t)out);
 
     /* Set message length */
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_MSG_LEN, len / 16);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_MSG_LEN, len / 16);
 
     if (aesCtx->mode == SEC_ENG_AES_CTR) {
-        tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_AES_DEC_KEY_SEL);
+        tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_AES_0_DEC_KEY_SEL);
     } else {
-        tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_DEC_KEY_SEL);
+        tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_0_DEC_KEY_SEL);
     }
 
     /* Set IV sel:0 for new, 1 for last */
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_IV_SEL, aesCtx->aesFeed);
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_CTRL, tmpVal);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, SEC_ENG_SE_AES_0_IV_SEL, aesCtx->aesFeed);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_CTRL, tmpVal);
 
     /* Trigger AES Engine */
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_AES_TRIG_1T);
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_CTRL, tmpVal);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_AES_0_TRIG_1T);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_CTRL, tmpVal);
 
     /* Wait finished */
     timeoutCnt = SEC_ENG_AES_BUSY_TIMEOUT_COUNT;
 
     do {
-        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_CTRL);
+        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_CTRL);
         timeoutCnt--;
 
         if (timeoutCnt == 0) {
             return TIMEOUT;
         }
-    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_AES_BUSY));
+    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_AES_0_BUSY));
 
     aesCtx->aesFeed = 1;
 
@@ -1347,27 +1347,27 @@ BL_Err_Type Sec_Eng_AES_Crypt(SEC_Eng_AES_Ctx *aesCtx, SEC_ENG_AES_ID_Type aesNo
 *******************************************************************************/
 BL_Err_Type Sec_Eng_AES_Finish(SEC_ENG_AES_ID_Type aesNo)
 {
-    uint32_t AESx = SEC_ENG_BASE + SEC_ENG_AES_OFFSET;
+    uint32_t AESx = SEC_ENG_BASE;
     uint32_t tmpVal;
     uint32_t timeoutCnt = SEC_ENG_AES_BUSY_TIMEOUT_COUNT;
 
     /* Wait finished */
     do {
-        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_CTRL);
+        tmpVal = BL_RD_REG(AESx, SEC_ENG_SE_AES_0_CTRL);
         timeoutCnt--;
 
         if (timeoutCnt == 0) {
             return TIMEOUT;
         }
-    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_AES_BUSY));
+    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_AES_0_BUSY));
 
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_EN);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_0_EN);
 
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_DEC_KEY_SEL);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_0_DEC_KEY_SEL);
 
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_IV_SEL);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_AES_0_IV_SEL);
 
-    BL_WR_REG(AESx, SEC_ENG_SE_AES_CTRL, tmpVal);
+    BL_WR_REG(AESx, SEC_ENG_SE_AES_0_CTRL, tmpVal);
 
     return SUCCESS;
 }
@@ -1382,20 +1382,20 @@ BL_Err_Type Sec_Eng_AES_Finish(SEC_ENG_AES_ID_Type aesNo)
 *******************************************************************************/
 BL_Err_Type Sec_Eng_Trng_Enable(void)
 {
-    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t TRNGx = SEC_ENG_BASE;
     uint32_t tmpVal;
     uint32_t timeoutCnt = SEC_ENG_TRNG_BUSY_TIMEOUT_COUNT;
 
-    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
 
     /* FIXME:default reseed number is 0x1ff, to verify, use 0xa to speed up */
     //tmpVal=BL_SET_REG_BITS_VAL(tmpVal,SEC_ENG_SE_TRNG_RESEED_N,0x1ff);
 
     /* No interrupt as default */
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_EN);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_INT_CLR_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_EN);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_INT_CLR_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
     /* busy will be set to 1 after trigger, the gap is 1T */
     __NOP();
     __NOP();
@@ -1403,17 +1403,17 @@ BL_Err_Type Sec_Eng_Trng_Enable(void)
     __NOP();
 
     do {
-        tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+        tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
         timeoutCnt--;
 
         if (timeoutCnt == 0) {
             return TIMEOUT;
         }
-    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_TRNG_BUSY));
+    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_TRNG_0_BUSY));
 
     /* Clear trng interrupt */
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_INT_CLR_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_INT_CLR_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 
 #ifndef BFLB_USE_HAL_DRIVER
     Interrupt_Handler_Register(SEC_TRNG_IRQn, SEC_TRNG_IRQHandler);
@@ -1432,14 +1432,14 @@ BL_Err_Type Sec_Eng_Trng_Enable(void)
 *******************************************************************************/
 void Sec_Eng_Trng_Int_Enable(void)
 {
-    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t TRNGx = SEC_ENG_BASE;
     uint32_t tmpVal;
 
-    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
 
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_INT_MASK);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_INT_MASK);
 
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 }
 
 /****************************************************************************/ /**
@@ -1452,14 +1452,14 @@ void Sec_Eng_Trng_Int_Enable(void)
 *******************************************************************************/
 void Sec_Eng_Trng_Int_Disable(void)
 {
-    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t TRNGx = SEC_ENG_BASE;
     uint32_t tmpVal;
 
-    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
 
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_INT_MASK);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_INT_MASK);
 
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 }
 
 /****************************************************************************/ /**
@@ -1473,15 +1473,15 @@ void Sec_Eng_Trng_Int_Disable(void)
 BL_Err_Type Sec_Eng_Trng_Read(uint8_t data[32])
 {
     uint8_t *p = (uint8_t *)data;
-    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t TRNGx = SEC_ENG_BASE;
     uint32_t tmpVal;
     uint32_t timeoutCnt = SEC_ENG_TRNG_BUSY_TIMEOUT_COUNT;
 
-    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
 
     /* Trigger */
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_TRIG_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_TRIG_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 
     /* busy will be set to 1 after trigger, the gap is 1T */
     __NOP();
@@ -1490,41 +1490,41 @@ BL_Err_Type Sec_Eng_Trng_Read(uint8_t data[32])
     __NOP();
 
     do {
-        tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+        tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
         timeoutCnt--;
 
         if (timeoutCnt == 0) {
             return TIMEOUT;
         }
-    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_TRNG_BUSY));
+    } while (BL_IS_REG_BIT_SET(tmpVal, SEC_ENG_SE_TRNG_0_BUSY));
 
     /* copy trng value */
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_0));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_0));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_1));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_1));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_2));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_2));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_3));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_3));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_4));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_4));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_5));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_5));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_6));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_6));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_7));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_7));
     p += 4;
 
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_TRIG_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_TRIG_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 
     /* Clear data */
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_DOUT_CLR_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_DOUT_CLR_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_DOUT_CLR_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_DOUT_CLR_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 
     return SUCCESS;
 }
@@ -1576,15 +1576,15 @@ BL_Err_Type Sec_Eng_Trng_Get_Random(uint8_t *data, uint32_t len)
 *******************************************************************************/
 void Sec_Eng_Trng_Int_Read_Trigger(void)
 {
-    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t TRNGx = SEC_ENG_BASE;
     uint32_t tmpVal;
 
     Sec_Eng_Trng_Int_Enable();
 
-    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
     /* Trigger */
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_TRIG_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_TRIG_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 }
 
 /****************************************************************************/ /**
@@ -1598,38 +1598,38 @@ void Sec_Eng_Trng_Int_Read_Trigger(void)
 void Sec_Eng_Trng_Int_Read(uint8_t data[32])
 {
     uint8_t *p = (uint8_t *)data;
-    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t TRNGx = SEC_ENG_BASE;
     uint32_t tmpVal;
 
-    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
 
     /* copy trng value */
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_0));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_0));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_1));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_1));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_2));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_2));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_3));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_3));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_4));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_4));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_5));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_5));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_6));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_6));
     p += 4;
-    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_7));
+    BL_WRWD_TO_BYTEP(p, BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_7));
     p += 4;
 
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_TRIG_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_TRIG_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 
     /* Clear data */
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_DOUT_CLR_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_DOUT_CLR_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_DOUT_CLR_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_DOUT_CLR_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 }
 
 /****************************************************************************/ /**
@@ -1642,16 +1642,16 @@ void Sec_Eng_Trng_Int_Read(uint8_t data[32])
 *******************************************************************************/
 void Sec_Eng_Trng_Disable(void)
 {
-    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t TRNGx = SEC_ENG_BASE;
     uint32_t tmpVal;
 
-    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+    tmpVal = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
 
-    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_EN);
+    tmpVal = BL_CLR_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_EN);
     //tmpVal=BL_CLR_REG_BIT(tmpVal,SEC_ENG_SE_TRNG_RESEED_N);
-    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_INT_CLR_1T);
+    tmpVal = BL_SET_REG_BIT(tmpVal, SEC_ENG_SE_TRNG_0_INT_CLR_1T);
 
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, tmpVal);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, tmpVal);
 }
 
 /****************************************************************************/ /**
@@ -2020,7 +2020,7 @@ __ASM void Sec_Eng_PKA_Write_Block(uint32_t *dest, const uint32_t *src, uint32_t
 Start1
     CMP  R2,#4
     BLT  Finish1
-    LDMIA  R1!,{R3-R6}    
+    LDMIA  R1!,{R3-R6}
     STR  R3,[R0]
     STR  R4,[R0]
     STR  R5,[R0]

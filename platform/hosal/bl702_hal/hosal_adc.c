@@ -178,6 +178,8 @@ static void adc_dma_lli_init(DMA_LLI_Ctrl_Type *pstlli, uint32_t *buf, uint32_t 
 {
     struct DMA_Control_Reg dma_ctrl_reg;
 
+    memset(&dma_ctrl_reg, 0, sizeof(dma_ctrl_reg));
+
     dma_ctrl_reg.TransferSize = data_num;
     dma_ctrl_reg.SBSize = DMA_BURST_SIZE_1;
     dma_ctrl_reg.DBSize = DMA_BURST_SIZE_1;
@@ -188,6 +190,9 @@ static void adc_dma_lli_init(DMA_LLI_Ctrl_Type *pstlli, uint32_t *buf, uint32_t 
     dma_ctrl_reg.I = 1;
     dma_ctrl_reg.SLargerD = 0;
     dma_ctrl_reg.Prot = 0;
+    dma_ctrl_reg.dst_add_mode = DISABLE;
+    dma_ctrl_reg.dst_min_mode = DISABLE;
+    dma_ctrl_reg.fix_cnt = 0;
 
     pstlli[0].srcDmaAddr = 0x40002000+0x4;
     pstlli[0].destDmaAddr = (uint32_t)&buf[0];
@@ -214,6 +219,11 @@ static int adc_dma_init(hosal_adc_dev_t *adc, uint32_t data_num)
     }
 
     adc->dma_chan = hosal_dma_chan_request(0);
+    if(adc->dma_chan < 0){
+        blog_error("dma channel request failed. \r\n");
+
+        return -1;
+    }
 
     pstlli = pvPortMalloc(sizeof(DMA_LLI_Ctrl_Type) * 2);
     if (NULL == pstlli) {
@@ -378,6 +388,10 @@ int hosal_adc_init(hosal_adc_dev_t *adc)
             blog_error("illegal freq. for mode0, freq 100HZ ~ 1250HZ \r\n");
             return -1;
         }
+
+        /* init gpio */ 
+        GLB_GPIO_Func_Init(GPIO_FUN_ANALOG, &pin, 1);
+
         /* init freq */
         adc_freq_init(adc->config.mode, freq);
         adc_init(adc);
@@ -395,26 +409,6 @@ int hosal_adc_init(hosal_adc_dev_t *adc)
 
 int hosal_adc_add_channel(hosal_adc_dev_t *adc, uint32_t channel)
 {
-    hosal_adc_ctx_t *pstctx = (hosal_adc_ctx_t *)adc->priv;
-
-    if (NULL == adc) {
-        blog_error("parameter is error!\r\n");
-        return -1;
-    }
-
-    if (channel > 11) {
-        blog_error("channel is error!");
-        return -1;
-    }
-    pstctx->chan_init_table |= 1 << channel;
-
-    return 0;
-}
-
-int hosal_adc_remove_channel(hosal_adc_dev_t *adc, uint32_t channel)
-{
-    hosal_adc_ctx_t *pstctx = (hosal_adc_ctx_t *)adc->priv;
-
     if (NULL == adc) {
         blog_error("parameter is error!\r\n");
         return -1;
@@ -424,6 +418,27 @@ int hosal_adc_remove_channel(hosal_adc_dev_t *adc, uint32_t channel)
         blog_error("channel is error!\r\n");
         return -1;
     }
+
+    hosal_adc_ctx_t *pstctx = (hosal_adc_ctx_t *)adc->priv;
+
+    pstctx->chan_init_table |= 1 << channel;
+
+    return 0;
+}
+
+int hosal_adc_remove_channel(hosal_adc_dev_t *adc, uint32_t channel)
+{
+    if (NULL == adc) {
+        blog_error("parameter is error!\r\n");
+        return -1;
+    }
+
+    if (channel > 11) {
+        blog_error("channel is error!\r\n");
+        return -1;
+    }
+
+    hosal_adc_ctx_t *pstctx = (hosal_adc_ctx_t *)adc->priv;
 
     pstctx->chan_init_table &= ~(1 << channel);
 
@@ -443,8 +458,7 @@ hosal_adc_dev_t *hosal_adc_device_get(void)
 int hosal_adc_value_get(hosal_adc_dev_t *adc, uint32_t channel, uint32_t timeout)
 {
     int val = -1;
-    hosal_adc_ctx_t *pstctx = (hosal_adc_ctx_t *)adc->priv;
- 
+
     if (NULL == adc) {
         blog_error("parameter is error!\r\n");
         return -1;
@@ -455,6 +469,8 @@ int hosal_adc_value_get(hosal_adc_dev_t *adc, uint32_t channel, uint32_t timeout
         return -1;
     }
     
+    hosal_adc_ctx_t *pstctx = (hosal_adc_ctx_t *)adc->priv;
+
     if (((1 << channel) & pstctx->chan_init_table) == 0) {
         blog_error("channel = %d  not init as adc \r\n", channel);
         return -1;
@@ -500,13 +516,13 @@ int hosal_adc_stop(hosal_adc_dev_t *adc)
 
 int hosal_adc_finalize(hosal_adc_dev_t *adc)
 {
-    hosal_adc_ctx_t *pstctx = (hosal_adc_ctx_t *)adc->priv;
-
     if (NULL == adc) {
         log_error("parm error!\r\n");
         return -1;
     }
     
+    hosal_adc_ctx_t *pstctx = (hosal_adc_ctx_t *)adc->priv;
+
     vPortFree(pstctx->llibuf);
     vPortFree(pstctx->adc_lli);
     vPortFree(pstctx);

@@ -112,7 +112,7 @@ template <DataLengthType kDataLengthType> void TestData(void)
     VerifyOrQuit(data.GetLength() == sizeof(u16));
     VerifyOrQuit(data.GetBytes() == reinterpret_cast<uint8_t *>(&u16));
 
-    printf("- TestData<%s> passed\r\n", kDataLengthType == kWithUint8Length ? "kWithUint8Length" : "kWithUint16Length");
+    printf("- TestData<%s> passed\n", kDataLengthType == kWithUint8Length ? "kWithUint8Length" : "kWithUint16Length");
 }
 
 template <DataLengthType kDataLengthType> void TestMutableData(void)
@@ -194,19 +194,19 @@ template <DataLengthType kDataLengthType> void TestMutableData(void)
     mutableData.ClearBytes();
     VerifyOrQuit(u16 == 0);
 
-    printf("- TestMutableData<%s> passed\r\n",
+    printf("- TestMutableData<%s> passed\n",
            kDataLengthType == kWithUint8Length ? "kWithUint8Length" : "kWithUint16Length");
 }
 
 } // namespace ot
 
-extern "C" int test_data(void)
+int main(void)
 {
     ot::TestData<ot::kWithUint8Length>();
     ot::TestData<ot::kWithUint16Length>();
     ot::TestMutableData<ot::kWithUint8Length>();
     ot::TestMutableData<ot::kWithUint16Length>();
 
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

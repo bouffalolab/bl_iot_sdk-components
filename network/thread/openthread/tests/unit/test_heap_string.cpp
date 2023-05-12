@@ -43,11 +43,11 @@ void PrintString(const char *aName, const Heap::String &aString)
 {
     if (aString.IsNull())
     {
-        printf("%s = (null)\r\n", aName);
+        printf("%s = (null)\n", aName);
     }
     else
     {
-        printf("%s = [%zu] \"%s\"\r\n", aName, strlen(aString.AsCString()), aString.AsCString());
+        printf("%s = [%zu] \"%s\"\n", aName, strlen(aString.AsCString()), aString.AsCString());
     }
 }
 
@@ -88,30 +88,30 @@ void TestHeapString(void)
     Heap::String str2;
     const char * oldBuffer;
 
-    printf("====================================================================================\r\n");
-    printf("TestHeapString\r\n\r\n");
+    printf("====================================================================================\n");
+    printf("TestHeapString\n\n");
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("After constructor\r\n\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("After constructor\n\n");
     VerifyString("str1", str1, nullptr);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("Set(const char *aCstring)\r\n\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("Set(const char *aCstring)\n\n");
     SuccessOrQuit(str1.Set("hello"));
     VerifyString("str1", str1, "hello");
     oldBuffer = str1.AsCString();
 
     SuccessOrQuit(str1.Set("0123456789"));
     VerifyString("str1", str1, "0123456789");
-    printf("\tDid reuse its old buffer: %s\r\n", str1.AsCString() == oldBuffer ? "yes" : "no");
+    printf("\tDid reuse its old buffer: %s\n", str1.AsCString() == oldBuffer ? "yes" : "no");
     oldBuffer = str1.AsCString();
 
     SuccessOrQuit(str1.Set("9876543210"));
     VerifyString("str1", str1, "9876543210");
-    printf("\tDid reuse its old buffer (same length): %s\r\n", str1.AsCString() == oldBuffer ? "yes" : "no");
+    printf("\tDid reuse its old buffer (same length): %s\n", str1.AsCString() == oldBuffer ? "yes" : "no");
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("Set(const Heap::String &)\r\n\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("Set(const Heap::String &)\n\n");
     SuccessOrQuit(str2.Set(str1));
     VerifyString("str2", str2, str1.AsCString());
 
@@ -121,8 +121,8 @@ void TestHeapString(void)
     SuccessOrQuit(str2.Set(str1));
     VerifyString("str2", str2, nullptr);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("Free()\r\n\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("Free()\n\n");
     str1.Free();
     VerifyString("str1", str1, nullptr);
 
@@ -132,22 +132,22 @@ void TestHeapString(void)
     str1.Free();
     VerifyString("str1", str1, nullptr);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("Set() move semantics\r\n\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("Set() move semantics\n\n");
     SuccessOrQuit(str1.Set("old name"));
     PrintString("str1", str1);
     SuccessOrQuit(str1.Set(GetName()), "Set() with move semantics failed");
     VerifyString("str1", str1, "name");
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("operator==() with two null string\r\n\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("operator==() with two null string\n\n");
     str1.Free();
     str2.Free();
     VerifyString("str1", str1, nullptr);
     VerifyString("str2", str2, nullptr);
     VerifyOrQuit(str1 == str2, "operator==() failed with two null strings");
 
-    printf("\r\n -- PASS\r\n");
+    printf("\n -- PASS\n");
 }
 
 void PrintData(const Heap::Data &aData)
@@ -219,15 +219,15 @@ void TestHeapData(void)
 
     message->SetOffset(0);
 
-    printf("\r\n\r\n====================================================================================\r\n");
-    printf("TestHeapData\r\n\r\n");
+    printf("\n\n====================================================================================\n");
+    printf("TestHeapData\n\n");
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("After constructor\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("After constructor\n");
     VerifyData(data, nullptr, 0);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("SetFrom(aBuffer, aLength)\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("SetFrom(aBuffer, aLength)\n");
 
     SuccessOrQuit(data.SetFrom(kData1, sizeof(kData1)));
     VerifyData(data, kData1);
@@ -246,8 +246,8 @@ void TestHeapData(void)
     SuccessOrQuit(data.SetFrom(kData4, 0));
     VerifyData(data, nullptr, 0);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("SetFrom(aMessage)\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("SetFrom(aMessage)\n");
 
     SuccessOrQuit(message->Append(kData2));
     SuccessOrQuit(data.SetFrom(*message));
@@ -280,8 +280,8 @@ void TestHeapData(void)
     VerifyOrQuit(data.SetFrom(*message, 0, message->GetLength() + 1) == kErrorParse);
     VerifyOrQuit(data.SetFrom(*message, 1, message->GetLength()) == kErrorParse);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("Free()\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("Free()\n");
 
     data.Free();
     VerifyData(data, nullptr, 0);
@@ -289,8 +289,8 @@ void TestHeapData(void)
     data.Free();
     VerifyData(data, nullptr, 0);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("CopyBytesTo(aMessage)\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("CopyBytesTo(aMessage)\n");
 
     SuccessOrQuit(message->SetLength(0));
 
@@ -303,20 +303,20 @@ void TestHeapData(void)
     VerifyOrQuit(message->GetLength() == data.GetLength(), "CopyBytesTo() failed");
     VerifyOrQuit(message->Compare(0, kData1), "CopyBytesTo() failed");
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("SetFrom() move semantics\r\n\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("SetFrom() move semantics\n\n");
     data.SetFrom(GetData());
     VerifyData(data, &kTestValue, sizeof(kTestValue));
 
-    printf("\r\n -- PASS\r\n");
+    printf("\n -- PASS\n");
 }
 
 } // namespace ot
 
-extern "C" int test_heap_string(void)
+int main(void)
 {
     ot::TestHeapString();
     ot::TestHeapData();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }

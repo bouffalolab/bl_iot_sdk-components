@@ -62,12 +62,12 @@ void TestAllocateSingle(void)
 
     for (size_t size = 1; size <= heap.GetCapacity(); ++size)
     {
-        printf("%s allocating %zu bytes...\r\n", __func__, size);
+        printf("%s allocating %zu bytes...\n", __func__, size);
         void *p = heap.CAlloc(1, size);
         VerifyOrQuit(p != nullptr && !heap.IsClean() && heap.GetFreeSize() + size <= totalSize, "allocating failed!");
         memset(p, 0xff, size);
         heap.Free(p);
-        VerifyOrQuit(heap.IsClean() && heap.GetFreeSize() == totalSize, "freeing failed!\r\n");
+        VerifyOrQuit(heap.IsClean() && heap.GetFreeSize() == totalSize, "freeing failed!\n");
     }
 }
 
@@ -98,7 +98,7 @@ void TestAllocateRandomly(size_t aSizeLimit, unsigned int aSeed)
     do
     {
         size_t size = sizeof(Node) + static_cast<size_t>(rand()) % aSizeLimit;
-        printf("TestAllocateRandomly allocating %zu bytes...\r\n", size);
+        printf("TestAllocateRandomly allocating %zu bytes...\n", size);
         last->mNext = static_cast<Node *>(heap.CAlloc(1, size));
 
         // No more memory for allocation.
@@ -127,7 +127,7 @@ void TestAllocateRandomly(size_t aSizeLimit, unsigned int aSeed)
             }
 
             Node *curr = prev->mNext;
-            printf("TestAllocateRandomly freeing %zu bytes...\r\n", curr->mSize);
+            printf("TestAllocateRandomly freeing %zu bytes...\n", curr->mSize);
             prev->mNext = curr->mNext;
             heap.Free(curr);
 
@@ -145,7 +145,7 @@ void TestAllocateRandomly(size_t aSizeLimit, unsigned int aSeed)
     while (last)
     {
         Node *next = last->mNext;
-        printf("TestAllocateRandomly freeing %zu bytes...\r\n", last->mSize);
+        printf("TestAllocateRandomly freeing %zu bytes...\n", last->mSize);
         heap.Free(last);
         last = next;
     }
@@ -162,7 +162,7 @@ void TestAllocateMultiple(void)
     for (unsigned int seed = 0; seed < 10; ++seed)
     {
         size_t sizeLimit = (1 << seed);
-        printf("TestAllocateRandomly(%zu, %u)...\r\n", sizeLimit, seed);
+        printf("TestAllocateRandomly(%zu, %u)...\n", sizeLimit, seed);
         TestAllocateRandomly(sizeLimit, seed);
     }
 }
@@ -175,11 +175,11 @@ void RunTimerTests(void)
 
 #endif // !OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE
 
-extern "C" int test_heap(void)
+int main(void)
 {
 #if !OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE
     RunTimerTests();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
 #endif // !OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE
     return 0;
 }

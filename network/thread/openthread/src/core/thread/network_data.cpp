@@ -486,7 +486,7 @@ void MutableNetworkData::RemoveTemporaryDataIn(ServiceTlv &aService)
             switch (cur->GetType())
             {
             case NetworkDataTlv::kTypeServer:
-                As<ServerTlv>(cur)->SetServer16(Mle::Mle::ServiceAlocFromId(aService.GetServiceId()));
+                As<ServerTlv>(cur)->SetServer16(Mle::ServiceAlocFromId(aService.GetServiceId()));
                 break;
 
             default:
@@ -644,7 +644,7 @@ Error NetworkData::SendServerDataNotification(uint16_t              aRloc16,
     Coap::Message *  message;
     Tmf::MessageInfo messageInfo(GetInstance());
 
-    message = Get<Tmf::Agent>().NewPriorityConfirmablePostMessage(UriPath::kServerData);
+    message = Get<Tmf::Agent>().NewPriorityConfirmablePostMessage(kUriServerData);
     VerifyOrExit(message != nullptr, error = kErrorNoBufs);
 
     if (aAppendNetDataTlv)
@@ -736,11 +736,11 @@ Error NetworkData::FindBorderRouters(RoleFilter aRoleFilter, uint16_t aRlocs[], 
                 break;
 
             case kRouterRoleOnly:
-                VerifyOrExit(Mle::Mle::IsActiveRouter(aRloc16));
+                VerifyOrExit(Mle::IsActiveRouter(aRloc16));
                 break;
 
             case kChildRoleOnly:
-                VerifyOrExit(!Mle::Mle::IsActiveRouter(aRloc16));
+                VerifyOrExit(!Mle::IsActiveRouter(aRloc16));
                 break;
             }
 

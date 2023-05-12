@@ -54,8 +54,7 @@ RegisterLogModule("DuaManager");
 
 DuaManager::DuaManager(Instance &aInstance)
     : InstanceLocator(aInstance)
-    , mRegistrationTask(aInstance, DuaManager::HandleRegistrationTask)
-    , mDuaNotification(UriPath::kDuaRegistrationNotify, &DuaManager::HandleDuaNotification, this)
+    , mRegistrationTask(aInstance)
     , mIsDuaPending(false)
 #if OPENTHREAD_CONFIG_DUA_ENABLE
     , mDuaState(kNotExist)
@@ -77,8 +76,6 @@ DuaManager::DuaManager(Instance &aInstance)
     mChildDuaMask.Clear();
     mChildDuaRegisteredMask.Clear();
 #endif
-
-    Get<Tmf::Agent>().AddResource(mDuaNotification);
 }
 
 void DuaManager::HandleDomainPrefixUpdate(BackboneRouter::Leader::DomainPrefixState aState)
@@ -402,11 +399,6 @@ void DuaManager::HandleTimeTick(void)
     UpdateTimeTickerRegistration();
 }
 
-void DuaManager::HandleRegistrationTask(Tasklet &aTasklet)
-{
-    aTasklet.Get<DuaManager>().PerformNextRegistration();
-}
-
 void DuaManager::UpdateTimeTickerRegistration(void)
 {
     if (mDelay.mValue == 0)
@@ -455,7 +447,7 @@ void DuaManager::PerformNextRegistration(void)
     }
 
     // Prepare DUA.req
-    message = Get<Tmf::Agent>().NewPriorityConfirmablePostMessage(UriPath::kDuaRegistrationRequest);
+    message = Get<Tmf::Agent>().NewPriorityConfirmablePostMessage(kUriDuaRegistrationRequest);
     VerifyOrExit(message != nullptr, error = kErrorNoBufs);
 
 #if OPENTHREAD_CONFIG_DUA_ENABLE
@@ -585,11 +577,8 @@ exit:
     LogInfo("Received DUA.rsp: %s", ErrorToString(error));
 }
 
-void DuaManager::HandleDuaNotification(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
-{
-    static_cast<DuaManager *>(aContext)->HandleDuaNotification(AsCoapMessage(aMessage), AsCoreType(aMessageInfo));
-}
-void DuaManager::HandleDuaNotification(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
+template <>
+void DuaManager::HandleTmf<kUriDuaRegistrationNotify>(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
 {
     OT_UNUSED_VARIABLE(aMessageInfo);
 
@@ -606,7 +595,7 @@ void DuaManager::HandleDuaNotification(Coap::Message &aMessage, const Ip6::Messa
 
 exit:
     OT_UNUSED_VARIABLE(error);
-    LogInfo("Received DUA.ntf: %d", ErrorToString(error));
+    LogInfo("Received DUA.ntf: %s", ErrorToString(error));
 }
 
 Error DuaManager::ProcessDuaResponse(Coap::Message &aMessage)
@@ -726,7 +715,7 @@ void DuaManager::SendAddressNotification(Ip6::Address &             aAddress,
     Tmf::MessageInfo messageInfo(GetInstance());
     Error            error;
 
-    message = Get<Tmf::Agent>().NewPriorityConfirmablePostMessage(UriPath::kDuaRegistrationNotify);
+    message = Get<Tmf::Agent>().NewPriorityConfirmablePostMessage(kUriDuaRegistrationNotify);
     VerifyOrExit(message != nullptr, error = kErrorNoBufs);
 
     SuccessOrExit(error = Tlv::Append<ThreadStatusTlv>(*message, aStatus));

@@ -463,6 +463,11 @@ int wifi_mgmr_sta_ps_exit(void)
     return 0;
 }
 
+int wifi_mgmr_sta_ps_get(void)
+{
+    return wifi_mgmr_api_fw_powersaving_get();
+}
+
 int wifi_mgmr_sta_autoconnect_enable(void)
 {
     wifi_mgmr_api_enable_autoreconnect();
@@ -967,6 +972,21 @@ int wifi_mgmr_scan_ap(char *ssid, wifi_mgmr_ap_item_t *item)
     return 0;
 }
 
+uint32_t wifi_mgmr_sta_scanlist_nums_get()
+{
+    uint32_t i, cnt = 0;
+    wifi_mgmr_scan_item_t *scan;
+
+    for (i = 0; i < sizeof(wifiMgmr.scan_items) / sizeof(wifiMgmr.scan_items[0]); i++) {
+        scan = &wifiMgmr.scan_items[i];
+        if (scan->is_used && (!wifi_mgmr_scan_item_is_timeout(&wifiMgmr, &(wifiMgmr.scan_items[i])))) {
+            cnt++;
+        }
+    }
+
+    return cnt;
+}
+
 int wifi_mgmr_scan_ap_all(wifi_mgmr_ap_item_t *env, uint32_t *param1, scan_item_cb_t cb)
 {
     int i;
@@ -1037,70 +1057,6 @@ void wifi_mgmr_conn_result_get(uint16_t *status_code, uint16_t *reason_code)
 	}
     (*status_code) = wifiMgmr.wifi_mgmr_stat_info.status_code;
     (*reason_code) = wifiMgmr.wifi_mgmr_stat_info.reason_code;
-}
-
-int wifi_mgmr_bcnind_auth_to_ext(int auth)
-{
-    int ret;
-    switch (auth) {
-    case WIFI_EVENT_BEACON_IND_AUTH_OPEN:
-        ret = WM_WIFI_AUTH_OPEN;
-        break;
-    case WIFI_EVENT_BEACON_IND_AUTH_WEP:
-        ret = WM_WIFI_AUTH_WEP;
-        break;
-    case WIFI_EVENT_BEACON_IND_AUTH_WPA_PSK:
-        ret = WM_WIFI_AUTH_WPA_PSK;
-        break;
-    case WIFI_EVENT_BEACON_IND_AUTH_WPA2_PSK:
-        ret = WM_WIFI_AUTH_WPA2_PSK;
-        break;
-    case WIFI_EVENT_BEACON_IND_AUTH_WPA_WPA2_PSK:
-        ret = WM_WIFI_AUTH_WPA_WPA2_PSK;
-        break;
-    case WIFI_EVENT_BEACON_IND_AUTH_WPA_ENT:
-        ret = WM_WIFI_AUTH_WPA_ENTERPRISE;
-        break;
-    case WIFI_EVENT_BEACON_IND_AUTH_WPA3_SAE:
-        ret = WM_WIFI_AUTH_WPA3_SAE;
-        break;
-    case WIFI_EVENT_BEACON_IND_AUTH_WPA2_PSK_WPA3_SAE:
-        ret = WM_WIFI_AUTH_WPA2_PSK_WPA3_SAE;
-        break;
-    case WIFI_EVENT_BEACON_IND_AUTH_UNKNOWN:
-        ret = WM_WIFI_AUTH_UNKNOWN;
-        break;
-    default:
-        ret = WM_WIFI_AUTH_UNKNOWN;
-        break;
-    }
-    return ret;
-}
-
-int wifi_mgmr_bcnind_cipher_to_ext(int cipher)
-{
-    int ret;
-    switch (cipher) {
-    case WIFI_EVENT_BEACON_IND_CIPHER_NONE:
-        ret = WM_WIFI_CIPHER_NONE;
-        break;
-    case WIFI_EVENT_BEACON_IND_CIPHER_WEP:
-        ret = WM_WIFI_CIPHER_WEP;
-        break;
-    case WIFI_EVENT_BEACON_IND_CIPHER_AES:
-        ret = WM_WIFI_CIPHER_AES;
-        break;
-    case WIFI_EVENT_BEACON_IND_CIPHER_TKIP:
-        ret = WM_WIFI_CIPHER_TKIP;
-        break;
-    case WIFI_EVENT_BEACON_IND_CIPHER_TKIP_AES:
-        ret = WM_WIFI_CIPHER_TKIP_AES;
-        break;
-    default:
-        ret = WM_WIFI_CIPHER_NONE;
-        break;
-    }
-    return ret;
 }
 
 void wifi_mgmr_diagnose_tlv_free(struct sm_tlv_list* list)

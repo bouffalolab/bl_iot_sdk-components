@@ -233,7 +233,7 @@ void VerifyChildTableContent(ChildTable &aTable, uint16_t aChildListLength, cons
         }
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 void TestChildTable(void)
@@ -315,7 +315,7 @@ void TestChildTable(void)
         VerifyOrQuit(table->GetNumChildren(filter) == 0);
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -388,16 +388,16 @@ void TestChildTable(void)
 
     VerifyOrQuit(table->GetNewChild() == nullptr, "GetNewChild() did not fail when table was full");
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
     testFreeInstance(sInstance);
 }
 
 } // namespace ot
 
-extern "C" int test_child_table(void)
+int main(void)
 {
     ot::TestChildTable();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }

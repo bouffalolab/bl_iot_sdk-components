@@ -41,7 +41,7 @@ void VerifyVersionTcFlow(const Header &aHeader, uint8_t aDscp, Ecn aEcn, uint32_
     uint8_t  expectedTc        = static_cast<uint8_t>((aDscp << 2) + aEcn);
     uint32_t expectedVerTcFlow = 0x60000000 + (static_cast<uint32_t>(expectedTc) << 20) + aFlow;
 
-    printf("%08x {dscp:%d, ecn:%d, flow:%d}\r\n", aHeader.GetVerionTrafficClassFlow(), aHeader.GetDscp(),
+    printf("%08x {dscp:%d, ecn:%d, flow:%d}\n", aHeader.GetVerionTrafficClassFlow(), aHeader.GetDscp(),
            aHeader.GetEcn(), aHeader.GetFlow());
 
     VerifyOrQuit(aHeader.IsVersion6());
@@ -134,9 +134,9 @@ void TestIp6Header(void)
 } // namespace Ip6
 } // namespace ot
 
-extern "C" int test_ip6_header(void)
+int main(void)
 {
     ot::Ip6::TestIp6Header();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

@@ -54,7 +54,7 @@ void TestMessage(void)
     uint8_t      readBuffer[kMaxSize];
     uint8_t      zeroBuffer[kMaxSize];
 
-    printf("TestMessage\r\n");
+    printf("TestMessage\n");
 
     memset(zeroBuffer, 0, sizeof(zeroBuffer));
 
@@ -253,7 +253,7 @@ void TestAppender(void)
     Appender                bufAppender(buffer, sizeof(buffer));
     Data<kWithUint16Length> data;
 
-    printf("TestAppender\r\n");
+    printf("TestAppender\n");
 
     instance = static_cast<Instance *>(testInitInstance());
     VerifyOrQuit(instance != nullptr);
@@ -330,10 +330,10 @@ void TestAppender(void)
 
 } // namespace ot
 
-extern "C" int test_message(void)
+int main(void)
 {
     ot::TestMessage();
     ot::TestAppender();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

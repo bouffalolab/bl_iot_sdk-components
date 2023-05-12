@@ -619,12 +619,14 @@ static bool tcp_timer_calculate_next_wake(u32_t * next_wake_ms)
       min_wake_time = LWIP_MIN(TCP_FIN_WAIT_TIMEOUT - (tcp_ticks - pcb->tmr) * TCP_SLOW_INTERVAL, min_wake_time);
     }
 
+#if TCP_QUEUE_OOSEQ
     if (pcb->ooseq != NULL) {
       /* calculate ooseq timeouts */
       LWIP_DEBUGF(TCP_DEBUG, ("calculate_next_wake: free ooseq timeout %ldms\n", (pcb->rto * TCP_OOSEQ_TIMEOUT - (tcp_ticks - pcb->tmr)) * TCP_SLOW_INTERVAL));
 
       min_wake_time = LWIP_MIN((pcb->rto * TCP_OOSEQ_TIMEOUT - (tcp_ticks - pcb->tmr)) * TCP_SLOW_INTERVAL, min_wake_time);
     }
+#endif
 
     if (pcb->state == SYN_RCVD) {
       LWIP_DEBUGF(TCP_DEBUG, ("calculate_next_wake: tcp SYN reset timeout %ldms\n", TCP_SYN_RCVD_TIMEOUT - (tcp_ticks - pcb->tmr) * TCP_SLOW_INTERVAL));

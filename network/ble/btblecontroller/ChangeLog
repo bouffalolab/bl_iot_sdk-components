@@ -1,0 +1,20 @@
+# Changes
+
+## 2023-05-06
+1.[BL702L]Add btblecontroller_702l_m2s1p library.
+
+## 2023-05-05
+1.[BL702L][BL616]Fix the issue that acl data from host cannot be accepted by controller in some corner case. 
+
+## 2023-05-04
+1. [BL702L]add new API btble_controller_sleep_init to initialize BLE sleep function.
+2. [BL616]fix a bug that btble controller may not wakeup immediately in some corner case.
+
+## 2023-04-20
+1. [BL702L]fix an error which may lead to ble link loss if interrupt is not processed in time in libbtblecontroller_702l_m1s1p.a and ibbtblecontroller_702l_m8s1.a .
+
+## 2023-04-19
+1. [BL702L]Add API to get ble tx power for bl702L.
+
+## 2023-04-13
+1. [BL702L]enable secure conneciton in bl702l_m1s1p lib.

@@ -35,6 +35,7 @@
 #include "common/array.hpp"
 #include "common/as_core_type.hpp"
 #include "common/instance.hpp"
+#include "common/time.hpp"
 #include "net/dns_dso.hpp"
 
 #if OPENTHREAD_CONFIG_DNS_DSO_ENABLE
@@ -48,7 +49,7 @@ static otInstance *sInstance;
 
 // Logs a message and adds current time (sNow) as "<hours>:<min>:<secs>.<msec>"
 #define Log(...)                                                                                          \
-    printf("%02u:%02u:%02u.%03u " OT_FIRST_ARG(__VA_ARGS__) "\r\n", (sNow / 36000000), (sNow / 60000) % 60, \
+    printf("%02u:%02u:%02u.%03u " OT_FIRST_ARG(__VA_ARGS__) "\n", (sNow / 36000000), (sNow / 60000) % 60, \
            (sNow / 1000) % 60, sNow % 1000 OT_REST_ARGS(__VA_ARGS__))
 
 void otPlatAlarmMilliStop(otInstance *)
@@ -78,7 +79,7 @@ void AdvanceTime(uint32_t aDuration)
 
     Log(" AdvanceTime for %u.%03u", aDuration / 1000, aDuration % 1000);
 
-    while (sAlarmTime <= time)
+    while (ot::TimeMilli(sAlarmTime) <= ot::TimeMilli(time))
     {
         sNow = sAlarmTime;
         otPlatAlarmMilliFired(sInstance);
@@ -1227,13 +1228,13 @@ void TestDso(void)
 
 #endif // OPENTHREAD_CONFIG_DNS_DSO_ENABLE
 
-extern "C" int test_dso(void)
+int main(void)
 {
 #if OPENTHREAD_CONFIG_DNS_DSO_ENABLE
     ot::Dns::TestDso();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
 #else
-    printf("DSO feature is not enabled\r\n");
+    printf("DSO feature is not enabled\n");
 #endif
 
     return 0;

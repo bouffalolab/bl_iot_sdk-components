@@ -851,6 +851,13 @@ static void wifi_power_saving_set(char *buf, int len, int argc, char **argv)
     wifi_mgmr_set_wifi_active_time(ms);
 }
 
+static void wifi_power_saving_get(char *buf, int len, int argc, char **argv)
+{
+    bl_os_printf("Getting wifi ps param...\r\n");
+    int mode = wifi_mgmr_sta_ps_get();
+    bl_os_printf("wifi ps mode: %d\r\n", mode);
+}
+
 static void sniffer_cb(void *env, uint8_t *pkt, int len, struct bl_rx_info *info)
 {
     static unsigned int sniffer_counter, sniffer_last;
@@ -1189,6 +1196,7 @@ const static struct cli_command cmds_user[] STATIC_CLI_CMD_ATTRIBUTE = {
         { "wifi_sta_ps_on", "wifi power saving mode ON", wifi_power_saving_on_cmd},
         { "wifi_sta_ps_off", "wifi power saving mode OFF", wifi_power_saving_off_cmd},
         { "wifi_sta_ps_set", "set wifi ps mode active time", wifi_power_saving_set},
+        { "wifi_sta_ps_get", "get wifi ps mode", wifi_power_saving_get},
         { "wifi_sta_denoise_enable", "wifi denoise", wifi_denoise_enable_cmd},
         { "wifi_sta_denoise_disable", "wifi denoise", wifi_denoise_disable_cmd},
         { "wifi_sniffer_on", "wifi sniffer mode on", wifi_sniffer_on_cmd},

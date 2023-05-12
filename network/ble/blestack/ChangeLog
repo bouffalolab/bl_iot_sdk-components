@@ -1,0 +1,19 @@
+# Changes
+
+## 2023-05-10
+1. Supplement EIR/AD data type definitions.
+2. Add API to make upper layer can disable pair.
+3. Add API to make upper layer can set preferred connection parameters If CONFIG_BT_GAP_PERIPHERAL_PREF_PARAMS is enabled.
+
+## 2023-04-20
+1. Fix an error that ble may crash when disable / re-enable again in some scenario.
+
+## 2023-04-19
+1. Add API to get ble tx power for bl702L/bl702/bl602.
+2. Static random address can be set to a new value after bt is disabled.
+ 
+## 2023-04-17
+1. Fix disconnect error when call bt_conn_disconnect().
+   Issue: when bt_conn_disconnect()->bt_hci_disconnect()->bt_hci_cmd_send_sync() is run, yeild will be called and current task is pending. Once disconnect done, conn->state will be changed to BT_CONN_DISCONNECTED and current task will be restored. Now if bt_conn_set_state() is called with parameter BT_CONN_DISCONNECT. conn->ref will be messed.
+2. Fix crash when call bt_le_scan_stop().
+   Issue: scan_dev_found_cb will be set to NULL in bt_le_scan_stop(). If bt_le_scan_stop() is called but scan has not been stopped immediately, le_adv_report() will call scan_dev_found_cb which leads to crash.

@@ -978,6 +978,24 @@ struct esco_para {
 struct bt_conn *bt_conn_create_sco(const bt_addr_t *peer,const struct esco_para *para);
 
 #endif
+#if defined (BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)
+/** @brief Set peripheral preferred connection parameters
+ *
+ * @param  param the preferred connection parameters to be set.
+ *
+ * @return 0 in case of success or negative value in case of error.
+ */
+int bt_conn_set_peripheral_pref_params(struct bt_le_conn_param *param);
+
+/** @brief Get peripheral preferred connection parameters
+ *
+ * @param param this API will assign peripheral preferred connection parameters.
+ *
+ * @return 0 in case of success or negative value in case of error.
+ */
+int bt_conn_get_peripheral_pref_params(struct bt_le_conn_param *param);
+#endif
+
 #endif
 
 #ifdef __cplusplus

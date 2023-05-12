@@ -103,7 +103,7 @@ static int i2c_master_send(I2C_ID_Type i2cNo, I2C_Transfer_Cfg *cfg, uint32_t ti
         }
     }
 
-    while (I2C_IsBusy(i2cNo) || !I2C_TransferEndStatus(i2cNo)) {
+    while (I2C_IsBusy(i2cNo) || !I2C_TransferEndStatus(i2cNo) || I2C_TransferNackStatus(i2cNo)) {
         time_end = bl_timer_now_us64() / 1000;
         if (HOSAL_WAIT_FOREVER == timeout) { 
             continue;

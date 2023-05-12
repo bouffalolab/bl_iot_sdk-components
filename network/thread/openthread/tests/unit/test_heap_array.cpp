@@ -169,12 +169,12 @@ template <typename EntryType, typename... Args> void VerifyArray(const Heap::Arr
 
     if (TypeTraits::IsSame<EntryType, Entry>::kValue)
     {
-        printf("} (constructor-calls:%u, destructor-calls:%u)\r\n", sConstructorCalls, sDestructorCalls);
+        printf("} (constructor-calls:%u, destructor-calls:%u)\n", sConstructorCalls, sDestructorCalls);
         VerifyOrQuit(sConstructorCalls - sDestructorCalls == aArray.GetLength());
     }
     else
     {
-        printf("}\r\n");
+        printf("}\n");
     }
 }
 
@@ -184,16 +184,16 @@ void TestHeapArrayOfUint16(void)
     Heap::Array<uint16_t, 2> array2;
     uint16_t *               entry;
 
-    printf("\r\n\r\n====================================================================================\r\n");
-    printf("TestHeapArrayOfUint16\r\n\r\n");
+    printf("\n\n====================================================================================\n");
+    printf("TestHeapArrayOfUint16\n\n");
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("After constructor\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("After constructor\n");
     VerifyOrQuit(array.GetCapacity() == 0);
     VerifyArray(array);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("PushBack(aEntry)\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("PushBack(aEntry)\n");
 
     SuccessOrQuit(array.PushBack(1));
     VerifyArray(array, 1);
@@ -207,8 +207,8 @@ void TestHeapArrayOfUint16(void)
     VerifyArray(array, 1, 2, 3);
     VerifyOrQuit(array.GetCapacity() == 4);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("entry = PushBack()\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("entry = PushBack()\n");
 
     entry = array.PushBack();
     VerifyOrQuit(entry != nullptr);
@@ -222,8 +222,8 @@ void TestHeapArrayOfUint16(void)
     VerifyArray(array, 1, 2, 3, 4, 5);
     VerifyOrQuit(array.GetCapacity() == 6);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("Clear()\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("Clear()\n");
 
     array.Clear();
     VerifyArray(array);
@@ -243,8 +243,8 @@ void TestHeapArrayOfUint16(void)
     VerifyArray(array, 11, 22, 33, 44, 55, 66, 77);
     VerifyOrQuit(array.GetCapacity() == 8);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("PopBack()\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("PopBack()\n");
 
     array.PopBack();
     VerifyArray(array, 11, 22, 33, 44, 55, 66);
@@ -274,8 +274,8 @@ void TestHeapArrayOfUint16(void)
     VerifyArray(array, 0x100, 0x101, 0x102, 0x103, 0x104, 0x105, 0x106, 0x107, 0x108, 0x109, 0x10a);
     VerifyOrQuit(array.GetCapacity() == 12);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("Free()\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("Free()\n");
 
     array.Free();
     VerifyArray(array);
@@ -285,8 +285,8 @@ void TestHeapArrayOfUint16(void)
     VerifyArray(array);
     VerifyOrQuit(array.GetCapacity() == 0);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("ReserveCapacity()\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("ReserveCapacity()\n");
 
     SuccessOrQuit(array.ReserveCapacity(5));
     VerifyArray(array);
@@ -316,8 +316,8 @@ void TestHeapArrayOfUint16(void)
     VerifyArray(array, 0, 1, 2, 3, 4, 5);
     VerifyOrQuit(array.GetCapacity() == 10);
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("TakeFrom()\r\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("TakeFrom()\n");
 
     for (uint16_t num = 0; num < 7; num++)
     {
@@ -334,7 +334,7 @@ void TestHeapArrayOfUint16(void)
     VerifyArray(array2, 0, 1, 2, 3, 4, 5);
     VerifyOrQuit(array2.GetCapacity() == 10);
 
-    printf("\r\n -- PASS\r\n");
+    printf("\n -- PASS\n");
 }
 
 void TestHeapArray(void)
@@ -342,21 +342,21 @@ void TestHeapArray(void)
     VerifyOrQuit(sConstructorCalls == 0);
     VerifyOrQuit(sDestructorCalls == 0);
 
-    printf("\r\n\r\n====================================================================================\r\n");
-    printf("TestHeapArray\r\n\r\n");
+    printf("\n\n====================================================================================\n");
+    printf("TestHeapArray\n\n");
 
     {
         Heap::Array<Entry, 2> array;
         Heap::Array<Entry, 2> array2;
         Entry *               entry;
 
-        printf("------------------------------------------------------------------------------------\r\n");
-        printf("After constructor\r\n");
+        printf("------------------------------------------------------------------------------------\n");
+        printf("After constructor\n");
         VerifyOrQuit(array.GetCapacity() == 0);
         VerifyArray(array);
 
-        printf("------------------------------------------------------------------------------------\r\n");
-        printf("PushBack(aEntry)\r\n");
+        printf("------------------------------------------------------------------------------------\n");
+        printf("PushBack(aEntry)\n");
 
         SuccessOrQuit(array.PushBack(Entry(1)));
         VerifyArray(array, 1);
@@ -386,8 +386,8 @@ void TestHeapArray(void)
         VerifyArray(array, 1, 2, 3, 4, 5);
         VerifyOrQuit(array.GetCapacity() == 6);
 
-        printf("------------------------------------------------------------------------------------\r\n");
-        printf("PopBack()\r\n");
+        printf("------------------------------------------------------------------------------------\n");
+        printf("PopBack()\n");
 
         array.PopBack();
         VerifyArray(array, 1, 2, 3, 4);
@@ -405,8 +405,8 @@ void TestHeapArray(void)
         VerifyArray(array, 1, 2, 3);
         VerifyOrQuit(array.GetCapacity() == 6);
 
-        printf("------------------------------------------------------------------------------------\r\n");
-        printf("Clear()\r\n");
+        printf("------------------------------------------------------------------------------------\n");
+        printf("Clear()\n");
 
         array.Clear();
         VerifyArray(array);
@@ -420,14 +420,14 @@ void TestHeapArray(void)
         VerifyArray(array, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
         VerifyOrQuit(array.GetCapacity() == 12);
 
-        printf("------------------------------------------------------------------------------------\r\n");
-        printf("Free()\r\n");
+        printf("------------------------------------------------------------------------------------\n");
+        printf("Free()\n");
         array.Free();
         VerifyArray(array);
         VerifyOrQuit(array.GetCapacity() == 0);
 
-        printf("------------------------------------------------------------------------------------\r\n");
-        printf("ReserveCapacity()\r\n");
+        printf("------------------------------------------------------------------------------------\n");
+        printf("ReserveCapacity()\n");
 
         SuccessOrQuit(array.ReserveCapacity(5));
         VerifyArray(array);
@@ -457,8 +457,8 @@ void TestHeapArray(void)
         VerifyArray(array, 0, 1, 2, 3, 4, 5);
         VerifyOrQuit(array.GetCapacity() == 10);
 
-        printf("------------------------------------------------------------------------------------\r\n");
-        printf("TakeFrom()\r\n");
+        printf("------------------------------------------------------------------------------------\n");
+        printf("TakeFrom()\n");
 
         for (uint16_t num = 0; num < 7; num++)
         {
@@ -474,21 +474,21 @@ void TestHeapArray(void)
         VerifyOrQuit(array2.GetCapacity() == 10);
     }
 
-    printf("------------------------------------------------------------------------------------\r\n");
-    printf("Array destructor\r\n");
-    printf(" - (constructor-calls:%u, destructor-calls:%u)\r\n", sConstructorCalls, sDestructorCalls);
+    printf("------------------------------------------------------------------------------------\n");
+    printf("Array destructor\n");
+    printf(" - (constructor-calls:%u, destructor-calls:%u)\n", sConstructorCalls, sDestructorCalls);
     VerifyOrQuit(sConstructorCalls == sDestructorCalls,
                  "Array destructor failed to invoke destructor on all its existing entries");
 
-    printf("\r\n -- PASS\r\n");
+    printf("\n -- PASS\n");
 }
 
 } // namespace ot
 
-extern "C" int test_heap_array(void)
+int main(void)
 {
     ot::TestHeapArrayOfUint16();
     ot::TestHeapArray();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }

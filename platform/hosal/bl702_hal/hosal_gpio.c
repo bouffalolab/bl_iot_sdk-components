@@ -137,6 +137,7 @@ int hosal_gpio_irq_set(hosal_gpio_dev_t *gpio, hosal_gpio_irq_trigger_t trigger_
 {
     if (NULL == gpio || gpio->port > GLB_GPIO_PIN_MAX || trigger_type > 3) {
         printf("hosal irq register paraments is not correct! \r\n");
+        return -1;
     }
     hosal_gpio_ctx_t *node = NULL;
     hosal_gpio_ctx_t *node_f = NULL;

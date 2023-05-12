@@ -54,6 +54,7 @@ int32_t ble_controller_sleep(int32_t max_sleep_cycles);
 void ble_controller_sleep_restore(void);
 bool ble_controller_sleep_is_ongoing(void);
 void ble_controller_set_tx_pwr(int ble_tx_power);
+int8_t ble_controller_get_tx_pwr(void);
 void ble_rf_set_tx_channel(uint16_t tx_channel);
 void ble_controller_disable_adv_random_delay(bool disable);
 

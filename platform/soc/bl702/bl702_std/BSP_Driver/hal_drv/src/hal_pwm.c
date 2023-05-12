@@ -162,39 +162,157 @@ int pwm_register(enum pwm_index_type index, const char *name)
 
 static void pwm_isr(pwm_device_t *handle)
 {
-    uint32_t i;
+#if defined(BSP_USING_PWM_CH0) || defined(BSP_USING_PWM_CH1) || \
+    defined(BSP_USING_PWM_CH2) || defined(BSP_USING_PWM_CH3)
+    
     uint32_t tmpVal;
     uint32_t timeoutCnt = 160 * 1000;
     /* Get channel register */
     uint32_t PWMx = PWM_BASE;
+    
+#endif
+    
+#ifdef BSP_USING_PWM_CH0
+    tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
 
-    for (i = 0; i < PWM_MAX_INDEX; i++) {
-        tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
+    if ((BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[0].ch)) != 0) {
+        /* Clear interrupt */
+        tmpVal |= (1 << (handle[0].ch + PWM_INT_CLEAR_POS));
+        BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
 
-        if ((BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[i].ch)) != 0) {
-            /* Clear interrupt */
-            tmpVal |= (1 << (handle[i].ch + PWM_INT_CLEAR_POS));
-            BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
+        /* FIXME: we need set pwm_int_clear to 0 by software and
+           before this,we must make sure pwm_interrupt_sts is 0*/
+        do {
+            tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
+            timeoutCnt--;
 
-            /* FIXME: we need set pwm_int_clear to 0 by software and
-               before this,we must make sure pwm_interrupt_sts is 0*/
-            do {
-                tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
-                timeoutCnt--;
-
-                if (timeoutCnt == 0) {
-                    break;
-                }
-            } while (BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[i].ch));
-
-            tmpVal &= (~(1 << (handle[i].ch + PWM_INT_CLEAR_POS)));
-            BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
-
-            if (handle[i].parent.callback) {
-                handle[i].parent.callback(&handle[i].parent, NULL, 0, PWM_EVENT_COMPLETE);
+            if (timeoutCnt == 0) {
+                break;
             }
+        } while (BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[0].ch));
+
+        tmpVal &= (~(1 << (handle[0].ch + PWM_INT_CLEAR_POS)));
+        BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
+
+        if (handle[0].parent.callback) {
+            handle[0].parent.callback(&handle[0].parent, NULL, 0, PWM_EVENT_COMPLETE);
         }
     }
+#endif    
+
+#ifdef BSP_USING_PWM_CH1
+    tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
+
+    if ((BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[1].ch)) != 0) {
+        /* Clear interrupt */
+        tmpVal |= (1 << (handle[1].ch + PWM_INT_CLEAR_POS));
+        BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
+
+        /* FIXME: we need set pwm_int_clear to 0 by software and
+           before this,we must make sure pwm_interrupt_sts is 0*/
+        do {
+            tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
+            timeoutCnt--;
+
+            if (timeoutCnt == 0) {
+                break;
+            }
+        } while (BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[1].ch));
+
+        tmpVal &= (~(1 << (handle[1].ch + PWM_INT_CLEAR_POS)));
+        BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
+
+        if (handle[1].parent.callback) {
+            handle[1].parent.callback(&handle[1].parent, NULL, 0, PWM_EVENT_COMPLETE);
+        }
+    }
+#endif   
+
+#ifdef BSP_USING_PWM_CH2
+    tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
+
+    if ((BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[2].ch)) != 0) {
+        /* Clear interrupt */
+        tmpVal |= (1 << (handle[2].ch + PWM_INT_CLEAR_POS));
+        BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
+
+        /* FIXME: we need set pwm_int_clear to 0 by software and
+           before this,we must make sure pwm_interrupt_sts is 0*/
+        do {
+            tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
+            timeoutCnt--;
+
+            if (timeoutCnt == 0) {
+                break;
+            }
+        } while (BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[2].ch));
+
+        tmpVal &= (~(1 << (handle[2].ch + PWM_INT_CLEAR_POS)));
+        BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
+
+        if (handle[2].parent.callback) {
+            handle[2].parent.callback(&handle[2].parent, NULL, 0, PWM_EVENT_COMPLETE);
+        }
+    }
+#endif   
+
+#ifdef BSP_USING_PWM_CH3
+    tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
+
+    if ((BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[3].ch)) != 0) {
+        /* Clear interrupt */
+        tmpVal |= (1 << (handle[3].ch + PWM_INT_CLEAR_POS));
+        BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
+
+        /* FIXME: we need set pwm_int_clear to 0 by software and
+           before this,we must make sure pwm_interrupt_sts is 0*/
+        do {
+            tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
+            timeoutCnt--;
+
+            if (timeoutCnt == 0) {
+                break;
+            }
+        } while (BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[3].ch));
+
+        tmpVal &= (~(1 << (handle[3].ch + PWM_INT_CLEAR_POS)));
+        BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
+
+        if (handle[3].parent.callback) {
+            handle[3].parent.callback(&handle[3].parent, NULL, 0, PWM_EVENT_COMPLETE);
+        }
+    }
+#endif   
+
+#ifdef BSP_USING_PWM_CH4
+    tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
+
+    if ((BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[4].ch)) != 0) {
+        /* Clear interrupt */
+        tmpVal |= (1 << (handle[4].ch + PWM_INT_CLEAR_POS));
+        BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
+
+        /* FIXME: we need set pwm_int_clear to 0 by software and
+           before this,we must make sure pwm_interrupt_sts is 0*/
+        do {
+            tmpVal = BL_RD_REG(PWMx, PWM_INT_CONFIG);
+            timeoutCnt--;
+
+            if (timeoutCnt == 0) {
+                break;
+            }
+        } while (BL_GET_REG_BITS_VAL(tmpVal, PWM_INTERRUPT_STS) & (1 << handle[4].ch));
+
+        tmpVal &= (~(1 << (handle[4].ch + PWM_INT_CLEAR_POS)));
+        BL_WR_REG(PWMx, PWM_INT_CONFIG, tmpVal);
+
+        if (handle[4].parent.callback) {
+            handle[4].parent.callback(&handle[4].parent, NULL, 0, PWM_EVENT_COMPLETE);
+        }
+    }
+#endif   
+
+    
 }
 
 static void PWM_IRQ(void)

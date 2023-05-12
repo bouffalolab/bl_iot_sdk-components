@@ -34,6 +34,7 @@ static EMAC_Handle_Type *thiz = NULL;
 eth_context *ctx = NULL;
 TaskHandle_t DequeueTaskHandle;
 TaskHandle_t OutputTaskHandle;
+struct netif eth_mac = {0};
 #define ETH_MAX_BUFFER_SIZE        (1536)
 #if 0
 uint32_t tx_buf[ETH_TXNB][(ETH_MAX_BUFFER_SIZE + 3)/4];/* Ethernet Transmit Buffers */
@@ -741,6 +742,7 @@ void unsent_recv_task(void *pvParameters)
 {
     uint32_t NotifyValue;
     BaseType_t recv;
+    struct netif *netif = (struct netif *)pvParameters;
 
     log_info("unsent_recv_task.\r\n");
     while(1) {
@@ -748,11 +750,11 @@ void unsent_recv_task(void *pvParameters)
         recv = xTaskNotifyWait(0, ULONG_MAX, &NotifyValue, 200);
         if (recv == pdTRUE) {
             if (NotifyValue & (1 << 0)) {
-                bl702ethernetif_output(&eth_mac);
+                bl702ethernetif_output(netif);
                 emac_intmask(EMAC_INT_TX_DONE, UNMASK);
             }
             if (NotifyValue & (1 << 1)) {
-                bl702ethernetif_input(&eth_mac);
+                bl702ethernetif_input(netif);
                 emac_intmask(EMAC_INT_RX_DONE, UNMASK);
             }
         } else {
@@ -795,7 +797,7 @@ err_t eth_init(struct netif *netif)
   netif->linkoutput = low_level_output;
   log_info("eth_init.\r\n");
   low_level_init(netif);
-  xTaskCreate(unsent_recv_task, (const char *)"Ontput_Unsent_queue", 1024, NULL, 29, &DequeueTaskHandle);
+  xTaskCreate(unsent_recv_task, (const char *)"Ontput_Unsent_queue", 1024, netif, 29, &DequeueTaskHandle);
 
   return ERR_OK;
 }

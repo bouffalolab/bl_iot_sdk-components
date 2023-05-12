@@ -132,11 +132,11 @@ void TestHkdfSha256(void)
         uint8_t                outKey[kMaxOuttKey];
         ot::Crypto::Key        testInputKey;
 
-        printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-        DumpBuffer("\r\nInput Key", test->mInKey, test->mInKeyLength);
-        DumpBuffer("\r\nSalt", test->mSalt, test->mSaltLength);
-        DumpBuffer("\r\nInfo", test->mInfo, test->mInfoLength);
-        DumpBuffer("\r\nExpected Output Key", test->mOutKey, test->mOutKeyLength);
+        printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+        DumpBuffer("\nInput Key", test->mInKey, test->mInKeyLength);
+        DumpBuffer("\nSalt", test->mSalt, test->mSaltLength);
+        DumpBuffer("\nInfo", test->mInfo, test->mInfoLength);
+        DumpBuffer("\nExpected Output Key", test->mOutKey, test->mOutKeyLength);
 
         memset(outKey, kFillByte, sizeof(outKey));
         memset(&testInputKey, 0x00, sizeof(testInputKey));
@@ -146,7 +146,7 @@ void TestHkdfSha256(void)
         hkdf.Extract(test->mSalt, test->mSaltLength, testInputKey);
         hkdf.Expand(test->mInfo, test->mInfoLength, outKey, test->mOutKeyLength);
 
-        DumpBuffer("\r\nCalculated Output Key", outKey, test->mOutKeyLength);
+        DumpBuffer("\nCalculated Output Key", outKey, test->mOutKeyLength);
 
         VerifyOrQuit(memcmp(outKey, test->mOutKey, test->mOutKeyLength) == 0, "HKDF-SHA-256 failed");
 
@@ -159,9 +159,9 @@ void TestHkdfSha256(void)
     testFreeInstance(instance);
 }
 
-extern "C" int test_hkdf_sha256(void)
+int main(void)
 {
     TestHkdfSha256();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

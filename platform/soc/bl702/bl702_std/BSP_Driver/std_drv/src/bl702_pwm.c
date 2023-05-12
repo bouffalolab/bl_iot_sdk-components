@@ -437,14 +437,14 @@ void PWM_SW_Force_Value(PWM_CH_ID_Type ch, uint8_t value)
 }
 
 /****************************************************************************/ /**
- * @brief  PWM channel force output high
+ * @brief  PWM channel force output mode enable
  *
  * @param  ch: PWM channel number
  *
  * @return None
  *
 *******************************************************************************/
-void PWM_Channel_Fource_Output(PWM_CH_ID_Type ch)
+void PWM_Channel_Force_Output(PWM_CH_ID_Type ch)
 {
     uint32_t tmpVal;
     /* Get channel register */

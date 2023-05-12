@@ -52,8 +52,13 @@ static ot::Spinel::RadioSpinel<ot::Posix::HdlcInterface, RadioProcessContext> sR
 #include "spi_interface.hpp"
 
 static ot::Spinel::RadioSpinel<ot::Posix::SpiInterface, RadioProcessContext> sRadioSpinel;
+#elif OPENTHREAD_POSIX_CONFIG_RCP_BUS == OT_POSIX_RCP_BUS_VENDOR
+#include "vendor_interface.hpp"
+
+static ot::Spinel::RadioSpinel<ot::Posix::VendorInterface, RadioProcessContext> sRadioSpinel;
 #else
-#error "OPENTHREAD_POSIX_CONFIG_RCP_BUS only allows OT_POSIX_RCP_BUS_UART and OT_POSIX_RCP_BUS_SPI!"
+#error "OPENTHREAD_POSIX_CONFIG_RCP_BUS only allows OT_POSIX_RCP_BUS_UART, OT_POSIX_RCP_BUS_SPI and " \
+    "OT_POSIX_RCP_BUS_VENDOR!"
 #endif
 
 namespace ot {
@@ -540,6 +545,34 @@ void otPlatDiagChannelSet(uint8_t aChannel)
 
 exit:
     return;
+}
+
+otError otPlatDiagGpioSet(uint32_t aGpio, bool aValue)
+{
+    otError error;
+    char    cmd[OPENTHREAD_CONFIG_DIAG_CMD_LINE_BUFFER_SIZE];
+
+    snprintf(cmd, sizeof(cmd), "gpio set %d %d", aGpio, aValue);
+    SuccessOrExit(error = sRadioSpinel.PlatDiagProcess(cmd, nullptr, 0));
+
+exit:
+    return error;
+}
+
+otError otPlatDiagGpioGet(uint32_t aGpio, bool *aValue)
+{
+    otError error;
+    char    cmd[OPENTHREAD_CONFIG_DIAG_CMD_LINE_BUFFER_SIZE];
+    char    output[OPENTHREAD_CONFIG_DIAG_OUTPUT_BUFFER_SIZE];
+    char *  str;
+
+    snprintf(cmd, sizeof(cmd), "gpio get %d", aGpio);
+    SuccessOrExit(error = sRadioSpinel.PlatDiagProcess(cmd, output, sizeof(output)));
+    VerifyOrExit((str = strtok(output, "\r")) != nullptr, error = OT_ERROR_FAILED);
+    *aValue = static_cast<bool>(atoi(str));
+
+exit:
+    return error;
 }
 
 void otPlatDiagRadioReceived(otInstance *aInstance, otRadioFrame *aFrame, otError aError)

@@ -437,7 +437,7 @@ int hosal_rtc_set_count(hosal_rtc_dev_t *rtc, uint64_t *time_stamp)
         return -1;
     }
     memset(&tim, 0, sizeof(struct tm));
-    memset(&time, 0, sizeof(struct tm));
+    memset(&time, 0, sizeof(hosal_rtc_time_t));
     __gmtime_r((const time_t *)time_stamp, s_rtc_base);
     return 0;
 }

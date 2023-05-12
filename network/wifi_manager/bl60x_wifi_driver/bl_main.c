@@ -224,7 +224,25 @@ int bl_main_disconnect()
 
 int bl_main_powersaving(int mode)
 {
-    return bl_send_mm_powersaving_req(&wifi_hw, mode);
+    int ret;
+
+    ret = bl_send_mm_powersaving_req(&wifi_hw, mode);
+    if (ret) {
+        return ret;
+    }
+
+    wifi_hw.vif_table[BL_VIF_STA].sta_ps = mode;
+    return ret;
+}
+
+int bl_main_powersaving_get(void)
+{
+    return wifi_hw.vif_table[BL_VIF_STA].sta_ps;
+}
+
+int bl_main_sta_is_connected(void)
+{
+    return (wifi_hw.vif_table[BL_VIF_STA].links_num > 0);
 }
 
 int bl_main_denoise(int mode)

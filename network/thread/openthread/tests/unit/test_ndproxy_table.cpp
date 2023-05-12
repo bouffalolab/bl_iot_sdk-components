@@ -102,16 +102,16 @@ void TestNdProxyTable(void)
 
 } // namespace ot
 
-extern "C" int test_ndproxy_table(void)
+int main(void)
 {
     ot::TestNdProxyTable();
 
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }
 
 #else
-extern "C" int test_ndproxy_table(void)
+int main(void)
 {
     return 0;
 }

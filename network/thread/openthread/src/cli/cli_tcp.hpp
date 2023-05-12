@@ -37,6 +37,7 @@
 #include "openthread-core-config.h"
 
 #include <openthread/tcp.h>
+#include <openthread/tcp_ext.h>
 
 #include "cli/cli_config.h"
 #include "cli/cli_output.hpp"
@@ -49,7 +50,7 @@ namespace Cli {
  * This class implements a CLI-based TCP example.
  *
  */
-class TcpExample : private OutputWrapper
+class TcpExample : private Output
 {
 public:
     using Arg = Utils::CmdLineParser::Arg;
@@ -57,10 +58,11 @@ public:
     /**
      * Constructor
      *
-     * @param[in]  aOutput  The CLI console output context.
+     * @param[in]  aInstance            The OpenThread Instance.
+     * @param[in]  aOutputImplementer   An `OutputImplementer`.
      *
      */
-    explicit TcpExample(Output &aOutput);
+    TcpExample(otInstance *aInstance, OutputImplementer &aOutputImplementer);
 
     /**
      * This method interprets a list of CLI arguments.
@@ -73,20 +75,14 @@ public:
 private:
     using Command = CommandEntry<TcpExample>;
 
-    otError ProcessHelp(Arg aArgs[]);
-    otError ProcessInit(Arg aArgs[]);
-    otError ProcessDeinit(Arg aArgs[]);
-    otError ProcessBind(Arg aArgs[]);
-    otError ProcessConnect(Arg aArgs[]);
-    otError ProcessSend(Arg aArgs[]);
-    otError ProcessBenchmark(Arg aArgs[]);
-    otError ProcessSendEnd(Arg aArgs[]);
-    otError ProcessAbort(Arg aArgs[]);
-    otError ProcessListen(Arg aArgs[]);
-    otError ProcessStopListening(Arg aArgs[]);
+    template <CommandId kCommandId> otError Process(Arg aArgs[]);
+
+    otError ContinueBenchmarkCircularSend(void);
+    void    CompleteBenchmark(void);
 
     static void HandleTcpEstablishedCallback(otTcpEndpoint *aEndpoint);
     static void HandleTcpSendDoneCallback(otTcpEndpoint *aEndpoint, otLinkedBuffer *aData);
+    static void HandleTcpForwardProgressCallback(otTcpEndpoint *aEndpoint, size_t aInSendBuffer, size_t aBacklog);
     static void HandleTcpReceiveAvailableCallback(otTcpEndpoint *aEndpoint,
                                                   size_t         aBytesAvailable,
                                                   bool           aEndOfStream,
@@ -99,33 +95,18 @@ private:
                                                                      otTcpEndpoint *   aEndpoint,
                                                                      const otSockAddr *aPeer);
 
-    void                          HandleTcpEstablished(otTcpEndpoint *aEndpoint);
-    void                          HandleTcpSendDone(otTcpEndpoint *aEndpoint, otLinkedBuffer *aData);
-    void                          HandleTcpReceiveAvailable(otTcpEndpoint *aEndpoint,
-                                                            size_t         aBytesAvailable,
-                                                            bool           aEndOfStream,
-                                                            size_t         aBytesRemaining);
-    void                          HandleTcpDisconnected(otTcpEndpoint *aEndpoint, otTcpDisconnectedReason aReason);
+    void HandleTcpEstablished(otTcpEndpoint *aEndpoint);
+    void HandleTcpSendDone(otTcpEndpoint *aEndpoint, otLinkedBuffer *aData);
+    void HandleTcpForwardProgress(otTcpEndpoint *aEndpoint, size_t aInSendBuffer, size_t aBacklog);
+    void HandleTcpReceiveAvailable(otTcpEndpoint *aEndpoint,
+                                   size_t         aBytesAvailable,
+                                   bool           aEndOfStream,
+                                   size_t         aBytesRemaining);
+    void HandleTcpDisconnected(otTcpEndpoint *aEndpoint, otTcpDisconnectedReason aReason);
     otTcpIncomingConnectionAction HandleTcpAcceptReady(otTcpListener *   aListener,
                                                        const otSockAddr *aPeer,
                                                        otTcpEndpoint **  aAcceptInto);
     void HandleTcpAcceptDone(otTcpListener *aListener, otTcpEndpoint *aEndpoint, const otSockAddr *aPeer);
-
-    static constexpr Command sCommands[] = {
-        {"abort", &TcpExample::ProcessAbort},
-        {"benchmark", &TcpExample::ProcessBenchmark},
-        {"bind", &TcpExample::ProcessBind},
-        {"connect", &TcpExample::ProcessConnect},
-        {"deinit", &TcpExample::ProcessDeinit},
-        {"help", &TcpExample::ProcessHelp},
-        {"init", &TcpExample::ProcessInit},
-        {"listen", &TcpExample::ProcessListen},
-        {"send", &TcpExample::ProcessSend},
-        {"sendend", &TcpExample::ProcessSendEnd},
-        {"stoplistening", &TcpExample::ProcessStopListening},
-    };
-
-    static_assert(BinarySearch::IsSorted(sCommands), "Command Table is not sorted");
 
     otTcpEndpoint mEndpoint;
     otTcpListener mListener;
@@ -133,15 +114,21 @@ private:
     bool mInitialized;
     bool mEndpointConnected;
     bool mSendBusy;
+    bool mUseCircularSendBuffer;
 
-    otLinkedBuffer mSendLink;
-    uint8_t        mSendBuffer[OPENTHREAD_CONFIG_CLI_MAX_LINE_LENGTH];
-    uint8_t        mReceiveBuffer[OPENTHREAD_CONFIG_CLI_TCP_RECEIVE_BUFFER_SIZE];
+    otTcpCircularSendBuffer mSendBuffer;
+    otLinkedBuffer          mSendLink;
+    uint8_t                 mSendBufferBytes[OPENTHREAD_CONFIG_CLI_TCP_RECEIVE_BUFFER_SIZE];
+    uint8_t                 mReceiveBufferBytes[OPENTHREAD_CONFIG_CLI_TCP_RECEIVE_BUFFER_SIZE];
 
-    otLinkedBuffer mBenchmarkLinks[(sizeof(mReceiveBuffer) + sizeof(mSendBuffer) - 1) / sizeof(mSendBuffer)];
-    uint32_t       mBenchmarkBytesTotal;
-    uint32_t       mBenchmarkLinksLeft;
-    TimeMilli      mBenchmarkStart;
+    otLinkedBuffer
+              mBenchmarkLinks[(sizeof(mReceiveBufferBytes) + sizeof(mSendBufferBytes) - 1) / sizeof(mSendBufferBytes)];
+    uint32_t  mBenchmarkBytesTotal;
+    uint32_t  mBenchmarkBytesUnsent;
+    TimeMilli mBenchmarkStart;
+
+    static constexpr const char * sBenchmarkData       = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    static constexpr const size_t sBenchmarkDataLength = 52;
 };
 
 } // namespace Cli

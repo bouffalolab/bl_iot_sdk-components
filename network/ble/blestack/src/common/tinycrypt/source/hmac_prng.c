@@ -134,8 +134,13 @@ int tc_hmac_prng_init(TCHmacPrng_t prng,
 
 	/* input sanity check: */
 	if (prng == (TCHmacPrng_t) 0 ||
+#if 0
 	    personalization == (uint8_t *) 0 ||
+	    /* Converity: Operands don't affect result */
 	    plen > MAX_PLEN) {
+#else
+	    personalization == (uint8_t *) 0) {
+#endif
 		return TC_CRYPTO_FAIL;
 	}
 
@@ -161,8 +166,13 @@ int tc_hmac_prng_reseed(TCHmacPrng_t prng,
 	/* input sanity check: */
 	if (prng == (TCHmacPrng_t) 0 ||
 	    seed == (const uint8_t *) 0 ||
+#if 0
 	    seedlen < MIN_SLEN ||
+	    /* Converity: Operands don't affect result */
 	    seedlen > MAX_SLEN) {
+#else
+	    seedlen < MIN_SLEN) {
+#endif
 		return TC_CRYPTO_FAIL;
 	}
 
@@ -171,8 +181,13 @@ int tc_hmac_prng_reseed(TCHmacPrng_t prng,
 		 * Abort if additional_input is provided but has inappropriate
 		 * length
 		 */
+#if 0
 		if (additionallen == 0 ||
+		    /* Converity: Operands don't affect result */
 		    additionallen > MAX_ALEN) {
+#else
+		if (additionallen == 0) {
+#endif
 			return TC_CRYPTO_FAIL;
 		} else {
 			/* call update for the seed and additional_input */

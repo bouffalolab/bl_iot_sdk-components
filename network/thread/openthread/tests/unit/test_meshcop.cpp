@@ -73,7 +73,7 @@ void TestSteeringData(void)
 
     for (uint8_t len = 1; len <= MeshCoP::SteeringData::kMaxLength; len++)
     {
-        printf("\r\n--------------------------------------------");
+        printf("\n--------------------------------------------");
 
         steeringData.Init(len);
 
@@ -110,7 +110,7 @@ void TestSteeringData(void)
     VerifyOrQuit(!steeringData.Contains(joinerId2), "after Init()");
     VerifyOrQuit(!steeringData.Contains(indexes), "after Init()");
 
-    printf("TestSteeringData() passed\r\n");
+    printf("TestSteeringData() passed\n");
 }
 
 void TestTimestamp(void)
@@ -150,15 +150,15 @@ void TestTimestamp(void)
     t2.SetAuthoritative(true);
     VerifyOrQuit(MeshCoP::Timestamp::Compare(&t1, &t2) == 0);
 
-    printf("TestTimestamp() passed\r\n");
+    printf("TestTimestamp() passed\n");
 }
 
 } // namespace ot
 
-extern "C" int test_meshcop(void)
+int main(void)
 {
     ot::TestSteeringData();
     ot::TestTimestamp();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }

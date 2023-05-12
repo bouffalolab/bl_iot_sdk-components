@@ -138,7 +138,7 @@ void TestLinkedList(void)
     LinkedList<Entry> list;
     LinkedList<Entry> removedList;
 
-    printf("TestLinkedList\r\n");
+    printf("TestLinkedList\n");
 
     VerifyOrQuit(list.IsEmpty(), "failed after init");
     VerifyOrQuit(list.GetHead() == nullptr, "failed after init");
@@ -304,7 +304,7 @@ void TestOwningList(void)
     OwningList<Entry> removedList;
     OwnedPtr<Entry>   ptr;
 
-    printf("TestOwningList\r\n");
+    printf("TestOwningList\n");
 
     VerifyOrQuit(list.IsEmpty());
     VerifyOrQuit(list.GetHead() == nullptr);
@@ -427,10 +427,10 @@ void TestOwningList(void)
 
 } // namespace ot
 
-extern "C" int test_linked_list(void)
+int main(void)
 {
     ot::TestLinkedList();
     ot::TestOwningList();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

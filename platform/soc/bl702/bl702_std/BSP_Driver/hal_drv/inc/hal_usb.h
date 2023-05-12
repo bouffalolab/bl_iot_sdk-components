@@ -27,25 +27,7 @@
 extern "C"{
 #endif
 
-#include "hal_common.h"
-#include "ring_buffer.h"
-#include "drv_device.h"
-#include "bl702_config.h"
-
-#define DEVICE_CTRL_USB_DC_SET_ACK            0X10
-#define DEVICE_CTRL_USB_DC_ENUM_ON            0X11
-#define DEVICE_CTRL_USB_DC_ENUM_OFF           0X12
-#define DEVICE_CTRL_USB_DC_GET_EP_TX_FIFO_CNT 0x13
-#define DEVICE_CTRL_USB_DC_GET_EP_RX_FIFO_CNT 0x14
-#define DEVICE_CTRL_USB_DC_SET_TX_DMA         0x15
-#define DEVICE_CTRL_USB_DC_SET_RX_DMA         0x16
-
-enum usb_index_type {
-#ifdef BSP_USING_USB
-    USB_INDEX,
-#endif
-    USB_MAX_INDEX
-};
+#include "stdint.h"
 
 /**
  * USB endpoint Transfer Type mask.
@@ -152,24 +134,6 @@ enum usb_dc_event_type {
     USB_DC_EVENT_UNKNOWN
 };
 
-enum usb_dc_ep_it_type {
-    USB_SOF_IT = 1 << 0,
-    USB_EP1_DATA_IN_IT = 1 << 10,
-    USB_EP1_DATA_OUT_IT = 1 << 11,
-    USB_EP2_DATA_IN_IT = 1 << 12,
-    USB_EP2_DATA_OUT_IT = 1 << 13,
-    USB_EP3_DATA_IN_IT = 1 << 14,
-    USB_EP3_DATA_OUT_IT = 1 << 15,
-    USB_EP4_DATA_IN_IT = 1 << 16,
-    USB_EP4_DATA_OUT_IT = 1 << 17,
-    USB_EP5_DATA_IN_IT = 1 << 18,
-    USB_EP5_DATA_OUT_IT = 1 << 19,
-    USB_EP6_DATA_IN_IT = 1 << 20,
-    USB_EP6_DATA_OUT_IT = 1 << 21,
-    USB_EP7_DATA_IN_IT = 1 << 22,
-    USB_EP7_DATA_OUT_IT = 1 << 23,
-};
-
 enum usb_error_type {
     USB_DC_OK = 0,
     USB_DC_EP_DIR_ERR = 1,
@@ -210,18 +174,10 @@ typedef struct
 } usb_dc_ep_state_t;
 
 typedef struct usb_dc_device {
-    struct device parent;
-    uint8_t id;
     usb_dc_ep_state_t in_ep[8];  /*!< IN endpoint parameters             */
     usb_dc_ep_state_t out_ep[8]; /*!< OUT endpoint parameters            */
-    void *tx_dma;
-    void *rx_dma;
 } usb_dc_device_t;
 
-int usb_dc_register(enum usb_index_type index, const char *name);
-
-int usb_dc_receive_to_ringbuffer(struct device *dev, Ring_Buffer_Type *rb, uint8_t ep);
-int usb_dc_send_from_ringbuffer(struct device *dev, Ring_Buffer_Type *rb, uint8_t ep);
 #ifdef __cplusplus
 }
 #endif

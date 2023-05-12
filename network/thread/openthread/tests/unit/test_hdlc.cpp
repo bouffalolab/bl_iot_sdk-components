@@ -120,7 +120,7 @@ void TestHdlcFrameBuffer(void)
     VerifyOrQuit(frameBuffer.CanWrite(1) == false, "did not fail with full buffer");
     VerifyOrQuit(frameBuffer.WriteByte(0) == OT_ERROR_NO_BUFS, "did not fail with full buffer");
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 void TestHdlcMultiFrameBuffer(void)
@@ -428,7 +428,7 @@ void TestHdlcMultiFrameBuffer(void)
     VerifyOrQuit(frameBuffer.SetLength(kBufferSize - (kFrameHeaderSize - 1)) == OT_ERROR_NO_BUFS, "after Clear()");
     VerifyOrQuit(frameBuffer.SetLength(kBufferSize - kFrameHeaderSize) == OT_ERROR_NONE, "after Clear()");
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 struct DecoderContext
@@ -588,7 +588,7 @@ void TestEncoderDecoder(void)
     decoder.Decode(&byte, sizeof(uint8_t));
     VerifyOrQuit(!decoderContext.mWasCalled);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 uint32_t GetRandom(uint32_t max)
@@ -641,18 +641,18 @@ void TestFuzzEncoderDecoder(void)
                      "Decoded frame content does not match original frame");
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 } // namespace Ncp
 } // namespace ot
 
-extern "C" int test_hdlc(void)
+int main(void)
 {
     ot::Ncp::TestHdlcFrameBuffer();
     ot::Ncp::TestHdlcMultiFrameBuffer();
     ot::Ncp::TestEncoderDecoder();
     ot::Ncp::TestFuzzEncoderDecoder();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }

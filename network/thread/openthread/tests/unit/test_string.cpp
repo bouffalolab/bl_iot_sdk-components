@@ -43,7 +43,7 @@ enum
 
 template <uint16_t kSize> void PrintString(const char *aName, const String<kSize> aString)
 {
-    printf("\t%s = [%zu] \"%s\"\r\n", aName, strlen(aString.AsCString()), aString.AsCString());
+    printf("\t%s = [%zu] \"%s\"\n", aName, strlen(aString.AsCString()), aString.AsCString());
 }
 
 void TestStringWriter(void)
@@ -51,7 +51,7 @@ void TestStringWriter(void)
     String<kStringSize> str;
     const char          kLongString[] = "abcdefghijklmnopqratuvwxyzabcdefghijklmnopqratuvwxyz";
 
-    printf("\r\nTest 1: StringWriter constructor\r\n");
+    printf("\nTest 1: StringWriter constructor\n");
 
     VerifyOrQuit(str.GetSize() == kStringSize);
     VerifyOrQuit(str.GetLength() == 0, "failed for empty string");
@@ -60,9 +60,9 @@ void TestStringWriter(void)
 
     PrintString("str", str);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\nTest 2: StringWriter::Append() method\r\n");
+    printf("\nTest 2: StringWriter::Append() method\n");
 
     str.Append("Hi");
     VerifyOrQuit(str.GetLength() == 2);
@@ -79,7 +79,7 @@ void TestStringWriter(void)
                  "String::Append() did not handle overflow buffer correctly");
     PrintString("str", str);
 
-    printf("\r\nTest 3: StringWriter::Clear() method\r\n");
+    printf("\nTest 3: StringWriter::Clear() method\n");
 
     str.Clear();
     str.Append("Hello");
@@ -102,7 +102,7 @@ void TestStringWriter(void)
                  "String::Clear() + String::Append() did not handle overflow buffer correctly");
     PrintString("str", str);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 void TestStringLength(void)
@@ -110,7 +110,7 @@ void TestStringLength(void)
     char string_a[5] = "\0foo";
     char string_b[8] = "foo\0bar";
 
-    printf("\r\nTest 4: String::StringLength() method\r\n");
+    printf("\nTest 4: String::StringLength() method\n");
 
     VerifyOrQuit(StringLength(string_a, 0) == 0);
     VerifyOrQuit(StringLength(string_a, 1) == 0);
@@ -124,12 +124,12 @@ void TestStringLength(void)
     VerifyOrQuit(StringLength(string_b, 5) == 3);
     VerifyOrQuit(StringLength(string_b, 6) == 3);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 void TestUtf8(void)
 {
-    printf("\r\nTest 5: IsValidUtf8String() function\r\n");
+    printf("\nTest 5: IsValidUtf8String() function\n");
 
     VerifyOrQuit(IsValidUtf8String("An ASCII string"));
     VerifyOrQuit(IsValidUtf8String(u8"Строка UTF-8"));
@@ -141,7 +141,7 @@ void TestUtf8(void)
     VerifyOrQuit(!IsValidUtf8String("NUL\x00NUL", 7)); // UTF-8 NUL
     VerifyOrQuit(!IsValidUtf8String("abcde\x11"));     // control character
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 void TestStringFind(void)
@@ -150,7 +150,7 @@ void TestStringFind(void)
     char testString[]   = "Foo.bar.bar\\.";
     char testString2[]  = "abcabcabcdabc";
 
-    printf("\r\nTest 6: StringFind() function\r\n");
+    printf("\nTest 6: StringFind() function\n");
 
     VerifyOrQuit(StringFind(testString, 'F') == testString);
     VerifyOrQuit(StringFind(testString, 'o') == &testString[1]);
@@ -203,12 +203,12 @@ void TestStringFind(void)
     VerifyOrQuit(StringFind(testString2, "ABCABC", kStringCaseInsensitiveMatch) == &testString2[0]);
     VerifyOrQuit(StringFind(testString2, "ABCABCD", kStringCaseInsensitiveMatch) == &testString2[3]);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 void TestStringStartsWith(void)
 {
-    printf("\r\nTest 7: StringStartsWith() function\r\n");
+    printf("\nTest 7: StringStartsWith() function\n");
 
     VerifyOrQuit(StringStartsWith("FooBar", "Foo"));
     VerifyOrQuit(!StringStartsWith("FooBar", "Ba"));
@@ -227,12 +227,12 @@ void TestStringStartsWith(void)
 
     VerifyOrQuit(!StringStartsWith("", "foo", kStringCaseInsensitiveMatch));
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 void TestStringEndsWith(void)
 {
-    printf("\r\nTest 8: StringEndsWith() function\r\n");
+    printf("\nTest 8: StringEndsWith() function\n");
 
     VerifyOrQuit(StringEndsWith("FooBar", 'r'));
     VerifyOrQuit(!StringEndsWith("FooBar", 'a'));
@@ -254,12 +254,12 @@ void TestStringEndsWith(void)
     VerifyOrQuit(!StringEndsWith("FooBar", "Foobarr", kStringCaseInsensitiveMatch));
     VerifyOrQuit(!StringEndsWith("", "Foo", kStringCaseInsensitiveMatch));
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 void TestStringMatch(void)
 {
-    printf("\r\nTest 9: StringMatch() function\r\n");
+    printf("\nTest 9: StringMatch() function\n");
 
     VerifyOrQuit(StringMatch("", ""));
     VerifyOrQuit(StringMatch("FooBar", "FooBar"));
@@ -279,20 +279,20 @@ void TestStringMatch(void)
     VerifyOrQuit(StringMatch("FoobaR", "FooBar", kStringCaseInsensitiveMatch));
     VerifyOrQuit(StringMatch("FOOBAR", "foobar", kStringCaseInsensitiveMatch));
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 void TestStringToLowercase(void)
 {
     const uint16_t kMaxSize = 100;
 
-    const char kTestString[]      = "!@#$%^&*()_+=[].,<>//;:\"'`~ \t\r\r\n";
+    const char kTestString[]      = "!@#$%^&*()_+=[].,<>//;:\"'`~ \t\r\n";
     const char kUppercaseString[] = "ABCDEFGHIJKLMNOPQRATUVWXYZABCDEFGHIJKLMNOPQRATUVWXYZ";
     const char kLowercaseString[] = "abcdefghijklmnopqratuvwxyzabcdefghijklmnopqratuvwxyz";
 
     char string[kMaxSize];
 
-    printf("\r\nTest 10: StringConvertToLowercase() function\r\n");
+    printf("\nTest 10: StringConvertToLowercase() function\n");
 
     memcpy(string, kTestString, sizeof(kTestString));
     StringConvertToLowercase(string);
@@ -306,7 +306,7 @@ void TestStringToLowercase(void)
     StringConvertToUppercase(string);
     VerifyOrQuit(memcmp(string, kUppercaseString, sizeof(kUppercaseString)) == 0);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 static_assert(ot::AreStringsInOrder("a", "b"), "AreStringsInOrder() failed");
@@ -318,7 +318,7 @@ static_assert(!ot::AreStringsInOrder("0", ""), "AreStringsInOrder() failed");
 
 } // namespace ot
 
-extern "C" int test_string(void)
+int main(void)
 {
     ot::TestStringWriter();
     ot::TestStringLength();
@@ -328,6 +328,6 @@ extern "C" int test_string(void)
     ot::TestStringEndsWith();
     ot::TestStringMatch();
     ot::TestStringToLowercase();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }

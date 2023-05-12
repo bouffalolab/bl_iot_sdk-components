@@ -152,7 +152,7 @@ bool Manager::IsBackboneRouterPreferredTo(const ServerTlv &                 aSer
                                           const BackboneRouter::ServerData &aOtherServerData) const
 {
     bool     isPreferred;
-    uint16_t leaderRloc16 = Mle::Mle::Rloc16FromRouterId(Get<Mle::MleRouter>().GetLeaderId());
+    uint16_t leaderRloc16 = Mle::Rloc16FromRouterId(Get<Mle::MleRouter>().GetLeaderId());
 
     VerifyOrExit(aServerTlv.GetServer16() != leaderRloc16, isPreferred = true);
     VerifyOrExit(aOtherServerTlv.GetServer16() != leaderRloc16, isPreferred = false);
@@ -183,7 +183,7 @@ Error Manager::GetNextDnsSrpAnycastInfo(Iterator &aIterator, DnsSrpAnycast::Info
 
     tlv->GetServiceData(serviceData);
     aInfo.mAnycastAddress.SetToAnycastLocator(Get<Mle::Mle>().GetMeshLocalPrefix(),
-                                              Mle::Mle::ServiceAlocFromId(tlv->GetServiceId()));
+                                              Mle::ServiceAlocFromId(tlv->GetServiceId()));
     aInfo.mSequenceNumber =
         reinterpret_cast<const DnsSrpAnycast::ServiceData *>(serviceData.GetBytes())->GetSequenceNumber();
 
@@ -288,6 +288,7 @@ Error Manager::GetNextDnsSrpUnicastInfo(Iterator &aIterator, DnsSrpUnicast::Info
                 aInfo.mSockAddr.SetAddress(serverData->GetAddress());
                 aInfo.mSockAddr.SetPort(serverData->GetPort());
                 aInfo.mOrigin = DnsSrpUnicast::kFromServerData;
+                aInfo.mRloc16 = aIterator.mServerSubTlv->GetServer16();
                 ExitNow();
             }
 
@@ -300,6 +301,7 @@ Error Manager::GetNextDnsSrpUnicastInfo(Iterator &aIterator, DnsSrpUnicast::Info
                                                                  aIterator.mServerSubTlv->GetServer16());
                 aInfo.mSockAddr.SetPort(Encoding::BigEndian::ReadUint16(data.GetBytes()));
                 aInfo.mOrigin = DnsSrpUnicast::kFromServerData;
+                aInfo.mRloc16 = aIterator.mServerSubTlv->GetServer16();
                 ExitNow();
             }
         }
@@ -322,6 +324,7 @@ Error Manager::GetNextDnsSrpUnicastInfo(Iterator &aIterator, DnsSrpUnicast::Info
             aInfo.mSockAddr.SetAddress(dnsServiceData->GetAddress());
             aInfo.mSockAddr.SetPort(dnsServiceData->GetPort());
             aInfo.mOrigin = DnsSrpUnicast::kFromServiceData;
+            aInfo.mRloc16 = Mle::kInvalidRloc16;
             ExitNow();
         }
 

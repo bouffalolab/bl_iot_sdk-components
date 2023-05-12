@@ -208,7 +208,7 @@ void TestInPlaceAesCcmProcessing(void)
 
     for (uint16_t msgLength : kMessageLengths)
     {
-        printf("msgLength %d\r\n", msgLength);
+        printf("msgLength %d\n", msgLength);
 
         SuccessOrQuit(message->SetLength(0));
 
@@ -253,11 +253,11 @@ void TestInPlaceAesCcmProcessing(void)
     testFreeInstance(instance);
 }
 
-extern "C" int test_aes(void)
+int main(void)
 {
     TestMacBeaconFrame();
     TestMacCommandFrame();
     TestInPlaceAesCcmProcessing();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

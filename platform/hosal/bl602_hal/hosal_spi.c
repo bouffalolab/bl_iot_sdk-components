@@ -127,8 +127,8 @@ static void spi_basic_init(hosal_spi_dev_t *arg)
     SPI_IntMask(spi_id,SPI_INT_ALL,MASK);
 
     /* fifo */
-    fifocfg.txFifoThreshold = 1;
-    fifocfg.rxFifoThreshold = 1;
+    fifocfg.txFifoThreshold = 0;
+    fifocfg.rxFifoThreshold = 0;
     if (hw_arg->config.dma_enable) {
         fifocfg.txFifoDmaEnable = ENABLE;
         fifocfg.rxFifoDmaEnable = ENABLE;

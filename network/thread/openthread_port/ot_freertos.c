@@ -16,9 +16,6 @@
 #include <openthread/tasklet.h>
 
 #include "openthread_port.h"
-#if defined(CFG_OTBR_ENABLE)
-#include "openthread_br.h"
-#endif /* CFG_OTBR_ENABLE */
 
 #ifdef CFG_LWIP_ENABLE
 #include <lwip/tcpip.h>
@@ -29,10 +26,10 @@
 #include <ot_utils_ext.h>
 
 #ifdef BL702
-ot_system_event_t                   ot_system_event_var = OT_SYSTEM_EVENT_NONE;
-static SemaphoreHandle_t            ot_extLock          = NULL;
-static otInstance *                 ot_instance         = NULL;
-static TaskHandle_t                 ot_taskHandle       = NULL;
+__attribute__((section(".bss"))) ot_system_event_t                   ot_system_event_var = OT_SYSTEM_EVENT_NONE;
+__attribute__((section(".bss"))) static SemaphoreHandle_t            ot_extLock          = NULL;
+__attribute__((section(".bss"))) static otInstance *                 ot_instance         = NULL;
+__attribute__((section(".bss"))) static TaskHandle_t                 ot_taskHandle       = NULL;
 #endif
 
 #ifdef BL702L
@@ -156,6 +153,9 @@ void otrStackInit(void)
 #ifdef BL702L
 ATTR_PDS_SECTION
 #endif
+
+OT_TOOL_WEAK void otbr_netif_process(otInstance *aInstance) {}
+
 void otrTaskLoop(void) 
 {   
     /** need put on RAM */
@@ -171,9 +171,7 @@ void otrTaskLoop(void)
             OT_THREAD_SAFE (
                 otTaskletsProcess(ot_instance);
                 otSysProcessDrivers(ot_instance);
-#if defined(CFG_OTBR_ENABLE)
-                netifProcess(ot_instance);
-#endif /* CFG_OTBR_ENABLE */
+                otbr_netif_process(ot_instance);
             );
         }
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -205,7 +203,7 @@ extern void test_main(void);
     printf ("==============================end==========================\r\n");
 
 #endif
-
+    
     OT_THREAD_SAFE (
         ot_alarmInit();
         ot_radioInit(opt);
@@ -233,21 +231,12 @@ extern void test_main(void);
 
 void otrStart(otRadio_opt_t opt)
 {
-#ifdef CFG_OPENTHREAD_TESTS_UNIT
-    static StackType_t  ot_stackTask_stack[OT_TASK_SIZE];
-#else
-    static StackType_t  ot_stackTask_stack[OT_TASK_SIZE * 2];
-#endif
-    static StaticTask_t ot_task;
-    static StaticQueue_t stackLock;
-
-    ot_extLock = xSemaphoreCreateMutexStatic(&stackLock);
+    ot_extLock = xSemaphoreCreateMutex();
     assert(ot_extLock != NULL);
 
     otrLock();
 
-    ot_taskHandle = xTaskCreateStatic(otrStackTask, "threadTask", sizeof(ot_stackTask_stack) / sizeof(StackType_t), 
-                                        (void *)((uint32_t)opt.byte), 15, ot_stackTask_stack, &ot_task);
+    xTaskCreate(otrStackTask, "threadTask", OT_TASK_SIZE, (void *)((uint32_t)opt.byte), 15, &ot_taskHandle);
 
     otrUnlock();
 }

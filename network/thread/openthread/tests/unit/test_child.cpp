@@ -209,7 +209,7 @@ void TestChildIp6Address(void)
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    printf("\r\nConverting IPv6 addresses from string");
+    printf("\nConverting IPv6 addresses from string");
 
     numAddresses = 0;
 
@@ -225,13 +225,13 @@ void TestChildIp6Address(void)
         SuccessOrQuit(addresses[numAddresses++].FromString(ip6Address));
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     printf("Child state after init");
     child.Clear();
     VerifyChildIp6Addresses(child, 0, nullptr);
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     printf("Adding a single IPv6 address");
@@ -245,7 +245,7 @@ void TestChildIp6Address(void)
         VerifyChildIp6Addresses(child, 0, nullptr);
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     printf("Adding multiple IPv6 addresses");
@@ -256,7 +256,7 @@ void TestChildIp6Address(void)
         VerifyChildIp6Addresses(child, index + 1, addresses);
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     printf("Checking for failure when adding an address already in list");
@@ -268,7 +268,7 @@ void TestChildIp6Address(void)
         VerifyChildIp6Addresses(child, numAddresses, addresses);
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     printf("Removing addresses from list starting from front of the list");
@@ -283,7 +283,7 @@ void TestChildIp6Address(void)
     }
 
     VerifyChildIp6Addresses(child, 0, nullptr);
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     printf("Removing addresses from list starting from back of the list");
@@ -302,7 +302,7 @@ void TestChildIp6Address(void)
                      "RemoveIp6Address() did not fail when removing an address not on the list");
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     printf("Removing address entries from middle of the list");
@@ -337,16 +337,16 @@ void TestChildIp6Address(void)
         }
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
     testFreeInstance(sInstance);
 }
 
 } // namespace ot
 
-extern "C" int test_child(void)
+int main(void)
 {
     ot::TestChildIp6Address();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }

@@ -143,7 +143,7 @@ static ssize_t read_appearance(struct bt_conn *conn,
 
 #if defined(CONFIG_BT_GAP_APPEARANCE_WRITABLE)
 static ssize_t write_appearance(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-			 void *buf, u16_t len, u16_t offset)
+			 const void *buf, u16_t len, u16_t offset, u8_t flags)
 {
 	if (offset) {
 		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
@@ -180,11 +180,14 @@ static ssize_t read_ppcp(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 		u16_t timeout;
 	} ppcp;
 
+	#if defined (BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)
+	bt_conn_get_peripheral_pref_params(&ppcp);
+	#else
 	ppcp.min_int = sys_cpu_to_le16(CONFIG_BT_PERIPHERAL_PREF_MIN_INT);
 	ppcp.max_int = sys_cpu_to_le16(CONFIG_BT_PERIPHERAL_PREF_MAX_INT);
 	ppcp.latency = sys_cpu_to_le16(CONFIG_BT_PERIPHERAL_PREF_SLAVE_LATENCY);
 	ppcp.timeout = sys_cpu_to_le16(CONFIG_BT_PERIPHERAL_PREF_TIMEOUT);
-
+	#endif
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &ppcp,
 				 sizeof(ppcp));
 }
@@ -3556,7 +3559,7 @@ int bt_gatt_write_without_response_cb(struct bt_conn *conn, u16_t handle,
 	__ASSERT(conn, "invalid parameters\n");
 	__ASSERT(handle, "invalid parameters\n");
 
-	if (conn->state != BT_CONN_CONNECTED) {
+	if (conn == NULL || conn->state != BT_CONN_CONNECTED) {
 		return -ENOTCONN;
 	}
 
@@ -5194,7 +5197,10 @@ static int bt_gatts_get_service_desp(struct bt_gatt_service *svc,
             const struct bt_gatt_attr *s = find_attr(phdl);
             const struct bt_gatt_attr *p = find_attr(nhdl);
             for(const struct bt_gatt_attr *d = s;d<p;d++){
-                if(d && !attr_is_descptor(d)){
+                if(!d){
+                    break;
+                }
+                if(!attr_is_descptor(d)){
                     bt_uuid_to_str(d->uuid,info[idx].uuid,sizeof(info[idx].uuid));
                     info[idx].desp_idx = info[idx].char_idx + d - s;
                 }

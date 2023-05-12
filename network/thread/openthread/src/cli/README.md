@@ -70,6 +70,7 @@ Done
 - [mlr](#mlr-reg-ipaddr--timeout)
 - [mode](#mode)
 - [multiradio](#multiradio)
+- [nat64](#nat64-cidr)
 - [neighbor](#neighbor-list)
 - [netdata](README_NETDATA.md)
 - [netstat](#netstat)
@@ -82,7 +83,7 @@ Done
 - [parent](#parent)
 - [parentpriority](#parentpriority)
 - [partitionid](#partitionid)
-- [ping](#ping--i-source-ipaddr-size-count-interval-hoplimit-timeout)
+- [ping](#ping-async--i-source-ipaddr-size-count-interval-hoplimit-timeout)
 - [pollperiod](#pollperiod-pollperiod)
 - [preferrouterid](#preferrouterid-routerid)
 - [prefix](#prefix)
@@ -386,7 +387,7 @@ Done
 
 Get the local NAT64 prefix of the Border Router.
 
-`OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE` is required.
+`OPENTHREAD_CONFIG_NAT64_BORDER_ROUTING_ENABLE` is required.
 
 ```bash
 > br nat64prefix
@@ -843,6 +844,8 @@ Done
 
 Get the counter value.
 
+Note: `OPENTHREAD_CONFIG_UPTIME_ENABLE` is required for MLE role time tracking in `counters mle`
+
 ```bash
 > counters mac
 TxTotal: 10
@@ -887,6 +890,12 @@ Attach Attempts: 1
 Partition Id Changes: 1
 Better Partition Attach Attempts: 0
 Parent Changes: 0
+Time Disabled Milli: 10026
+Time Detached Milli: 6852
+Time Child Milli: 0
+Time Router Milli: 0
+Time Leader Milli: 16195
+Time Tracked Milli: 33073
 Done
 > counters ip
 TxSuccess: 10
@@ -1062,6 +1071,17 @@ The parameters after `hostname` are optional. Any unspecified (or zero) value fo
 > DNS response for ipv6.google.com - 2a00:1450:401b:801:0:0:0:200e TTL: 300
 ```
 
+The DNS server IP can be an IPv4 address, which will be synthesized to an IPv6 address using the preferred NAT64 prefix from the network data.
+
+> Note: The command will return `InvalidState` when the DNS server IP is an IPv4 address but the preferred NAT64 prefix is unavailable.
+
+```bash
+> dns resolve example.com 8.8.8.8
+Synthesized IPv6 DNS server address: fdde:ad00:beef:2:0:0:808:808
+DNS response for example.com. - fd4c:9574:3720:2:0:0:5db8:d822 TTL:20456
+Done
+```
+
 ### dns browse \<service-name\> \[DNS server IP\] \[DNS server port\] \[response timeout (ms)\] \[max tx attempts\] \[recursion desired (boolean)\]
 
 Send a browse (service instance enumeration) DNS query to get the list of services for given service-name.
@@ -1084,11 +1104,15 @@ instance2
 Done
 ```
 
+> Note: The DNS server IP can be an IPv4 address, which will be synthesized to an IPv6 address using the preferred NAT64 prefix from the network data. The command will return `InvalidState` when the DNS server IP is an IPv4 address but the preferred NAT64 prefix is unavailable.
+
 ### dns service \<service-instance-label\> \<service-name\> \[DNS server IP\] \[DNS server port\] \[response timeout (ms)\] \[max tx attempts\] \[recursion desired (boolean)\]
 
 Send a service instance resolution DNS query for a given service instance. Service instance label is provided first, followed by the service name (note that service instance label can contain dot '.' character).
 
 The parameters after `service-name` are optional. Any unspecified (or zero) value for these optional parameters is replaced by the value from the current default config (`dns config`).
+
+> Note: The DNS server IP can be an IPv4 address, which will be synthesized to an IPv6 address using the preferred NAT64 prefix from the network data. The command will return `InvalidState` when the DNS server IP is an IPv4 address but the preferred NAT64 prefix is unavailable.
 
 ### dns compression \[enable|disable\]
 
@@ -1835,6 +1859,123 @@ This command is only available when device supports more than one radio link.
 Done
 ```
 
+### nat64 cidr
+
+Gets the IPv4 configured CIDR in the NAT64 translator.
+
+`OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` is required.
+
+```bash
+> nat64 cidr
+192.168.255.0/24
+Done
+```
+
+### nat64 disable
+
+Disable NAT64 functions, including the translator and the prefix publishing.
+
+This command will reset the mapping table in the translator (if NAT64 translator is enabled in the build).
+
+`OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` or `OPENTHREAD_CONFIG_NAT64_BORDER_ROUTING_ENABLE` are required.
+
+```bash
+> nat64 disable
+Done
+```
+
+### nat64 enable
+
+Enable NAT64 functions, including the translator and the prefix publishing.
+
+This command can be called anytime.
+
+`OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` or `OPENTHREAD_CONFIG_NAT64_BORDER_ROUTING_ENABLE` are required.
+
+```bash
+> nat64 enable
+Done
+```
+
+### nat64 state
+
+Gets the state of NAT64 functions.
+
+Possible results for prefix manager are (`OPENTHREAD_CONFIG_NAT64_BORDER_ROUTING_ENABLE` is required):
+
+- `Disabled`: NAT64 prefix manager is disabled.
+- `NotRunning`: NAT64 prefix manager is enabled, but is not running, probably bacause the routing manager is disabled.
+- `Idle`: NAT64 prefix manager is enabled and is running, but is not publishing a NAT64 prefix. Usually when there is another border router publishing a NAT64 prefix with higher priority.
+- `Active`: NAT64 prefix manager is enabled, running and publishing a NAT64 prefix.
+
+Possible results for NAT64 translator are (`OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` is required):
+
+- `Disabled`: NAT64 translator is disabled.
+- `NotRunning`: NAT64 translator is enabled, but is not translating packets, probably bacause it is not configued with a NAT64 prefix or a CIDR for NAT64.
+- `Active`: NAT64 translator is enabled and is translating packets.
+
+`OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` or `OPENTHREAD_CONFIG_NAT64_BORDER_ROUTING_ENABLE` are required.
+
+```bash
+> nat64 state
+PrefixManager: NotRunning
+Translator:    NotRunning
+Done
+
+> nat64 state
+PrefixManager: Idle
+Translator:    NotRunning
+Done
+
+> nat64 state
+PrefixManager: Active
+Translator:    Active
+Done
+```
+
+### nat64 mappings
+
+Get the NAT64 translator mappings.
+
+`OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` is required.
+
+```bash
+> nat64 mappings
+|          | Address                   |        | 4 to 6       | 6 to 4       |
++----------+---------------------------+--------+--------------+--------------+
+| ID       | IPv6       | IPv4         | Expiry | Pkts | Bytes | Pkts | Bytes |
++----------+------------+--------------+--------+------+-------+------+-------+
+| 00021cb9 | fdc7::df79 | 192.168.64.2 |  7196s |    6 |   456 |   11 |  1928 |
+|          |                                TCP |    0 |     0 |    0 |     0 |
+|          |                                UDP |    1 |   136 |   16 |  1608 |
+|          |                               ICMP |    5 |   320 |    5 |   320 |
+```
+
+### nat64 counters
+
+Get the NAT64 translator packet and error counters.
+
+`OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` is required.
+
+```bash
+> nat64 counters
+|               | 4 to 6                  | 6 to 4                  |
++---------------+-------------------------+-------------------------+
+| Protocol      | Pkts     | Bytes        | Pkts     | Bytes        |
++---------------+----------+--------------+----------+--------------+
+|         Total |       11 |          704 |       11 |          704 |
+|           TCP |        0 |            0 |        0 |            0 |
+|           UDP |        0 |            0 |        0 |            0 |
+|          ICMP |       11 |          704 |       11 |          704 |
+| Errors        | Pkts                    | Pkts                    |
++---------------+-------------------------+-------------------------+
+|         Total |                       8 |                       4 |
+|   Illegal Pkt |                       0 |                       0 |
+|   Unsup Proto |                       0 |                       0 |
+|    No Mapping |                       2 |                       0 |
+Done
+```
+
 ### neighbor list
 
 List RLOC16 of neighbors.
@@ -1995,7 +2136,7 @@ Done
 
 Get the diagnostic information for a Thread Router as parent.
 
-Note: When operating as a Thread Router, this command will return the cached information from when the device was previously attached as a Thread Child. Returning cached information is necessary to support the Thread Test Harness - Test Scenario 8.2.x requests the former parent (i.e. Joiner Router's) MAC address even if the device has already promoted to a router.
+Note: When operating as a Thread Router when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is enabled, this command will return the cached information from when the device was previously attached as a Thread Child. Returning cached information is necessary to support the Thread Test Harness - Test Scenario 8.2.x requests the former parent (i.e. Joiner Router's) MAC address even if the device has already promoted to a router.
 
 ```bash
 > parent
@@ -2004,7 +2145,15 @@ Rloc: 5c00
 Link Quality In: 3
 Link Quality Out: 3
 Age: 20
+Version: 4
 Done
+```
+
+Note: When `OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE` is enabled, this command will return two extra lines with information relevant for CSL Receiver operation.
+
+```bash
+CSL clock accuracy: 20
+CSL uncertainty: 5
 ```
 
 ### parentpriority
@@ -2059,10 +2208,11 @@ Set the preferred Thread Leader Partition ID.
 Done
 ```
 
-### ping \[-I source\] \<ipaddr\> \[size\] \[count\] \[interval\] \[hoplimit\] \[timeout\]
+### ping \[async\] \[-I source\] \<ipaddr\> \[size\] \[count\] \[interval\] \[hoplimit\] \[timeout\]
 
 Send an ICMPv6 Echo Request.
 
+- async: Use the non-blocking mode. New commands are allowed before the ping process terminates.
 - source: The source IPv6 address of the echo request.
 - size: The number of data bytes to be sent.
 - count: The number of ICMPv6 Echo Requests to be sent.
@@ -2079,6 +2229,18 @@ Done
 > ping -I fd00:db8:0:0:76b:6a05:3ae9:a61a ff02::1 100 1 1 1
 > 108 bytes from fd00:db8:0:0:f605:fb4b:d429:d59a: icmp_seq=4 hlim=64 time=7ms
 1 packets transmitted, 1 packets received. Round-trip min/avg/max = 7/7.0/7 ms.
+Done
+```
+
+The address can be an IPv4 address, which will be synthesized to an IPv6 address using the preferred NAT64 prefix from the network data.
+
+> Note: The command will return `InvalidState` when the preferred NAT64 prefix is unavailable.
+
+```bash
+> ping 172.17.0.1
+Pinging synthesized IPv6 address: fdde:ad00:beef:2:0:0:ac11:1
+> 16 bytes from fdde:ad00:beef:2:0:0:ac11:1: icmp_seq=5 hlim=64 time=0ms
+1 packets transmitted, 1 packets received. Packet loss = 0.0%. Round-trip min/avg/max = 0/0.0/0 ms.
 Done
 ```
 

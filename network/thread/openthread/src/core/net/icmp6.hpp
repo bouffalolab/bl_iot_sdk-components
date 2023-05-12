@@ -61,6 +61,8 @@ using ot::Encoding::BigEndian::HostSwap16;
  *
  */
 
+class Headers;
+
 /**
  * This class implements ICMPv6.
  *
@@ -90,6 +92,8 @@ public:
             kTypeEchoReply        = OT_ICMP6_TYPE_ECHO_REPLY,        ///< Echo Reply
             kTypeRouterSolicit    = OT_ICMP6_TYPE_ROUTER_SOLICIT,    ///< Router Solicitation
             kTypeRouterAdvert     = OT_ICMP6_TYPE_ROUTER_ADVERT,     ///< Router Advertisement
+            kTypeNeighborSolicit  = OT_ICMP6_TYPE_NEIGHBOR_SOLICIT,  ///< Neighbor Solicitation
+            kTypeNeighborAdvert   = OT_ICMP6_TYPE_NEIGHBOR_ADVERT,   ///< Neighbor Advertisement
         };
 
         /**
@@ -283,6 +287,20 @@ public:
      *
      */
     Error SendError(Header::Type aType, Header::Code aCode, const MessageInfo &aMessageInfo, const Message &aMessage);
+
+    /**
+     * This method sends an ICMPv6 error message.
+     *
+     * @param[in]  aType         The ICMPv6 message type.
+     * @param[in]  aCode         The ICMPv6 message code.
+     * @param[in]  aMessageInfo  A reference to the message info.
+     * @param[in]  aHeaders      The parsed headers from the error-causing IPv6 message.
+     *
+     * @retval kErrorNone     Successfully enqueued the ICMPv6 error message.
+     * @retval kErrorNoBufs   Insufficient buffers available.
+     *
+     */
+    Error SendError(Header::Type aType, Header::Code aCode, const MessageInfo &aMessageInfo, const Headers &aHeaders);
 
     /**
      * This method handles an ICMPv6 message.

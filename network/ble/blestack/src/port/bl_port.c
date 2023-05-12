@@ -376,7 +376,7 @@ void k_timer_delete(k_timer_t *timer)
 
 long long k_now_ms(void)
 {
-    return (long long)(xTaskGetTickCount() * 1000)/configTICK_RATE_HZ;   
+    return (long long)xTaskGetTickCount() * 1000 / configTICK_RATE_HZ;
 }
 
 void k_get_random_byte_array(uint8_t *buf, size_t len)

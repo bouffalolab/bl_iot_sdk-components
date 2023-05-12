@@ -54,19 +54,12 @@ RegisterLogModule("AddrResolver");
 
 AddressResolver::AddressResolver(Instance &aInstance)
     : InstanceLocator(aInstance)
-    , mAddressError(UriPath::kAddressError, &AddressResolver::HandleAddressError, this)
 #if OPENTHREAD_FTD
-    , mAddressQuery(UriPath::kAddressQuery, &AddressResolver::HandleAddressQuery, this)
-    , mAddressNotification(UriPath::kAddressNotify, &AddressResolver::HandleAddressNotification, this)
     , mCacheEntryPool(aInstance)
     , mIcmpHandler(&AddressResolver::HandleIcmpReceive, this)
 #endif
 {
-    Get<Tmf::Agent>().AddResource(mAddressError);
 #if OPENTHREAD_FTD
-    Get<Tmf::Agent>().AddResource(mAddressQuery);
-    Get<Tmf::Agent>().AddResource(mAddressNotification);
-
     IgnoreError(Get<Ip6::Icmp>().RegisterHandler(mIcmpHandler));
 #endif
 }
@@ -96,11 +89,8 @@ void AddressResolver::Clear(void)
 Error AddressResolver::GetNextCacheEntry(EntryInfo &aInfo, Iterator &aIterator) const
 {
     Error                 error = kErrorNone;
-    const CacheEntryList *list;
-    const CacheEntry *    entry;
-
-    list  = reinterpret_cast<const CacheEntryList *>(aIterator.mData[kIteratorListIndex]);
-    entry = reinterpret_cast<const CacheEntry *>(aIterator.mData[kIteratorEntryIndex]);
+    const CacheEntryList *list  = aIterator.GetList();
+    const CacheEntry *    entry = aIterator.GetEntry();
 
     while (entry == nullptr)
     {
@@ -130,16 +120,16 @@ Error AddressResolver::GetNextCacheEntry(EntryInfo &aInfo, Iterator &aIterator) 
 
     // Update the iterator then populate the `aInfo`.
 
-    aIterator.mData[kIteratorEntryIndex] = entry->GetNext();
-    aIterator.mData[kIteratorListIndex]  = list;
+    aIterator.SetEntry(entry->GetNext());
+    aIterator.SetList(list);
 
-    memset(&aInfo, 0, sizeof(aInfo));
+    aInfo.Clear();
     aInfo.mTarget = entry->GetTarget();
     aInfo.mRloc16 = entry->GetRloc16();
 
     if (list == &mCachedList)
     {
-        aInfo.mState          = OT_CACHE_ENTRY_STATE_CACHED;
+        aInfo.mState          = MapEnum(EntryInfo::kStateCached);
         aInfo.mCanEvict       = true;
         aInfo.mValidLastTrans = entry->IsLastTransactionTimeValid();
 
@@ -154,15 +144,15 @@ Error AddressResolver::GetNextCacheEntry(EntryInfo &aInfo, Iterator &aIterator) 
 
     if (list == &mSnoopedList)
     {
-        aInfo.mState = OT_CACHE_ENTRY_STATE_SNOOPED;
+        aInfo.mState = MapEnum(EntryInfo::kStateSnooped);
     }
     else if (list == &mQueryList)
     {
-        aInfo.mState = OT_CACHE_ENTRY_STATE_QUERY;
+        aInfo.mState = MapEnum(EntryInfo::kStateQuery);
     }
     else
     {
-        aInfo.mState = OT_CACHE_ENTRY_STATE_RETRY_QUERY;
+        aInfo.mState = MapEnum(EntryInfo::kStateRetryQuery);
     }
 
     aInfo.mCanEvict   = entry->CanEvict();
@@ -175,7 +165,7 @@ exit:
 
 void AddressResolver::Remove(uint8_t aRouterId)
 {
-    Remove(Mle::Mle::Rloc16FromRouterId(aRouterId), /* aMatchRouterId */ true);
+    Remove(Mle::Rloc16FromRouterId(aRouterId), /* aMatchRouterId */ true);
 }
 
 void AddressResolver::Remove(uint16_t aRloc16)
@@ -199,7 +189,7 @@ void AddressResolver::Remove(Mac::ShortAddress aRloc16, bool aMatchRouterId)
 
         while ((entry = GetEntryAfter(prev, *list)) != nullptr)
         {
-            if ((aMatchRouterId && Mle::Mle::RouterIdMatch(entry->GetRloc16(), aRloc16)) ||
+            if ((aMatchRouterId && Mle::RouterIdMatch(entry->GetRloc16(), aRloc16)) ||
                 (!aMatchRouterId && (entry->GetRloc16() == aRloc16)))
             {
                 RemoveCacheEntry(*entry, *list, prev, aMatchRouterId ? kReasonRemovingRouterId : kReasonRemovingRloc16);
@@ -386,6 +376,10 @@ void AddressResolver::UpdateSnoopedCacheEntry(const Ip6::Address &aEid,
 
     VerifyOrExit(Get<Mle::MleRouter>().IsFullThreadDevice());
 
+#if OPENTHREAD_CONFIG_TMF_ALLOW_ADDRESS_RESOLUTION_USING_NET_DATA_SERVICES
+    VerifyOrExit(ResolveUsingNetDataServices(aEid, macAddress) != kErrorNone);
+#endif
+
     VerifyOrExit(UpdateCacheEntry(aEid, aRloc16) != kErrorNone);
 
     // Skip if the `aRloc16` (i.e., the source of the snooped message)
@@ -480,6 +474,10 @@ Error AddressResolver::Resolve(const Ip6::Address &aEid, Mac::ShortAddress &aRlo
     CacheEntry *    prev = nullptr;
     CacheEntryList *list;
 
+#if OPENTHREAD_CONFIG_TMF_ALLOW_ADDRESS_RESOLUTION_USING_NET_DATA_SERVICES
+    VerifyOrExit(ResolveUsingNetDataServices(aEid, aRloc16) != kErrorNone);
+#endif
+
     entry = FindCacheEntry(aEid, list, prev);
 
     if (entry == nullptr)
@@ -558,13 +556,48 @@ exit:
     return error;
 }
 
+#if OPENTHREAD_CONFIG_TMF_ALLOW_ADDRESS_RESOLUTION_USING_NET_DATA_SERVICES
+
+Error AddressResolver::ResolveUsingNetDataServices(const Ip6::Address &aEid, Mac::ShortAddress &aRloc16)
+{
+    // Tries to resolve `aEid` Network Data DNS/SRP Unicast address
+    // service entries.  Returns `kErrorNone` and updates `aRloc16`
+    // if successful, otherwise returns `kErrorNotFound`.
+
+    Error                                     error = kErrorNotFound;
+    NetworkData::Service::Manager::Iterator   iterator;
+    NetworkData::Service::DnsSrpUnicast::Info unicastInfo;
+
+    VerifyOrExit(Get<Mle::Mle>().GetDeviceMode().GetNetworkDataType() == NetworkData::kFullSet);
+
+    while (Get<NetworkData::Service::Manager>().GetNextDnsSrpUnicastInfo(iterator, unicastInfo) == kErrorNone)
+    {
+        if (unicastInfo.mOrigin != NetworkData::Service::DnsSrpUnicast::kFromServerData)
+        {
+            continue;
+        }
+
+        if (aEid == unicastInfo.mSockAddr.GetAddress())
+        {
+            aRloc16 = unicastInfo.mRloc16;
+            error   = kErrorNone;
+            ExitNow();
+        }
+    }
+
+exit:
+    return error;
+}
+
+#endif // OPENTHREAD_CONFIG_TMF_ALLOW_ADDRESS_RESOLUTION_USING_NET_DATA_SERVICES
+
 Error AddressResolver::SendAddressQuery(const Ip6::Address &aEid)
 {
     Error            error;
     Coap::Message *  message;
     Tmf::MessageInfo messageInfo(GetInstance());
 
-    message = Get<Tmf::Agent>().NewPriorityNonConfirmablePostMessage(UriPath::kAddressQuery);
+    message = Get<Tmf::Agent>().NewPriorityNonConfirmablePostMessage(kUriAddressQuery);
     VerifyOrExit(message != nullptr, error = kErrorNoBufs);
 
     SuccessOrExit(error = Tlv::Append<ThreadTargetTlv>(*message, aEid));
@@ -594,13 +627,8 @@ exit:
     return error;
 }
 
-void AddressResolver::HandleAddressNotification(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
-{
-    static_cast<AddressResolver *>(aContext)->HandleAddressNotification(AsCoapMessage(aMessage),
-                                                                        AsCoreType(aMessageInfo));
-}
-
-void AddressResolver::HandleAddressNotification(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
+template <>
+void AddressResolver::HandleTmf<kUriAddressNotify>(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
 {
     Ip6::Address             target;
     Ip6::InterfaceIdentifier meshLocalIid;
@@ -679,7 +707,7 @@ void AddressResolver::SendAddressError(const Ip6::Address &            aTarget,
     VerifyOrExit((message = Get<Tmf::Agent>().NewMessage()) != nullptr, error = kErrorNoBufs);
 
     message->Init(aDestination == nullptr ? Coap::kTypeNonConfirmable : Coap::kTypeConfirmable, Coap::kCodePost);
-    SuccessOrExit(error = message->AppendUriPathOptions(UriPath::kAddressError));
+    SuccessOrExit(error = message->AppendUriPathOptions(PathForUri(kUriAddressError)));
     SuccessOrExit(error = message->SetPayloadMarker());
 
     SuccessOrExit(error = Tlv::Append<ThreadTargetTlv>(*message, aTarget));
@@ -709,12 +737,8 @@ exit:
 
 #endif // OPENTHREAD_FTD
 
-void AddressResolver::HandleAddressError(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
-{
-    static_cast<AddressResolver *>(aContext)->HandleAddressError(AsCoapMessage(aMessage), AsCoreType(aMessageInfo));
-}
-
-void AddressResolver::HandleAddressError(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
+template <>
+void AddressResolver::HandleTmf<kUriAddressError>(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
 {
     Error                    error = kErrorNone;
     Ip6::Address             target;
@@ -795,12 +819,8 @@ exit:
 
 #if OPENTHREAD_FTD
 
-void AddressResolver::HandleAddressQuery(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
-{
-    static_cast<AddressResolver *>(aContext)->HandleAddressQuery(AsCoapMessage(aMessage), AsCoreType(aMessageInfo));
-}
-
-void AddressResolver::HandleAddressQuery(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
+template <>
+void AddressResolver::HandleTmf<kUriAddressQuery>(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
 {
     Ip6::Address target;
     uint32_t     lastTransactionTime;
@@ -857,7 +877,7 @@ void AddressResolver::SendAddressQueryResponse(const Ip6::Address &            a
     Coap::Message *  message;
     Tmf::MessageInfo messageInfo(GetInstance());
 
-    message = Get<Tmf::Agent>().NewPriorityConfirmablePostMessage(UriPath::kAddressNotify);
+    message = Get<Tmf::Agent>().NewPriorityConfirmablePostMessage(kUriAddressNotify);
     VerifyOrExit(message != nullptr, error = kErrorNoBufs);
 
     SuccessOrExit(error = Tlv::Append<ThreadTargetTlv>(*message, aTarget));

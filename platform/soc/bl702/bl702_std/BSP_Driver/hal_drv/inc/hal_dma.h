@@ -81,10 +81,10 @@ enum dma_index_type {
 #define DMA_TRANSFER_WIDTH_16BIT 1
 #define DMA_TRANSFER_WIDTH_32BIT 2
 
-#define DMA_BURST_1BYTE  0
-#define DMA_BURST_4BYTE  1
-#define DMA_BURST_8BYTE  2
-#define DMA_BURST_16BYTE 3
+#define DMA_BURST_INCR1  0
+#define DMA_BURST_INCR4  1
+#define DMA_BURST_INCR8  2
+#define DMA_BURST_INCR16 3
 
 #define DMA_ADDR_UART0_TDR (0x4000A000 + 0x88)
 #define DMA_ADDR_UART0_RDR (0x4000A000 + 0x8C)
@@ -160,6 +160,13 @@ typedef struct
     dma_control_data_t cfg;
 } dma_lli_ctrl_t;
 
+struct dma_lli_info {
+    dlist_t list; /*list node of lli */
+    dma_lli_ctrl_t *llihead;
+    dma_lli_ctrl_t *llitail;
+    uint32_t lli_count;
+};
+
 typedef struct dma_device {
     struct device parent;
     uint8_t id;
@@ -174,14 +181,19 @@ typedef struct dma_device {
     uint8_t dst_burst_size;
     uint8_t src_width;
     uint8_t dst_width;
-    dma_lli_ctrl_t *lli_cfg;
+    dma_lli_ctrl_t *lli_cfg; /* private param*/
+    dlist_t lli_list;        /*list node of lli */
 } dma_device_t;
 
 #define DMA_DEV(dev) ((dma_device_t *)dev)
 
 int dma_register(enum dma_index_type index, const char *name);
-int dma_allocate_register(const char *name);
 int dma_reload(struct device *dev, uint32_t src_addr, uint32_t dst_addr, uint32_t transfer_size);
+struct dma_lli_info *dma_lli_node_alloc(struct device *dev, uint32_t lli_count);
+void dma_lli_node_freeall(struct device *dev);
+int dma_lli_node_update(struct device *dev, struct dma_lli_info *lli_info, uint32_t src_addr, uint32_t dst_addr, uint32_t transfer_size);
+void dma_lli_node_append(struct dma_lli_info *last, struct dma_lli_info *next);
+int dma_lli_start(struct device *dev);
 
 #ifdef __cplusplus
 }

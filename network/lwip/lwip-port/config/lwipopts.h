@@ -77,7 +77,12 @@ a lot of data that needs to be copied, this should be set high. */
 #define MEMP_NUM_PBUF           26
 /* MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
    per active UDP "connection". */
+#ifdef OPENTHREAD_BORDER_ROUTER
+#define MEMP_NUM_UDP_PCB        20
+#else
 #define MEMP_NUM_UDP_PCB        6
+#endif
+
 /* MEMP_NUM_TCP_PCB: the number of simulatenously active TCP
    connections. */
 #define MEMP_NUM_TCP_PCB        10
@@ -239,7 +244,11 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* ---------- Statistics options ---------- */
 #define LWIP_STATS 1
+#ifdef OPENTHREAD_BORDER_ROUTER
+#define LWIP_ERRNO_STDINCLUDE 1
+#else
 #define LWIP_PROVIDE_ERRNO 1
+#endif
 
 /* ---------- link callback options ---------- */
 /* LWIP_NETIF_LINK_CALLBACK==1: Support a callback function from an interface
@@ -400,5 +409,17 @@ extern int * __errno(void);
 
 #define LWIP_RANDOMIZE_INITIAL_LOCAL_PORTS 1
 #define LWIP_RAND() ((u32_t)bl_rand())
+
+#ifdef LWIP_NETCONN_DUPLEX_SWITCH
+#define LWIP_NETCONN_FULLDUPLEX 1
+#define LWIP_NETCONN_SEM_PER_THREAD     1
+
+void *sys_thread_sem_get(void);
+void sys_thread_sem_init(void);
+void sys_thread_sem_deinit(void);
+#define LWIP_NETCONN_THREAD_SEM_GET() sys_thread_sem_get()
+#define LWIP_NETCONN_THREAD_SEM_ALLOC() sys_thread_sem_init()
+#define LWIP_NETCONN_THREAD_SEM_FREE() sys_thread_sem_deinit()
+#endif
 
 #endif /* __LWIPOPTS_H__ */

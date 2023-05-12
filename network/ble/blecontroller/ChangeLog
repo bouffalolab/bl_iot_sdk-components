@@ -1,0 +1,10 @@
+# Changes
+
+## 2023-04-19
+1. Fixed the crash problem when the code calls ble_stack_start after restarting by calling the hal_sys_reset function.
+
+## 2023-04-19
+1. Add API to get ble tx power.
+
+## 2023-04-18
+1. fix a potential issue that ble controller may hit assert when enable/disable ble scan periodically.

@@ -49,6 +49,49 @@ uint32_t sPlatDt;
 bool     sTimerOn;
 uint32_t sCallCount[kCallCountIndexMax];
 
+extern "C" {
+
+void otPlatAlarmMilliStop(otInstance *)
+{
+    sTimerOn = false;
+    sCallCount[kCallCountIndexAlarmStop]++;
+}
+
+void otPlatAlarmMilliStartAt(otInstance *, uint32_t aT0, uint32_t aDt)
+{
+    sTimerOn = true;
+    sCallCount[kCallCountIndexAlarmStart]++;
+    sPlatT0 = aT0;
+    sPlatDt = aDt;
+}
+
+uint32_t otPlatAlarmMilliGetNow(void)
+{
+    return sNow;
+}
+
+#if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
+void otPlatAlarmMicroStop(otInstance *)
+{
+    sTimerOn = false;
+    sCallCount[kCallCountIndexAlarmStop]++;
+}
+
+void otPlatAlarmMicroStartAt(otInstance *, uint32_t aT0, uint32_t aDt)
+{
+    sTimerOn = true;
+    sCallCount[kCallCountIndexAlarmStart]++;
+    sPlatT0 = aT0;
+    sPlatDt = aDt;
+}
+
+uint32_t otPlatAlarmMicroGetNow(void)
+{
+    return sNow;
+}
+#endif
+
+} // extern "C"
 
 void InitCounters(void)
 {
@@ -106,7 +149,7 @@ template <> void AlarmFired<ot::TimerMicro>(otInstance *aInstance)
 template <typename TimerType> int TestOneTimer(void)
 {
     const uint32_t       kTimeT0        = 1000;
-    const uint32_t       kTimerInterval = 100;
+    const uint32_t       kTimerInterval = 10;
     ot::Instance *       instance       = testInitInstance();
     TestTimer<TimerType> timer(*instance);
 
@@ -120,17 +163,11 @@ template <typename TimerType> int TestOneTimer(void)
     sNow = kTimeT0;
     timer.Start(kTimerInterval);
 
-    printf("kCallCountIndexAlarmStart\r\n");
     VerifyOrQuit(sCallCount[kCallCountIndexAlarmStart] == 1, "Start CallCount Failed.");
-    printf("kCallCountIndexAlarmStop\r\n");
     VerifyOrQuit(sCallCount[kCallCountIndexAlarmStop] == 0, "Stop CallCount Failed.");
-    printf("kCallCountIndexTimerHandler\r\n");
     VerifyOrQuit(sCallCount[kCallCountIndexTimerHandler] == 0, "Handler CallCount Failed.");
-    printf("sPlatT0 == 1000 && sPlatDt == 10\r\n");
     VerifyOrQuit(sPlatT0 == 1000 && sPlatDt == 10, "Start params Failed.");
-    printf("timer.IsRunning()\r\n");
     VerifyOrQuit(timer.IsRunning(), "Timer running Failed.");
-    printf("sTimerOn\r\n");
     VerifyOrQuit(sTimerOn, "Platform Timer State Failed.");
 
     sNow += kTimerInterval;
@@ -225,7 +262,7 @@ template <typename TimerType> int TestOneTimer(void)
     VerifyOrQuit(timer.IsRunning() == false, "Timer running Failed.");
     VerifyOrQuit(sTimerOn == false, "Platform Timer State Failed.");
 
-    printf(" --> PASSED\r\n");
+    printf(" --> PASSED\n");
 
     testFreeInstance(instance);
 
@@ -394,7 +431,7 @@ template <typename TimerType> int TestTwoTimers(void)
     VerifyOrQuit(timer2.IsRunning() == false, "Timer running Failed.");
     VerifyOrQuit(sTimerOn == false, "Platform Timer State Failed.");
 
-    printf(" --> PASSED\r\n");
+    printf(" --> PASSED\n");
 
     testFreeInstance(instance);
 
@@ -535,7 +572,7 @@ template <typename TimerType> static void TenTimers(uint32_t aTimeShift)
         VerifyOrQuit(timers[i]->GetFiredCounter() == 1, "TestTenTimer: Timer fired counter Failed.");
     }
 
-    printf("--> PASSED\r\n");
+    printf("--> PASSED\n");
 
     testFreeInstance(instance);
 }
@@ -637,7 +674,7 @@ int TestTimerTime(void)
             t2 -= 1;
             VerifyOrQuit(!(t1 > t2), "GetDistantPast() failed");
 
-            printf("--> PASSED\r\n");
+            printf("--> PASSED\n");
         }
     }
 
@@ -651,13 +688,13 @@ template <typename TimerType> void RunTimerTests(void)
     TestTenTimers<TimerType>();
 }
 
-extern "C" int test_timer(void)
+int main(void)
 {
     RunTimerTests<ot::TimerMilli>();
 #if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
     RunTimerTests<ot::TimerMicro>();
 #endif
     TestTimerTime();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

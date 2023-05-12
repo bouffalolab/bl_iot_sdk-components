@@ -57,19 +57,27 @@ static int32_t pwm_init(uint8_t id, uint32_t freq)
         .clk = PWM_CLK_BCLK,        //PWM_CLK_BCLK PWM_CLK_XCLK
         .stopMode = PWM_STOP_ABRUPT,//PWM_STOP_ABRUPT:default PWM_STOP_GRACEFUL:no change 
         .pol = PWM_POL_NORMAL,      //first low
-        .clkDiv = 0,                //32/1 = 32M
-        .period = 100,
+        .clkDiv = 0,
+        .period = 0,
         .threshold1 = 0,
         .threshold2 = 0,
         .intPulseCnt = 0,
     };
 
     /* 2k ~ 800K */
-    if ((freq < 2000) || (freq > 800000)) {
-        return -1;
+    //if ((freq < 2000) || (freq > 800000)) {
+    //    return -1;
+    //}
+
+    uint32_t div = 1;
+    uint32_t period = BL_PWM_CLK/freq;
+    while(period >= 65536){
+        div <<= 1;
+        period >>= 1;
     }
 
-    pwmCfg.period = BL_PWM_CLK/freq;
+    pwmCfg.clkDiv = div;
+    pwmCfg.period = period;
     pwmCfg.ch = id;
 
     PWM_Channel_Disable(id);
@@ -85,10 +93,10 @@ int32_t bl_pwm_init(uint8_t id, uint8_t pin, uint32_t freq)
     }
 
     /* 2k ~ 800K */
-    if ((freq < 2000) || (freq > 800000)) {
-        blog_error("arg error. bl_pwm_init freq = %ld\r\n", freq);
-        return -1;
-    }
+    //if ((freq < 2000) || (freq > 800000)) {
+    //    blog_error("arg error. bl_pwm_init freq = %ld\r\n", freq);
+    //    return -1;
+    //}
 
     /* init gpio */
     gpio_init(pin);
@@ -113,10 +121,17 @@ int32_t bl_pwm_set_freq(uint8_t id, uint32_t freq)
 {
     PWM_Channel_Disable(id);
 
-    uint16_t period = BL_PWM_CLK/freq;
     uint16_t threshold1 = 0;
     uint16_t threshold2 = 0;
 
+    uint32_t div = 1;
+    uint32_t period = BL_PWM_CLK/freq;
+    while(period >= 65536){
+        div <<= 1;
+        period >>= 1;
+    }
+
+    PWM_Channel_Set_Div(id, div);
     PWM_Channel_Update(id, period, threshold1, threshold2);
     PWM_Channel_Enable(id);
 
@@ -132,7 +147,7 @@ int32_t bl_pwm_set_duty(uint8_t id, float duty)
     PWM_Channel_Get(id, &period, &threshold1, &threshold2);
 
     threshold1 = 0;
-    threshold2 = (uint16_t)(period/100 * duty);
+    threshold2 = (uint16_t)(period * duty / 100);
 
     PWM_Channel_Set_Threshold1(id, threshold1);
     PWM_Channel_Set_Threshold2(id, threshold2);

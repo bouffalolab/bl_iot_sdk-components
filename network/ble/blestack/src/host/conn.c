@@ -139,6 +139,37 @@ static inline const char *state2str(bt_conn_state_t state)
 	}
 }
 
+#if defined (BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)
+struct bt_le_conn_param peripheral_pref_con_params = {
+    .interval_min = CONFIG_BT_PERIPHERAL_PREF_MIN_INT,
+    .interval_max = CONFIG_BT_PERIPHERAL_PREF_MAX_INT,
+    .latency = CONFIG_BT_PERIPHERAL_PREF_SLAVE_LATENCY,
+    .timeout = CONFIG_BT_PERIPHERAL_PREF_TIMEOUT,
+};
+
+int bt_conn_set_peripheral_pref_params(struct bt_le_conn_param *param)
+{
+    if (!bt_le_conn_params_valid(param)) {
+        return -EINVAL;;
+    }
+
+    memcpy(&peripheral_pref_con_params, param, sizeof(struct bt_le_conn_param));;
+
+    return 0;
+}
+
+int bt_conn_get_peripheral_pref_params(struct bt_le_conn_param *param)
+{
+    if (!param) {
+        return -EINVAL;;
+    }
+
+    memcpy(param, &peripheral_pref_con_params, sizeof(struct bt_le_conn_param));
+
+    return 0;
+}
+#endif//BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS
+
 static void notify_connected(struct bt_conn *conn)
 {
 	struct bt_conn_cb *cb;
@@ -396,11 +427,17 @@ static void conn_update_timeout(struct k_work *work)
 
 		send_conn_le_param_update(conn, param);
 	} else {
+        #if defined (BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)
+		param = BT_LE_CONN_PARAM(peripheral_pref_con_params.interval_min,
+					 peripheral_pref_con_params.interval_max,
+					 peripheral_pref_con_params.latency,
+					 peripheral_pref_con_params.timeout);
+        #else
 		param = BT_LE_CONN_PARAM(CONFIG_BT_PERIPHERAL_PREF_MIN_INT,
 					 CONFIG_BT_PERIPHERAL_PREF_MAX_INT,
 					 CONFIG_BT_PERIPHERAL_PREF_SLAVE_LATENCY,
 					 CONFIG_BT_PERIPHERAL_PREF_TIMEOUT);
-
+        #endif//BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS
 		send_conn_le_param_update(conn, param);
 	}
 #else
@@ -1667,7 +1704,7 @@ int bt_conn_prepare_events(struct k_poll_event events[])
 		 * set, but tx_queue isn't init.
 		 */
 		 if(conn->tx_queue._queue.hdl == 0){
-			BT_WARN("conn %x tx_queue is not vaild", conn);
+			BT_WARN("conn %p tx_queue is not vaild", conn);
 			continue;
 		}
 
@@ -1871,6 +1908,11 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 
 		break;
 	case BT_CONN_DISCONNECT:
+		#if defined(BFLB_BLE_PATCH_DISCONNECT_ERROR_WHEN_TASK_YEILD)
+		if(old_state == BT_CONN_DISCONNECTED){
+			bt_conn_unref(conn);
+		}
+		#endif /* BFLB_BLE_PATCH_DISCONNECT_ERROR_WHEN_TASK_YEILD */
 		break;
 	default:
 		BT_WARN("no valid (%u) state was set", state);

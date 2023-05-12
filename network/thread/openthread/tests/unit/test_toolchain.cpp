@@ -174,9 +174,9 @@ void TestToolchain(void)
     test_packed_alignment();
 }
 
-extern "C" int test_toolchain(void)
+int main(void)
 {
     TestToolchain();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

@@ -99,7 +99,7 @@ extern "C" void otCliOutputFormat(const char *aFmt, ...);
  * This class implements the CLI interpreter.
  *
  */
-class Interpreter : public Output
+class Interpreter : public OutputImplementer, public Output
 {
 #if OPENTHREAD_FTD || OPENTHREAD_MTD
     friend class Commissioner;
@@ -235,6 +235,27 @@ public:
      */
     static const char *PreferenceToString(signed int aPreference);
 
+    /**
+     * This method parses the argument as an IP address.
+     *
+     * If the argument string is an IPv4 address, this method will try to synthesize an IPv6 address using preferred
+     * NAT64 prefix in the network data.
+     *
+     * @param[in]  aInstance       A pointer to openthread instance.
+     * @param[in]  aArg            The argument string to parse.
+     * @param[out] aAddress        A reference to an `otIp6Address` to output the parsed IPv6 address.
+     * @param[out] aSynthesized    Whether @p aAddress is synthesized from an IPv4 address.
+     *
+     * @retval OT_ERROR_NONE          The argument was parsed successfully.
+     * @retval OT_ERROR_INVALID_ARGS  The argument is empty or does not contain valid IP address.
+     * @retval OT_ERROR_INVALID_STATE No valid NAT64 prefix in the network data.
+     *
+     */
+    static otError ParseToIp6Address(otInstance *  aInstance,
+                                     const Arg &   aArg,
+                                     otIp6Address &aAddress,
+                                     bool &        aSynthesized);
+
 protected:
     static Interpreter *sInterpreter;
 
@@ -249,6 +270,8 @@ private:
 
     static constexpr uint32_t kNetworkDiagnosticTimeoutMsecs = 5000;
     static constexpr uint32_t kLocateTimeoutMsecs            = 2500;
+
+    static constexpr uint16_t kMaxTxtDataSize = OPENTHREAD_CONFIG_CLI_TXT_RECORD_MAX_SIZE;
 
     using Command = CommandEntry<Interpreter>;
 
@@ -546,6 +569,10 @@ private:
 #endif
 #if OPENTHREAD_CONFIG_TMF_ANYCAST_LOCATOR_ENABLE
     bool mLocateInProgress : 1;
+#endif
+
+#if OPENTHREAD_CONFIG_MLE_LINK_METRICS_INITIATOR_ENABLE
+    bool mLinkMetricsQueryInProgress : 1;
 #endif
 };
 

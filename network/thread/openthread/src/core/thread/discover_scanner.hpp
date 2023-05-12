@@ -38,6 +38,7 @@
 
 #include "common/locator.hpp"
 #include "common/non_copyable.hpp"
+#include "common/tasklet.hpp"
 #include "common/timer.hpp"
 #include "mac/channel_mask.hpp"
 #include "mac/mac.hpp"
@@ -169,13 +170,17 @@ private:
     // Methods used from `Mle`
     void HandleDiscoveryResponse(Mle::RxInfo &aRxInfo) const;
 
-    void        HandleDiscoverComplete(void);
-    static void HandleTimer(Timer &aTimer);
-    void        HandleTimer(void);
+    void HandleDiscoverComplete(void);
+    void HandleScanDoneTask(void);
+    void HandleTimer(void);
+
+    using ScanTimer    = TimerMilliIn<DiscoverScanner, &DiscoverScanner::HandleTimer>;
+    using ScanDoneTask = TaskletIn<DiscoverScanner, &DiscoverScanner::HandleScanDoneTask>;
 
     Handler          mHandler;
     void *           mHandlerContext;
-    TimerMilli       mTimer;
+    ScanDoneTask     mScanDoneTask;
+    ScanTimer        mTimer;
     FilterIndexes    mFilterIndexes;
     Mac::ChannelMask mScanChannels;
     State            mState;

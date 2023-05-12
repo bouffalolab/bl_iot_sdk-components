@@ -34,7 +34,7 @@ uint64_t mtimer_get_time_ms();
 uint64_t mtimer_get_time_us();
 void mtimer_delay_ms(uint32_t time);
 void mtimer_delay_us(uint32_t time);
-
+void mtimer_clear_time();
 #ifdef __cplusplus
 }
 #endif

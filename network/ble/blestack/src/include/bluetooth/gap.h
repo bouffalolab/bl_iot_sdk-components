@@ -31,6 +31,7 @@ extern "C" {
 #define BT_DATA_TX_POWER                0x0a /* Tx Power */
 #define BT_DATA_SM_TK_VALUE             0x10 /* Security Manager TK Value */
 #define BT_DATA_SM_OOB_FLAGS            0x11 /* Security Manager OOB Flags */
+#define BT_DATA_PERIPHERAL_CONN_INTVL_RANGE 0x12 /*Peripheral Connection Interval Range*/
 #define BT_DATA_SOLICIT16               0x14 /* Solicit UUIDs, 16-bit */
 #define BT_DATA_SOLICIT128              0x15 /* Solicit UUIDs, 128-bit */
 #define BT_DATA_SVC_DATA16              0x16 /* Service data, 16-bit UUID */
@@ -46,6 +47,7 @@ extern "C" {
 #define BT_DATA_MESH_PROV               0x29 /* Mesh Provisioning PDU */
 #define BT_DATA_MESH_MESSAGE            0x2a /* Mesh Networking PDU */
 #define BT_DATA_MESH_BEACON             0x2b /* Mesh Beacon */
+#define BT_DATA_3D_INFOR_DATA           0x3d /* 3D Synchronization Profile */
 
 #define BT_DATA_MANUFACTURER_DATA       0xff /* Manufacturer Specific Data */
 

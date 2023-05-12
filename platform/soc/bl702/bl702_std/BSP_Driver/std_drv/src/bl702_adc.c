@@ -244,7 +244,7 @@ void ADC_Init(ADC_CFG_Type *cfg)
  * @return None
  *
 *******************************************************************************/
-void ADC_Channel_Config(ADC_Chan_Type posCh, ADC_Chan_Type negCh, BL_Fun_Type contEn)
+void ADC_Channel_Config(uint8_t posCh, uint8_t negCh, BL_Fun_Type contEn)
 {
     uint32_t regCmd;
     uint32_t regCfg1;
@@ -276,7 +276,7 @@ void ADC_Channel_Config(ADC_Chan_Type posCh, ADC_Chan_Type negCh, BL_Fun_Type co
  * @return None
  *
 *******************************************************************************/
-void ADC_Scan_Channel_Config(ADC_Chan_Type posChList[], ADC_Chan_Type negChList[], uint8_t scanLength, BL_Fun_Type contEn)
+void ADC_Scan_Channel_Config(uint8_t posChList[], uint8_t negChList[], uint8_t scanLength, BL_Fun_Type contEn)
 {
     uint32_t tmpVal, i;
     uint32_t dealLen;
@@ -508,6 +508,7 @@ void ADC_Parse_Result(uint32_t *orgVal, uint32_t len, ADC_Result_Type *result)
     uint32_t tmpVal1 = 0, tmpVal2 = 0;
     ADC_Data_Width_Type dataType;
     ADC_SIG_INPUT_Type sigType;
+    uint32_t conv_result = 0;
     float ref = 2.0;
     uint32_t i = 0;
 
@@ -532,15 +533,27 @@ void ADC_Parse_Result(uint32_t *orgVal, uint32_t len, ADC_Result_Type *result)
             result[i].negChan = -1;
 
             if (dataType == ADC_DATA_WIDTH_12) {
-                result[i].value = (unsigned int)(((orgVal[i] & 0xffff) >> 4) / coe);
+                conv_result = (unsigned int)(((orgVal[i] & 0xffff) >> 4) / coe);
+                if (conv_result > 4095) {
+                    conv_result = 4095;
+                }
+                result[i].value = conv_result;
                 result[i].volt = result[i].value / 4096.0 * ref;
             } else if ((dataType == ADC_DATA_WIDTH_14_WITH_16_AVERAGE) ||
                        (dataType == ADC_DATA_WIDTH_14_WITH_64_AVERAGE)) {
-                result[i].value = (unsigned int)(((orgVal[i] & 0xffff) >> 2) / coe);
+                conv_result = (unsigned int)(((orgVal[i] & 0xffff) >> 2) / coe);
+                if (conv_result > 16383) {
+                    conv_result = 16383;
+                }
+                result[i].value = conv_result;
                 result[i].volt = result[i].value / 16384.0 * ref;
             } else if ((dataType == ADC_DATA_WIDTH_16_WITH_128_AVERAGE) ||
                        (dataType == ADC_DATA_WIDTH_16_WITH_256_AVERAGE)) {
-                result[i].value = (unsigned int)((orgVal[i] & 0xffff) / coe);
+                conv_result = (unsigned int)((orgVal[i] & 0xffff) / coe);
+                if (conv_result > 65535) {
+                    conv_result = 65535;
+                }
+                result[i].value = conv_result;
                 result[i].volt = result[i].value / 65536.0 * ref;
             }
         }
@@ -557,15 +570,27 @@ void ADC_Parse_Result(uint32_t *orgVal, uint32_t len, ADC_Result_Type *result)
             }
 
             if (dataType == ADC_DATA_WIDTH_12) {
-                result[i].value = (unsigned int)(((orgVal[i] & 0xffff) >> 4) / coe);
+                conv_result = (unsigned int)(((orgVal[i] & 0xffff) >> 4) / coe);
+                if (conv_result > 2047) {
+                    conv_result = 2047;
+                }
+                result[i].value = conv_result;
                 result[i].volt = result[i].value / 2048.0 * ref;
             } else if ((dataType == ADC_DATA_WIDTH_14_WITH_16_AVERAGE) ||
                        (dataType == ADC_DATA_WIDTH_14_WITH_64_AVERAGE)) {
-                result[i].value = (unsigned int)(((orgVal[i] & 0xffff) >> 2) / coe);
+                conv_result = (unsigned int)(((orgVal[i] & 0xffff) >> 2) / coe);
+                if (conv_result > 8191) {
+                    conv_result = 8191;
+                }
+                result[i].value = conv_result;
                 result[i].volt = result[i].value / 8192.0 * ref;
             } else if ((dataType == ADC_DATA_WIDTH_16_WITH_128_AVERAGE) ||
                        (dataType == ADC_DATA_WIDTH_16_WITH_256_AVERAGE)) {
-                result[i].value = (unsigned int)((orgVal[i] & 0xffff) / coe);
+                conv_result = (unsigned int)((orgVal[i] & 0xffff) / coe);
+                if (conv_result > 32767) {
+                    conv_result = 32767;
+                }
+                result[i].value = conv_result;
                 result[i].volt = result[i].value / 32768.0 * ref;
             }
 
@@ -605,22 +630,22 @@ BL_Mask_Type ADC_IntGetMask(ADC_INT_Type intType)
             break;
 
         case ADC_INT_FIFO_UNDERRUN:
-            tmpVal = BL_RD_REG(AON_BASE, GPIP_GPADC_CONFIG);
+            tmpVal = BL_RD_REG(GPIP_BASE, GPIP_GPADC_CONFIG);
             return BL_IS_REG_BIT_SET(tmpVal, GPIP_GPADC_FIFO_UNDERRUN_MASK);
             break;
 
         case ADC_INT_FIFO_OVERRUN:
-            tmpVal = BL_RD_REG(AON_BASE, GPIP_GPADC_CONFIG);
+            tmpVal = BL_RD_REG(GPIP_BASE, GPIP_GPADC_CONFIG);
             return BL_IS_REG_BIT_SET(tmpVal, GPIP_GPADC_FIFO_OVERRUN_MASK);
             break;
 
         case ADC_INT_ADC_READY:
-            tmpVal = BL_RD_REG(AON_BASE, GPIP_GPADC_CONFIG);
+            tmpVal = BL_RD_REG(GPIP_BASE, GPIP_GPADC_CONFIG);
             return BL_IS_REG_BIT_SET(tmpVal, GPIP_GPADC_RDY_MASK);
             break;
 
         case ADC_INT_FIFO_READY:
-            tmpVal = BL_RD_REG(AON_BASE, GPIP_GPADC_CONFIG);
+            tmpVal = BL_RD_REG(GPIP_BASE, GPIP_GPADC_CONFIG);
             return BL_IS_REG_BIT_SET(tmpVal, GPIP_GPADC_FIFO_RDY_MASK);
             break;
         default:
@@ -734,7 +759,7 @@ void ADC_IntMask(ADC_INT_Type intType, BL_Mask_Type intMask)
         case ADC_INT_ALL:
             if (intMask == UNMASK) {
                 /* Enable this interrupt */
-                tmpVal = BL_RD_REG(GPIP_BASE, AON_GPADC_REG_ISR);
+                tmpVal = BL_RD_REG(AON_BASE, AON_GPADC_REG_ISR);
                 tmpVal = BL_CLR_REG_BIT(tmpVal, AON_GPADC_POS_SATUR_MASK);
                 tmpVal = BL_CLR_REG_BIT(tmpVal, AON_GPADC_NEG_SATUR_MASK);
                 BL_WR_REG(AON_BASE, AON_GPADC_REG_ISR, tmpVal);
@@ -746,7 +771,7 @@ void ADC_IntMask(ADC_INT_Type intType, BL_Mask_Type intMask)
                 BL_WR_REG(GPIP_BASE, GPIP_GPADC_CONFIG, tmpVal);
             } else {
                 /* Disable this interrupt */
-                tmpVal = BL_RD_REG(GPIP_BASE, AON_GPADC_REG_ISR);
+                tmpVal = BL_RD_REG(AON_BASE, AON_GPADC_REG_ISR);
                 tmpVal = BL_SET_REG_BIT(tmpVal, AON_GPADC_POS_SATUR_MASK);
                 tmpVal = BL_SET_REG_BIT(tmpVal, AON_GPADC_NEG_SATUR_MASK);
                 BL_WR_REG(AON_BASE, AON_GPADC_REG_ISR, tmpVal);
@@ -997,7 +1022,7 @@ void ADC_Int_Callback_Install(ADC_INT_Type intType, intCallback_Type *cbFun)
 #ifndef BFLB_USE_HAL_DRIVER
 void GPADC_DMA_IRQHandler(void)
 {
-    if (ADC_GetIntStatus(ADC_INT_POS_SATURATION) == SET) {
+    if (ADC_IntGetMask(ADC_INT_POS_SATURATION) == UNMASK && ADC_GetIntStatus(ADC_INT_POS_SATURATION) == SET) {
         ADC_IntClr(ADC_INT_POS_SATURATION);
 
         if (adcIntCbfArra[ADC_INT_POS_SATURATION] != NULL) {
@@ -1005,7 +1030,7 @@ void GPADC_DMA_IRQHandler(void)
         }
     }
 
-    if (ADC_GetIntStatus(ADC_INT_NEG_SATURATION) == SET) {
+    if (ADC_IntGetMask(ADC_INT_NEG_SATURATION) == UNMASK && ADC_GetIntStatus(ADC_INT_NEG_SATURATION) == SET) {
         ADC_IntClr(ADC_INT_NEG_SATURATION);
 
         if (adcIntCbfArra[ADC_INT_NEG_SATURATION] != NULL) {
@@ -1013,7 +1038,7 @@ void GPADC_DMA_IRQHandler(void)
         }
     }
 
-    if (ADC_GetIntStatus(ADC_INT_FIFO_UNDERRUN) == SET) {
+    if (ADC_IntGetMask(ADC_INT_FIFO_UNDERRUN) == UNMASK && ADC_GetIntStatus(ADC_INT_FIFO_UNDERRUN) == SET) {
         ADC_IntClr(ADC_INT_FIFO_UNDERRUN);
 
         if (adcIntCbfArra[ADC_INT_FIFO_UNDERRUN] != NULL) {
@@ -1021,7 +1046,7 @@ void GPADC_DMA_IRQHandler(void)
         }
     }
 
-    if (ADC_GetIntStatus(ADC_INT_FIFO_OVERRUN) == SET) {
+    if (ADC_IntGetMask(ADC_INT_FIFO_OVERRUN) == UNMASK && ADC_GetIntStatus(ADC_INT_FIFO_OVERRUN) == SET) {
         ADC_IntClr(ADC_INT_FIFO_OVERRUN);
 
         if (adcIntCbfArra[ADC_INT_FIFO_OVERRUN] != NULL) {
@@ -1029,7 +1054,7 @@ void GPADC_DMA_IRQHandler(void)
         }
     }
 
-    if (ADC_GetIntStatus(ADC_INT_ADC_READY) == SET) {
+    if (ADC_IntGetMask(ADC_INT_ADC_READY) == UNMASK && ADC_GetIntStatus(ADC_INT_ADC_READY) == SET) {
         ADC_IntClr(ADC_INT_ADC_READY);
 
         if (adcIntCbfArra[ADC_INT_ADC_READY] != NULL) {
@@ -1228,7 +1253,7 @@ uint32_t TSEN_Get_V_Error(void)
     uint32_t v0 = 0, v1 = 0;
     uint32_t v_error = 0;
     uint32_t regVal = 0;
-    ADC_Result_Type result;
+    ADC_Result_Type result = { 0 };
     uint32_t tmpVal;
     uint8_t gainCalEnabled = 0;
 
@@ -1344,7 +1369,7 @@ float TSEN_Get_Temp(uint32_t tsen_offset)
     uint32_t v0 = 0, v1 = 0;
     float temp = 0;
     uint32_t regVal = 0;
-    ADC_Result_Type result;
+    ADC_Result_Type result = { 0 };
     uint32_t tmpVal;
     uint8_t gainCalEnabled = 0;
 

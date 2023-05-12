@@ -71,7 +71,7 @@ typedef struct {
 
     /** struct _mac_sub_mac_check_t is used to check whether the following classes are changed */
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
-    char Mac_Links_check[ (140 == sizeof(Mac::Links)) ? 1 : -1];
+    char Mac_Links_check[ (144 == sizeof(Mac::Links)) ? 1 : -1];
 #else
     char Mac_Links_check[ (112 == sizeof(Mac::Links)) ? 1 : -1];
 #endif
@@ -175,6 +175,7 @@ typedef struct {
     uint8_t  mCslChannel : 7; // The CSL sample channel.
     bool mIsCslSampling : 1;  // Indicates that the radio is receiving in CSL state for platforms not supporting delayed
                               // reception.
+    uint16_t   mCslPeerShort;      // The CSL peer short address.
     TimeMicro  mCslSampleTime;     // The CSL sample time of the current period.
     TimeMicro  mCslLastSync;       // The timestamp of the last successful CSL synchronization.
     uint8_t    mCslParentAccuracy; // Drift of timer used for scheduling CSL tx by the parent, in ± ppm.
@@ -187,7 +188,8 @@ typedef struct {
 typedef struct {
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
     /** struct _mac_sub_mac_check_t is used to check whether size of Mac::SubMac is changed */
-    char Mac_SubMac_check[ (132 == sizeof(Mac::SubMac)) ? 1 : -1];
+    char Mac_SubMac_check[ (136 == sizeof(Mac::SubMac)) ? 1 : -1];
+    char __Mac_SubMac_check[ (136 == sizeof(sub_mac_t)) ? 1 : -1];
 #else
     /** struct _mac_sub_mac_check_t is used to check whether size of Mac::SubMac is changed */
     char Mac_SubMac_check[ (104 == sizeof(Mac::SubMac)) ? 1 : -1];
@@ -329,7 +331,7 @@ extern "C" bool otSetMeshForwarderInfo(otInstance *aInstance, uint8_t linkFailur
                 parent.ResetLinkFailures();
             }
 
-            if ((Mle::Mle::IsActiveRouter(parent.GetRloc16())) && (parent.GetLinkFailures() >= aFailLimit)) {
+            if ((Mle::IsActiveRouter(parent.GetRloc16())) && (parent.GetLinkFailures() >= aFailLimit)) {
                 AsCoreType(aInstance).Get<Mle::MleRouter>().RemoveRouterLink(static_cast<Router &>(parent));
             }
         }
@@ -344,7 +346,7 @@ extern "C" bool otSetMeshForwarderInfo(otInstance *aInstance, uint8_t linkFailur
                 parentCandidate.ResetLinkFailures();
             }
 
-            if ((Mle::Mle::IsActiveRouter(parentCandidate.GetRloc16())) && (parentCandidate.GetLinkFailures() >= aFailLimit)) {
+            if ((Mle::IsActiveRouter(parentCandidate.GetRloc16())) && (parentCandidate.GetLinkFailures() >= aFailLimit)) {
                 AsCoreType(aInstance).Get<Mle::MleRouter>().RemoveRouterLink(static_cast<Router &>(parentCandidate));
             }
         }  

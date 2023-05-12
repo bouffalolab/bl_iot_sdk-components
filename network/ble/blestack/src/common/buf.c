@@ -693,7 +693,14 @@ struct net_buf *net_buf_slist_get(sys_slist_t *list)
 		frag->frags = (void *)sys_slist_get(list);
 		irq_unlock(key);
 
+#if 0
 		NET_BUF_ASSERT(frag->frags);
+#else
+		/* Converity: Dereference null return value */
+		if (!frag->frags) {
+			while(1);
+		}
+#endif
 
 		/* The fragments flag is only for list-internal usage */
 		frag->flags &= ~NET_BUF_FRAGS;

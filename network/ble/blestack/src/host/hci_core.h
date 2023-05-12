@@ -136,6 +136,10 @@ struct bt_dev {
 	/* Current local Random Address */
 	bt_addr_le_t		random_addr;
 
+	#if defined(BFLB_BLE)
+	/* Current local Public Address */
+	bt_addr_le_t		public_addr;
+	#endif
 	/* Controller version & manufacturer information */
 	u8_t			hci_version;
 	u8_t			lmp_version;
@@ -195,6 +199,9 @@ struct bt_dev {
 	/* Local Name */
 #if defined(CONFIG_BT_DEVICE_NAME_DYNAMIC)
 	char			name[CONFIG_BT_DEVICE_NAME_MAX + 1];
+#endif
+#if defined(BFLB_BLE_SMP_SUPPORT_DISABLE_PAIR)
+    bool disable_pair;
 #endif
 };
 
@@ -277,6 +284,9 @@ int hci_le_set_default_phy(u8_t default_phy);
 int bt_set_bd_addr(const bt_addr_t *addr);
 
 int bt_set_tx_pwr(int8_t power);
+#if defined(BL702L) || defined(BL602) || defined(BL702)
+int8_t bt_get_tx_pwr(void);
+#endif
 
 #if defined(BFLB_HOST_ASSISTANT)
 struct blhast_cb{

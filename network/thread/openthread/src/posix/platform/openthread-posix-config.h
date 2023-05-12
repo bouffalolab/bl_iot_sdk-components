@@ -86,6 +86,12 @@
 #define OT_POSIX_RCP_BUS_SPI 2
 
 /**
+ * RCP bus defined by vendors.
+ *
+ */
+#define OT_POSIX_RCP_BUS_VENDOR 3
+
+/**
  * @def OPENTHREAD_POSIX_CONFIG_RCP_BUS
  *
  * This setting configures what type of RCP bus to use.
@@ -209,6 +215,16 @@
 #endif
 
 /**
+ * @def OPENTHREAD_POSIX_CONFIG_NAT64_AIL_PREFIX_ENABLE
+ *
+ * Define as 1 to enable discovering NAT64 posix on adjacent infrastructure link.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_NAT64_AIL_PREFIX_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_NAT64_AIL_PREFIX_ENABLE 0
+#endif
+
+/**
  * @def OPENTHREAD_POSIX_CONFIG_FIREWALL_ENABLE
  *
  * Define as 1 to enable firewall.
@@ -276,6 +292,16 @@
  */
 #ifndef OPENTHREAD_POSIX_CONFIG_TREL_UDP_PORT
 #define OPENTHREAD_POSIX_CONFIG_TREL_UDP_PORT 0
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_NAT64_CIDR
+ *
+ * This setting configures the NAT64 CIDR, used by NAT64 translator.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_NAT64_CIDR
+#define OPENTHREAD_POSIX_CONFIG_NAT64_CIDR "192.168.255.0/24"
 #endif
 
 #endif // OPENTHREAD_PLATFORM_CONFIG_H_

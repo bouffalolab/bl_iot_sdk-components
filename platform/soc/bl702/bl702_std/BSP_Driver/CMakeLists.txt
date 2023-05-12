@@ -27,6 +27,7 @@ list(APPEND ADD_SRCS  ${sources})
 # aux_source_directory(src ADD_SRCS)
 list(REMOVE_ITEM ADD_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/std_drv/src/bl702_snflash.c"
 "${CMAKE_CURRENT_SOURCE_DIR}/std_drv/src/bl702_romdriver.c"
+"${CMAKE_CURRENT_SOURCE_DIR}/std_drv/src/bl702_romapi.c"
 )
 #######################################################
 
@@ -48,6 +49,7 @@ list(APPEND ADD_REQUIREMENTS common)
 #add components denpend on this component
 if(CONFIG_ROMAPI)
 list(APPEND ADD_DEFINITIONS -DBFLB_USE_ROM_DRIVER)
+list(APPEND ADD_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/std_drv/src/bl702_romapi.c")
 endif()
 if(CONFIG_HALAPI)
 list(APPEND ADD_DEFINITIONS -DBFLB_USE_HAL_DRIVER)

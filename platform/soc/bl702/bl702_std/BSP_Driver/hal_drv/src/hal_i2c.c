@@ -50,54 +50,6 @@ int i2c_open(struct device *dev, uint16_t oflag)
     return 0;
 }
 
-// int i2c_close(struct device *dev)
-// {
-
-//     return 0;
-// }
-
-// int i2c_control(struct device *dev, int cmd, void *args)
-// {
-//     //i2c_device_t *i2c_device = (i2c_device_t *)dev;
-
-//     switch (cmd)
-//     {
-//     case DEVICE_CTRL_SET_INT /* constant-expression */:
-
-//         break;
-//     case DEVICE_CTRL_CLR_INT /* constant-expression */:
-//         /* code */
-//         /* Enable UART interrupt*/
-
-//         break;
-//     case DEVICE_CTRL_GET_INT /* constant-expression */:
-//         /* code */
-//         break;
-//     case DEVICE_CTRL_CONFIG /* constant-expression */:
-//         /* code */
-//         break;
-//     case 4 /* constant-expression */:
-//         /* code */
-//         break;
-//     case 5 /* constant-expression */:
-//         /* code */
-//         break;
-//     default:
-//         break;
-//     }
-
-//     return 0;
-// }
-// int i2c_write(struct device *dev, uint32_t pos, const void *buffer, uint32_t size)
-// {
-
-//     return 0;
-// }
-// int i2c_read(struct device *dev, uint32_t pos, void *buffer, uint32_t size)
-// {
-
-//     return 0;
-// }
 /**
  * @brief
  *

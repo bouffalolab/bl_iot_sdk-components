@@ -141,3 +141,13 @@ void mtimer_delay_us(uint32_t time)
         }
     }
 }
+/**
+ * @brief
+ *
+ * @param
+ */
+void mtimer_clear_time()
+{
+    *(volatile uint32_t *)(CLIC_CTRL_ADDR + CLIC_MTIME) = 0;
+    *(volatile uint32_t *)(CLIC_CTRL_ADDR + CLIC_MTIME + 4) = 0;
+}

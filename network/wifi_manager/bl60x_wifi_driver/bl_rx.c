@@ -695,6 +695,7 @@ static int bl_rx_sm_connect_ind(struct bl_hw *bl_hw,
         {
             bl_hw->vif_table[BL_VIF_STA].links_num--;
             bl_hw->vif_table[BL_VIF_STA].fc_chan = 0;
+            bl_hw->vif_table[BL_VIF_STA].sta_ps = PS_MODE_OFF;
 
             int fixed_sta_idx = bl_hw->vif_table[BL_VIF_STA].fixed_sta_idx;
             struct bl_sta *sta = &(bl_hw->sta_table[fixed_sta_idx]);
@@ -755,6 +756,7 @@ static int bl_rx_sm_disconnect_ind(struct bl_hw *bl_hw,
     {
         bl_hw->vif_table[BL_VIF_STA].links_num--;
         bl_hw->vif_table[BL_VIF_STA].fc_chan = 0;
+        bl_hw->vif_table[BL_VIF_STA].sta_ps = PS_MODE_OFF;
 
         sta->is_used = 0;
         bl_tx_cntrl_link_down(sta);

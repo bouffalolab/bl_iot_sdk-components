@@ -121,16 +121,6 @@ icmp6_input(struct pbuf *p, struct netif *inp)
     nd6_input(p, inp);
     return;
   case ICMP6_TYPE_RS:
-#if LWIP_IPV6_FORWARD
-#ifdef LWIP_IPV6_FOR_BORDER_ROUTER
-  {
-    /* @todo implement router functionality */
-    extern void ot_recv_icmp_6nd(struct netif *inp, ip6_addr_t* src, const uint8_t* data, uint16_t len);
-    ot_recv_icmp_6nd(inp,ip6_current_src_addr(),p->payload,
-                                    p->len);
-  }
-#endif /* LWIP_IPV6_FOR_BORDER_ROUTER */
-#endif
     break;
 #if LWIP_IPV6_MLD
   case ICMP6_TYPE_MLQ:
@@ -149,6 +139,14 @@ icmp6_input(struct pbuf *p, struct netif *inp)
       return;
     }
 #endif /* LWIP_MULTICAST_PING */
+
+#if defined (OPENTHREAD_BORDER_ROUTER) && LWIP_MULTICAST_PING
+    if (ip6_addr_ismulticast(ip6_current_dest_addr()) && !ip6_addr_ismulticast_linklocal(ip6_current_dest_addr())) {
+      pbuf_free(p);
+      ICMP6_STATS_INC(icmp6.drop);
+      return;
+    }
+#endif
 
     /* Allocate reply. */
     r = pbuf_alloc(PBUF_IP, p->tot_len, PBUF_RAM);

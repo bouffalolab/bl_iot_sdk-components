@@ -114,8 +114,8 @@ void TestEncoder(void)
 
     memset(buffer, 0, sizeof(buffer));
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 1: Encoding of simple types");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 1: Encoding of simple types");
 
     SuccessOrQuit(encoder.BeginFrame(Spinel::Buffer::kPriorityLow));
     SuccessOrQuit(encoder.WriteBool(kBool_1));
@@ -178,10 +178,10 @@ void TestEncoder(void)
     VerifyOrQuit(dataLen == sizeof(kData));
     VerifyOrQuit(memcmp(dataPtr, &kData, sizeof(kData)) == 0);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 2: Test a single simple struct.");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 2: Test a single simple struct.");
 
     SuccessOrQuit(encoder.BeginFrame(Spinel::Buffer::kPriorityLow));
     SuccessOrQuit(encoder.WriteUint8(kUint8));
@@ -225,10 +225,10 @@ void TestEncoder(void)
     VerifyOrQuit(u8 == kUint8);
     VerifyOrQuit(i16 == kInt16);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 3: Test multiple structs and struct within struct.");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 3: Test multiple structs and struct within struct.");
 
     SuccessOrQuit(encoder.BeginFrame(Spinel::Buffer::kPriorityLow));
     SuccessOrQuit(encoder.OpenStruct());
@@ -274,10 +274,10 @@ void TestEncoder(void)
     VerifyOrQuit(memcmp(eui48, &kEui48, sizeof(spinel_eui48_t)) == 0);
     VerifyOrQuit(memcmp(utf_1, kString_1, sizeof(kString_1)) == 0);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 4: Test unclosed struct.");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 4: Test unclosed struct.");
 
     SuccessOrQuit(encoder.BeginFrame(Spinel::Buffer::kPriorityLow));
     SuccessOrQuit(encoder.WriteUint8(kUint8));
@@ -307,10 +307,10 @@ void TestEncoder(void)
     VerifyOrQuit(u_3 == kUint_3);
     VerifyOrQuit(memcmp(eui48, &kEui48, sizeof(spinel_eui48_t)) == 0);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 5: Test saving position and reseting back to a saved position");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 5: Test saving position and reseting back to a saved position");
 
     SuccessOrQuit(encoder.BeginFrame(Spinel::Buffer::kPriorityLow));
     SuccessOrQuit(encoder.WriteUint8(kUint8));
@@ -354,15 +354,15 @@ void TestEncoder(void)
     VerifyOrQuit(memcmp(eui64, &kEui64, sizeof(spinel_eui64_t)) == 0);
     VerifyOrQuit(memcmp(utf_1, kString_1, sizeof(kString_1)) == 0);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 } // namespace Spinel
 } // namespace ot
 
-extern "C" int test_spinel_encoder(void)
+int main(void)
 {
     ot::Spinel::TestEncoder();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }

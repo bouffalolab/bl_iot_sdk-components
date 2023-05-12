@@ -101,8 +101,8 @@ void TestDecoder(void)
 
     memset(buffer, 0, sizeof(buffer));
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 1: Decoding simple types");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 1: Decoding simple types");
 
     frameLen = spinel_datatype_pack(
         buffer, sizeof(buffer),
@@ -184,10 +184,10 @@ void TestDecoder(void)
     VerifyOrQuit(dataLen_2 == sizeof(kData));
     VerifyOrQuit(memcmp(dataPtr_2, &kData, sizeof(kData)) == 0);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 2: Test Reset(), SavePosition(), ResetToSaved()");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 2: Test Reset(), SavePosition(), ResetToSaved()");
 
     // `ResetToSaved()` should fail if there is no saved position
     VerifyOrQuit(decoder.ResetToSaved() == OT_ERROR_INVALID_STATE);
@@ -289,10 +289,10 @@ void TestDecoder(void)
     decoder.Init(buffer, static_cast<uint16_t>(frameLen));
     VerifyOrQuit(decoder.ResetToSaved() == OT_ERROR_INVALID_STATE);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 3: Test decoding a single simple struct.");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 3: Test decoding a single simple struct.");
 
     frameLen = spinel_datatype_pack(buffer, sizeof(buffer),
                                     (SPINEL_DATATYPE_UINT8_S SPINEL_DATATYPE_STRUCT_S(
@@ -323,10 +323,10 @@ void TestDecoder(void)
     VerifyOrQuit(u_3 == kUint_3);
     VerifyOrQuit(memcmp(eui48, &kEui48, sizeof(spinel_eui48_t)) == 0);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 4: Test partial struct read");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 4: Test partial struct read");
 
     // Re-use same frame as the previous test.
 
@@ -344,10 +344,10 @@ void TestDecoder(void)
     VerifyOrQuit(u8 == kUint8);
     VerifyOrQuit(i16 == kInt16);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 5: Test `GetRemainingLengthInStruct()` and `IsAllReadInStruct`() in and out of an struct");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 5: Test `GetRemainingLengthInStruct()` and `IsAllReadInStruct`() in and out of an struct");
 
     // Re-use same frame as the previous test.
 
@@ -402,10 +402,10 @@ void TestDecoder(void)
     VerifyOrQuit(u_3 == kUint_3);
     VerifyOrQuit(memcmp(eui48, &kEui48, sizeof(spinel_eui48_t)) == 0);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 6: Test multiple nested structs");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 6: Test multiple nested structs");
 
     frameLen = spinel_datatype_pack(
         buffer, sizeof(buffer),
@@ -452,10 +452,10 @@ void TestDecoder(void)
     VerifyOrQuit(memcmp(eui48, &kEui48, sizeof(spinel_eui48_t)) == 0);
     VerifyOrQuit(memcmp(utf_1, kString_1, sizeof(kString_1)) == 0);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 7: Test `SavePosition()`, `ResetToSaved()` for nested structs");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 7: Test `SavePosition()`, `ResetToSaved()` for nested structs");
 
     // Re-use same frame as the previous test.
 
@@ -514,10 +514,10 @@ void TestDecoder(void)
     VerifyOrQuit(memcmp(eui48, &kEui48, sizeof(spinel_eui48_t)) == 0);
     VerifyOrQuit(memcmp(utf_1, kString_1, sizeof(kString_1)) == 0);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 8: Test saving position at start of an open struct");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 8: Test saving position at start of an open struct");
 
     // Re-use same frame as the previous test.
 
@@ -570,10 +570,10 @@ void TestDecoder(void)
     VerifyOrQuit(memcmp(eui48, &kEui48, sizeof(spinel_eui48_t)) == 0);
     VerifyOrQuit(memcmp(utf_1, kString_1, sizeof(kString_1)) == 0);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 9: Test `ResetToSaved()` failure case (jumping back to a saved position closed struct).");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 9: Test `ResetToSaved()` failure case (jumping back to a saved position closed struct).");
 
     // Re-use same frame as the previous test.
 
@@ -598,10 +598,10 @@ void TestDecoder(void)
         VerifyOrQuit(decoder.ResetToSaved() == OT_ERROR_INVALID_STATE);
     }
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 
-    printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-    printf("\r\nTest 10: Testing error cases and failures. (e.g., wrong struct length).");
+    printf("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+    printf("\nTest 10: Testing error cases and failures. (e.g., wrong struct length).");
 
     frameLen = spinel_datatype_pack(buffer, sizeof(buffer),
                                     (SPINEL_DATATYPE_UINT8_S SPINEL_DATATYPE_UINT16_S // Treat this as struct length
@@ -635,15 +635,15 @@ void TestDecoder(void)
     // Try reading beyond end of frame.
     VerifyOrQuit(decoder.ReadUint8(u8) == OT_ERROR_PARSE);
 
-    printf(" -- PASS\r\n");
+    printf(" -- PASS\n");
 }
 
 } // namespace Spinel
 } // namespace ot
 
-extern "C" int test_spinel_decoder(void)
+int main(void)
 {
     ot::Spinel::Decoder();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }

@@ -188,9 +188,9 @@ void TestFlash(void)
 
 } // namespace ot
 
-extern "C" int test_flash(void)
+int main(void)
 {
     ot::TestFlash();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

@@ -97,20 +97,20 @@ void TestExampleInSpec(void)
     testFreeInstance(instance);
 }
 
-extern "C" int test_pskc(void)
+int main(void)
 {
     TestMinimumPassphrase();
     TestMaximumPassphrase();
     TestExampleInSpec();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }
 
 #else // #if OPENTHREAD_FTD
 
-extern "C" int test_pskc(void)
+int main(void)
 {
-    printf("PSKc generation is not supported on non-ftd build\r\n");
+    printf("PSKc generation is not supported on non-ftd build\n");
     return 0;
 }
 

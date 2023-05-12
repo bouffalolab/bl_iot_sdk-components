@@ -256,7 +256,7 @@ static void bredr_init(char *pcWriteBuffer, int xWriteBufferLen, int argc, char 
 
 static void bredr_connected(struct bt_conn *conn, u8_t err)
 {
-    if(err || conn->type != BT_CONN_TYPE_BR)
+    if(conn->type != BT_CONN_TYPE_BR)
     {
         return;
     }
@@ -277,9 +277,6 @@ static void bredr_connected(struct bt_conn *conn, u8_t err)
     {
         default_conn = conn;
     }
-
-    bt_br_set_connectable(false);
-
 }
 
 static void bredr_disconnected(struct bt_conn *conn, u8_t reason)
@@ -300,6 +297,7 @@ static void bredr_disconnected(struct bt_conn *conn, u8_t reason)
     {
         default_conn = NULL;
     }
+
 }
 
 static void bredr_write_local_name(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
@@ -626,26 +624,28 @@ static void a2dp_get_cap(char *p_write_buffer, int write_buffer_len, int argc, c
 
     ret = bt_a2dp_get_cap(default_conn);
     if(ret) {
-        printf("A2dp start discovery successfully.\n");
+        printf("A2dp get cap successfully.\n");
     } else {
-        printf("A2dp start discovery fail. ret(%d)\n",ret);
+        printf("A2dp get cap discovery fail. ret(%d)\n",ret);
     }
 }
 
 static void a2dp_set_conf(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
 {
     int ret;
+    uint8_t acp_seid;
 
     if(!default_conn){
         printf("Not connected.\n");
         return;
     }
 
-    ret = bt_a2dp_set_conf(default_conn);
+    get_uint8_from_string(&argv[1], &acp_seid);
+    ret = bt_a2dp_set_conf(default_conn,acp_seid);
     if(ret) {
-        printf("A2dp start discovery successfully.\n");
+        printf("A2dp set conf successfully.\n");
     } else {
-        printf("A2dp start discovery fail. ret(%d)\n",ret);
+        printf("A2dp set conf fail. ret(%d)\n",ret);
     }
 }
 
@@ -660,9 +660,9 @@ static void a2dp_close_stream(char *p_write_buffer, int write_buffer_len, int ar
 
     ret = bt_a2dp_close_stream(default_conn);
     if(ret) {
-        printf("A2dp disconnect successfully.\n");
+        printf("A2dp close stream successfully.\n");
     } else {
-        printf("A2dp disconnect fail. ret(%d)\n",ret);
+        printf("A2dp close stream. ret(%d)\n",ret);
     }
 }
 
@@ -677,9 +677,9 @@ static void a2dp_open_stream(char *p_write_buffer, int write_buffer_len, int arg
 
     ret = bt_a2dp_open_stream(default_conn);
     if(ret) {
-        printf("A2dp disconnect successfully.\n");
+        printf("A2dp open stream successfully.\n");
     } else {
-        printf("A2dp disconnect fail. ret(%d)\n",ret);
+        printf("A2dp open stream  fail. ret(%d)\n",ret);
     }
 }
 
@@ -694,9 +694,9 @@ static void a2dp_start_stream(char *p_write_buffer, int write_buffer_len, int ar
 
     ret = bt_a2dp_start_stream(default_conn);
     if(ret) {
-        printf("A2dp disconnect successfully.\n");
+        printf("A2dp start stream successfully.\n");
     } else {
-        printf("A2dp disconnect fail. ret(%d)\n",ret);
+        printf("A2dp start stream fail. ret(%d)\n",ret);
     }
 }
 
@@ -711,9 +711,9 @@ static void a2dp_suspend_stream(char *p_write_buffer, int write_buffer_len, int 
 
     ret = bt_a2dp_suspend_stream(default_conn);
     if(ret) {
-        printf("A2dp disconnect successfully.\n");
+        printf("A2dp suspend stream successfully.\n");
     } else {
-        printf("A2dp disconnect fail. ret(%d)\n",ret);
+        printf("A2dp suspend stream fail. ret(%d)\n",ret);
     }
 }
 
@@ -728,9 +728,9 @@ static void a2dp_delay_report(char *p_write_buffer, int write_buffer_len, int ar
 
     ret = bt_a2dp_delay_report(default_conn);
     if(ret) {
-        printf("A2dp disconnect successfully.\n");
+        printf("A2dp set delay report successfully.\n");
     } else {
-        printf("A2dp disconnect fail. ret(%d)\n",ret);
+        printf("A2dp set delay report fail. ret(%d)\n",ret);
     }
 }
 

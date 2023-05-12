@@ -51,8 +51,8 @@ Link::Link(Instance &aInstance)
     , mRxChannel(0)
     , mPanId(Mac::kPanIdBroadcast)
     , mTxPacketNumber(0)
-    , mTxTasklet(aInstance, HandleTxTasklet)
-    , mTimer(aInstance, HandleTimer)
+    , mTxTasklet(aInstance)
+    , mTimer(aInstance)
     , mInterface(aInstance)
 {
     memset(&mTxFrame, 0, sizeof(mTxFrame));
@@ -114,11 +114,6 @@ void Link::Send(void)
 
     SetState(kStateTransmit);
     mTxTasklet.Post();
-}
-
-void Link::HandleTxTasklet(Tasklet &aTasklet)
-{
-    aTasklet.Get<Link>().HandleTxTasklet();
 }
 
 void Link::HandleTxTasklet(void)
@@ -245,7 +240,7 @@ void Link::BeginTransmit(void)
         mRxFrame.mRadioType = Mac::kRadioTypeTrel;
 #endif
         mRxFrame.mInfo.mRxInfo.mTimestamp             = 0;
-        mRxFrame.mInfo.mRxInfo.mRssi                  = OT_RADIO_RSSI_INVALID;
+        mRxFrame.mInfo.mRxInfo.mRssi                  = Radio::kInvalidRssi;
         mRxFrame.mInfo.mRxInfo.mLqi                   = OT_RADIO_LQI_NONE;
         mRxFrame.mInfo.mRxInfo.mAckedWithFramePending = false;
 
@@ -264,11 +259,6 @@ void Link::InvokeSendDone(Error aError, Mac::RxFrame *aAckFrame)
 
     Get<Mac::Mac>().RecordFrameTransmitStatus(mTxFrame, aAckFrame, aError, /* aRetryCount */ 0, /* aWillRetx */ false);
     Get<Mac::Mac>().HandleTransmitDone(mTxFrame, aAckFrame, aError);
-}
-
-void Link::HandleTimer(Timer &aTimer)
-{
-    aTimer.Get<Link>().HandleTimer();
 }
 
 void Link::HandleTimer(void)

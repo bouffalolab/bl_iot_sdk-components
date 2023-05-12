@@ -294,7 +294,7 @@ void TestArrayCopyAndFindMatching(void)
     {
         Entry *match;
 
-        printf("- Name:%-3s Year:%d\r\n", entry.mName, entry.mYear);
+        printf("- Name:%-3s Year:%d\n", entry.mName, entry.mYear);
 
         match = array2.FindMatching(entry.mName);
         VerifyOrQuit(match != nullptr);
@@ -340,14 +340,14 @@ void TestArrayCopyAndFindMatching(void)
         array2 = array1;
         array2.RemoveMatching(entryToRemove.mName);
 
-        printf("\r\n- - - - - - - - - - - - - - - - - - - - - - - - ");
-        printf("\r\nArray after `RemoveMatching()` on entry %s\r\n", entryToRemove.mName);
+        printf("\n- - - - - - - - - - - - - - - - - - - - - - - - ");
+        printf("\nArray after `RemoveMatching()` on entry %s\n", entryToRemove.mName);
 
         VerifyOrQuit(array2.GetLength() == array1.GetLength() - 1);
 
         for (const Entry &entry : array2)
         {
-            printf("- Name:%-3s Year:%d\r\n", entry.mName, entry.mYear);
+            printf("- Name:%-3s Year:%d\n", entry.mName, entry.mYear);
             VerifyOrQuit(entry != entryToRemove);
             VerifyOrQuit(array1.Contains(entry));
         }
@@ -382,13 +382,13 @@ void TestArrayCopyAndFindMatching(void)
 
             array3.RemoveAllMatching(matchMode);
 
-            printf("\r\nArray after `RemoveAllMatching(%s)\r\n", kMatchModeStrings[matchMode]);
+            printf("\nArray after `RemoveAllMatching(%s)\n", kMatchModeStrings[matchMode]);
 
             for (const Entry &entry : array3)
             {
                 VerifyOrQuit(!entry.Matches(matchMode));
                 VerifyOrQuit(array2.Contains(entry));
-                printf("- Name:%-3s Year:%d\r\n", entry.mName, entry.mYear);
+                printf("- Name:%-3s Year:%d\n", entry.mName, entry.mYear);
             }
 
             for (const Entry &entry : array2)
@@ -404,7 +404,7 @@ void TestArrayCopyAndFindMatching(void)
         }
     }
 
-    printf("\r\n");
+    printf("\n");
 }
 
 void TestArrayIndexType(void)
@@ -420,12 +420,12 @@ void TestArrayIndexType(void)
 
 } // namespace ot
 
-extern "C" int test_array(void)
+int main(void)
 {
     ot::TestArray();
     ot::TestArrayCopyAndFindMatching();
     ot::TestArrayIndexType();
 
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

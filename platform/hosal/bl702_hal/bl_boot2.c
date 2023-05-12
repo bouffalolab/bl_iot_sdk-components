@@ -53,6 +53,10 @@ PtTable_Error_Type PtTable_Update_Entry(const SPI_Flash_Cfg_Type *pFlashCfg,
     ptTable=&ptStuff->ptTable;
     ptEntries=ptStuff->ptEntries;
     
+    if(ptTable->entryCnt > PT_ENTRY_MAX){
+        return PT_ERROR_TABLE_NOT_VALID;
+    }
+    
     if(targetTableID==PT_TABLE_ID_INVALID){
         return PT_ERROR_TABLE_NOT_VALID;
     }

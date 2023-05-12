@@ -51,7 +51,7 @@ extern "C" {
     {                                                                                                           \
         if ((OT_FIRST_ARG(__VA_ARGS__)) != 0)                                                                   \
         {                                                                                                       \
-            fprintf(stderr, "\r\nFAILED %s:%d - SuccessOrQuit(%s)" OT_SECOND_ARG(__VA_ARGS__) "\r\n", __FUNCTION__, \
+            fprintf(stderr, "\nFAILED %s:%d - SuccessOrQuit(%s)" OT_SECOND_ARG(__VA_ARGS__) "\n", __FUNCTION__, \
                     __LINE__, _Stringize(OT_FIRST_ARG(__VA_ARGS__)));                                           \
             exit(-1);                                                                                           \
         }                                                                                                       \
@@ -65,23 +65,14 @@ extern "C" {
  * @param[in]  aMessage    An optional message (constant C string) to print on failure.
  *
  */
-#if defined BL702
-extern void vAssertCalled(void);
-#elif defined BL702L
-#ifdef __cplusplus
-extern "C" void (*vAssertCalled)( void );
-#else
-extern void (*vAssertCalled)( void );
-#endif
-#endif
 #define VerifyOrQuit(...)                                                                                       \
     do                                                                                                          \
     {                                                                                                           \
         if (!(OT_FIRST_ARG(__VA_ARGS__)))                                                                       \
         {                                                                                                       \
-            printf("\r\nFAILED %s:%d - VerifyOrQuit(%s) " OT_SECOND_ARG(__VA_ARGS__) "\r\n", __FUNCTION__, \
+            fprintf(stderr, "\nFAILED %s:%d - VerifyOrQuit(%s) " OT_SECOND_ARG(__VA_ARGS__) "\n", __FUNCTION__, \
                     __LINE__, _Stringize(OT_FIRST_ARG(__VA_ARGS__)));                                           \
-                    vAssertCalled();                                                                                           \
+            exit(-1);                                                                                           \
         }                                                                                                       \
     } while (false)
 

@@ -108,8 +108,6 @@ class SubMac : public InstanceLocator, private NonCopyable
     friend class LinkRaw;
 
 public:
-    static constexpr int8_t kInvalidRssiValue = 127; ///< Invalid Received Signal Strength Indicator (RSSI) value.
-
     /**
      * This class defines the callbacks notifying `SubMac` user of changes and events.
      *
@@ -189,7 +187,7 @@ public:
         /**
          * This method notifies user of `SubMac` that energy scan is complete.
          *
-         * @param[in]  aMaxRssi  Maximum RSSI seen on the channel, or `SubMac::kInvalidRssiValue` if failed.
+         * @param[in]  aMaxRssi  Maximum RSSI seen on the channel, or `Radio::kInvalidRssi` if failed.
          *
          */
         void EnergyScanDone(int8_t aMaxRssi);
@@ -367,7 +365,7 @@ public:
     /**
      * This method gets the most recent RSSI measurement.
      *
-     * @returns The RSSI in dBm when it is valid. `kInvalidRssiValue` when RSSI is invalid.
+     * @returns The RSSI in dBm when it is valid. `Radio::kInvalidRssi` when RSSI is invalid.
      *
      */
     int8_t GetRssi(void) const;
@@ -392,7 +390,7 @@ public:
      * @returns The noise floor value in dBm.
      *
      */
-    int8_t GetNoiseFloor(void);
+    int8_t GetNoiseFloor(void) const;
 
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
     /**
@@ -418,36 +416,20 @@ public:
     void CslSample(void);
 
     /**
-     * This method returns CSL parent clock accuracy, in ± ppm.
+     * This method returns parent CSL accuracy (clock accuracy and uncertainty).
      *
-     * @retval CSL parent clock accuracy.
+     * @returns The parent CSL accuracy.
      *
      */
-    uint8_t GetCslParentClockAccuracy(void) const { return mCslParentAccuracy; }
+    const CslAccuracy &GetCslParentAccuracy(void) const { return mCslParentAccuracy; }
 
     /**
-     * This method sets CSL parent clock accuracy, in ± ppm.
+     * This method sets parent CSL accuracy.
      *
-     * @param[in] aCslParentAccuracy CSL parent clock accuracy, in ± ppm.
-     *
-     */
-    void SetCslParentClockAccuracy(uint8_t aCslParentAccuracy) { mCslParentAccuracy = aCslParentAccuracy; }
-
-    /**
-     * This method sets CSL parent uncertainty, in ±10 us units.
-     *
-     * @retval CSL parent uncertainty, in ±10 us units.
+     * @param[in] aCslAccuracy  The parent CSL accuracy.
      *
      */
-    uint8_t GetCslParentUncertainty(void) const { return mCslParentUncert; }
-
-    /**
-     * This method returns CSL parent uncertainty, in ±10 us units.
-     *
-     * @param[in] aCslParentUncert  CSL parent uncertainty, in ±10 us units.
-     *
-     */
-    void SetCslParentUncertainty(uint8_t aCslParentUncert) { mCslParentUncert = aCslParentUncert; }
+    void SetCslParentAccuracy(const CslAccuracy &aCslAccuracy) { mCslParentAccuracy = aCslAccuracy; }
 
 #endif // OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
 
@@ -620,12 +602,17 @@ private:
     void HandleTransmitDone(TxFrame &aFrame, RxFrame *aAckFrame, Error aError);
     void SignalFrameCounterUsedOnTxDone(const TxFrame &aFrame);
     void HandleEnergyScanDone(int8_t aMaxRssi);
-
-    static void HandleTimer(Timer &aTimer);
-    void        HandleTimer(void);
+    void HandleTimer(void);
 
     void               SetState(State aState);
     static const char *StateToString(State aState);
+
+    using SubMacTimer =
+#if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
+        TimerMicroIn<SubMac, &SubMac::HandleTimer>;
+#else
+        TimerMilliIn<SubMac, &SubMac::HandleTimer>;
+#endif
 
     otRadioCaps  mRadioCaps;
     State        mState;
@@ -651,22 +638,18 @@ private:
 #if OPENTHREAD_CONFIG_MAC_ADD_DELAY_ON_NO_ACK_ERROR_BEFORE_RETRY
     uint8_t mRetxDelayBackOffExponent;
 #endif
-#if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
-    TimerMicro mTimer;
-#else
-    TimerMilli                mTimer;
-#endif
+    SubMacTimer mTimer;
 
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
     uint16_t mCslPeriod;      // The CSL sample period, in units of 10 symbols (160 microseconds).
     uint8_t  mCslChannel : 7; // The CSL sample channel.
     bool mIsCslSampling : 1;  // Indicates that the radio is receiving in CSL state for platforms not supporting delayed
                               // reception.
-    TimeMicro  mCslSampleTime;     // The CSL sample time of the current period.
-    TimeMicro  mCslLastSync;       // The timestamp of the last successful CSL synchronization.
-    uint8_t    mCslParentAccuracy; // Drift of timer used for scheduling CSL tx by the parent, in ± ppm.
-    uint8_t    mCslParentUncert;   // Uncertainty of the scheduling CSL of tx by the parent, in ±10 us units.
-    TimerMicro mCslTimer;
+    uint16_t    mCslPeerShort;      // The CSL peer short address.
+    TimeMicro   mCslSampleTime;     // The CSL sample time of the current period.
+    TimeMicro   mCslLastSync;       // The timestamp of the last successful CSL synchronization.
+    CslAccuracy mCslParentAccuracy; // The parent's CSL accuracy (clock accuracy and uncertainty).
+    TimerMicro  mCslTimer;
 #endif
 };
 

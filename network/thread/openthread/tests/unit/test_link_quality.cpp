@@ -31,6 +31,7 @@
 
 #include "common/array.hpp"
 #include "common/code_utils.hpp"
+#include "thread/link_metrics.hpp"
 #include "thread/link_quality.hpp"
 
 namespace ot {
@@ -69,7 +70,7 @@ int8_t sNoiseFloor = -100; // dBm
 // Check and verify the raw average RSS value to match the value from GetAverage().
 void VerifyRawRssValue(int8_t aAverage, uint16_t aRawValue)
 {
-    if (aAverage != OT_RADIO_RSSI_INVALID)
+    if (aAverage != Radio::kInvalidRssi)
     {
         VerifyOrQuit(aAverage == -static_cast<int16_t>((aRawValue + (kRawAverageMultiple / 2)) >> kRawAverageBitShift),
                      "Raw value does not match the average.");
@@ -83,7 +84,7 @@ void VerifyRawRssValue(int8_t aAverage, uint16_t aRawValue)
 // This function prints the values in the passed in link info instance. It is invoked as the final step in test-case.
 void PrintOutcome(LinkQualityInfo &aLinkInfo)
 {
-    printf("%s -> PASS \r\n", aLinkInfo.ToInfoString().AsCString());
+    printf("%s -> PASS \n", aLinkInfo.ToInfoString().AsCString());
 }
 
 void TestLinkQualityData(RssTestData aRssData)
@@ -96,7 +97,7 @@ void TestLinkQualityData(RssTestData aRssData)
     VerifyOrQuit(sInstance != nullptr);
     linkInfo.Init(*sInstance);
 
-    printf("- - - - - - - - - - - - - - - - - -\r\n");
+    printf("- - - - - - - - - - - - - - - - - -\n");
     linkInfo.Clear();
     min = kMinRssValue;
     max = kMaxRssValue;
@@ -125,7 +126,7 @@ void VerifyRawRssValue(RssAverager &aRssAverager)
     int8_t   average  = aRssAverager.GetAverage();
     uint16_t rawValue = aRssAverager.GetRaw();
 
-    if (average != OT_RADIO_RSSI_INVALID)
+    if (average != Radio::kInvalidRssi)
     {
         VerifyOrQuit(average == -static_cast<int16_t>((rawValue + (kRawAverageMultiple / 2)) >> kRawAverageBitShift),
                      "Raw value does not match the average.");
@@ -139,7 +140,7 @@ void VerifyRawRssValue(RssAverager &aRssAverager)
 // This function prints the values in the passed link info instance. It is invoked as the final step in test-case.
 void PrintOutcome(RssAverager &aRssAverager)
 {
-    printf("%s -> PASS\r\n", aRssAverager.ToString().AsCString());
+    printf("%s -> PASS\n", aRssAverager.ToString().AsCString());
 }
 
 int8_t GetRandomRss(void)
@@ -164,8 +165,8 @@ void TestRssAveraging(void)
 
     rssAverager.Clear();
 
-    printf("\r\nAfter Clear: ");
-    VerifyOrQuit(rssAverager.GetAverage() == OT_RADIO_RSSI_INVALID, "Initial value from GetAverage() is incorrect.");
+    printf("\nAfter Clear: ");
+    VerifyOrQuit(rssAverager.GetAverage() == Radio::kInvalidRssi, "Initial value from GetAverage() is incorrect.");
     VerifyRawRssValue(rssAverager);
     PrintOutcome(rssAverager);
 
@@ -183,14 +184,14 @@ void TestRssAveraging(void)
 
     printf("Clear(): ");
     rssAverager.Clear();
-    VerifyOrQuit(rssAverager.GetAverage() == OT_RADIO_RSSI_INVALID, "GetAverage() after Clear() is incorrect.");
+    VerifyOrQuit(rssAverager.GetAverage() == Radio::kInvalidRssi, "GetAverage() after Clear() is incorrect.");
     VerifyRawRssValue(rssAverager);
     PrintOutcome(rssAverager);
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Adding the same value many times.
 
-    printf("- - - - - - - - - - - - - - - - - -\r\n");
+    printf("- - - - - - - - - - - - - - - - - -\n");
 
     for (j = 0; j < sizeof(rssValues); j++)
     {
@@ -211,7 +212,7 @@ void TestRssAveraging(void)
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Adding two RSS values:
 
-    printf("- - - - - - - - - - - - - - - - - -\r\n");
+    printf("- - - - - - - - - - - - - - - - - -\n");
 
     for (j = 0; j < sizeof(rssValues); j++)
     {
@@ -238,7 +239,7 @@ void TestRssAveraging(void)
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Adding one value many times and a different value once:
 
-    printf("- - - - - - - - - - - - - - - - - -\r\n");
+    printf("- - - - - - - - - - - - - - - - - -\n");
 
     for (j = 0; j < sizeof(rssValues); j++)
     {
@@ -272,7 +273,7 @@ void TestRssAveraging(void)
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Adding two alternating values many times:
 
-    printf("- - - - - - - - - - - - - - - - - -\r\n");
+    printf("- - - - - - - - - - - - - - - - - -\n");
 
     for (j = 0; j < sizeof(rssValues); j++)
     {
@@ -309,7 +310,7 @@ void TestRssAveraging(void)
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // For the first 8 values the average should be the arithmetic mean.
 
-    printf("- - - - - - - - - - - - - - - - - -\r\n");
+    printf("- - - - - - - - - - - - - - - - - -\n");
 
     for (i = 0; i < 1000; i++)
     {
@@ -318,7 +319,7 @@ void TestRssAveraging(void)
         rssAverager.Clear();
         sum = 0;
 
-        printf("\r\n");
+        printf("\n");
 
         for (j = 1; j <= 8; j++)
         {
@@ -381,7 +382,7 @@ void TestSuccessRateTracker(void)
     const double   kMaxError      = 1.0; // Max permitted error in percentage
     const uint16_t kWeightLimit[] = {64, 128, 256, 300, 512, 810, 900};
 
-    printf("\r\nTesting SuccessRateTracker\r\n");
+    printf("\nTesting SuccessRateTracker\n");
 
     rateTracker.Clear();
 
@@ -477,17 +478,68 @@ void TestSuccessRateTracker(void)
             }
         }
 
-        printf(" MaxDiff = %.3f%%-> PASS\r\n", maxDiff);
+        printf(" MaxDiff = %.3f%%-> PASS\n", maxDiff);
     }
 }
 
+#if OPENTHREAD_CONFIG_MLE_LINK_METRICS_INITIATOR_ENABLE || OPENTHREAD_CONFIG_MLE_LINK_METRICS_SUBJECT_ENABLE
+
+class UnitTester
+{
+public:
+    static void TestLinkMetricsScaling(void)
+    {
+        printf("\nTestLinkMetricsScaling\n");
+
+        // Test Link Margin scaling from [0,130] -> [0, 255]
+
+        for (uint8_t linkMargin = 0; linkMargin <= 130; linkMargin++)
+        {
+            double  scaled     = 255.0 / 130.0 * linkMargin;
+            uint8_t scaledAsU8 = static_cast<uint8_t>(scaled + 0.5);
+
+            printf("\nLinkMargin : %-3u -> Scaled : %.1f (rounded:%u)", linkMargin, scaled, scaledAsU8);
+
+            VerifyOrQuit(LinkMetrics::LinkMetrics::ScaleLinkMarginToRawValue(linkMargin) == scaledAsU8);
+            VerifyOrQuit(LinkMetrics::LinkMetrics::ScaleRawValueToLinkMargin(scaledAsU8) == linkMargin);
+        }
+
+        VerifyOrQuit(LinkMetrics::LinkMetrics::ScaleLinkMarginToRawValue(131) == 255);
+        VerifyOrQuit(LinkMetrics::LinkMetrics::ScaleLinkMarginToRawValue(150) == 255);
+        VerifyOrQuit(LinkMetrics::LinkMetrics::ScaleLinkMarginToRawValue(255) == 255);
+
+        // Test RSSI scaling from [-130, 0] -> [0, 255]
+
+        for (int8_t rssi = -128; rssi <= 0; rssi++)
+        {
+            double  scaled     = 255.0 / 130.0 * (rssi + 130.0);
+            uint8_t scaledAsU8 = static_cast<uint8_t>(scaled + 0.5);
+
+            printf("\nRSSI : %-3d -> Scaled :%.1f (rounded:%u)", rssi, scaled, scaledAsU8);
+
+            VerifyOrQuit(LinkMetrics::LinkMetrics::ScaleRssiToRawValue(rssi) == scaledAsU8);
+            VerifyOrQuit(LinkMetrics::LinkMetrics::ScaleRawValueToRssi(scaledAsU8) == rssi);
+        }
+
+        VerifyOrQuit(LinkMetrics::LinkMetrics::ScaleRssiToRawValue(1) == 255);
+        VerifyOrQuit(LinkMetrics::LinkMetrics::ScaleRssiToRawValue(10) == 255);
+        VerifyOrQuit(LinkMetrics::LinkMetrics::ScaleRssiToRawValue(127) == 255);
+    }
+};
+
+#endif
+
 } // namespace ot
 
-extern "C" int test_link_quality(void)
+int main(void)
 {
     ot::TestRssAveraging();
     ot::TestLinkQualityCalculations();
     ot::TestSuccessRateTracker();
-    printf("\r\nAll tests passed\r\n");
+#if OPENTHREAD_CONFIG_MLE_LINK_METRICS_INITIATOR_ENABLE || OPENTHREAD_CONFIG_MLE_LINK_METRICS_SUBJECT_ENABLE
+    ot::UnitTester::TestLinkMetricsScaling();
+#endif
+
+    printf("\nAll tests passed\n");
     return 0;
 }

@@ -89,9 +89,9 @@ void TestBinarySearch(void)
 
 } // namespace ot
 
-extern "C" int test_binary_search(void)
+int main(void)
 {
     ot::TestBinarySearch();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

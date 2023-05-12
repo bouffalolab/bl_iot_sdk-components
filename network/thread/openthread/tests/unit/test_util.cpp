@@ -41,7 +41,7 @@ void DumpBuffer(const char *aTextMessage, const uint8_t *aBuffer, uint16_t aBuff
     uint16_t counter;
     uint8_t  byte;
 
-    printf("\r\n%s - len = %u\r\n    ", aTextMessage ? aTextMessage : "Buffer", aBufferLength);
+    printf("\n%s - len = %u\n    ", aTextMessage ? aTextMessage : "Buffer", aBufferLength);
 
     counter = 0;
 
@@ -55,7 +55,7 @@ void DumpBuffer(const char *aTextMessage, const uint8_t *aBuffer, uint16_t aBuff
         if (counter == kBytesPerLine)
         {
             charBuff[counter] = 0;
-            printf("    %s\r\n    ", charBuff);
+            printf("    %s\n    ", charBuff);
             counter = 0;
         }
     }
@@ -67,5 +67,5 @@ void DumpBuffer(const char *aTextMessage, const uint8_t *aBuffer, uint16_t aBuff
         printf("   ");
     }
 
-    printf("    %s\r\n", charBuff);
+    printf("    %s\n", charBuff);
 }

@@ -827,7 +827,7 @@ int bl_hbn_enter(hbn_type_t *hbn, uint32_t *time)
     }
 
     cfg.sleepTime = (*time << 15) / 1000;  // ms -> rtc cycles
-    if ((!hbn->buf) || (hbn->buflen > 5)) {
+    if (hbn->buflen > 5) {
         printf("not support arg.\r\n");
         return -1;
     }

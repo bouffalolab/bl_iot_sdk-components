@@ -62,7 +62,7 @@ void VerifyParser(const TestCase<ValueType> *aTestCases, const char *aParserName
     ValueType                  value;
     otError                    error;
 
-    printf("----------------------------------------------------------\r\n");
+    printf("----------------------------------------------------------\n");
 
     while (true)
     {
@@ -77,7 +77,7 @@ void VerifyParser(const TestCase<ValueType> *aTestCases, const char *aParserName
             printf(aPrintFormat, testCase->mValue);
         }
 
-        printf("\r\n");
+        printf("\n");
 
         error = Parser(testCase->mString, value);
 
@@ -290,7 +290,7 @@ void TestParsingHexStrings(void)
 
     // Verify `ParseAsHexString(const char *aString, uint16_t &aSize, uint8_t *aBuffer)`
 
-    printf("----------------------------------------------------------\r\n");
+    printf("----------------------------------------------------------\n");
     len = sizeof(buffer);
 
     SuccessOrQuit(ParseAsHexString(kEvenHexString, len, buffer));
@@ -305,7 +305,7 @@ void TestParsingHexStrings(void)
 
     // Verify `ParseAsHexStringSegement()`
 
-    printf("----------------------------------------------------------\r\n");
+    printf("----------------------------------------------------------\n");
 
     for (uint8_t testIter = 0; testIter <= 1; testIter++)
     {
@@ -347,16 +347,16 @@ void TestParsingHexStrings(void)
                 bufPtr += len;
             }
 
-            printf("\r\n");
+            printf("\n");
         }
     }
 }
 
-extern "C" int test_cmd_line_parser(void)
+int main(void)
 {
     TestParsingInts();
     TestParsingHexStrings();
 
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

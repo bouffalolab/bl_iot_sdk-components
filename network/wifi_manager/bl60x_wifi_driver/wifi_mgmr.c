@@ -195,24 +195,13 @@ int wifi_mgmr_scan_beacon_save( wifi_mgmr_scan_item_t *scan )
 {
 #define SCAN_UPDATE_LIMIT_TIME_MS (3000)
 
-    int i, empty = -1, oldest = -1, ret = 0;
-    uint32_t lastseen = 0xFFFFFFFF;
+    int i, j, pos_empty = -1, ret = 0, flag = 0;
+    uint32_t oldest = 0xFFFFFFFF;
     uint32_t counter = 0;
-    uint32_t lastseen_found = 0;
-
-#ifdef DEBUG_SCAN_BEACON
-    bl_os_printf(DEBUG_HEADER "channel %02u, bssid %02X:%02X:%02X:%02X:%02X:%02X, rssi %3d, ppm %d:%d, auth %s, cipher:%s, group_cipher:%s \t, SSID %s\r\n",
-            scan->channel,
-            MAC_ADDR_LIST(scan->bssid),
-            scan->rssi,
-            scan->ppm_abs,
-            scan->ppm_rel,
-            wifi_mgmr_auth_to_str(scan->auth),
-            wifi_mgmr_cipher_to_str(scan->cipher),
-            wifi_mgmr_cipher_to_str(scan->group_cipher),
-            scan->ssid
-    );
-#endif
+    int8_t lowest_rssi = 0, pos_rssi = -1;
+    int8_t pos_oldest = -1;
+    int8_t pos_same_ssid = -1;
+    wifi_mgmr_scan_item_t tmp_item;
 
     bl_os_mutex_lock(wifiMgmr.scan_items_lock);
     if (scan->channel > wifiMgmr.channel_nums || !scan->channel){
@@ -223,74 +212,109 @@ int wifi_mgmr_scan_beacon_save( wifi_mgmr_scan_item_t *scan )
         ret = -1;
         goto __exit;
     }
-
     /*update scan_items, we just store the newly found item, or update exsiting one*/
     counter = bl_os_get_time_ms();
     for (i = 0; i < sizeof(wifiMgmr.scan_items)/sizeof(wifiMgmr.scan_items[0]); i++) {
         if(wifiMgmr.scan_items[i].channel > wifiMgmr.channel_nums){
             memset(&wifiMgmr.scan_items[i], 0, sizeof(wifi_mgmr_scan_item_t));
-            wifiMgmr.scan_items[i].is_used = 0;
         }
 
-        if (wifiMgmr.scan_items[i].is_used) {
-            /*track the oldest scan_item*/
-            if ((0 == lastseen_found) ||
-                ((int32_t)wifiMgmr.scan_items[i].timestamp_lastseen - (int32_t)lastseen < 0)) {
-                lastseen_found = 1;
-                lastseen = wifiMgmr.scan_items[i].timestamp_lastseen;
-                oldest = i;
-            }
+        if(0 == wifiMgmr.scan_items[i].is_used) {
+            pos_empty = i;
+            continue;
+        }
 
-            /*bssid and ssid must be the same at the same time*/
-            if (0 == memcmp(wifiMgmr.scan_items[i].bssid, scan->bssid, sizeof(scan->bssid)) &&
-                    0 == strcmp(scan->ssid, wifiMgmr.scan_items[i].ssid)) {
+        /* delete old item */
+        if(counter - wifiMgmr.scan_items[i].timestamp_lastseen > SCAN_UPDATE_LIMIT_TIME_MS) {
+            // printf("ssid:%s rssi:%d is old\r\n",wifiMgmr.scan_items[i].ssid,wifiMgmr.scan_items[i].rssi);
+            memset(&wifiMgmr.scan_items[i], 0, sizeof(wifi_mgmr_scan_item_t));
+            pos_empty = i;
+            continue;
+        }
 
-                /*exactly the same scan item found*/
-                if ((scan->rssi < wifiMgmr.scan_items[i].rssi) &&
-                    ((int32_t)bl_os_get_time_ms() - (int32_t)wifiMgmr.scan_items[i].timestamp_lastseen < SCAN_UPDATE_LIMIT_TIME_MS)) {
+        if(0 == flag) {
+            lowest_rssi = wifiMgmr.scan_items[i].rssi;
+            pos_rssi = i;
+            oldest = wifiMgmr.scan_items[i].timestamp_lastseen;
+            pos_oldest = i;
+            flag = 1;
+        }
 
-                    bl_os_log_debug("skip update %s with rssi %d\r\n", scan->ssid, scan->rssi);
+        /* find the weakest rssi. If rssi is samed, update to the older position */
+        if(lowest_rssi > wifiMgmr.scan_items[i].rssi) {
+            lowest_rssi = wifiMgmr.scan_items[i].rssi;
+            pos_rssi = i; 
+        }else if(lowest_rssi == wifiMgmr.scan_items[i].rssi && wifiMgmr.scan_items[i].timestamp_lastseen < wifiMgmr.scan_items[pos_rssi].timestamp_lastseen) {
+            pos_rssi = i;
+        }
 
-                } else {
-
-                    wifiMgmr.scan_items[i].channel = scan->channel;
-                    wifiMgmr.scan_items[i].rssi = scan->rssi;
-                    wifiMgmr.scan_items[i].ppm_abs = scan->ppm_abs;
-                    wifiMgmr.scan_items[i].ppm_rel = scan->ppm_rel;
-                    wifiMgmr.scan_items[i].timestamp_lastseen = counter;
-                    wifiMgmr.scan_items[i].auth = scan->auth;
-                    wifiMgmr.scan_items[i].cipher = scan->cipher;
-                    wifiMgmr.scan_items[i].wps = scan->wps;
-                    wifiMgmr.scan_items[i].mode = scan->mode;
-                    wifiMgmr.scan_items[i].group_cipher = scan->group_cipher;
-                }
-                break;
-            }
-        } else {
-            empty  = i;
+        if (0 == memcmp(wifiMgmr.scan_items[i].bssid, scan->bssid, sizeof(scan->bssid)) && 0 == strcmp(scan->ssid, wifiMgmr.scan_items[i].ssid)) {
+            pos_same_ssid = i;
         }
     }
+
     if (i == sizeof(wifiMgmr.scan_items)/sizeof(wifiMgmr.scan_items[0])) {
-        /*no valid item found in database, so try to store this newly found*/
-        i = (-1 != empty) ? empty : oldest;
-        if (-1 != i) {
-            memset(&wifiMgmr.scan_items[i], 0, sizeof(wifiMgmr.scan_items[0]));
-            strncpy(wifiMgmr.scan_items[i].ssid, scan->ssid, sizeof(wifiMgmr.scan_items[0].ssid));
-            wifiMgmr.scan_items[i].ssid_tail[0] = '\0';
-            wifiMgmr.scan_items[i].ssid_len = strlen(wifiMgmr.scan_items[i].ssid);
-            memcpy(wifiMgmr.scan_items[i].bssid, scan->bssid, sizeof(wifiMgmr.scan_items[i].bssid));
-            wifiMgmr.scan_items[i].channel = scan->channel;
-            wifiMgmr.scan_items[i].rssi = scan->rssi;
-            wifiMgmr.scan_items[i].timestamp_lastseen = counter;
-            wifiMgmr.scan_items[i].auth = scan->auth;
-            wifiMgmr.scan_items[i].cipher = scan->cipher;
-            wifiMgmr.scan_items[i].wps = scan->wps;
-            wifiMgmr.scan_items[i].mode = scan->mode;
-            wifiMgmr.scan_items[i].group_cipher = scan->group_cipher;
-            wifiMgmr.scan_items[i].is_used = 1;
+        /* The oldest item is deleted if exist. Just need update the same ssid */
+        if(-1 != pos_same_ssid) {
+            if(scan->rssi >= wifiMgmr.scan_items[pos_same_ssid].rssi){
+                wifiMgmr.scan_items[pos_same_ssid].channel = scan->channel;
+                wifiMgmr.scan_items[pos_same_ssid].rssi = scan->rssi;
+                wifiMgmr.scan_items[pos_same_ssid].ppm_abs = scan->ppm_abs;
+                wifiMgmr.scan_items[pos_same_ssid].ppm_rel = scan->ppm_rel;
+                wifiMgmr.scan_items[pos_same_ssid].timestamp_lastseen = counter;
+                wifiMgmr.scan_items[pos_same_ssid].auth = scan->auth;
+                wifiMgmr.scan_items[pos_same_ssid].cipher = scan->cipher;
+                wifiMgmr.scan_items[pos_same_ssid].wps = scan->wps;
+                wifiMgmr.scan_items[pos_same_ssid].mode = scan->mode;
+            }
+        }else {
+            /* find empty item */
+            if(-1 != pos_empty) {
+                memset(&wifiMgmr.scan_items[pos_empty], 0, sizeof(wifiMgmr.scan_items[0]));
+                strncpy(wifiMgmr.scan_items[pos_empty].ssid, scan->ssid, sizeof(wifiMgmr.scan_items[0].ssid));
+                wifiMgmr.scan_items[pos_empty].ssid_tail[0] = '\0';
+                wifiMgmr.scan_items[pos_empty].ssid_len = strlen(wifiMgmr.scan_items[pos_empty].ssid);
+                memcpy(wifiMgmr.scan_items[pos_empty].bssid, scan->bssid, sizeof(wifiMgmr.scan_items[pos_empty].bssid));
+                wifiMgmr.scan_items[pos_empty].channel = scan->channel;
+                wifiMgmr.scan_items[pos_empty].rssi = scan->rssi;
+                wifiMgmr.scan_items[pos_empty].timestamp_lastseen = counter;
+                wifiMgmr.scan_items[pos_empty].auth = scan->auth;
+                wifiMgmr.scan_items[pos_empty].cipher = scan->cipher;
+                wifiMgmr.scan_items[pos_empty].wps = scan->wps;
+                wifiMgmr.scan_items[pos_empty].mode = scan->mode;
+                wifiMgmr.scan_items[pos_empty].is_used = 1;
+            }else {
+                /* if no empty item, copy to low rssi item */
+                if(scan->rssi > lowest_rssi) {
+                    memset(&wifiMgmr.scan_items[pos_rssi], 0, sizeof(wifiMgmr.scan_items[0]));
+                    strncpy(wifiMgmr.scan_items[pos_rssi].ssid, scan->ssid, sizeof(wifiMgmr.scan_items[0].ssid));
+                    wifiMgmr.scan_items[pos_rssi].ssid_tail[0] = '\0';
+                    wifiMgmr.scan_items[pos_rssi].ssid_len = strlen(wifiMgmr.scan_items[pos_rssi].ssid);
+                    memcpy(wifiMgmr.scan_items[pos_rssi].bssid, scan->bssid, sizeof(wifiMgmr.scan_items[pos_rssi].bssid));
+                    wifiMgmr.scan_items[pos_rssi].channel = scan->channel;
+                    wifiMgmr.scan_items[pos_rssi].rssi = scan->rssi;
+                    wifiMgmr.scan_items[pos_rssi].timestamp_lastseen = counter;
+                    wifiMgmr.scan_items[pos_rssi].auth = scan->auth;
+                    wifiMgmr.scan_items[pos_rssi].cipher = scan->cipher;
+                    wifiMgmr.scan_items[pos_rssi].wps = scan->wps;
+                    wifiMgmr.scan_items[pos_rssi].mode = scan->mode;
+                    wifiMgmr.scan_items[pos_rssi].is_used = 1;
+                }
+            }
         }
     }
 
+    /* sort scan results according to rssi. The empty item placed in the end of the list*/
+    for(i = 0; i < WIFI_MGMR_SCAN_ITEMS_MAX - 1; ++i) {
+        for(j = 0; j < WIFI_MGMR_SCAN_ITEMS_MAX-i-1; ++j) {
+            if((wifiMgmr.scan_items[j].rssi < wifiMgmr.scan_items[j+1].rssi && wifiMgmr.scan_items[j+1].is_used)
+                    || ((!wifiMgmr.scan_items[j].is_used) && (wifiMgmr.scan_items[j+1].is_used))) {
+                memcpy(&tmp_item, &wifiMgmr.scan_items[j], sizeof(wifi_mgmr_scan_item_t));
+                memcpy(&wifiMgmr.scan_items[j], &wifiMgmr.scan_items[j+1], sizeof(wifi_mgmr_scan_item_t));
+                memcpy(&wifiMgmr.scan_items[j+1], &tmp_item, sizeof(wifi_mgmr_scan_item_t));
+            }
+        }
+    }
 __exit:
     bl_os_mutex_unlock(wifiMgmr.scan_items_lock);
 
@@ -353,14 +377,22 @@ static bool stateGlobalGuard_fw_disconnect(void *ch, struct event *event)
 static bool stateGlobalGuard_fw_powersaving(void *ch, struct event *event)
 {
     wifi_mgmr_msg_t *msg;
+    int mode, ret = -1;
 
     msg = event->data;
     if (WIFI_MGMR_EVENT_FW_POWERSAVING == msg->ev) {
         bl_os_printf("------>>>>>> Powersaving CMD, mode: %u\r\n", (unsigned int)msg->data1);
-//TODO mode check?
-        bl_main_powersaving((int)msg->data1);
+        mode = (int)msg->data1;
+        if (mode >= PS_MODE_OFF && mode <= PS_MODE_ON_DYN) {
+            if ((mode == PS_MODE_OFF) || ((mode > PS_MODE_OFF) && bl_main_sta_is_connected()))
+            if (!bl_main_powersaving(mode)) {
+                ret = 0;
+            }
+        }
     }
 
+    aos_post_event(EV_WIFI, CODE_WIFI_ON_SET_PS_DONE, (ret==0)?WIFI_PS_SET_DONE_EVENT_OK:
+                                                               WIFI_PS_SET_DONE_EVENT_FAIL);
     return false;
 }
 
@@ -381,6 +413,7 @@ static bool stateGlobalGuard_fw_scan(void *ch, struct event *event)
         return false;
     }
 
+#ifndef CFG_NETBUS_WIFI_ENABLE
     /*pending wifi scan command*/
     if (&stateConnecting == wifiMgmr.m.currentState ||
             &stateConnectedIPNo == wifiMgmr.m.currentState ||
@@ -390,6 +423,7 @@ static bool stateGlobalGuard_fw_scan(void *ch, struct event *event)
             _pending_task_set_safely(WIFI_MGMR_PENDING_TASK_SCAN_BIT);
             return false;
     }
+#endif
 
     ch_req = (wifi_mgmr_scan_params_t *)msg->data;
     channel_num = ch_req->channel_num;
@@ -407,7 +441,7 @@ static bool stateGlobalGuard_fw_scan(void *ch, struct event *event)
     }
 #endif
 
-
+#ifndef CFG_NETBUS_WIFI_ENABLE
     /*Forbidden other cases*/
     if (&stateIdle != wifiMgmr.m.currentState &&
             &stateConnectedIPYes != wifiMgmr.m.currentState &&
@@ -416,6 +450,7 @@ static bool stateGlobalGuard_fw_scan(void *ch, struct event *event)
             aos_post_event(EV_WIFI, CODE_WIFI_ON_SCAN_DONE, WIFI_SCAN_DONE_EVENT_BUSY);
             return false;
     }
+#endif
 
     if (channel_num) {
         bl_os_printf("------>>>>>> Scan CMD fixed channels_num:%u\r\n", channel_num);
@@ -1209,10 +1244,10 @@ static void stateConnectedIPYes_action( void *oldStateData, struct event *event,
 static void stateConnectedIPYes_enter( void *stateData, struct event *event )
 {
     // XXX: tell FW GOT IP
-    uint32_t trigger_flag = 0;
-    bl_main_cfg_task_req(CFG_ELEMENT_TYPE_OPS_SET, TASK_SM,
-                         TASK_SM_CFG_RECONNECT_TRIGGER_FLAG,
-                         CFG_ELEMENT_TYPE_UINT32, &trigger_flag, NULL);
+    // uint32_t trigger_flag = 0;
+    // bl_main_cfg_task_req(CFG_ELEMENT_TYPE_OPS_SET, TASK_SM,
+    //                      TASK_SM_CFG_RECONNECT_TRIGGER_FLAG,
+    //                      CFG_ELEMENT_TYPE_UINT32, &trigger_flag, NULL);
 
     if (_pending_task_is_set(WIFI_MGMR_PENDING_TASK_CONNECT_BIT)) {
         //disconnect, not need to clear pending
@@ -1320,10 +1355,10 @@ static void stateDisconnect_action_reconnect( void *oldStateData, struct event *
     dump_connect_param(profile_msg, band, freq, bssid ? bssid : null_bssid);
 
     // XXX: tell FW reconnect happening
-    uint32_t trigger_flag = 1;
-    bl_main_cfg_task_req(CFG_ELEMENT_TYPE_OPS_SET, TASK_SM,
-                         TASK_SM_CFG_RECONNECT_TRIGGER_FLAG,
-                         CFG_ELEMENT_TYPE_UINT32, &trigger_flag, NULL);
+    // uint32_t trigger_flag = 1;
+    // bl_main_cfg_task_req(CFG_ELEMENT_TYPE_OPS_SET, TASK_SM,
+    //                      TASK_SM_CFG_RECONNECT_TRIGGER_FLAG,
+    //                      CFG_ELEMENT_TYPE_UINT32, &trigger_flag, NULL);
 
     //TODO Other security support
     bl_main_connect((const uint8_t *)profile_msg->ssid, profile_msg->ssid_len,
@@ -1780,3 +1815,7 @@ int wifi_mgmr_scan_complete_notify()
     return 0;
 }
 
+int wifi_mgmr_api_fw_powersaving_get(void)
+{
+    return bl_main_powersaving_get();
+}

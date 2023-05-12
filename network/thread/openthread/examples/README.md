@@ -12,7 +12,6 @@ This page lists the available common switches with description. Unless stated ot
 | BORDER_AGENT | OT_BORDER_AGENT | Enables support for border agent. In most cases, enable this switch if you are building On-mesh Commissioner or Border Router with External Commissioning support. |
 | BORDER_ROUTER | OT_BORDER_ROUTER | Enables support for Border Router. This switch is usually combined with the BORDER_AGENT and UDP_FORWARD (or PLATFORM_UDP in case of RCP design) switches to build Border Router device. |
 | BORDER_ROUTING | OT_BORDER_ROUTING | Enables bi-directional border routing between Thread and Infrastructure networks for Border Router. |
-| BORDER_ROUTING_NAT64 | OT_BORDER_ROUTING_NAT64 | Enables NAT64 border routing support for Border Router. |
 | BUILTIN_MBEDTLS_MANAGEMENT | OT_BUILTIN_MBEDTLS_MANAGEMENT | Enables the built-in mbedTLS management. Enable this switch if the external mbedTLS is used, but mbedTLS memory allocation and debug config should be managed internally by OpenThread. |
 | CHANNEL_MANAGER | OT_CHANNEL_MANAGER | Enables support for channel manager. Enable this switch on devices that are supposed to request a Thread network channel change. This switch should be used only with an FTD build. |
 | CHANNEL_MONITOR | OT_CHANNEL_MONITOR | Enables support for channel monitor. Enable this switch on devices that are supposed to determine the cleaner channels. |
@@ -54,6 +53,8 @@ This page lists the available common switches with description. Unless stated ot
 | MLR | OT_MLR | Enables Multicast Listener Registration feature for Thread 1.2. |
 | MTD_NETDIAG | OT_MTD_NETDIAG | Enables the TMF network diagnostics on MTDs. |
 | MULTIPLE_INSTANCE | OT_MULTIPLE_INSTANCE | Enables multiple OpenThread instances. |
+| NAT64_BORDER_ROUTING | OT_NAT64_BORDER_ROUTING | Enables NAT64 border routing support for Border Router. |
+| NAT64_TRANSLATOR | OT_NAT64_TRANSLATOR | Enables NAT64 translator for Border Router. |
 | NETDATA_PUBLISHER | OT_NETDATA_PUBLISHER | Enables support for Thread Network Data publisher. |
 | PING_SENDER | OT_PING_SENDER | Enables support for ping sender. |
 | OTNS | OT_OTNS | Enables support for [OpenThread Network Simulator](https://github.com/openthread/ot-ns). Enable this switch if you are building OpenThread for OpenThread Network Simulator. |
@@ -67,7 +68,7 @@ This page lists the available common switches with description. Unless stated ot
 | SRP_CLIENT | OT_SRP_CLIENT | Enable support for SRP client. |
 | SRP_SERVER | OT_SRP_SERVER | Enable support for SRP server. |
 | THREAD_VERSION | OT_THREAD_VERSION | Enables the chosen Thread version (1.1 / 1.2 (default)). For example, set to `1.1` for Thread 1.1. |
-| TIME_SYNC | OT_TIME_SYNC | Enables the time synchronization service feature. **Note: Enabling this feature breaks conformance to the Thread Specification.** |  |
+| TIME_SYNC | OT_TIME_SYNC | Enables the time synchronization service feature. **Note: Enabling this feature breaks conformance to the Thread Specification.** |
 | TREL | OT_TREL | Enables TREL radio link for Thread over Infrastructure feature. |
-| UDP_FORWARD | OT_UDP_FORWARD | Enables support for UDP forward. | Enable this switch on the Border Router device (running on the NCP design) with External Commissioning support to service Thread Commissioner packets on the NCP side. |
+| UDP_FORWARD | OT_UDP_FORWARD | Enables support for UDP forward. Enable this switch on the Border Router device (running on the NCP design) with External Commissioning support to service Thread Commissioner packets on the NCP side. |
 | UPTIME | OT_UPTIME | Enables support for tracking OpenThread instance's uptime. |

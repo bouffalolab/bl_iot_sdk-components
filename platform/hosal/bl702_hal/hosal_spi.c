@@ -113,6 +113,7 @@ static void spi_basic_init(hosal_spi_dev_t *arg)
         spicfg.clkPolarity = SPI_CLK_POLARITY_HIGH;
     } else {
         blog_error("node support polar_phase \r\n");
+        return;
     }
     SPI_Init(0,&spicfg);
 
@@ -148,6 +149,8 @@ static int lli_list_init(DMA_LLI_Ctrl_Type **pptxlli, DMA_LLI_Ctrl_Type **pprxll
     uint32_t remainder;
     struct DMA_Control_Reg dmactrl;
 
+    memset(&dmactrl, 0, sizeof(dmactrl));
+
     count = length / LLI_BUFF_SIZE;
     remainder = length % LLI_BUFF_SIZE;
 
@@ -174,7 +177,7 @@ static int lli_list_init(DMA_LLI_Ctrl_Type **pptxlli, DMA_LLI_Ctrl_Type **pprxll
     if (NULL != prx_data) {
         *pprxlli = pvPortMalloc(sizeof(DMA_LLI_Ctrl_Type) * count);
         if (*pprxlli == NULL) {
-            blog_error("malloc lli failed.");
+            blog_error("malloc lli failed. \r\n");
             vPortFree(*pptxlli);
             return -1;
         }
@@ -232,13 +235,14 @@ static int hosal_spi_dma_trans(hosal_spi_dev_t *arg, uint8_t *TxData, uint8_t *R
     DMA_LLI_Cfg_Type rxllicfg;
     DMA_LLI_Ctrl_Type *ptxlli = NULL;
     DMA_LLI_Ctrl_Type *prxlli = NULL;
-    spi_dma_priv_t *dma_arg = (spi_dma_priv_t*)arg->priv;
     int ret;
 
     if (!arg) {
         blog_error("arg err.\r\n");
         return -1;
     }
+
+    spi_dma_priv_t *dma_arg = (spi_dma_priv_t*)arg->priv;
 
     if (TxData) {
         if (dma_arg->tx_dma_ch == -1) {
@@ -615,7 +619,7 @@ int hosal_spi_send(hosal_spi_dev_t *spi, const uint8_t *data, uint16_t size, uin
 {
     int ret;
 
-    if (NULL == spi || data == NULL) {
+    if (NULL == spi) {
         log_error("not init.\r\n");
         return -1;
     }
@@ -635,7 +639,7 @@ int hosal_spi_recv(hosal_spi_dev_t *spi, uint8_t *data, uint16_t size, uint32_t 
 {
 	int ret;
 
-    if (NULL == spi || data == NULL) {
+    if (NULL == spi) {
         log_error("not init.\r\n");
         return -1;
     }

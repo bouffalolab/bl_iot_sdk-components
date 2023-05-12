@@ -129,7 +129,7 @@ static BL_Err_Type ATTR_TCM_SECTION flash_config_init(SPI_Flash_Cfg_Type *p_flas
     XIP_SFlash_State_Save(p_flash_cfg, &offset);
     flash_sf2_gpio_init();
     SFlash_GetJedecId(p_flash_cfg, (uint8_t *)&jid);
-    arch_memcpy(jedec_id, (uint8_t *)&jid, 3);
+    memcpy(jedec_id, (uint8_t *)&jid, 3);
     jid &= 0xFFFFFF;
     g_jedec_id = jid;
     ret = SF_Cfg_Get_Flash_Cfg_Need_Lock_Ext(jid, p_flash_cfg);
@@ -164,7 +164,7 @@ BL_Err_Type ATTR_TCM_SECTION flash_init(void)
     SF_Cfg_Get_Flash_Cfg_Need_Lock_Ext(0, &g_flash_cfg);
     L1C_Cache_Flush_Ext();
     cpu_global_irq_enable();
-    if (g_flash_cfg.mid != 0xff) {
+    if (g_flash_cfg.mid != 0xff && g_flash_cfg.mid != 0x00) {
         return SUCCESS;
     }
     clkDelay = g_flash_cfg.clkDelay;
@@ -201,7 +201,7 @@ BL_Err_Type ATTR_TCM_SECTION flash_read_jedec_id(uint8_t *data)
     XIP_SFlash_Opt_Exit();
     cpu_global_irq_enable();
     jid &= 0xFFFFFF;
-    arch_memcpy(data, (void *)&jid, 4);
+    memcpy(data, (void *)&jid, 4);
 
     return SUCCESS;
 }

@@ -861,6 +861,21 @@ int bt_br_write_local_name(char *name);
   * write extern inquiry response.
   */
 int bt_br_write_eir(u8_t fec, u8_t *data);
+/** Update a2dp status to controller.
+  *
+  * @param conHandle        connection handle
+  * @param status           current a2dp status(only a2dp stream start or suspend)
+    eg.
+        BT_A2DP_STREAM_START = 3,
+        BT_A2DP_STREAM_SUSPEND = 4,
+  */
+int bt_br_internal_update_a2dp_status(u16_t conHandle,u8_t status);
+/** It's used to set the duty cycle of the a2dp stream.
+  *
+  * @param DutyValue        the range is 0-100
+  */
+int bt_br_set_a2dp_stream_duty(u8_t DutyValue);
+
 /**
  * @}
  */

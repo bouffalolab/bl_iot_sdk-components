@@ -369,9 +369,9 @@ void TestPriorityQueue(void)
     testFreeInstance(instance);
 }
 
-extern "C" int test_priority_queue(void)
+int main(void)
 {
     TestPriorityQueue();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

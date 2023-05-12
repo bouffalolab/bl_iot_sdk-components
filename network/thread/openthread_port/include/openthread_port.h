@@ -9,7 +9,13 @@ extern "C" {
 #endif
 
 #ifndef OT_TASK_SIZE
+#if defined CFG_OTBR_ENABLE
+#define OT_TASK_SIZE (1024 + 512)
+#elif defined CFG_OPENTHREAD_TESTS_UNIT
+#define OT_TASK_SIZE (1024 * 2)
+#else
 #define OT_TASK_SIZE 1024
+#endif
 #endif
 
 #ifndef OT_TASK_PRORITY
@@ -19,7 +25,6 @@ extern "C" {
 #ifndef OT_UART_RX_BUFFSIZE
 #define OT_UART_RX_BUFFSIZE 256
 #endif
-
 
 typedef union {
     struct {

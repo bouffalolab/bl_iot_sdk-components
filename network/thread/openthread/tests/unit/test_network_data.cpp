@@ -43,7 +43,7 @@ namespace NetworkData {
 
 void PrintExternalRouteConfig(const ExternalRouteConfig &aConfig)
 {
-    printf("\r\nroute-prefix:");
+    printf("\nroute-prefix:");
 
     for (uint8_t b : aConfig.mPrefix.mPrefix.mFields.m8)
     {
@@ -56,7 +56,7 @@ void PrintExternalRouteConfig(const ExternalRouteConfig &aConfig)
 
 void PrintOnMeshPrefixConfig(const OnMeshPrefixConfig &aConfig)
 {
-    printf("\r\non-mesh-prefix:");
+    printf("\non-mesh-prefix:");
 
     for (uint8_t b : aConfig.mPrefix.mPrefix.mFields.m8)
     {
@@ -91,7 +91,7 @@ void VerifyRlocsArray(const uint16_t *aRlocs, uint16_t aRlocsLength, const uint1
 {
     VerifyOrQuit(aRlocsLength == kLength);
 
-    printf("\r\nRLOCs: { ");
+    printf("\nRLOCs: { ");
 
     for (uint8_t index = 0; index < aRlocsLength; index++)
     {
@@ -156,8 +156,8 @@ void TestNetworkDataIterator(void)
 
         iter = OT_NETWORK_DATA_ITERATOR_INIT;
 
-        printf("\r\nTest #1: Network data 1");
-        printf("\r\n-------------------------------------------------");
+        printf("\nTest #1: Network data 1");
+        printf("\n-------------------------------------------------");
 
         for (const auto &route : routes)
         {
@@ -272,8 +272,8 @@ void TestNetworkDataIterator(void)
 
         iter = OT_NETWORK_DATA_ITERATOR_INIT;
 
-        printf("\r\nTest #2: Network data 2");
-        printf("\r\n-------------------------------------------------");
+        printf("\nTest #2: Network data 2");
+        printf("\n-------------------------------------------------");
 
         for (const auto &route : routes)
         {
@@ -439,8 +439,8 @@ void TestNetworkDataIterator(void)
 
         NetworkData netData(*instance, kNetworkData, sizeof(kNetworkData));
 
-        printf("\r\nTest #3: Network data 3");
-        printf("\r\n-------------------------------------------------");
+        printf("\nTest #3: Network data 3");
+        printf("\n-------------------------------------------------");
 
         iter = OT_NETWORK_DATA_ITERATOR_INIT;
 
@@ -583,8 +583,8 @@ void TestNetworkDataFindNextService(void)
 {
     ot::Instance *instance;
 
-    printf("\r\n\r\n-------------------------------------------------");
-    printf("\r\nTestNetworkDataFindNextService()\r\n");
+    printf("\n\n-------------------------------------------------");
+    printf("\nTestNetworkDataFindNextService()\n");
 
     instance = testInitInstance();
     VerifyOrQuit(instance != nullptr);
@@ -616,8 +616,8 @@ void TestNetworkDataDsnSrpServices(void)
 
     ot::Instance *instance;
 
-    printf("\r\n\r\n-------------------------------------------------");
-    printf("\r\nTestNetworkDataDsnSrpServices()\r\n");
+    printf("\n\n-------------------------------------------------");
+    printf("\nTestNetworkDataDsnSrpServices()\n");
 
     instance = testInitInstance();
     VerifyOrQuit(instance != nullptr);
@@ -642,6 +642,7 @@ void TestNetworkDataDsnSrpServices(void)
             const char *                   mAddress;
             uint16_t                       mPort;
             Service::DnsSrpUnicast::Origin mOrigin;
+            uint16_t                       mRloc16;
 
             bool Matches(Service::DnsSrpUnicast::Info aInfo) const
             {
@@ -650,7 +651,7 @@ void TestNetworkDataDsnSrpServices(void)
                 SuccessOrQuit(sockAddr.GetAddress().FromString(mAddress));
                 sockAddr.SetPort(mPort);
 
-                return (aInfo.mSockAddr == sockAddr) && (aInfo.mOrigin == mOrigin);
+                return (aInfo.mSockAddr == sockAddr) && (aInfo.mOrigin == mOrigin) && (aInfo.mRloc16 == mRloc16);
             }
         };
 
@@ -671,11 +672,11 @@ void TestNetworkDataDsnSrpServices(void)
         };
 
         const UnicastEntry kUnicastEntries[] = {
-            {"fdde:ad00:beef:0:2d0e:c627:5556:18d9", 0x1234, Service::DnsSrpUnicast::kFromServiceData},
-            {"fd00:aabb:ccdd:eeff:11:2233:4455:6677", 0xabcd, Service::DnsSrpUnicast::kFromServerData},
-            {"fdde:ad00:beef:0:0:ff:fe00:2800", 0x5678, Service::DnsSrpUnicast::kFromServerData},
-            {"fd00:1234:5678:9abc:def0:123:4567:89ab", 0x0e, Service::DnsSrpUnicast::kFromServerData},
-            {"fdde:ad00:beef:0:0:ff:fe00:6c00", 0xcd12, Service::DnsSrpUnicast::kFromServerData},
+            {"fdde:ad00:beef:0:2d0e:c627:5556:18d9", 0x1234, Service::DnsSrpUnicast::kFromServiceData, 0xfffe},
+            {"fd00:aabb:ccdd:eeff:11:2233:4455:6677", 0xabcd, Service::DnsSrpUnicast::kFromServerData, 0x6c00},
+            {"fdde:ad00:beef:0:0:ff:fe00:2800", 0x5678, Service::DnsSrpUnicast::kFromServerData, 0x2800},
+            {"fd00:1234:5678:9abc:def0:123:4567:89ab", 0x0e, Service::DnsSrpUnicast::kFromServerData, 0x4c00},
+            {"fdde:ad00:beef:0:0:ff:fe00:6c00", 0xcd12, Service::DnsSrpUnicast::kFromServerData, 0x6c00},
         };
 
         const uint8_t kPreferredAnycastEntryIndex = 2;
@@ -691,14 +692,14 @@ void TestNetworkDataDsnSrpServices(void)
 
         // Verify all the "DNS/SRP Anycast Service" entries in Network Data
 
-        printf("\r\n- - - - - - - - - - - - - - - - - - - -");
-        printf("\r\nDNS/SRP Anycast Service entries\r\n");
+        printf("\n- - - - - - - - - - - - - - - - - - - -");
+        printf("\nDNS/SRP Anycast Service entries\n");
 
         for (const AnycastEntry &entry : kAnycastEntries)
         {
             SuccessOrQuit(manager.GetNextDnsSrpAnycastInfo(iterator, anycastInfo));
 
-            printf("\r\nanycastInfo { %s, seq:%d }", anycastInfo.mAnycastAddress.ToString().AsCString(),
+            printf("\nanycastInfo { %s, seq:%d }", anycastInfo.mAnycastAddress.ToString().AsCString(),
                    anycastInfo.mSequenceNumber);
 
             VerifyOrQuit(entry.Matches(anycastInfo), "GetNextDnsSrpAnycastInfo() returned incorrect info");
@@ -711,22 +712,22 @@ void TestNetworkDataDsnSrpServices(void)
 
         SuccessOrQuit(manager.FindPreferredDnsSrpAnycastInfo(anycastInfo));
 
-        printf("\r\n\r\nPreferred anycastInfo { %s, seq:%d }", anycastInfo.mAnycastAddress.ToString().AsCString(),
+        printf("\n\nPreferred anycastInfo { %s, seq:%d }", anycastInfo.mAnycastAddress.ToString().AsCString(),
                anycastInfo.mSequenceNumber);
 
         VerifyOrQuit(kAnycastEntries[kPreferredAnycastEntryIndex].Matches(anycastInfo),
                      "FindPreferredDnsSrpAnycastInfo() returned invalid info");
 
-        printf("\r\n\r\n- - - - - - - - - - - - - - - - - - - -");
-        printf("\r\nDNS/SRP Unicast Service entries\r\n");
+        printf("\n\n- - - - - - - - - - - - - - - - - - - -");
+        printf("\nDNS/SRP Unicast Service entries\n");
 
         iterator.Clear();
 
         for (const UnicastEntry &entry : kUnicastEntries)
         {
             SuccessOrQuit(manager.GetNextDnsSrpUnicastInfo(iterator, unicastInfo));
-            printf("\r\nunicastInfo { %s, origin:%s }", unicastInfo.mSockAddr.ToString().AsCString(),
-                   kOriginStrings[unicastInfo.mOrigin]);
+            printf("\nunicastInfo { %s, origin:%s, rloc16:%04x }", unicastInfo.mSockAddr.ToString().AsCString(),
+                   kOriginStrings[unicastInfo.mOrigin], unicastInfo.mRloc16);
 
             VerifyOrQuit(entry.Matches(unicastInfo), "GetNextDnsSrpUnicastInfo() returned incorrect info");
         }
@@ -734,7 +735,7 @@ void TestNetworkDataDsnSrpServices(void)
         VerifyOrQuit(manager.GetNextDnsSrpUnicastInfo(iterator, unicastInfo) == kErrorNotFound,
                      "GetNextDnsSrpUnicastInfo() returned unexpected extra entry");
 
-        printf("\r\n");
+        printf("\n");
     }
 
     testFreeInstance(instance);
@@ -763,8 +764,8 @@ void TestNetworkDataDsnSrpAnycastSeqNumSelection(void)
 
     ot::Instance *instance;
 
-    printf("\r\n\r\n-------------------------------------------------");
-    printf("\r\nTestNetworkDataDsnSrpAnycastSeqNumSelection()\r\n");
+    printf("\n\n-------------------------------------------------");
+    printf("\nTestNetworkDataDsnSrpAnycastSeqNumSelection()\n");
 
     instance = testInitInstance();
     VerifyOrQuit(instance != nullptr);
@@ -898,14 +899,14 @@ void TestNetworkDataDsnSrpAnycastSeqNumSelection(void)
 
         reinterpret_cast<TestLeader &>(instance->Get<Leader>()).Populate(test.mNetworkData, test.mNetworkDataLength);
 
-        printf("\r\n- - - - - - - - - - - - - - - - - - - -");
-        printf("\r\nDNS/SRP Anycast Service entries for test %d", ++testIndex);
+        printf("\n- - - - - - - - - - - - - - - - - - - -");
+        printf("\nDNS/SRP Anycast Service entries for test %d", ++testIndex);
 
         for (uint8_t index = 0; index < test.mSeqNumbersLength; index++)
         {
             SuccessOrQuit(manager.GetNextDnsSrpAnycastInfo(iterator, anycastInfo));
 
-            printf("\r\n { %s, seq:%d }", anycastInfo.mAnycastAddress.ToString().AsCString(),
+            printf("\n { %s, seq:%d }", anycastInfo.mAnycastAddress.ToString().AsCString(),
                    anycastInfo.mSequenceNumber);
 
             VerifyOrQuit(anycastInfo.mSequenceNumber == test.mSeqNumbers[index]);
@@ -914,7 +915,7 @@ void TestNetworkDataDsnSrpAnycastSeqNumSelection(void)
         VerifyOrQuit(manager.GetNextDnsSrpAnycastInfo(iterator, anycastInfo) == kErrorNotFound);
         SuccessOrQuit(manager.FindPreferredDnsSrpAnycastInfo(anycastInfo));
 
-        printf("\r\n preferred -> seq:%d ", anycastInfo.mSequenceNumber);
+        printf("\n preferred -> seq:%d ", anycastInfo.mSequenceNumber);
         VerifyOrQuit(anycastInfo.mSequenceNumber == test.mPreferredSeqNum);
     }
 
@@ -924,7 +925,7 @@ void TestNetworkDataDsnSrpAnycastSeqNumSelection(void)
 } // namespace NetworkData
 } // namespace ot
 
-extern "C" int test_network_data(void)
+int main(void)
 {
     ot::NetworkData::TestNetworkDataIterator();
 #if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
@@ -933,6 +934,6 @@ extern "C" int test_network_data(void)
     ot::NetworkData::TestNetworkDataDsnSrpServices();
     ot::NetworkData::TestNetworkDataDsnSrpAnycastSeqNumSelection();
 
-    printf("\r\nAll tests passed\r\n");
+    printf("\nAll tests passed\n");
     return 0;
 }

@@ -29,11 +29,19 @@ extern "C" {
 
 #include "bl702_common.h"
 
+typedef enum {
+    HAL_REBOOT_AS_BOOTPIN,           /*!< reboot as bootpin level */
+    HAL_REBOOT_FROM_INTERFACE,       /*!< reboot from interface, download mode */
+    HAL_REBOOT_FROM_MEDIA,           /*!< reboot from media, running mode */
+    HAL_REBOOT_MAX                   /*!< reboot max value */
+} hal_reboot_cfg_t;
+
 void cpu_global_irq_enable(void);
 void cpu_global_irq_disable(void);
 void hal_por_reset(void);
 void hal_system_reset(void);
 void hal_cpu_reset(void);
+void hal_reboot_config(hal_reboot_cfg_t rbot);
 void hal_get_chip_id(uint8_t chip_id[8]);
 void hal_enter_usb_iap(void);
 void hal_jump2app(uint32_t flash_offset);

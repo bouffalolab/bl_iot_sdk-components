@@ -191,15 +191,15 @@ void testMulticastListenersTableAPIs(Instance *aInstance)
 
 } // namespace ot
 
-extern "C" int test_multicast_listeners_table(void)
+int main(void)
 {
     ot::TestMulticastListenersTable();
-    printf("\r\nAll tests passed.\r\n");
+    printf("\nAll tests passed.\n");
     return 0;
 }
 
 #else
-extern "C" int test_multicast_listeners_table(void)
+int main(void)
 {
     return 0;
 }

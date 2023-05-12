@@ -66,7 +66,11 @@ const mbedtls_ecp_group_id Dtls::sCurves[] = {MBEDTLS_ECP_DP_SECP256R1, MBEDTLS_
 #endif
 
 #if defined(MBEDTLS_KEY_EXCHANGE__WITH_CERT__ENABLED) || defined(MBEDTLS_KEY_EXCHANGE_WITH_CERT_ENABLED)
+#if (MBEDTLS_VERSION_NUMBER >= 0x03020000)
+const uint16_t Dtls::sSignatures[] = {MBEDTLS_TLS1_3_SIG_ECDSA_SECP256R1_SHA256, MBEDTLS_TLS1_3_SIG_NONE};
+#else
 const int Dtls::sHashes[] = {MBEDTLS_MD_SHA256, MBEDTLS_MD_NONE};
+#endif
 #endif
 
 Dtls::Dtls(Instance &aInstance, bool aLayerTwoSecurity)
@@ -180,17 +184,11 @@ void Dtls::HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &aMessageI
         ExitNow();
 
     case Dtls::kStateOpen:
-        IgnoreError(mSocket.Connect(Ip6::SockAddr(aMessageInfo.GetPeerAddr(), aMessageInfo.GetPeerPort())));
-
         mMessageInfo.SetPeerAddr(aMessageInfo.GetPeerAddr());
         mMessageInfo.SetPeerPort(aMessageInfo.GetPeerPort());
         mMessageInfo.SetIsHostInterface(aMessageInfo.IsHostInterface());
 
-        if (Get<ThreadNetif>().HasUnicastAddress(aMessageInfo.GetSockAddr()))
-        {
-            mMessageInfo.SetSockAddr(aMessageInfo.GetSockAddr());
-        }
-
+        mMessageInfo.SetSockAddr(aMessageInfo.GetSockAddr());
         mMessageInfo.SetSockPort(aMessageInfo.GetSockPort());
 
         SuccessOrExit(Setup(false));
@@ -228,7 +226,7 @@ Error Dtls::Bind(uint16_t aPort)
     VerifyOrExit(mState == kStateOpen, error = kErrorInvalidState);
     VerifyOrExit(mTransportCallback == nullptr, error = kErrorAlready);
 
-    SuccessOrExit(error = mSocket.Bind(aPort, OT_NETIF_UNSPECIFIED));
+    SuccessOrExit(error = mSocket.Bind(aPort, Ip6::kNetifUnspecified));
 
 exit:
     return error;
@@ -289,8 +287,13 @@ Error Dtls::Setup(bool aClient)
 #endif
 
     mbedtls_ssl_conf_rng(&mConf, Crypto::MbedTls::CryptoSecurePrng, nullptr);
+#if (MBEDTLS_VERSION_NUMBER >= 0x03020000)
+    mbedtls_ssl_conf_min_tls_version(&mConf, MBEDTLS_SSL_VERSION_TLS1_2);
+    mbedtls_ssl_conf_max_tls_version(&mConf, MBEDTLS_SSL_VERSION_TLS1_2);
+#else
     mbedtls_ssl_conf_min_version(&mConf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);
     mbedtls_ssl_conf_max_version(&mConf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);
+#endif
 
     OT_ASSERT(mCipherSuites[1] == 0);
     mbedtls_ssl_conf_ciphersuites(&mConf, mCipherSuites);
@@ -302,7 +305,11 @@ Error Dtls::Setup(bool aClient)
         mbedtls_ssl_conf_curves(&mConf, sCurves);
 #endif
 #if defined(MBEDTLS_KEY_EXCHANGE__WITH_CERT__ENABLED) || defined(MBEDTLS_KEY_EXCHANGE_WITH_CERT_ENABLED)
+#if (MBEDTLS_VERSION_NUMBER >= 0x03020000)
+        mbedtls_ssl_conf_sig_algs(&mConf, sSignatures);
+#else
         mbedtls_ssl_conf_sig_hashes(&mConf, sHashes);
+#endif
 #endif
     }
 
@@ -970,20 +977,20 @@ void Dtls::HandleMbedtlsDebug(int aLevel, const char *aFile, int aLine, const ch
     switch (aLevel)
     {
     case 1:
-        LogCrit("[%hu] %s", mSocket.GetSockName().mPort, aStr);
+        LogCrit("[%u] %s", mSocket.GetSockName().mPort, aStr);
         break;
 
     case 2:
-        LogWarn("[%hu] %s", mSocket.GetSockName().mPort, aStr);
+        LogWarn("[%u] %s", mSocket.GetSockName().mPort, aStr);
         break;
 
     case 3:
-        LogInfo("[%hu] %s", mSocket.GetSockName().mPort, aStr);
+        LogInfo("[%u] %s", mSocket.GetSockName().mPort, aStr);
         break;
 
     case 4:
     default:
-        LogDebg("[%hu] %s", mSocket.GetSockName().mPort, aStr);
+        LogDebg("[%u] %s", mSocket.GetSockName().mPort, aStr);
         break;
     }
 }

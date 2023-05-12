@@ -39,6 +39,24 @@ SECTIONS
       . = ORIGIN(flash) + __RFTLV_SIZE_OFFSET + __RFTLV_SIZE_HOLE;
   } > flash
 
+  .blverinf 0 : AT (ORIGIN(flash) + 3K)
+  {
+    LONG(0x42464c42); /* BLFB */
+    LONG(0x46524556); /* VERF */
+    KEEP (*component_version.obj(.blverinf))
+    LONG(0x42464c42); /* BLFB */
+    LONG(0x46524556); /* VERF */
+    KEEP (*component_version.obj(.rodata*))
+  }
+
+  .text ORIGIN(flash) + 4K: AT(ORIGIN(flash) + 4K)
+  {
+    *(.text.unlikely .text.unlikely.*)
+    *(.text.startup .text.startup.*)
+    *(.text .text.*)
+    *(.gnu.linkonce.t.*)
+  } > flash
+
   .bugkiller_command :
   {
     PROVIDE( __bugkiller_command_start = ADDR(.bugkiller_command) );
@@ -51,16 +69,9 @@ SECTIONS
     KEEP (*bugkiller*.o(.rodata* .text* .data* .sdata* .sbss*))
   } > bugkill
 
-  .text           :
-  {
-    *(.text.unlikely .text.unlikely.*)
-    *(.text.startup .text.startup.*)
-    *(.text .text.*)
-    *(.gnu.linkonce.t.*)
-  } > flash
-
   .rodata         :
   {
+
     *(.rdata)
     *(.rodata .rodata.*)
     *(.sdata2.*)

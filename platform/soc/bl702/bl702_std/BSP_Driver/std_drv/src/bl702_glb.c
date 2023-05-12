@@ -2618,7 +2618,7 @@ BL_Err_Type GLB_Set_DIG_512K_CLK(uint8_t enable, uint8_t compensation, uint8_t d
  * @return SUCCESS or ERROR
  *
 *******************************************************************************/
-BL_Err_Type GLB_Set_DIG_32K_CLK(uint8_t enable, uint8_t compensation, uint8_t div)
+BL_Err_Type GLB_Set_DIG_32K_CLK(uint8_t enable, uint8_t compensation, uint16_t div)
 {
     uint32_t tmpVal;
 
@@ -4048,6 +4048,83 @@ void GPIO_INT0_IRQHandler(void)
     }
 }
 #endif
+
+/****************************************************************************/ /**
+ * @brief  Switch System clock
+ *
+ * @param  xtalType: XTAL frequency type
+ * @param  clkFreq: clock frequency selection
+ * @param  hclkDiv: hclk div
+ * @param  bclkDiv: bclk div
+ *
+ * @return SUCCESS or ERROR
+ *
+*******************************************************************************/
+BL_Err_Type ATTR_CLOCK_SECTION GLB_Switch_System_CLK(GLB_DLL_XTAL_Type xtalType,GLB_SYS_CLK_Type clkFreq, uint8_t hclkDiv,uint8_t bclkDiv)
+{
+    uint32_t tmpVal;
+    uint32_t tmpVal2;
+    
+    CHECK_PARAM(IS_GLB_DLL_XTAL_TYPE(xtalType));
+    CHECK_PARAM(IS_GLB_SYS_CLK_TYPE(clkFreq));
+    
+    /* make sure root clk is from XCLK */
+    tmpVal=BL_RD_REG(HBN_BASE,HBN_GLB);
+    tmpVal2=BL_GET_REG_BITS_VAL(tmpVal,HBN_ROOT_CLK_SEL);
+    tmpVal2&=0x1;
+    tmpVal=BL_SET_REG_BITS_VAL(tmpVal,HBN_ROOT_CLK_SEL,tmpVal2);
+    BL_WR_REG(HBN_BASE,HBN_GLB,tmpVal);
+    GLB_CLK_SET_DUMMY_WAIT;
+    
+    /* Before config XTAL and DLL ,make sure root clk is from RC32M */
+    tmpVal=BL_RD_REG(GLB_BASE,GLB_CLK_CFG0);
+    tmpVal=BL_SET_REG_BITS_VAL(tmpVal,GLB_REG_HCLK_DIV,hclkDiv);
+    tmpVal=BL_SET_REG_BITS_VAL(tmpVal,GLB_REG_BCLK_DIV,bclkDiv);
+    BL_WR_REG(GLB_BASE,GLB_CLK_CFG0,tmpVal);
+    GLB_REG_BCLK_DIS_TRUE;
+    GLB_REG_BCLK_DIS_FALSE;
+    GLB_CLK_SET_DUMMY_WAIT;
+    
+    /* select pll output clock before select root clock */
+    if(clkFreq>=GLB_SYS_CLK_DLL57P6M){
+        tmpVal = BL_RD_REG(GLB_BASE,GLB_CLK_CFG0);
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal,GLB_REG_PLL_SEL,clkFreq-GLB_SYS_CLK_DLL57P6M);
+        BL_WR_REG(GLB_BASE,GLB_CLK_CFG0,tmpVal);
+    }
+    
+    /* select root clock */
+    switch(clkFreq){
+        case GLB_SYS_CLK_RC32M:
+            HBN_Set_ROOT_CLK_Sel(HBN_ROOT_CLK_RC32M);
+            SystemCoreClockSet((32 * 1000 * 1000)/((uint16_t)hclkDiv + 1));
+            break;
+        case GLB_SYS_CLK_XTAL:
+            HBN_Set_ROOT_CLK_Sel(HBN_ROOT_CLK_XTAL);
+            Update_SystemCoreClockWith_XTAL(xtalType);
+            SystemCoreClockSet(SystemCoreClockGet()/((uint16_t)hclkDiv + 1));
+            break;
+        case GLB_SYS_CLK_DLL57P6M:
+            HBN_Set_ROOT_CLK_Sel(HBN_ROOT_CLK_DLL);
+            SystemCoreClockSet((576 * 100 * 1000)/((uint16_t)hclkDiv + 1));
+            break;
+        case GLB_SYS_CLK_DLL96M:
+            L1C_IROM_2T_Access_Set(ENABLE);
+            HBN_Set_ROOT_CLK_Sel(HBN_ROOT_CLK_DLL);
+            SystemCoreClockSet((96*1000*1000)/((uint16_t)hclkDiv + 1));
+            break;
+        case GLB_SYS_CLK_DLL144M:
+            L1C_IROM_2T_Access_Set(ENABLE);
+            HBN_Set_ROOT_CLK_Sel(HBN_ROOT_CLK_DLL);
+            SystemCoreClockSet((144*1000*1000)/((uint16_t)hclkDiv + 1));
+            break;
+        default :
+            break;
+    }
+    
+    GLB_CLK_SET_DUMMY_WAIT;
+    
+    return SUCCESS;
+}
 
 /*@} end of group GLB_Public_Functions */
 

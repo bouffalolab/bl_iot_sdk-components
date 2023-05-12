@@ -382,22 +382,22 @@ static uint8_t auth_to_sdio(uint8_t auth)
     switch (auth) {
     default:
         /* fallthrough */
-    case WIFI_AUTH_OPEN:
+    case WIFI_EVENT_BEACON_IND_AUTH_OPEN:
         ret = BF1B_WIFI_AUTH_OPEN;
         break;
-    case WIFI_AUTH_WEP:
+    case WIFI_EVENT_BEACON_IND_AUTH_WEP:
         ret = BF1B_WIFI_AUTH_WEP;
         break;
-    case WIFI_AUTH_WPA_PSK:
+    case WIFI_EVENT_BEACON_IND_AUTH_WPA_PSK:
         ret = BF1B_WIFI_AUTH_WPA_PSK;
         break;
-    case WIFI_AUTH_WPA2_PSK:
+    case WIFI_EVENT_BEACON_IND_AUTH_WPA2_PSK:
         ret = BF1B_WIFI_AUTH_WPA2_PSK;
         break;
-    case WIFI_AUTH_WPA_WPA2_PSK:
+    case WIFI_EVENT_BEACON_IND_AUTH_WPA_WPA2_PSK:
         ret = BF1B_WIFI_AUTH_WPA_WPA2_PSK;
         break;
-    case WIFI_AUTH_WPA2_ENTERPRISE:
+    case WIFI_EVENT_BEACON_IND_AUTH_WPA_ENT:
         ret = BF1B_WIFI_AUTH_WPA_ENTERPRISE;
         break;
     }
@@ -430,7 +430,7 @@ static void send_scan_ind(wifi_mgmr_ap_item_t *array, uint32_t cnt)
         memcpy(di->ssid, si->ssid, 32);
         di->channel = si->channel;
         di->rssi = si->rssi;
-        di->auth_mode = auth_to_sdio(wifi_mgmr_bcnind_auth_to_ext(si->auth));
+        di->auth_mode = auth_to_sdio(si->auth);
         //di->cipher = cipher_to_sdio(wifi_mgmr_cipher_to_ext(si->cipher));
     }
 

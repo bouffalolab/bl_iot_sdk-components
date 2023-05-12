@@ -411,7 +411,6 @@ static int hci_driver_send(struct net_buf *buf)
 #if defined(BFLB_BLE)
     err = bl_onchiphci_send_2_controller(buf);
     net_buf_unref(buf);
-    return err;
 #else
 	type = bt_buf_get_type(buf);
 	switch (type) {
@@ -430,12 +429,10 @@ static int hci_driver_send(struct net_buf *buf)
 	}
 
 	if (!err) {
-        
 		net_buf_unref(buf);
+	} else {
+
 	}
-    else
-    {
-    }
 
 	BT_DBG("exit: %d", err);
 #endif

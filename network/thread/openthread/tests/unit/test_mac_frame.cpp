@@ -64,7 +64,7 @@ void TestMacAddress(void)
     uint8_t         buffer[OT_EXT_ADDRESS_SIZE];
 
     instance = testInitInstance();
-    VerifyOrQuit(instance != nullptr, "nullptr instance\r\n");
+    VerifyOrQuit(instance != nullptr, "nullptr instance\n");
 
     // Mac::ExtAddress
 
@@ -271,15 +271,15 @@ void TestMacChannelMask(void)
     Mac::ChannelMask mask1;
     Mac::ChannelMask mask2(Radio::kSupportedChannels);
 
-    printf("Testing Mac::ChannelMask\r\n");
+    printf("Testing Mac::ChannelMask\n");
 
     VerifyOrQuit(mask1.IsEmpty());
-    printf("empty = %s\r\n", mask1.ToString().AsCString());
+    printf("empty = %s\n", mask1.ToString().AsCString());
     VerifyOrQuit(strcmp(mask1.ToString().AsCString(), kEmptyMaskString) == 0);
 
     VerifyOrQuit(!mask2.IsEmpty());
     VerifyOrQuit(mask2.GetMask() == Radio::kSupportedChannels);
-    printf("allChannels = %s\r\n", mask2.ToString().AsCString());
+    printf("allChannels = %s\n", mask2.ToString().AsCString());
     VerifyOrQuit(strcmp(mask2.ToString().AsCString(), kAllChannelsString) == 0);
 
     mask1.SetMask(Radio::kSupportedChannels);
@@ -304,7 +304,7 @@ void TestMacChannelMask(void)
         mask1.AddChannel(channel);
     }
 
-    printf("channels1 = %s\r\n", mask1.ToString().AsCString());
+    printf("channels1 = %s\n", mask1.ToString().AsCString());
     VerifyOrQuit(strcmp(mask1.ToString().AsCString(), kChannels1String) == 0);
 
     VerifyOrQuit(!mask1.IsEmpty());
@@ -317,7 +317,7 @@ void TestMacChannelMask(void)
         mask2.AddChannel(channel);
     }
 
-    printf("channels2 = %s\r\n", mask2.ToString().AsCString());
+    printf("channels2 = %s\n", mask2.ToString().AsCString());
     VerifyOrQuit(strcmp(mask2.ToString().AsCString(), kChannels2String) == 0);
 
     VerifyOrQuit(!mask2.IsEmpty());
@@ -325,14 +325,14 @@ void TestMacChannelMask(void)
 
     mask1.Intersect(mask2);
     VerifyChannelMaskContent(mask1, channels3, sizeof(channels3));
-    printf("channels3 = %s\r\n", mask1.ToString().AsCString());
+    printf("channels3 = %s\n", mask1.ToString().AsCString());
     VerifyOrQuit(strcmp(mask1.ToString().AsCString(), kChannels3String) == 0);
 
     mask2.Clear();
     mask2.AddChannel(channles4[0]);
     VerifyChannelMaskContent(mask2, channles4, sizeof(channles4));
 
-    printf("channels4 = %s\r\n", mask2.ToString().AsCString());
+    printf("channels4 = %s\n", mask2.ToString().AsCString());
     VerifyOrQuit(strcmp(mask2.ToString().AsCString(), kChannels4String) == 0);
 
     mask1.Clear();
@@ -442,7 +442,7 @@ void TestMacFrameApi(void)
     VerifyOrQuit(frame.GetType() == Mac::Frame::kFcfFrameMacCmd);
     SuccessOrQuit(frame.GetCommandId(commandId));
     VerifyOrQuit(commandId == Mac::Frame::kMacCmdDataRequest);
-    printf("commandId:%d\r\n", commandId);
+    printf("commandId:%d\n", commandId);
     SuccessOrQuit(frame.SetCommandId(Mac::Frame::kMacCmdOrphanNotification));
     SuccessOrQuit(frame.GetCommandId(commandId));
     VerifyOrQuit(commandId == Mac::Frame::kMacCmdOrphanNotification);
@@ -568,13 +568,13 @@ void TestMacFrameAckGeneration(void)
 
 } // namespace ot
 
-extern "C" int test_mac_frame(void)
+int main(void)
 {
     ot::TestMacAddress();
     ot::TestMacHeader();
     ot::TestMacChannelMask();
     ot::TestMacFrameApi();
     ot::TestMacFrameAckGeneration();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

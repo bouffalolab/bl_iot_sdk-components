@@ -22,6 +22,10 @@
 #include "hog.h"
 #endif
 
+#include "bluetooth.h"
+#include "hci_driver.h"
+
+
 
 #define 		PASSKEY_MAX  		0xF423F
 #define 		NAME_LEN 			30
@@ -47,6 +51,7 @@ static int ble_adv_id;
 
 #define vOutputString(...)  printf(__VA_ARGS__)
 
+static void blecli_enable(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 static void blecli_init(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 #if defined(BL702)
 static void blecli_set_2M_phy(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
@@ -141,6 +146,7 @@ const struct cli_command btStackCmdSet[] STATIC_CLI_CMD_ATTRIBUTE = {
 #if 1
     /*1.The cmd string to type, 2.Cmd description, 3.The function to run, 4.Number of parameters*/
 
+    {"ble_enable", "ble enable\r\nParameter [Null]\r\n", blecli_enable},
     {"ble_init", "ble Initialize\r\nParameter [Null]\r\n", blecli_init},
     {"ble_get_device_name", "ble get device name\r\nParameter [Null]\r\n", blecli_get_device_name},
     {"ble_set_device_name", "ble set device name\r\nParameter [Lenth of name] [name]\r\n", blecli_set_device_name},
@@ -481,6 +487,33 @@ static struct bt_conn_cb conn_callbacks = {
 #endif
 };
 #endif //CONFIG_BT_CONN
+
+void btcli_enable_cb(int err)
+{
+    if (!err) {
+        bt_addr_le_t bt_addr;
+        bt_conn_cb_register(&conn_callbacks);
+        bt_get_local_public_address(&bt_addr);
+        printf("BD_ADDR:(MSB)%02x:%02x:%02x:%02x:%02x:%02x(LSB) \n",
+            bt_addr.a.val[5], bt_addr.a.val[4], bt_addr.a.val[3], bt_addr.a.val[2], bt_addr.a.val[1], bt_addr.a.val[0]);
+    }else{
+         printf("bt_enable_failed\n");
+    }
+}
+
+static void blecli_enable(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+    // Initialize BLE controller
+    #if defined(BL702) || defined(BL602)
+    ble_controller_init(configMAX_PRIORITIES - 1);
+    #else
+    btble_controller_init(configMAX_PRIORITIES - 1);
+    #endif
+    // Initialize BLE Host stack
+    hci_driver_init();
+
+    bt_enable(btcli_enable_cb);
+}
 
 static void blecli_init(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
@@ -1059,9 +1092,7 @@ static void blecli_whitelist_rem(char *pcWriteBuffer, int xWriteBufferLen, int a
 
 static void blecli_whitelist_clear(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
-	bt_addr_le_t waddr;
 	int 		err;
-	u8_t 		val[6];
 
 	if(argc != 1){
 		printf("Number of Parameters is not correct (argc = [%d])\r\n",argc);

@@ -128,9 +128,9 @@ void TestPool(void)
     testFreeInstance(instance);
 }
 
-extern "C" int test_pool(void)
+int main(void)
 {
     TestPool();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

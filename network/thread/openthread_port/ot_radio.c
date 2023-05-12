@@ -32,8 +32,8 @@
 
 #include OPENTHREAD_PROJECT_CORE_CONFIG_FILE
 
-static otRadio_t                otRadioVar;
-static uint8_t                  otRadio_buffPool[TOTAL_RX_FRAME_SIZE * (OTRADIO_RX_FRAME_BUFFER_NUM + 1) + (ALIGNED_RX_FRAME_SIZE + MAX_ACK_FRAME_SIZE) * 2];
+__attribute__((section(".bss"))) static otRadio_t                otRadioVar;
+__attribute__((section(".bss"))) static uint8_t                  otRadio_buffPool[TOTAL_RX_FRAME_SIZE * (OTRADIO_RX_FRAME_BUFFER_NUM + 1) + (ALIGNED_RX_FRAME_SIZE + MAX_ACK_FRAME_SIZE) * 2];
 #ifdef BL702
 otRadio_t                       *otRadioVar_ptr = NULL;
 #endif

@@ -583,8 +583,12 @@
 #define BFLB_FIXED_IRK 0
 #define BFLB_DYNAMIC_ALLOC_MEM
 #define BFLB_BT_LINK_KEYS_STORE
-#if defined(CFG_BLE_PDS) && defined(BL702) && defined(BFLB_BLE) && defined(BFLB_DYNAMIC_ALLOC_MEM)
+#if defined(BL702) || defined(BL702L)
+#if defined(CFG_BLE_PDS) && defined(BFLB_BLE) && defined(BFLB_DYNAMIC_ALLOC_MEM)
 #define BFLB_STATIC_ALLOC_MEM   1
+#else
+#define BFLB_STATIC_ALLOC_MEM   0
+#endif
 #else
 #define BFLB_STATIC_ALLOC_MEM   0
 #endif
@@ -616,6 +620,11 @@ happens, which cause memory leak issue.*/
 #define BFLB_BLE_PATCH_FREE_ALLOCATED_BUFFER_IN_OS
 /*To avoid duplicated pubkey callback.*/
 #define BFLB_BLE_PATCH_AVOID_DUPLI_PUBKEY_CB
+/* Fix call bt_conn_disconnect->bt_hci_disconnect->bt_hci_cmd_send_sync, the current task yeild.
+ * When disconnect done and conn->state change to BT_CONN_DISCONNECTED, current task retore.
+ * Then bt_conn_set_state called with parameter BT_CONN_DISCONNECT. the conn->ref shall be error.
+ */
+#define BFLB_BLE_PATCH_DISCONNECT_ERROR_WHEN_TASK_YEILD
 #if defined(CONFIG_BT_GATT_DYNAMIC_DB)
 #define BFLB_BLE_DYNAMIC_SERVICE
 #endif
@@ -629,8 +638,15 @@ happens, which cause memory leak issue.*/
 #define BFLB_BLE_PATCH_SETTINGS_LOAD
 #endif
 #define BFLB_BLE_PATCH_AVOID_CONN_UPDATE_WHEN_PREVIOUS_IS_NOT_OVER
+#ifdef CONFIG_BT_SMP
 #define BFLB_BLE_SMP_LOCAL_AUTH
+#define BFLB_BLE_SMP_SUPPORT_DISABLE_PAIR
+#endif
 #define BFLB_BLE_MTU_CHANGE_CB
+#if defined(CONFIG_BT_GAP_PERIPHERAL_PREF_PARAMS)
+#define BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS
+#endif
+
 #if defined(CFG_BT_RESET)
 #define BFLB_HOST_ASSISTANT
 #endif

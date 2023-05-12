@@ -25,7 +25,8 @@
 #include "bl702_romdriver.h"
 #include "bl702_sec_eng.h"
 #include "bl702_l1c.h"
-#include "hbn_reg.h"
+#include "bl702_glb.h"
+#include "bl702_hbn.h"
 
 volatile uint32_t nesting = 0;
 
@@ -56,6 +57,11 @@ void hal_system_reset(void)
 void hal_cpu_reset(void)
 {
     RomDriver_GLB_SW_CPU_Reset();
+}
+
+void hal_reboot_config(hal_reboot_cfg_t rbot)
+{
+    (void)rbot;
 }
 
 void hal_get_chip_id(uint8_t chip_id[8])

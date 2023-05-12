@@ -41,23 +41,6 @@
 static usb_dc_device_t usb_fs_device;
 static void USBD_IRQHandler(void);
 
-static dma_lli_ctrl_t usb_lli_list = {
-    .src_addr = 0,
-    .dst_addr = 0,
-    .nextlli = 0,
-    .cfg.bits.fix_cnt = 0,
-    .cfg.bits.dst_min_mode = 0,
-    .cfg.bits.dst_add_mode = 0,
-    .cfg.bits.SI = 0,
-    .cfg.bits.DI = 0,
-    .cfg.bits.SWidth = DMA_TRANSFER_WIDTH_8BIT,
-    .cfg.bits.DWidth = DMA_TRANSFER_WIDTH_8BIT,
-    .cfg.bits.SBSize = 0,
-    .cfg.bits.DBSize = 0,
-    .cfg.bits.I = 0,
-    .cfg.bits.TransferSize = 0
-};
-
 static void usb_set_power_up(void)
 {
     uint32_t tmpVal = 0;
@@ -199,14 +182,7 @@ static void usb_xcvr_config(BL_Fun_Type NewState)
     }
 }
 
-/**
- * @brief
- *
- * @param dev
- * @param oflag
- * @return int
- */
-int usb_open(struct device *dev, uint16_t oflag)
+int usb_dc_init(void)
 {
     USB_Config_Type usbCfg = { 0 };
 
@@ -228,6 +204,8 @@ int usb_open(struct device *dev, uint16_t oflag)
 
     /* Init Device */
     USB_Set_Config(DISABLE, &usbCfg);
+
+    memset(&usb_fs_device, 0, sizeof(usb_dc_device_t));
 
     usb_fs_device.out_ep[0].ep_ena = 1U;
     usb_fs_device.in_ep[0].ep_ena = 1U;
@@ -286,196 +264,6 @@ int usb_open(struct device *dev, uint16_t oflag)
 
     return 0;
 }
-/**
- * @brief
- *
- * @param dev
- * @return int
- */
-int usb_close(struct device *dev)
-{
-    /* disable all interrupts and force USB reset */
-    CPU_Interrupt_Disable(USB_IRQn);
-    USB_IntMask(USB_INT_LPM_WAKEUP, MASK);
-    USB_IntMask(USB_INT_LPM_PACKET, MASK);
-
-    USB_Disable();
-
-    /* clear interrupt status register */
-    USB_Clr_IntStatus(USB_INT_ALL);
-
-    usb_set_power_off();
-
-    usb_xcvr_config(DISABLE);
-    GLB_AHB_Slave1_Reset(BL_AHB_SLAVE1_USB);
-    return 0;
-}
-/**
- * @brief
- *
- * @param dev
- * @param cmd
- * @param args
- * @return int
- */
-int usb_control(struct device *dev, int cmd, void *args)
-{
-    struct usb_dc_device *usb_device = (struct usb_dc_device *)dev;
-
-    switch (cmd) {
-        case DEVICE_CTRL_SET_INT /* constant-expression */: {
-            uint32_t offset = __builtin_ctz((uint32_t)args);
-
-            while (offset < 24) {
-                if ((uint32_t)args & (1 << offset)) {
-                    USB_IntEn(offset, ENABLE);
-                    USB_IntMask(offset, UNMASK);
-                }
-
-                offset++;
-            }
-            break;
-        }
-        case DEVICE_CTRL_CLR_INT /* constant-expression */: {
-            uint32_t offset = __builtin_ctz((uint32_t)args);
-
-            while (offset < 24) {
-                if ((uint32_t)args & (1 << offset)) {
-                    USB_IntEn(offset, DISABLE);
-                    USB_IntMask(offset, MASK);
-                }
-
-                offset++;
-            }
-            break;
-        }
-        case DEVICE_CTRL_USB_DC_SET_ACK /* constant-expression */:
-            USB_Set_EPx_Status(USB_EP_GET_IDX(((uint32_t)args) & 0x7f), USB_EP_STATUS_ACK);
-            return 0;
-        case DEVICE_CTRL_USB_DC_ENUM_ON: {
-            uint32_t tmpVal;
-            tmpVal = BL_RD_REG(GLB_BASE, GLB_USB_XCVR);
-            tmpVal = BL_SET_REG_BITS_VAL(tmpVal, GLB_USB_ENUM, 1);
-            BL_WR_REG(GLB_BASE, GLB_USB_XCVR, tmpVal);
-            return 0;
-        }
-        case DEVICE_CTRL_USB_DC_ENUM_OFF: {
-            uint32_t tmpVal;
-            tmpVal = BL_RD_REG(GLB_BASE, GLB_USB_XCVR);
-            tmpVal = BL_SET_REG_BITS_VAL(tmpVal, GLB_USB_ENUM, 0);
-            BL_WR_REG(GLB_BASE, GLB_USB_XCVR, tmpVal);
-            return 0;
-        }
-        case DEVICE_CTRL_USB_DC_GET_EP_TX_FIFO_CNT:
-            return USB_Get_EPx_TX_FIFO_CNT(((uint32_t)args) & 0x7f);
-
-        case DEVICE_CTRL_USB_DC_GET_EP_RX_FIFO_CNT:
-            return USB_Get_EPx_RX_FIFO_CNT(((uint32_t)args) & 0x7f);
-        case DEVICE_CTRL_ATTACH_TX_DMA /* constant-expression */:
-            usb_device->tx_dma = (struct device *)args;
-            break;
-
-        case DEVICE_CTRL_ATTACH_RX_DMA /* constant-expression */:
-            usb_device->rx_dma = (struct device *)args;
-            break;
-
-        case DEVICE_CTRL_USB_DC_SET_TX_DMA /* constant-expression */:
-            USB_Set_EPx_TX_DMA_Interface_Config(((uint32_t)args) & 0x7f, ENABLE);
-            break;
-
-        case DEVICE_CTRL_USB_DC_SET_RX_DMA /* constant-expression */:
-            USB_Set_EPx_RX_DMA_Interface_Config(((uint32_t)args) & 0x7f, ENABLE);
-            break;
-
-        default:
-            break;
-    }
-
-    return 0;
-}
-
-int usb_write(struct device *dev, uint32_t pos, const void *buffer, uint32_t size)
-{
-    struct usb_dc_device *usb_device = (struct usb_dc_device *)dev;
-    uint8_t ep_idx = USB_EP_GET_IDX(pos);
-
-    if (usb_device->in_ep[ep_idx].ep_cfg.ep_type == USBD_EP_TYPE_ISOC) {
-        uint32_t usb_ep_addr = USB_BASE + 0x308 + ep_idx * 0x10;
-
-        dma_channel_stop(usb_device->tx_dma);
-        usb_lli_list.src_addr = (uint32_t)buffer;
-        usb_lli_list.dst_addr = usb_ep_addr;
-        usb_lli_list.cfg.bits.TransferSize = size;
-        usb_lli_list.cfg.bits.DI = 0;
-        usb_lli_list.cfg.bits.SI = 1;
-        usb_lli_list.cfg.bits.SBSize = DMA_BURST_16BYTE;
-        usb_lli_list.cfg.bits.DBSize = DMA_BURST_1BYTE;
-        dma_channel_update(usb_device->tx_dma, (void *)((uint32_t)&usb_lli_list));
-        dma_channel_start(usb_device->tx_dma);
-        return 0;
-    } else {
-    }
-
-    return -1;
-}
-
-int usb_read(struct device *dev, uint32_t pos, void *buffer, uint32_t size)
-{
-    struct usb_dc_device *usb_device = (struct usb_dc_device *)dev;
-    uint8_t ep_idx = USB_EP_GET_IDX(pos);
-
-    if (usb_device->out_ep[ep_idx].ep_cfg.ep_type == USBD_EP_TYPE_ISOC) {
-        uint32_t usb_ep_addr = USB_BASE + 0x308 + ep_idx * 0x1c;
-
-        dma_channel_stop(usb_device->tx_dma);
-        usb_lli_list.src_addr = usb_ep_addr;
-        usb_lli_list.dst_addr = (uint32_t)buffer;
-        usb_lli_list.cfg.bits.TransferSize = size;
-        usb_lli_list.cfg.bits.DI = 1;
-        usb_lli_list.cfg.bits.SI = 0;
-        usb_lli_list.cfg.bits.SBSize = DMA_BURST_1BYTE;
-        usb_lli_list.cfg.bits.DBSize = DMA_BURST_16BYTE;
-        dma_channel_update(usb_device->rx_dma, (void *)((uint32_t)&usb_lli_list));
-        dma_channel_start(usb_device->rx_dma);
-        return 0;
-    } else {
-    }
-
-    return -1;
-}
-
-/**
- * @brief
- *
- * @param index
- * @param name
- * @param flag
- * @return int
- */
-int usb_dc_register(enum usb_index_type index, const char *name)
-{
-    struct device *dev;
-
-    if (USB_MAX_INDEX == 0) {
-        return -DEVICE_EINVAL;
-    }
-
-    memset(&usb_fs_device, 0, sizeof(usb_dc_device_t));
-
-    dev = &(usb_fs_device.parent);
-
-    dev->open = usb_open;
-    dev->close = usb_close;
-    dev->control = usb_control;
-    dev->write = usb_write;
-    dev->read = usb_read;
-
-    dev->type = DEVICE_CLASS_USB;
-    dev->handle = NULL;
-
-    return device_register(dev, name);
-}
-
 /**
  * @brief Set USB device address
  *
@@ -554,12 +342,20 @@ int usbd_ep_open(const struct usb_dc_ep_cfg *ep_cfg)
 
     if (USB_EP_DIR_IS_OUT(ep)) {
         /* Clear NAK and enable ep */
-        USB_Set_EPx_Status(USB_EP_GET_IDX(ep), USB_EP_STATUS_ACK);
+        USB_Set_EPx_Status(ep_idx, USB_EP_STATUS_ACK);
         usb_fs_device.out_ep[ep_idx].ep_ena = 1U;
+        USB_IntEn(USB_INT_EP1_DONE + 2 * (ep_idx - 1), ENABLE);
+        USB_IntMask(USB_INT_EP1_DONE + 2 * (ep_idx - 1), UNMASK);
     } else {
-        //USB_Set_EPx_Status(USB_EP_GET_IDX(ep), USB_EP_STATUS_ACK);
-        USB_Set_EPx_Status(USB_EP_GET_IDX(ep), USB_EP_STATUS_NACK);
+        if (ep_cfg->ep_type == USBD_EP_TYPE_ISOC) {
+            USB_Set_EPx_Status(ep_idx, USB_EP_STATUS_ACK);
+        } else {
+            USB_Set_EPx_Status(ep_idx, USB_EP_STATUS_NACK);
+        }
+
         usb_fs_device.in_ep[ep_idx].ep_ena = 1U;
+        USB_IntEn(USB_INT_EP1_CMD + 2 * (ep_idx - 1), ENABLE);
+        USB_IntMask(USB_INT_EP1_CMD + 2 * (ep_idx - 1), UNMASK);
     }
 
     return 0;
@@ -928,98 +724,6 @@ int usbd_ep_read(const uint8_t ep, uint8_t *data, uint32_t data_len, uint32_t *r
 
     return USB_DC_OK;
 }
-/**
- * @brief
- *
- * @param dev
- * @param rb
- * @param ep
- * @return int
- */
-int usb_dc_receive_to_ringbuffer(struct device *dev, Ring_Buffer_Type *rb, uint8_t ep)
-{
-    uint8_t ep_idx;
-    uint8_t recv_len;
-    static bool overflow_flag = false;
-
-    /* Check if OUT ep */
-    if (USB_EP_GET_DIR(ep) != USB_EP_DIR_OUT) {
-        USB_DC_LOG_ERR("Wrong endpoint direction\r\n");
-        return -USB_DC_EP_DIR_ERR;
-    }
-
-    /* Check if ep enabled */
-    if (!usb_ep_is_enabled(ep)) {
-        return -USB_DC_EP_EN_ERR;
-    }
-
-    ep_idx = USB_EP_GET_IDX(ep);
-
-    recv_len = USB_Get_EPx_RX_FIFO_CNT(ep_idx);
-
-    /*if rx fifo count equal 0,it means last is send nack and ringbuffer is smaller than 64,
-    * so,if ringbuffer is larger than 64,set ack to recv next data.
-    */
-    if (overflow_flag && (Ring_Buffer_Get_Empty_Length(rb) > 64) && (!recv_len)) {
-        overflow_flag = false;
-        USB_Set_EPx_Rdy(ep_idx);
-        return 0;
-    } else {
-        uint32_t addr = USB_BASE + 0x11C + (ep_idx - 1) * 0x10;
-        Ring_Buffer_Write_Callback(rb, recv_len, fifocopy_to_mem, (void *)addr);
-
-        if (Ring_Buffer_Get_Empty_Length(rb) < 64) {
-            overflow_flag = true;
-            return -USB_DC_RB_SIZE_SMALL_ERR;
-        }
-
-        USB_Set_EPx_Rdy(ep_idx);
-        return 0;
-    }
-}
-/**
- * @brief
- *
- * @param dev
- * @param rb
- * @param ep
- * @return int
- */
-int usb_dc_send_from_ringbuffer(struct device *dev, Ring_Buffer_Type *rb, uint8_t ep)
-{
-    uint8_t ep_idx;
-    static bool zlp_flag = false;
-
-    ep_idx = USB_EP_GET_IDX(ep);
-
-    /* Check if IN ep */
-    if (USB_EP_GET_DIR(ep) != USB_EP_DIR_IN) {
-        return -USB_DC_EP_DIR_ERR;
-    }
-
-    /* Check if ep enabled */
-    if (!usb_ep_is_enabled(ep)) {
-        return -USB_DC_EP_EN_ERR;
-    }
-
-    uint32_t addr = USB_BASE + 0x118 + (ep_idx - 1) * 0x10;
-
-    if (zlp_flag == false) {
-        if ((USB_Get_EPx_TX_FIFO_CNT(ep_idx) == USB_FS_MAX_PACKET_SIZE) && Ring_Buffer_Get_Length(rb)) {
-            uint32_t actual_len = Ring_Buffer_Read_Callback(rb, USB_FS_MAX_PACKET_SIZE, memcopy_to_fifo, (void *)addr);
-
-            if (!Ring_Buffer_Get_Length(rb) && (!(actual_len % 64))) {
-                zlp_flag = true;
-            }
-
-            USB_Set_EPx_Rdy(ep_idx);
-        }
-    } else {
-        zlp_flag = false;
-        USB_Set_EPx_Rdy(ep_idx);
-    }
-    return 0;
-}
 
 extern void usbd_event_notify_handler(uint8_t event, void *arg);
 
@@ -1099,6 +803,12 @@ void USBD_IRQHandler(void)
     /* reset */
     if (USB_Get_IntStatus(USB_INT_RESET)) {
         USB_Clr_IntStatus(USB_INT_RESET);
+        uint32_t tmpVal = BL_RD_REG(USB_BASE, USB_INT_MASK);
+        tmpVal |= 0x00fffc00;
+        BL_WR_REG(USB_BASE, USB_INT_MASK, tmpVal);
+        tmpVal = BL_RD_REG(USB_BASE, USB_INT_EN);
+        tmpVal |= 0x00fffc00;
+        BL_WR_REG(USB_BASE, USB_INT_EN, tmpVal);
         usbd_event_notify_handler(USB_DC_EVENT_RESET, NULL);
         return;
     }

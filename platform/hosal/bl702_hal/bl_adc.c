@@ -71,8 +71,8 @@ int bl_adc_tsen_init(void)
     
     // Initialize TSEN
     ADC_Disable();
-    ADC_Reset();
     ADC_Enable();
+    ADC_Reset();
     ADC_Init(&adcCfg);
     ADC_Vbat_Disable();
     ADC_Tsen_Init(ADC_TSEN_MOD_INTERNAL_DIODE);
@@ -153,8 +153,8 @@ int bl_adc_vbat_init(void)
     
     // Initialize VBAT
     ADC_Disable();
-    ADC_Reset();
     ADC_Enable();
+    ADC_Reset();
     ADC_Init(&adcCfg);
     ADC_Tsen_Disable();
     ADC_Vbat_Enable();
@@ -283,8 +283,8 @@ static void tsen_adc_init(void)
     
     // Initialize TSEN
     ADC_Disable();
-    ADC_Reset();
     ADC_Enable();
+    ADC_Reset();
     ADC_Init(&adcCfg);
     ADC_Vbat_Disable();
     ADC_Tsen_Init(ADC_TSEN_MOD_INTERNAL_DIODE);
@@ -439,8 +439,8 @@ static void voice_adc_init(bl_adc_voice_cfg_t *cfg)
     GLB_Set_ADC_CLK(ENABLE, GLB_ADC_CLK_XCLK, 0);
     
     ADC_Disable();
-    ADC_Reset();
     ADC_Enable();
+    ADC_Reset();
     ADC_Init(&adcCfg);
     ADC_Tsen_Disable();
     ADC_Vbat_Disable();

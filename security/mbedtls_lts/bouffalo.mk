@@ -167,3 +167,4 @@ COMPONENT_OBJS := $(patsubst %.c,%.o, $(COMPONENT_SRCS))
 COMPONENT_SRCDIRS := $(LIBRARY_DIR) port port/hw_acc
 
 ##
+CFLAGS += -msave-restore

@@ -55,65 +55,65 @@ SemaphoreHandle_t g_bl_sec_sha_mutex = NULL;
 
 static inline void _trng_ht_disable()
 {
-    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t TRNGx = SEC_ENG_BASE;
     uint32_t val;
 
-    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_TEST);
-    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_HT_DIS);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_TEST, val);
+    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_TEST);
+    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_0_HT_DIS);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_TEST, val);
 }
 
 static inline void _trng_trigger()
 {
-    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t TRNGx = SEC_ENG_BASE;
     uint32_t val;
 
-    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);    
-    if (BL_IS_REG_BIT_SET(val, SEC_ENG_SE_TRNG_BUSY)) {
+    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);    
+    if (BL_IS_REG_BIT_SET(val, SEC_ENG_SE_TRNG_0_BUSY)) {
         return;
     }
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_1, trng_buffer[0]);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_2, trng_buffer[1]);
-    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_INT_SET_1T);
-    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_INT_CLR_1T);
-    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_EN);
-    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_TRIG_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_1, trng_buffer[0]);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_2, trng_buffer[1]);
+    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_0_INT_SET_1T);
+    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_0_INT_CLR_1T);
+    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_0_EN);
+    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_0_TRIG_1T);
 
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, val);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, val);
 }
 
 static inline void wait_trng4feed()
 {
-    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t TRNGx = SEC_ENG_BASE;
     uint32_t val;
 
-    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
 
-    while (BL_IS_REG_BIT_SET(val, SEC_ENG_SE_TRNG_BUSY)) {
+    while (BL_IS_REG_BIT_SET(val, SEC_ENG_SE_TRNG_0_BUSY)) {
         /*wait until trng is NOT busy*/
-        val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+        val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
     }
 
-    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_INT_CLR_1T);
-    val = BL_CLR_REG_BIT(val, SEC_ENG_SE_TRNG_TRIG_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, val);
+    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_0_INT_CLR_1T);
+    val = BL_CLR_REG_BIT(val, SEC_ENG_SE_TRNG_0_TRIG_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, val);
 
     //blog_info("Feed random number is %08lx\r\n", trng_buffer[0]);
 
-    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
-    while (BL_IS_REG_BIT_SET(val, SEC_ENG_SE_TRNG_BUSY)) {
+    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
+    while (BL_IS_REG_BIT_SET(val, SEC_ENG_SE_TRNG_0_BUSY)) {
         /*wait until trng is NOT busy*/
-        val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
+        val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
     }
 
-    trng_buffer[0] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_0);
-    trng_buffer[1] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_1);
-    trng_buffer[2] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_2);
-    trng_buffer[3] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_3);
-    trng_buffer[4] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_4);
-    trng_buffer[5] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_5);
-    trng_buffer[6] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_6);
-    trng_buffer[7] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_7);
+    trng_buffer[0] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_0);
+    trng_buffer[1] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_1);
+    trng_buffer[2] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_2);
+    trng_buffer[3] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_3);
+    trng_buffer[4] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_4);
+    trng_buffer[5] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_5);
+    trng_buffer[6] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_6);
+    trng_buffer[7] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_7);
 
     blog_info("Feed random number is %08lx\r\n", trng_buffer[0]);
 }
@@ -164,27 +164,27 @@ int bl_rand()
 
 void sec_trng_IRQHandler(void)
 {
-    uint32_t TRNGx = SEC_ENG_BASE + SEC_ENG_TRNG_OFFSET;
+    uint32_t TRNGx = SEC_ENG_BASE;
     uint32_t val;
 
     if (aos_now_ms() < 1000 * 2) {
         /*debug when boot*/
         puts("[BL] [SEC] TRNG Handler\r\n");
     }
-    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0);
-    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_INT_CLR_1T);
-    val = BL_CLR_REG_BIT(val, SEC_ENG_SE_TRNG_TRIG_1T);
-    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_CTRL_0, val);
+    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0);
+    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_0_INT_CLR_1T);
+    val = BL_CLR_REG_BIT(val, SEC_ENG_SE_TRNG_0_TRIG_1T);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_CTRL_0, val);
 
     blog_debug("random number is %08lx\r\n", trng_buffer[0]);
-    trng_buffer[0] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_0);
-    trng_buffer[1] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_1);
-    trng_buffer[2] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_2);
-    trng_buffer[3] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_3);
-    trng_buffer[4] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_4);
-    trng_buffer[5] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_5);
-    trng_buffer[6] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_6);
-    trng_buffer[7] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_DOUT_7);
+    trng_buffer[0] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_0);
+    trng_buffer[1] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_1);
+    trng_buffer[2] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_2);
+    trng_buffer[3] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_3);
+    trng_buffer[4] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_4);
+    trng_buffer[5] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_5);
+    trng_buffer[6] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_6);
+    trng_buffer[7] = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_DOUT_7);
 }
 
 int bl_sec_init(void)

@@ -1282,12 +1282,17 @@ tcp_slowtmr_start:
             if (pcb->state != SYN_SENT) {
               u8_t backoff_idx = LWIP_MIN(pcb->nrtx, sizeof(tcp_backoff) - 1);
               int calc_rto = ((pcb->sa >> 3) + pcb->sv) << tcp_backoff[backoff_idx];
+            #ifdef BL_TCP_OPTIMIZE
+              pcb->rto = 1;
+            #else
               pcb->rto = (s16_t)LWIP_MIN(calc_rto, 0x7FFF);
+            #endif
             }
 
             /* Reset the retransmission timer. */
             pcb->rtime = tcp_ticks;
 
+            #ifndef BL_TCP_OPTIMIZE
             /* Reduce congestion window and ssthresh. */
             eff_wnd = LWIP_MIN(pcb->cwnd, pcb->snd_wnd);
             pcb->ssthresh = eff_wnd >> 1;
@@ -1298,6 +1303,7 @@ tcp_slowtmr_start:
             LWIP_DEBUGF(TCP_CWND_DEBUG, ("tcp_slowtmr: cwnd %"TCPWNDSIZE_F
                                          " ssthresh %"TCPWNDSIZE_F"\n",
                                          pcb->cwnd, pcb->ssthresh));
+            #endif
             pcb->bytes_acked = 0;
 
             /* The following needs to be called AFTER cwnd is set to one

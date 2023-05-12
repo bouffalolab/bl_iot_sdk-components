@@ -23,6 +23,7 @@
 #include "bl702.h"
 #include "bl702_glb.h"
 #include "bl702_hbn.h"
+#include "bl702_aon.h"
 #include "risc-v/Core/Include/clic.h"
 
 #ifdef BFLB_EFLASH_LOADER
@@ -129,6 +130,8 @@ void SystemInit(void)
 #ifdef BFLB_EFLASH_LOADER
     Interrupt_Handler_Register(USB_IRQn, USB_DoNothing_IRQHandler);
 #endif
+    /* dcdc 1.8v -> 1.5v */
+    AON_Set_DCDC18_Top_0(0xC, 0x3);
     /* init bor for all platform */
     system_bor_init();
     /* global IRQ enable */
@@ -137,6 +140,7 @@ void SystemInit(void)
 
 void System_Post_Init(void)
 {
+    BL_WR_REG(GLB_BASE, GLB_UART_SIG_SEL_0, 0xffffffff);
     PDS_Trim_RC32M();
     HBN_Trim_RC32K();
 }

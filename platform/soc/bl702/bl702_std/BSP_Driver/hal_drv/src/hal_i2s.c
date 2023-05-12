@@ -79,7 +79,7 @@ int i2s_open(struct device *dev, uint16_t oflag)
             break;
 
         default:
-            return ERROR;
+            return -1;
             break;
     }
 
@@ -102,7 +102,7 @@ int i2s_open(struct device *dev, uint16_t oflag)
             break;
 
         default:
-            return ERROR;
+            return -1;
             break;
     }
 
@@ -124,7 +124,7 @@ int i2s_open(struct device *dev, uint16_t oflag)
             break;
 
         default:
-            return ERROR;
+            return -1;
             break;
     }
 
@@ -152,7 +152,7 @@ int i2s_open(struct device *dev, uint16_t oflag)
 
         case I2S_FS_CHANNELS_NUM_3:
             if ((i2s_device->interface_mode != I2S_MODE_DSP_A) && (i2s_device->interface_mode != I2S_MODE_DSP_B)) {
-                return ERROR;
+                return -1;
             }
 
             i2sCfg.monoMode = DISABLE;
@@ -161,14 +161,14 @@ int i2s_open(struct device *dev, uint16_t oflag)
 
         case I2S_FS_CHANNELS_NUM_4:
             if ((i2s_device->interface_mode != I2S_MODE_DSP_A) && (i2s_device->interface_mode != I2S_MODE_DSP_B)) {
-                return ERROR;
+                return -1;
             }
 
             i2sCfg.monoMode = DISABLE;
             i2sCfg.fsChannel = I2S_FS_CHANNELS_4;
 
         default:
-            return ERROR;
+            return -1;
             break;
     }
 
@@ -214,45 +214,11 @@ int i2s_control(struct device *dev, int cmd, void *args)
     I2S_CFG_Type i2sCfg;
 
     switch (cmd) {
-        case DEVICE_CTRL_SET_INT:
-            for (uint16_t i = 0, j = 1; i < 8; i++, j <<= 1) {
-                if ((uint32_t)args & j) {
-                    /* code */
-                }
-            }
-
-            break;
-
-        case DEVICE_CTRL_CLR_INT:
-            for (uint16_t i = 0, j = 1; i < 8; i++, j <<= 1) {
-                if ((uint32_t)args & j) {
-                    /* code */
-                }
-            }
-
-            break;
-
-        case DEVICE_CTRL_GET_INT:
-            /* code */
-            break;
-
-        case DEVICE_CTRL_RESUME:
-            /* code */
-            break;
-
-        case DEVICE_CTRL_SUSPEND:
-            /* code */
-            break;
-
-        case DEVICE_CTRL_CONFIG:
-            /* code */
-            break;
-
-        case DEVICE_CTRL_ATTACH_TX_DMA /* constant-expression */:
+        case DEVICE_CTRL_ATTACH_TX_DMA :
             i2s_device->tx_dma = (struct device *)args;
             break;
 
-        case DEVICE_CTRL_ATTACH_RX_DMA /* constant-expression */:
+        case DEVICE_CTRL_ATTACH_RX_DMA :
             i2s_device->rx_dma = (struct device *)args;
             break;
 
@@ -280,7 +246,7 @@ int i2s_control(struct device *dev, int cmd, void *args)
                     i2sCfg.frameSize = I2S_SIZE_FRAME_32;
                     break;
                 default:
-                    return ERROR;
+                    return -1;
                     break;
             }
             i2sCfg.audioFreqHz = Clock_Peripheral_Clock_Get(BL_PERIPHERAL_CLOCK_I2S);
@@ -289,11 +255,11 @@ int i2s_control(struct device *dev, int cmd, void *args)
             break;
 
         default:
-            return ERROR;
+            return -1;
             break;
     }
 
-    return SUCCESS;
+    return 0;
 }
 
 int i2s_write(struct device *dev, uint32_t pos, const void *buffer, uint32_t size)
@@ -317,7 +283,7 @@ int i2s_write(struct device *dev, uint32_t pos, const void *buffer, uint32_t siz
 
         return 0;
     } else {
-        return 0;
+        return -1;
     }
 }
 
@@ -342,7 +308,7 @@ int i2s_read(struct device *dev, uint32_t pos, void *buffer, uint32_t size)
 
         return 0;
     } else {
-        return 0;
+        return -1;
     }
 }
 
@@ -370,7 +336,6 @@ int i2s_register(enum i2s_index_type index, const char *name)
 
 void i2s_isr(i2s_device_t *handle)
 {
-    return;
 }
 
 void I2S_IRQ(void)

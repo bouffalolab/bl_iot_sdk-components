@@ -38,7 +38,6 @@
 
 #include <openthread/thread_ftd.h>
 
-#include "coap/coap.hpp"
 #include "coap/coap_message.hpp"
 #include "common/time_ticker.hpp"
 #include "common/timer.hpp"
@@ -52,6 +51,7 @@
 #include "thread/mle_tlvs.hpp"
 #include "thread/router_table.hpp"
 #include "thread/thread_tlvs.hpp"
+#include "thread/tmf.hpp"
 #include "thread/topology.hpp"
 
 namespace ot {
@@ -77,6 +77,7 @@ class MleRouter : public Mle
     friend class Mle;
     friend class ot::Instance;
     friend class ot::TimeTicker;
+    friend class Tmf::Agent;
 
 public:
     /**
@@ -388,7 +389,7 @@ public:
      * @retval kErrorNoRoute   The destination is not reachable and the message should be dropped.
      *
      */
-    Error CheckReachability(uint16_t aMeshDest, Ip6::Header &aIp6Header);
+    Error CheckReachability(uint16_t aMeshDest, const Ip6::Header &aIp6Header);
 
     /**
      * This method resolves 2-hop routing loops.
@@ -570,15 +571,6 @@ public:
     void SetThreadVersionCheckEnabled(bool aEnabled) { mThreadVersionCheckEnabled = aEnabled; }
 #endif
 
-    /**
-     * This function sends an Address Release.
-     *
-     * @param[in] aResponseHandler        A pointer to a function that is called upon response reception or time-out.
-     * @param[in] aResponseHandlerContext A pointer to callback application-specific context.
-     *
-     */
-    void SendAddressRelease(Coap::ResponseHandler aResponseHandler = nullptr, void *aResponseHandlerContext = nullptr);
-
 private:
     static constexpr uint16_t kDiscoveryMaxJitter            = 250;  // Max jitter delay Discovery Responses (in msec).
     static constexpr uint32_t kStateUpdatePeriod             = 1000; // State update period (in msec).
@@ -615,22 +607,21 @@ private:
                                      ThreadStatusTlv::Status aResponseStatus,
                                      const Router *          aRouter,
                                      const Ip6::MessageInfo &aMessageInfo);
+    void  SendAddressRelease(void);
     void  SendAdvertisement(void);
     Error SendLinkAccept(const Ip6::MessageInfo &aMessageInfo,
                          Neighbor *              aNeighbor,
-                         const RequestedTlvs &   aRequestedTlvs,
+                         const TlvList &         aRequestedTlvList,
                          const Challenge &       aChallenge);
     void  SendParentResponse(Child *aChild, const Challenge &aChallenge, bool aRoutersOnlyRequest);
     Error SendChildIdResponse(Child &aChild);
     Error SendChildUpdateRequest(Child &aChild);
     void  SendChildUpdateResponse(Child *                 aChild,
                                   const Ip6::MessageInfo &aMessageInfo,
-                                  const uint8_t *         aTlvs,
-                                  uint8_t                 aTlvsLength,
+                                  const TlvList &         aTlvList,
                                   const Challenge &       aChallenge);
     void  SendDataResponse(const Ip6::Address &aDestination,
-                           const uint8_t *     aTlvs,
-                           uint8_t             aTlvsLength,
+                           const TlvList &     aTlvList,
                            uint16_t            aDelay,
                            const Message *     aRequestMessage = nullptr);
     Error SendDiscoveryResponse(const Ip6::Address &aDestination, const Message &aDiscoverRequestMessage);
@@ -648,10 +639,8 @@ private:
                                              const otMessageInfo *aMessageInfo,
                                              Error                aResult);
     void HandleAddressSolicitResponse(Coap::Message *aMessage, const Ip6::MessageInfo *aMessageInfo, Error aResult);
-    static void HandleAddressRelease(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
-    void        HandleAddressRelease(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
-    static void HandleAddressSolicit(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
-    void        HandleAddressSolicit(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
+
+    template <Uri kUri> void HandleTmf(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 
     static bool IsSingleton(const RouteTlv &aRouteTlv);
 
@@ -669,9 +658,6 @@ private:
     void        HandleTimeTick(void);
 
     TrickleTimer mAdvertiseTrickleTimer;
-
-    Coap::Resource mAddressSolicit;
-    Coap::Resource mAddressRelease;
 
     ChildTable  mChildTable;
     RouterTable mRouterTable;
@@ -721,6 +707,9 @@ private:
     otThreadDiscoveryRequestCallback mDiscoveryRequestCallback;
     void *                           mDiscoveryRequestCallbackContext;
 };
+
+DeclareTmfHandler(MleRouter, kUriAddressSolicit);
+DeclareTmfHandler(MleRouter, kUriAddressRelease);
 
 #endif // OPENTHREAD_FTD
 

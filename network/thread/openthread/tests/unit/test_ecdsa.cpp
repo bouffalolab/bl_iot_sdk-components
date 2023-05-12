@@ -66,12 +66,14 @@ void TestEcdsaVector(void)
 
     const uint8_t kMessage[] = {'s', 'a', 'm', 'p', 'l', 'e'};
 
+#if OPENTHREAD_CONFIG_DETERMINISTIC_ECDSA_ENABLE
     const uint8_t kExpectedSignature[] = {
         0xEF, 0xD4, 0x8B, 0x2A, 0xAC, 0xB6, 0xA8, 0xFD, 0x11, 0x40, 0xDD, 0x9C, 0xD4, 0x5E, 0x81, 0xD6,
         0x9D, 0x2C, 0x87, 0x7B, 0x56, 0xAA, 0xF9, 0x91, 0xC3, 0x4D, 0x0E, 0xA8, 0x4E, 0xAF, 0x37, 0x16,
         0xF7, 0xCB, 0x1C, 0x94, 0x2D, 0x65, 0x7C, 0x41, 0xD4, 0x36, 0xC7, 0xA1, 0xB6, 0xE2, 0x9F, 0x65,
         0xF3, 0xE9, 0x00, 0xDB, 0xB9, 0xAF, 0xF4, 0x06, 0x4D, 0xC4, 0xAB, 0x2F, 0x84, 0x3A, 0xCD, 0xA8,
     };
+#endif
 
     Instance *instance = testInitInstance();
 
@@ -83,10 +85,10 @@ void TestEcdsaVector(void)
 
     VerifyOrQuit(instance != nullptr, "Null OpenThread instance");
 
-    printf("\r\n===========================================================================\r\n");
-    printf("Test ECDA with test vector from RFC 6979 (A.2.5)\r\n");
+    printf("\n===========================================================================\n");
+    printf("Test ECDA with test vector from RFC 6979 (A.2.5)\n");
 
-    printf("\r\nLoading key-pair ----------------------------------------------------------\r\n");
+    printf("\nLoading key-pair ----------------------------------------------------------\n");
     memcpy(keyPair.GetDerBytes(), kKeyPairInfo, sizeof(kKeyPairInfo));
     keyPair.SetDerLength(sizeof(kKeyPairInfo));
 
@@ -99,33 +101,35 @@ void TestEcdsaVector(void)
     VerifyOrQuit(memcmp(publicKey.GetBytes(), kPublicKey, sizeof(kPublicKey)) == 0,
                  "KeyPair::GetPublicKey() did not return the expected key");
 
-    printf("\r\nHash the message ----------------------------------------------------------\r\n");
+    printf("\nHash the message ----------------------------------------------------------\n");
     sha256.Start();
     sha256.Update(kMessage);
     sha256.Finish(hash);
 
     DumpBuffer("Hash", hash.GetBytes(), sizeof(hash));
 
-    printf("\r\nSign the message ----------------------------------------------------------\r\n");
+    printf("\nSign the message ----------------------------------------------------------\n");
     SuccessOrQuit(keyPair.Sign(hash, signature));
     DumpBuffer("Signature", signature.GetBytes(), sizeof(signature));
 
-    printf("\r\nCheck signature against expected sequence----------------------------------\r\n");
+#if OPENTHREAD_CONFIG_DETERMINISTIC_ECDSA_ENABLE
+    printf("\nCheck signature against expected sequence----------------------------------\n");
     DumpBuffer("Expected signature", kExpectedSignature, sizeof(kExpectedSignature));
 
     VerifyOrQuit(sizeof(kExpectedSignature) == sizeof(signature));
     VerifyOrQuit(memcmp(signature.GetBytes(), kExpectedSignature, sizeof(kExpectedSignature)) == 0);
 
-    printf("Signature matches expected sequence.\r\n");
+    printf("Signature matches expected sequence.\n");
+#endif
 
-    printf("\r\nVerify the signature ------------------------------------------------------\r\n");
+    printf("\nVerify the signature ------------------------------------------------------\n");
     SuccessOrQuit(publicKey.Verify(hash, signature));
-    printf("\r\nSignature was verified successfully.\r\n\r\n");
+    printf("\nSignature was verified successfully.\n\n");
 
     testFreeInstance(instance);
 }
 
-void TestEdsaKeyGenerationSignAndVerify(void)
+void TestEcdsaKeyGenerationSignAndVerify(void)
 {
     Instance *instance = testInitInstance();
 
@@ -139,10 +143,10 @@ void TestEdsaKeyGenerationSignAndVerify(void)
 
     VerifyOrQuit(instance != nullptr, "Null OpenThread instance");
 
-    printf("\r\n===========================================================================\r\n");
-    printf("Test ECDA key generation, signing and verification\r\n");
+    printf("\n===========================================================================\n");
+    printf("Test ECDA key generation, signing and verification\n");
 
-    printf("\r\nGenerating key-pair -------------------------------------------------------\r\n");
+    printf("\nGenerating key-pair -------------------------------------------------------\n");
     SuccessOrQuit(keyPair.Generate());
 
     DumpBuffer("KeyPair", keyPair.GetDerBytes(), keyPair.GetDerLength());
@@ -150,26 +154,26 @@ void TestEdsaKeyGenerationSignAndVerify(void)
     SuccessOrQuit(keyPair.GetPublicKey(publicKey));
     DumpBuffer("PublicKey", publicKey.GetBytes(), Ecdsa::P256::PublicKey::kSize);
 
-    printf("\r\nHash the message ----------------------------------------------------------\r\n");
+    printf("\nHash the message ----------------------------------------------------------\n");
     sha256.Start();
     sha256.Update(kMessage, sizeof(kMessage) - 1);
     sha256.Finish(hash);
 
     DumpBuffer("Hash", hash.GetBytes(), sizeof(hash));
 
-    printf("\r\nSign the message ----------------------------------------------------------\r\n");
+    printf("\nSign the message ----------------------------------------------------------\n");
     SuccessOrQuit(keyPair.Sign(hash, signature));
     DumpBuffer("Signature", signature.GetBytes(), sizeof(signature));
 
-    printf("\r\nVerify the signature ------------------------------------------------------\r\n");
+    printf("\nVerify the signature ------------------------------------------------------\n");
     SuccessOrQuit(publicKey.Verify(hash, signature));
-    printf("\r\nSignature was verified successfully.");
+    printf("\nSignature was verified successfully.");
 
     sha256.Start();
     sha256.Update(kMessage, sizeof(kMessage)); // include null char
     sha256.Finish(hash);
     VerifyOrQuit(publicKey.Verify(hash, signature) != kErrorNone, "PublicKey::Verify() passed for invalid signature");
-    printf("\r\nSignature verification correctly failed with incorrect hash/signature.\r\n\r\n");
+    printf("\nSignature verification correctly failed with incorrect hash/signature.\n\n");
 
     testFreeInstance(instance);
 }
@@ -179,14 +183,14 @@ void TestEdsaKeyGenerationSignAndVerify(void)
 
 #endif // OPENTHREAD_CONFIG_ECDSA_ENABLE
 
-extern "C" int test_ecdsa(void)
+int main(void)
 {
 #if OPENTHREAD_CONFIG_ECDSA_ENABLE
     ot::Crypto::TestEcdsaVector();
-    ot::Crypto::TestEdsaKeyGenerationSignAndVerify();
-    printf("All tests passed\r\n");
+    ot::Crypto::TestEcdsaKeyGenerationSignAndVerify();
+    printf("All tests passed\n");
 #else
-    printf("ECDSA feature is not enabled\r\n");
+    printf("ECDSA feature is not enabled\n");
 #endif
 
     return 0;

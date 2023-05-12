@@ -125,6 +125,7 @@ SOURCES_COMMON                                  = \
     api/backbone_router_ftd_api.cpp               \
     api/border_agent_api.cpp                      \
     api/border_router_api.cpp                     \
+    api/border_routing_api.cpp                    \
     api/channel_manager_api.cpp                   \
     api/channel_monitor_api.cpp                   \
     api/child_supervision_api.cpp                 \
@@ -152,6 +153,7 @@ SOURCES_COMMON                                  = \
     api/logging_api.cpp                           \
     api/message_api.cpp                           \
     api/multi_radio_api.cpp                       \
+    api/nat64_api.cpp                             \
     api/netdata_api.cpp                           \
     api/netdata_publisher_api.cpp                 \
     api/netdiag_api.cpp                           \
@@ -166,6 +168,7 @@ SOURCES_COMMON                                  = \
     api/srp_server_api.cpp                        \
     api/tasklet_api.cpp                           \
     api/tcp_api.cpp                               \
+    api/tcp_ext_api.cpp                           \
     api/thread_api.cpp                            \
     api/thread_ftd_api.cpp                        \
     api/trel_api.cpp                              \
@@ -186,6 +189,8 @@ SOURCES_COMMON                                  = \
     common/crc16.cpp                              \
     common/data.cpp                               \
     common/error.cpp                              \
+    common/frame_builder.cpp                      \
+    common/frame_data.cpp                         \
     common/heap.cpp                               \
     common/heap_data.cpp                          \
     common/heap_string.cpp                        \
@@ -252,12 +257,13 @@ SOURCES_COMMON                                  = \
     net/dns_types.cpp                             \
     net/dnssd_server.cpp                          \
     net/icmp6.cpp                                 \
-    net/ip4_address.cpp                           \
+    net/ip4_types.cpp                             \
     net/ip6.cpp                                   \
     net/ip6_address.cpp                           \
     net/ip6_filter.cpp                            \
     net/ip6_headers.cpp                           \
     net/ip6_mpl.cpp                               \
+    net/nat64_translator.cpp                      \
     net/nd6.cpp                                   \
     net/nd_agent.cpp                              \
     net/netif.cpp                                 \
@@ -266,6 +272,7 @@ SOURCES_COMMON                                  = \
     net/srp_client.cpp                            \
     net/srp_server.cpp                            \
     net/tcp6.cpp                                  \
+    net/tcp6_ext.cpp                              \
     net/udp6.cpp                                  \
     radio/radio.cpp                               \
     radio/radio_callbacks.cpp                     \
@@ -285,6 +292,7 @@ SOURCES_COMMON                                  = \
     thread/indirect_sender.cpp                    \
     thread/key_manager.cpp                        \
     thread/link_metrics.cpp                       \
+    thread/link_metrics_types.cpp                 \
     thread/link_quality.cpp                       \
     thread/lowpan.cpp                             \
     thread/mesh_forwarder.cpp                     \
@@ -436,6 +444,8 @@ HEADERS_COMMON                                  = \
     common/equatable.hpp                          \
     common/error.hpp                              \
     common/extension.hpp                          \
+    common/frame_builder.hpp                      \
+    common/frame_data.hpp                         \
     common/heap.hpp                               \
     common/heap_allocatable.hpp                   \
     common/heap_array.hpp                         \
@@ -452,6 +462,7 @@ HEADERS_COMMON                                  = \
     common/new.hpp                                \
     common/non_copyable.hpp                       \
     common/notifier.hpp                           \
+    common/num_utils.hpp                          \
     common/numeric_limits.hpp                     \
     common/owned_ptr.hpp                          \
     common/owning_list.hpp                        \
@@ -473,7 +484,9 @@ HEADERS_COMMON                                  = \
     common/uptime.hpp                             \
     config/announce_sender.h                      \
     config/backbone_router.h                      \
+    config/border_agent.h                         \
     config/border_router.h                        \
+    config/border_routing.h                       \
     config/channel_manager.h                      \
     config/channel_monitor.h                      \
     config/child_supervision.h                    \
@@ -497,6 +510,7 @@ HEADERS_COMMON                                  = \
     config/mac.h                                  \
     config/misc.h                                 \
     config/mle.h                                  \
+    config/nat64.h                                \
     config/netdata_publisher.h                    \
     config/openthread-core-config-check.h         \
     config/parent_search.h                        \
@@ -556,13 +570,14 @@ HEADERS_COMMON                                  = \
     net/dns_types.hpp                             \
     net/dnssd_server.hpp                          \
     net/icmp6.hpp                                 \
-    net/ip4_address.hpp                           \
+    net/ip4_types.hpp                             \
     net/ip6.hpp                                   \
     net/ip6_address.hpp                           \
     net/ip6_filter.hpp                            \
     net/ip6_headers.hpp                           \
     net/ip6_mpl.hpp                               \
     net/ip6_types.hpp                             \
+    net/nat64_translator.hpp                      \
     net/nd6.hpp                                   \
     net/nd_agent.hpp                              \
     net/netif.hpp                                 \
@@ -571,6 +586,7 @@ HEADERS_COMMON                                  = \
     net/srp_client.hpp                            \
     net/srp_server.hpp                            \
     net/tcp6.hpp                                  \
+    net/tcp6_ext.hpp                              \
     net/udp6.hpp                                  \
     openthread-core-config.h                      \
     radio/max_power_table.hpp                     \
@@ -593,6 +609,7 @@ HEADERS_COMMON                                  = \
     thread/key_manager.hpp                        \
     thread/link_metrics.hpp                       \
     thread/link_metrics_tlvs.hpp                  \
+    thread/link_metrics_types.hpp                 \
     thread/link_quality.hpp                       \
     thread/lowpan.hpp                             \
     thread/mesh_forwarder.hpp                     \
@@ -624,6 +641,7 @@ HEADERS_COMMON                                  = \
     thread/tmf.hpp                                \
     thread/topology.hpp                           \
     thread/uri_paths.hpp                          \
+    thread/version.hpp                            \
     utils/channel_manager.hpp                     \
     utils/channel_monitor.hpp                     \
     utils/child_supervision.hpp                   \

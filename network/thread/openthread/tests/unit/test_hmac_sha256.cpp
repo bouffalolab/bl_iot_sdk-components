@@ -83,7 +83,7 @@ void TestSha256(void)
         {kData4, kHash4},
     };
 
-    printf("TestSha256\r\n");
+    printf("TestSha256\n");
 
     Instance *   instance = testInitInstance();
     MessagePool *messagePool;
@@ -232,7 +232,7 @@ void TestHmacSha256(void)
     uint16_t     offsets[GetArrayLength(kTestCases)];
     uint8_t      index;
 
-    printf("TestHmacSha256\r\n");
+    printf("TestHmacSha256\n");
 
     VerifyOrQuit(instance != nullptr);
 
@@ -284,10 +284,10 @@ void TestHmacSha256(void)
 
 } // namespace ot
 
-extern "C" int test_hmac_sha256(void)
+int main(void)
 {
     ot::TestSha256();
     ot::TestHmacSha256();
-    printf("All tests passed\r\n");
+    printf("All tests passed\n");
     return 0;
 }

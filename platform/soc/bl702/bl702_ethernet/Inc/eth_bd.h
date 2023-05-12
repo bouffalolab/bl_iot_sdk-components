@@ -7,7 +7,7 @@
 
 #define ETH_RXNB  6
 #define ETH_TXNB  4
-struct netif eth_mac;
+
 #define EMAC_TX_COMMON_FLAGS   (EMAC_BD_FIELD_MSK(TX_RD)  | \
                                 EMAC_BD_FIELD_MSK(TX_IRQ) | \
                                 EMAC_BD_FIELD_MSK(TX_PAD) | \
@@ -46,6 +46,8 @@ typedef enum {
 
 
 typedef int (*eth_callback)(eth_link_state val);
+
+extern struct netif eth_mac;
 
 int ethernet_init(eth_callback cb);
 #endif

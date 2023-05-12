@@ -40,6 +40,7 @@
 #include "thread/mesh_forwarder.hpp"
 #include "thread/mle.hpp"
 #include "thread/mle_router.hpp"
+#include "thread/version.hpp"
 
 namespace ot {
 namespace Mle {
@@ -48,7 +49,8 @@ DiscoverScanner::DiscoverScanner(Instance &aInstance)
     : InstanceLocator(aInstance)
     , mHandler(nullptr)
     , mHandlerContext(nullptr)
-    , mTimer(aInstance, DiscoverScanner::HandleTimer)
+    , mScanDoneTask(aInstance)
+    , mTimer(aInstance)
     , mFilterIndexes()
     , mState(kStateIdle)
     , mScanChannel(0)
@@ -246,20 +248,22 @@ void DiscoverScanner::HandleDiscoverComplete(void)
             mShouldRestorePanId = false;
         }
 
-        mState = kStateIdle;
-
-        if (mHandler)
-        {
-            mHandler(nullptr, mHandlerContext);
-        }
-
+        // Post the tasklet to change `mState` and invoke handler
+        // callback. This allows users to safely call OT APIs from
+        // the callback.
+        mScanDoneTask.Post();
         break;
     }
 }
 
-void DiscoverScanner::HandleTimer(Timer &aTimer)
+void DiscoverScanner::HandleScanDoneTask(void)
 {
-    aTimer.Get<DiscoverScanner>().HandleTimer();
+    mState = kStateIdle;
+
+    if (mHandler != nullptr)
+    {
+        mHandler(nullptr, mHandlerContext);
+    }
 }
 
 void DiscoverScanner::HandleTimer(void)
@@ -357,7 +361,7 @@ void DiscoverScanner::HandleDiscoveryResponse(Mle::RxInfo &aRxInfo) const
 
                 steeringData.Init(dataLength);
 
-                SuccessOrExit(error = Tlv::ReadTlv(aRxInfo.mMessage, offset, steeringData.GetData(), dataLength));
+                SuccessOrExit(error = Tlv::ReadTlvValue(aRxInfo.mMessage, offset, steeringData.GetData(), dataLength));
 
                 if (mEnableFiltering)
                 {

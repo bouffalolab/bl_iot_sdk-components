@@ -275,6 +275,17 @@ static bool oobd_present;
 static bool sc_supported;
 static const u8_t *sc_public_key;
 
+#if defined(BFLB_BLE_SMP_LOCAL_AUTH)
+#define SMP_INVALID_AUTH 0xFF
+u8_t local_auth = SMP_INVALID_AUTH;
+#endif
+
+#if defined(BFLB_BLE)
+struct k_sem sc_local_pkey_ready;
+#else
+static K_SEM_DEFINE(sc_local_pkey_ready, 0, 1);
+#endif
+
 #if defined(BFLB_BLE_SMP_SC_ONLY)
 static bool force_smp_sc_only_flag = 0;
 void bt_smp_set_sc_only(bool sc_only)
@@ -287,15 +298,12 @@ void bt_smp_set_sc_only(bool sc_only)
     force_smp_sc_only_flag = sc_only;
 }
 #endif
-#if defined(BFLB_BLE_SMP_LOCAL_AUTH)
-#define SMP_INVALID_AUTH 0xFF
-u8_t local_auth = SMP_INVALID_AUTH;
-#endif
 
-#if defined(BFLB_BLE)
-struct k_sem sc_local_pkey_ready;
-#else
-static K_SEM_DEFINE(sc_local_pkey_ready, 0, 1);
+#if defined(BFLB_BLE_SMP_SUPPORT_DISABLE_PAIR)
+void bt_smp_disable_pair(bool disable)
+{
+    bt_dev.disable_pair = disable;
+}
 #endif
 
 #if defined(CONFIG_AUTO_PTS)
@@ -2663,6 +2671,9 @@ static u8_t smp_master_ident(struct bt_smp *smp, struct net_buf *buf)
 
 static int smp_init(struct bt_smp *smp)
 {
+    #if defined(BFLB_BLE_SMP_SUPPORT_DISABLE_PAIR)
+    bt_dev.disable_pair = false;
+    #endif
 	/* Initialize SMP context without clearing L2CAP channel context */
 	(void)memset((u8_t *)smp + sizeof(smp->chan), 0,
 		     sizeof(*smp) - (sizeof(smp->chan) + sizeof(smp->work)));
@@ -2955,6 +2966,11 @@ static u8_t smp_pairing_req(struct bt_smp *smp, struct net_buf *buf)
 	struct bt_smp_pairing *rsp;
 
 	BT_DBG("");
+
+    #if defined(BFLB_BLE_SMP_SUPPORT_DISABLE_PAIR)
+    if(bt_dev.disable_pair)
+        return BT_SMP_ERR_PAIRING_NOTSUPP;
+    #endif
 
 	if ((req->max_key_size > BT_SMP_MAX_ENC_KEY_SIZE) ||
 	    (req->max_key_size < BT_SMP_MIN_ENC_KEY_SIZE)) {
@@ -3964,6 +3980,10 @@ static u8_t smp_security_request(struct bt_smp *smp, struct net_buf *buf)
 
 	BT_DBG("");
 
+    #if defined(BFLB_BLE_SMP_SUPPORT_DISABLE_PAIR)
+    if(bt_dev.disable_pair)
+        return BT_SMP_ERR_PAIRING_NOTSUPP;
+    #endif
 	if (atomic_test_bit(smp->flags, SMP_FLAG_PAIRING)) {
 		/* We have already started pairing process */
 		return 0;

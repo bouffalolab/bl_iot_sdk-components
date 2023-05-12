@@ -230,11 +230,12 @@ SECTIONS
 
   .psram (NOLOAD) :
   {
+    PROVIDE( _psram_start = . );
     *(.wifi_ram*)
     . = ALIGN(16);
   } > psram
-
   . = ALIGN(8);
+  PROVIDE( _psram_end = . );
   PROVIDE( _heap3_start = . );
   PROVIDE( _heap3_size = ORIGIN(psram) + LENGTH(psram) - _heap3_start );
 

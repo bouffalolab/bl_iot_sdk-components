@@ -54,13 +54,13 @@ static HeapRegion_t xHeapRegions[] =
     { NULL, 0 } /* Terminates the array. */
 };
 #if defined(CFG_USE_PSRAM)
-        extern uint8_t _heap3_start;
-        extern uint8_t _heap3_size; // @suppress("Type cannot be resolved")
-        static const HeapRegion_t xHeapRegionsPsram[] =
-        {
-            { &_heap3_start, (unsigned int) &_heap3_size},
-            { NULL, 0 } /* Terminates the array. */
-        };
+extern uint8_t _heap3_start;
+extern uint8_t _heap3_size; // @suppress("Type cannot be resolved")
+static const HeapRegion_t xHeapRegionsPsram[] =
+{
+    { &_heap3_start, (unsigned int) &_heap3_size},
+    { NULL, 0 } /* Terminates the array. */
+};
 #endif /* CFG_USE_PSRAM */
 
 void __attribute__((weak)) vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName )
@@ -308,6 +308,15 @@ void setup_heap()
 
     // Invoked during system boot via start.S
     vPortDefineHeapRegions(xHeapRegions);
+
+#if defined(CFG_USE_PSRAM)
+    extern uint8_t _psram_start;
+    extern uint8_t _psram_end;
+
+    bl_psram_init();
+    memset(&_psram_start, 0, &_psram_end - &_psram_start);
+    vPortDefineHeapRegionsPsram(xHeapRegionsPsram);
+#endif /*CFG_USE_PSRAM*/
 }
 
 static void system_early_init(void)
@@ -327,13 +336,6 @@ static void system_early_init(void)
     /* To be added... */
     /* board config is set after system is init*/
     hal_board_cfg(0);
-
-#if defined(CFG_USE_PSRAM)
-    bl_psram_init();
-    vPortDefineHeapRegionsPsram(xHeapRegionsPsram);
-    printf("PSRAM Heap %u@%p\r\n",(unsigned int)&_heap3_size, &_heap3_start);
-#endif /*CFG_USE_PSRAM*/
-
 }
 
 void bl702_main()
@@ -358,6 +360,10 @@ void bl702_main()
     );
 
     system_early_init();
+
+#if defined(CFG_USE_PSRAM)
+    printf("PSRAM Heap %u@%p\r\n",(unsigned int)&_heap3_size, &_heap3_start);
+#endif /*CFG_USE_PSRAM*/
 
     puts("[OS] Starting aos_loop_proc task...\r\n");
     xTaskCreateStatic(aos_loop_proc, (char*)"event_loop", sizeof(aos_loop_proc_stack)/4, NULL, SYS_AOS_LOOP_TASK_PRIORITY, aos_loop_proc_stack, &aos_loop_proc_task);

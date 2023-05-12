@@ -37,6 +37,22 @@
 extern "C" {
 #endif
 
+#define WIFI_EVENT_BEACON_IND_AUTH_OPEN            0
+#define WIFI_EVENT_BEACON_IND_AUTH_WEP             1
+#define WIFI_EVENT_BEACON_IND_AUTH_WPA_PSK         2
+#define WIFI_EVENT_BEACON_IND_AUTH_WPA2_PSK        3
+#define WIFI_EVENT_BEACON_IND_AUTH_WPA_WPA2_PSK    4
+#define WIFI_EVENT_BEACON_IND_AUTH_WPA_ENT         5
+#define WIFI_EVENT_BEACON_IND_AUTH_WPA3_SAE        6
+#define WIFI_EVENT_BEACON_IND_AUTH_WPA2_PSK_WPA3_SAE 7
+#define WIFI_EVENT_BEACON_IND_AUTH_UNKNOWN      0xff
+
+#define WIFI_EVENT_BEACON_IND_CIPHER_NONE           0
+#define WIFI_EVENT_BEACON_IND_CIPHER_WEP            1
+#define WIFI_EVENT_BEACON_IND_CIPHER_AES            2
+#define WIFI_EVENT_BEACON_IND_CIPHER_TKIP           3
+#define WIFI_EVENT_BEACON_IND_CIPHER_TKIP_AES       4
+
 enum ap_info_type {
     /* The current AP information is advisory. When the AP fails to connect
     * through its specified parameters, the information is no longer used
@@ -99,28 +115,6 @@ struct bl_rx_info {
     uint8_t format_mod;
 };
 typedef struct bl_rx_info bl_rx_info_t;
-
-typedef enum {
-    WM_WIFI_CIPHER_NONE = 0,
-    WM_WIFI_CIPHER_WEP,
-    WM_WIFI_CIPHER_AES,
-    WM_WIFI_CIPHER_TKIP,
-    WM_WIFI_CIPHER_TKIP_AES,
-    WM_WIFI_CIPHER_MAX,
-} wifi_mgmr_ap_cipher_t;
-
-typedef enum {
-    WM_WIFI_AUTH_UNKNOWN = 0,
-    WM_WIFI_AUTH_OPEN,
-    WM_WIFI_AUTH_WEP,
-    WM_WIFI_AUTH_WPA_PSK,
-    WM_WIFI_AUTH_WPA2_PSK,
-    WM_WIFI_AUTH_WPA_WPA2_PSK,
-    WM_WIFI_AUTH_WPA_ENTERPRISE,
-    WM_WIFI_AUTH_WPA3_SAE,
-    WM_WIFI_AUTH_WPA2_PSK_WPA3_SAE,
-    WM_WIFI_AUTH_MAX,
-} wifi_mgmr_ap_auth_mode_t;
 
 typedef struct wifi_mgmr_ap_item {
     char ssid[32];
@@ -203,6 +197,11 @@ enum WIFI_SCAN_DONE_EVENT_TYPE {
     WIFI_SCAN_DONE_EVENT_BUSY                       = 0x01,
 };
 
+enum WIFI_PS_SET_DONE_EVENT_TYPE {
+    WIFI_PS_SET_DONE_EVENT_OK                       = 0x00,
+    WIFI_PS_SET_DONE_EVENT_FAIL                     = 0x01,
+};
+
 enum WIFI_COEX_PM_LEVEL {
     WIFI_COEX_PM_STA_NONE = PM_MODE_STA_NONE,
     WIFI_COEX_PM_STA_IDLE = PM_MODE_STA_IDLE,
@@ -243,7 +242,8 @@ int wifi_mgmr_sta_connect(wifi_interface_t *wifi_interface, char *ssid, char *ps
 int wifi_mgmr_sta_disconnect(void);
 int wifi_sta_ip4_addr_get(uint32_t *addr, uint32_t *mask, uint32_t *gw, uint32_t *dns);
 int wifi_mgmr_sta_ps_enter(uint32_t ps_level);
-int wifi_mgmr_sta_ps_exit();
+int wifi_mgmr_sta_ps_exit(void);
+int wifi_mgmr_sta_ps_get(void);
 int wifi_mgmr_sta_autoconnect_enable(void);
 int wifi_mgmr_sta_autoconnect_disable(void);
 void wifi_mgmr_sta_ssid_set(char *ssid);
@@ -288,6 +288,7 @@ int wifi_mgmr_scan_complete_callback();
 int wifi_mgmr_cli_scanlist(void);
 int wifi_mgmr_cli_init(void);
 int wifi_mgmr_scan_ap(char *ssid, wifi_mgmr_ap_item_t *item);
+uint32_t wifi_mgmr_sta_scanlist_nums_get();
 int wifi_mgmr_scan_ap_all(wifi_mgmr_ap_item_t *env, uint32_t *param1, scan_item_cb_t cb);
 int wifi_mgmr_raw_80211_send(uint8_t *pkt, int len);
 int wifi_mgmr_set_country_code(char *country_code);

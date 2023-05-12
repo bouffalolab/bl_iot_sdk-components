@@ -58,7 +58,9 @@
 
 #include "config/announce_sender.h"
 #include "config/backbone_router.h"
+#include "config/border_agent.h"
 #include "config/border_router.h"
+#include "config/border_routing.h"
 #include "config/channel_manager.h"
 #include "config/channel_monitor.h"
 #include "config/child_supervision.h"
@@ -82,6 +84,7 @@
 #include "config/mac.h"
 #include "config/misc.h"
 #include "config/mle.h"
+#include "config/nat64.h"
 #include "config/netdata_publisher.h"
 #include "config/parent_search.h"
 #include "config/ping_sender.h"
