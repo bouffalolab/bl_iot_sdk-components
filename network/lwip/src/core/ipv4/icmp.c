@@ -51,6 +51,11 @@
 
 #include <string.h>
 
+#ifdef BL_DUAL_STACK
+#include "lwip/etharp.h"
+#include <bl_dual_stack_input.h>
+#endif
+
 #ifdef LWIP_HOOK_FILENAME
 #include LWIP_HOOK_FILENAME
 #endif
@@ -113,6 +118,13 @@ icmp_input(struct pbuf *p, struct netif *inp)
       /* This is OK, echo reply might have been parsed by a raw PCB
          (as obviously, an echo request has been sent, too). */
       MIB2_STATS_INC(mib2.icmpinechoreps);
+#ifdef BL_DUAL_STACK
+      pbuf_header_force(p, (s16_t)(SIZEOF_ETH_HDR + ip_current_header_tot_len()));
+      pbuf_ref(p);
+      if (bl_dual_stack_peer_input(p, NULL)) {
+        pbuf_free(p);
+      }
+#endif
       break;
     case ICMP_ECHO:
       MIB2_STATS_INC(mib2.icmpinechos);

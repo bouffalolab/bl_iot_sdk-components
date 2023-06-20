@@ -643,7 +643,6 @@ PROVIDE(zb_simple_check_time_expire = 0x0000000021034772);
 PROVIDE(zb_simple_pds_fastboot_done_callback = 0x00000000210347d4);
 PROVIDE(otPlatALarm_msTimerCallback = 0x0000000021034a1c);
 PROVIDE(ot_alarmInit = 0x0000000021034a3c);
-PROVIDE(otPlatAlarmMilliStartAt = 0x0000000021034a6c);
 PROVIDE(otPlatAlarmMilliStop = 0x0000000021034ae4);
 PROVIDE(otPlatAlarmMilliGetNow = 0x0000000021034b16);
 PROVIDE(otPlatTimeGet = 0x0000000021034b34);

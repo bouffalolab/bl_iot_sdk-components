@@ -4514,6 +4514,15 @@ static void bt_smp_encrypt_change(struct bt_l2cap_chan *chan,
 	atomic_clear_bit(smp->flags, SMP_FLAG_ENC_PENDING);
 
 	if (hci_status) {
+		#ifdef BFLB_BLE_AUTO_CLEAN_KEY_WHEN_KEY_MISSING
+		if(hci_status == BT_HCI_ERR_PIN_OR_KEY_MISSING ){
+			smp_reset(smp);
+			if(conn->le.keys){
+				bt_keys_clear(conn->le.keys);
+				conn->le.keys = NULL;
+			}
+		}
+		#endif /* BFLB_BLE_AUTO_CLEAN_KEY_WHEN_KEY_MISSING */
 		return;
 	}
 

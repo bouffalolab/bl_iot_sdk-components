@@ -215,7 +215,7 @@ int bl_sys_early_init(void)
 #if !(defined(CFG_PDS_ENABLE) || defined(CFG_HBN_ENABLE))
     GLB_Set_System_CLK(GLB_DLL_XTAL_32M, GLB_SYS_CLK_DLL128M);
     HBN_Set_XCLK_CLK_Sel(HBN_XCLK_CLK_XTAL);
-    GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_BCLK, 0);
+    GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_42P67M, 0);
 #else
     GLB_Set_System_CLK(GLB_DLL_XTAL_32M, GLB_SYS_CLK_XTAL);
     GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_XCLK, 0);

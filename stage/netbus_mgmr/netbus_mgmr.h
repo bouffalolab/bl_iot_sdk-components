@@ -78,6 +78,7 @@ enum {
     BFLB_CMD_STOP_AP,
 
     BFLB_CMD_PING,
+    BFLB_CMD_HBN,
 
     BFLB_CMD_EXT,
 };

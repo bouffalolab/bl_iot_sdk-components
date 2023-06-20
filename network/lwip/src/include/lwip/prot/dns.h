@@ -109,12 +109,20 @@ struct dns_hdr {
   PACK_STRUCT_FIELD(u16_t numauthrr);
   PACK_STRUCT_FIELD(u16_t numextrarr);
 } PACK_STRUCT_STRUCT;
+
+struct dns_ans {
+  PACK_STRUCT_FIELD(u16_t name);
+  PACK_STRUCT_FIELD(u16_t type);
+  PACK_STRUCT_FIELD(u16_t class);
+  PACK_STRUCT_FIELD(u32_t ttl);
+  PACK_STRUCT_FIELD(u16_t len);
+  PACK_STRUCT_FIELD(ip_addr_t addr);
+} PACK_STRUCT_STRUCT;
 PACK_STRUCT_END
 #ifdef PACK_STRUCT_USE_INCLUDES
 #  include "arch/epstruct.h"
 #endif
 #define SIZEOF_DNS_HDR 12
-
 
 /* Multicast DNS definitions */
 

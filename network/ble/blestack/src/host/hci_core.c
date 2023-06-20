@@ -109,7 +109,7 @@ static bt_ready_cb_t ready_cb;
 
 static bt_le_scan_cb_t *scan_dev_found_cb;
 
-u8_t adv_ch_map = 0x7;
+u8_t adv_ch_map = BT_GAP_ADV_CHNL_ALL_EN;
 
 #if defined(CONFIG_BT_HCI_VS_EVT_USER)
 static bt_hci_vnd_evt_cb_t *hci_vnd_evt_cb;
@@ -157,6 +157,16 @@ struct cmd_state_set {
 	int bit;
 	bool val;
 };
+
+static void bt_ble_throughput_evt (struct net_buf *buf)
+{
+    struct bt_hci_vs_ble_throughput *evt = (void *)buf->data;
+    u16_t conn_handle = sys_le16_to_cpu(evt->conhdl);
+    u32_t tx_throughput = sys_le32_to_cpu(evt->tx_throughput);
+    u32_t rx_throughput = sys_le32_to_cpu(evt->rx_throughput);
+    BT_WARN("connection handler=%d ble tx throughput=%dB ble rx throughput=%dB\r\n",conn_handle,tx_throughput,rx_throughput);    
+    
+}
 
 #if defined(BFLB_RELEASE_CMD_SEM_IF_CONN_DISC)
 void hci_release_conn_related_cmd(void);
@@ -1256,7 +1266,7 @@ static void hci_le_set_data_len(struct bt_conn *conn)
 	}
 }
 
-
+#if defined (BFLB_BLE)
 int bt_le_set_data_len(struct bt_conn *conn, u16_t tx_octets, u16_t tx_time)
 {
 	struct bt_hci_cp_le_set_data_len *cp;
@@ -1276,6 +1286,39 @@ int bt_le_set_data_len(struct bt_conn *conn, u16_t tx_octets, u16_t tx_time)
 	return bt_hci_cmd_send(BT_HCI_OP_LE_SET_DATA_LEN, buf);
 }
 
+int bt_le_read_chan_map(struct bt_conn *conn, struct bt_hci_rp_le_read_chan_map *rsp_buf)
+{
+	struct bt_hci_cp_le_read_chan_map *cp;
+	struct net_buf *buf, *rsp;
+    int err = 0;
+
+	buf = bt_hci_cmd_create(BT_HCI_OP_LE_READ_CHAN_MAP, sizeof(*cp));
+	if (!buf) {
+		return -ENOBUFS;
+	}
+
+	cp = net_buf_add(buf, sizeof(*cp));
+	cp->handle = sys_cpu_to_le16(conn->handle);
+
+    err = bt_hci_cmd_send_sync(BT_HCI_OP_LE_READ_CHAN_MAP, buf, &rsp);
+
+    if(err){
+        return err;
+    }
+
+    struct bt_hci_rp_le_read_chan_map *rp = (void *)rsp->data;
+    if(rsp_buf)
+    {
+        rsp_buf->status = rp->status;
+        rsp_buf->handle = rp->handle;
+        memcpy(rsp_buf->ch_map, rp->ch_map, sizeof(rp->ch_map));
+    }
+
+    net_buf_unref(rsp);
+
+    return 0;
+}
+#endif
 
 int hci_le_set_phy(struct bt_conn *conn, uint8_t all_phys,
 		  uint8_t pref_tx_phy, uint8_t pref_rx_phy, uint8_t phy_opts)
@@ -4156,10 +4199,17 @@ int bt_hci_register_vnd_evt_cb(bt_hci_vnd_evt_cb_t cb)
 }
 #endif /* CONFIG_BT_HCI_VS_EVT_USER */
 
+static const struct event_handler vendor_event[] = {
+	EVENT_HANDLER(BT_HCI_VS_BLE_THROUGHPUT_CALC_EVT_SUBCODE, bt_ble_throughput_evt,
+		      sizeof(struct bt_hci_vs_ble_throughput)),
+};
+
 static void hci_vendor_event(struct net_buf *buf)
 {
 	bool handled = false;
+	struct bt_hci_evt_vs *evt;
 
+	evt = net_buf_pull_mem(buf, sizeof(*evt));
 #if defined(CONFIG_BT_HCI_VS_EVT_USER)
 	if (hci_vnd_evt_cb) {
 		struct net_buf_simple_state state;
@@ -4177,6 +4227,11 @@ static void hci_vendor_event(struct net_buf *buf)
 		BT_WARN("Unhandled vendor-specific event: %s",
 			bt_hex(buf->data, buf->len));
 	}
+
+    if(!handled)
+    {
+	   handle_event(evt->subevent, buf, vendor_event, ARRAY_SIZE(vendor_event));
+    }
 }
 
 static const struct event_handler meta_events[] = {
@@ -5954,7 +6009,11 @@ int bt_disable_action(void)
     bl_onchiphci_interface_deinit();
 
     //delete task
+    #if defined(BL602) || defined(BL702)
     ble_controller_deinit();
+    #else
+    btble_controller_deinit();
+    #endif
     k_thread_delete(&tx_thread_data);
     k_thread_delete(&work_q_thread);
     k_thread_delete(&recv_thread_data);
@@ -6419,7 +6478,7 @@ static inline bool ad_has_name(const struct bt_data *ad, size_t ad_len)
 #if defined(BFLB_BLE_PATCH_FORCE_UPDATE_GAP_DEVICE_NAME)
 static inline int bt_le_name_update(const struct bt_data *ad, size_t ad_len)
 {
-	char name[CONFIG_BT_DEVICE_NAME_MAX] = { 0 };
+	char name[CONFIG_BT_DEVICE_NAME_MAX + 1] = { 0 };
 	int i,ret=-1;
 
 	if(ad_has_name(ad,ad_len)){
@@ -6984,17 +7043,16 @@ int set_ad_and_rsp_d(u16_t hci_op, u8_t *data, u32_t ad_len)
 
 		memcpy(set_data->data,data,set_data->len);
 
-	}else
-		return -ENOBUFS;
+	}
 
     return bt_hci_cmd_send_sync(hci_op,buf,NULL);
 }
 
-int set_adv_channel_map(u8_t channel)
+int set_adv_channel_map(bt_gap_adv_chnl_map_t channel)
 {
     int err = 0;
 
-    if(channel >= 1 && channel <= 7)
+    if(channel >= BT_GAP_ADV_CHNL_37_EN && channel <= BT_GAP_ADV_CHNL_ALL_EN)
     {
         adv_ch_map = channel;
     }
@@ -7502,8 +7560,46 @@ int bt_set_tx_pwr(int8_t power)
 #if defined(BL702L) || defined(BL602) || defined(BL702)
 int8_t bt_get_tx_pwr(void)
 {
+    #if defined(BL602) || defined(BL702)
     return ble_controller_get_tx_pwr();
+    #else
+    return btble_controller_get_tx_pwr();
+    #endif
 }
+#endif
+
+
+#if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
+int bt_le_throughput_calc(bool enable, u8_t interval)
+{
+    struct bt_hci_cp_vs_le_throughput_calc set_param;
+	struct net_buf *buf;
+	int err;
+
+    if(enable && interval < 1)
+        return BT_HCI_ERR_INVALID_PARAM;
+    
+	memset(&set_param, 0, sizeof(set_param));
+
+	set_param.enable = enable;
+    set_param.interval = interval;
+
+	buf = bt_hci_cmd_create(BT_HCI_OP_VS_LE_THROUGHPUT_CALC, sizeof(set_param));
+	if (!buf) {
+		return -ENOBUFS;
+	}
+
+	net_buf_add_mem(buf, &set_param, sizeof(set_param));
+
+	err = bt_hci_cmd_send_sync(BT_HCI_OP_VS_LE_THROUGHPUT_CALC, buf, NULL);
+
+	if (err) {
+		return err;
+	}
+    
+	return 0;
+}
+
 #endif
 
 int bt_set_bd_addr(const bt_addr_t *addr)

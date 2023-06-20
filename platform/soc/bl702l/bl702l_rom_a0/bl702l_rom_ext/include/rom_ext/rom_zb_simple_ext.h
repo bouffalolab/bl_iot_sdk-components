@@ -5,10 +5,11 @@
 #include "hosal_gpio.h"
 
 typedef struct{
-    bool uart_enable;
+    uint8_t uart_enable; //1: enable uart print in rom code; 0: disable uart print in rom code
     uint8_t uart_tx_pin;
     uint8_t uart_rx_pin;
     uint32_t uart_baudrate;
+    uint8_t gpio_irq_restore; //1: restore gpio irq after pds wakeup; 0: do not restore gpio irq after pds wakeup
     uint8_t gpio_num;
     uint8_t gpio_index[4];
     hosal_gpio_irq_trigger_t trigger_type[4];

@@ -17,10 +17,11 @@
 
 #include "openthread_port.h"
 
-#ifdef CFG_LWIP_ENABLE
+#ifdef OPENTHREAD_BORDER_ROUTER
 #include <lwip/tcpip.h>
-#endif /* CFG_LWIP_ENABLE */
-#if defined(CFG_USE_PSRAM)
+#endif /* OPENTHREAD_BORDER_ROUTER */
+
+#if defined(CFG_USE_PSRAM) || defined(OPENTHREAD_BORDER_ROUTER)
 #include <mbedtls/platform.h>
 #endif
 #include <ot_utils_ext.h>
@@ -150,12 +151,11 @@ void otrStackInit(void)
     assert(ot_instance);
 }
 
+OT_TOOL_WEAK void otbr_netif_process(otInstance *aInstance) {}
+
 #ifdef BL702L
 ATTR_PDS_SECTION
 #endif
-
-OT_TOOL_WEAK void otbr_netif_process(otInstance *aInstance) {}
-
 void otrTaskLoop(void) 
 {   
     /** need put on RAM */
@@ -208,7 +208,7 @@ extern void test_main(void);
         ot_alarmInit();
         ot_radioInit(opt);
         otrStackInit();
-#if defined(CFG_USE_PSRAM) || defined(CFG_OTBR_ENABLE)
+#if defined(CFG_USE_PSRAM) || defined(OPENTHREAD_BORDER_ROUTER)
         mbedtls_platform_set_calloc_free(pvPortCalloc, vPortFree);
 #endif /* CFG_USE_PSRAM */
 #if OPENTHREAD_ENABLE_DIAG

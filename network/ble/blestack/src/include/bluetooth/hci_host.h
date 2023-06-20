@@ -1923,6 +1923,7 @@ struct bt_hci_rp_le_read_iso_link_quality {
 #define BT_HCI_CSEVT_LEN             0x06
 #define BT_HCI_CSVT_PARLEN           0x04
 #define BT_HCI_EVT_LE_PARAM_OFFSET   0x02
+#define BT_HCI_EVT_DBG_PARAM_OFFSET  0x02
 #endif
 
 #define BT_HCI_EVT_UNKNOWN                      0x00
@@ -2463,6 +2464,27 @@ struct bt_hci_evt_le_biginfo_adv_report {
 	uint8_t  framing;
 	uint8_t  encryption;
 } __packed;
+
+
+//vendor hci event
+
+#define BT_HCI_VS_BLE_THROUGHPUT_CALC_EVT_SUBCODE 0x06
+struct bt_hci_vs_ble_throughput
+{
+    u16_t    conhdl;
+    u32_t    tx_throughput;
+    u32_t    rx_throughput;
+} __packed;
+
+#if 0
+#define BT_HCI_EVT_VS_LE_CHNL_MAP_UPDATE_COMPLETE  0x07
+#define BT_LE_CHNL_MAP_LEN     0x05
+struct bt_hci_evt_vs_le_chnl_map_update_complete {
+	u8_t         status;
+	u16_t        conn_hdl;
+	u8_t         map[BT_LE_CHNL_MAP_LEN];
+} __packed;
+#endif
 
 /* Event mask bits */
 

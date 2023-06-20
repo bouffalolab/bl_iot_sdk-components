@@ -81,6 +81,15 @@ extern "C" {
 #define BT_GAP_INIT_CONN_INT_MIN                0x0018  /* 30 ms    */
 #define BT_GAP_INIT_CONN_INT_MAX                0x0028  /* 50 ms    */
 
+/*Defined by Bouffalo*/
+typedef enum {
+	BT_GAP_ADV_CHNL_37_EN = 0x01,  /*Byte value for advertising channel map for channel 37 enable*/
+	BT_GAP_ADV_CHNL_38_EN = 0x02,  /*Byte value for advertising channel map for channel 38 enable*/
+	BT_GAP_ADV_CHNL_39_EN = 0x04,  /*Byte value for advertising channel map for channel 39 enable*/
+	BT_GAP_ADV_CHNL_ALL_EN = 0x07, /*Byte value for advertising channel map for channel 37, 38 and 39 enable*/
+}bt_gap_adv_chnl_map_t;
+/*Defined by Bouffalo,end*/
+
 void bt_gap_set_local_device_appearance(u16_t device_appearance);
 
 #ifdef __cplusplus

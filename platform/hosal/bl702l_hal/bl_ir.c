@@ -29,6 +29,11 @@
  */
 #include "bl_ir.h"
 #include "bl_irq.h"
+#include "hosal_dma.h"
+
+
+static int8_t ir_tx_dma_ch = -1;
+static uint32_t ir_tx_dma_data[32];
 
 
 static void bl_ir_irq(void)
@@ -38,6 +43,49 @@ static void bl_ir_irq(void)
     IR_ClrIntStatus(IR_INT_TX_END);
 
     bl_ir_swm_tx_done_callback();
+}
+
+static void bl_ir_tx_interrupt_cfg(void)
+{
+    IR_FifoCfg_Type irFifoCfg = {
+        .txFifoThreshold = 1,
+        .txFifoDmaEnable = ENABLE,
+    };
+
+    IR_FifoConfig(&irFifoCfg);
+
+    if(ir_tx_dma_ch < 0){
+        hosal_dma_init();
+        ir_tx_dma_ch = hosal_dma_chan_request(0);
+    }
+
+    DMA_Channel_Cfg_Type dmaChCfg = {
+        0,                         /* Source address of DMA transfer */
+        0x4000A688,                /* Destination address of DMA transfer */
+        0,                         /* Transfer length, 0~4095, this is burst count */
+        DMA_TRNS_M2P,              /* Transfer dir control. 0: Memory to Memory, 1: Memory to peripheral, 2: Peripheral to memory */
+        ir_tx_dma_ch,              /* Channel select 0-7 */
+        DMA_TRNS_WIDTH_32BITS,     /* Transfer width. 0: 8  bits, 1: 16  bits, 2: 32  bits */
+        DMA_TRNS_WIDTH_32BITS,     /* Transfer width. 0: 8  bits, 1: 16  bits, 2: 32  bits */
+        DMA_BURST_SIZE_1,          /* Number of data items for burst transaction length. Each item width is as same as tansfer width. 0: 1 item, 1: 4 items, 2: 8 items, 3: 16 items */
+        DMA_BURST_SIZE_1,          /* Number of data items for burst transaction length. Each item width is as same as tansfer width. 0: 1 item, 1: 4 items, 2: 8 items, 3: 16 items */
+        DISABLE,
+        DISABLE,
+        0,
+        DMA_MINC_ENABLE,           /* Source address increment. 0: No change, 1: Increment */
+        DMA_PINC_DISABLE,          /* Destination address increment. 0: No change, 1: Increment */
+        DMA_REQ_NONE,              /* Source peripheral select */
+        DMA_REQ_IR_TX,             /* Destination peripheral select */
+    };
+
+    GLB_PER_Clock_UnGate(GLB_AHB_CLOCK_DMA_0);
+    DMA_Enable(DMA0_ID);
+    bl_irq_enable(DMA_ALL_IRQn);
+
+    DMA_Channel_Init(DMA0_ID, &dmaChCfg);
+
+    bl_irq_register(IRTX_IRQn, bl_ir_irq);
+    bl_irq_enable(IRTX_IRQn);
 }
 
 
@@ -75,6 +123,7 @@ void bl_ir_custom_tx_cfg(IR_TxCfg_Type *txCfg, IR_TxPulseWidthCfg_Type *txPWCfg)
     GLB_Set_IR_CLK(ENABLE, GLB_IR_CLK_SRC_XCLK, 15);
 
     IR_Disable(IR_TX);
+    IR_TxSWM(DISABLE);
     IR_TxInit(txCfg);
     IR_TxPulseWidthConfig(txPWCfg);
 }
@@ -151,9 +200,9 @@ void bl_ir_rc5_tx_cfg(void)
 
 void bl_ir_swm_tx_cfg(float freq_hz, float duty_cycle)
 {
-    uint16_t mod_width = (uint16_t)(2000000 / freq_hz);
-    uint8_t mod_width_0 = (uint8_t)(mod_width * duty_cycle + 0.5);
-    uint8_t mod_width_1 = mod_width - mod_width_0;
+    uint16_t pw_unit = (uint16_t)(2000000 / freq_hz);
+    uint8_t mod_width_0 = (uint8_t)(pw_unit * duty_cycle + 0.5);
+    uint8_t mod_width_1 = pw_unit - mod_width_0;
 
     IR_TxCfg_Type txCfg = {
         1,                                                   /* Number of pulse */
@@ -182,64 +231,64 @@ void bl_ir_swm_tx_cfg(float freq_hz, float duty_cycle)
         0,                                                   /* Don't care when SWM is enabled */
         mod_width_1,                                         /* Modulation phase 1 width */
         mod_width_0,                                         /* Modulation phase 0 width */
-        1125                                                 /* Pulse width unit */
+        pw_unit                                              /* Pulse width unit */
     };
 
     bl_ir_custom_tx_cfg(&txCfg, &txPWCfg);
-
-    bl_irq_register(IRTX_IRQn, bl_ir_irq);
-    bl_irq_enable(IRTX_IRQn);
+    bl_ir_tx_interrupt_cfg();
 }
 
 void bl_ir_nec_tx(uint32_t wdata)
 {
-    IR_TxSWM(DISABLE);
     IR_SendCommand(&wdata, 1);
 }
 
 void bl_ir_rc5_tx(uint32_t wdata)
 {
-    IR_TxSWM(DISABLE);
     IR_SendCommand(&wdata, 1);
 }
 
-void bl_ir_swm_tx(int pw_unit, int pw_mul, int out_level)
+int bl_ir_swm_tx(uint16_t data[], uint8_t len)
 {
     uint32_t tmpVal;
     uint32_t pwVal;
-
-    if(pw_unit > 4096){
-        pw_unit = 4096;
-    }
-
-    if(pw_unit < 1){
-        pw_unit = 1;
-    }
-
-    if(pw_mul > 256){
-        pw_mul = 256;
-    }
-
-    if(pw_mul < 1){
-        pw_mul = 1;
-    }
-
-    tmpVal = BL_RD_REG(IR_BASE, IRTX_PULSE_WIDTH);
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_PW_UNIT, pw_unit - 1);
-    BL_WR_REG(IR_BASE, IRTX_PULSE_WIDTH, tmpVal);
+    int i, j;
 
     tmpVal = BL_RD_REG(IR_BASE, IRTX_CONFIG);
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_MOD_EN, !!out_level);
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_OUT_INV, !out_level);
+    if(BL_GET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_EN)){
+        return -1;
+    }
+
+    tmpVal = BL_RD_REG(IR_BASE, IRTX_CONFIG);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_DATA_NUM, len - 1);
     BL_WR_REG(IR_BASE, IRTX_CONFIG, tmpVal);
 
-    pwVal = (pw_mul - 1) & 0xFF;
-    BL_WR_REG(IR_BASE, IR_FIFO_WDATA, pwVal);
+    pwVal = 0;
+    for(i=0; i<len; i++){
+        j = i % 4;
+        pwVal |= ((data[i] - 1) & 0xFF) << 8 * j;
+        if(i == len - 1 || j == 3){
+            ir_tx_dma_data[i / 4] = pwVal;
+            pwVal = 0;
+        }
+    }
 
-    IR_ClrIntStatus(IR_INT_TX_END);
+    DMA_Channel_Update_SrcMemcfg(DMA0_ID, ir_tx_dma_ch, (uint32_t)ir_tx_dma_data, (len + 3) / 4);
+    DMA_Channel_Enable(DMA0_ID, ir_tx_dma_ch);
+
     IR_IntMask(IR_INT_TX_END, UNMASK);
     IR_TxSWM(ENABLE);
     IR_Enable(IR_TX);
+
+    return 0;
+}
+
+int bl_ir_swm_tx_busy(void)
+{
+    uint32_t tmpVal;
+
+    tmpVal = BL_RD_REG(IR_BASE, IRTX_CONFIG);
+    return BL_GET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_EN);
 }
 
 __attribute__((weak)) void bl_ir_swm_tx_done_callback(void)

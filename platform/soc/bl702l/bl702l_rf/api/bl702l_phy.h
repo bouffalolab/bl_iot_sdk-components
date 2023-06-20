@@ -7,7 +7,9 @@
 void bz_phy_reset();
 void bz_phy_force_agc_enable(bool en);
 bool bz_phy_set_tx_power(int power_dbm);
+bool bz_phy_set_tx_power_offset(int8_t pwr_offset_zb[16], int8_t pwr_offset_ble[4]);
 int bz_phy_get_tx_power(void);
+bool bz_phy_optimize_tx_channel(uint32_t channel); // MHz
 int16_t bz_phy_get_freq_offset_zb(void);
 void bz_phy_start_cont_rx_zb();
 void bz_phy_stop_cont_rx_zb();

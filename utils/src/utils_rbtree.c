@@ -364,7 +364,7 @@ int rb_tree_remove_with_cb (struct rb_tree *self, void *value, rb_tree_node_f no
                             q->red = 1;
                         } else {
                             // Converity: Explicit null dereferenced
-                            if(g) {
+                            if (g) {
                                 int dir2 = g->link[1] == p;
                                 if (rb_node_is_red(s->link[last])) {
                                     g->link[dir2] = rb_node_rotate2(p, last);

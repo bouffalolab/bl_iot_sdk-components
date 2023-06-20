@@ -112,7 +112,7 @@ static ssize_t write_name(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 			 const void *buf, u16_t len, u16_t offset,
 			 u8_t flags)
 {
-	char value[CONFIG_BT_DEVICE_NAME_MAX] = {};
+	char value[CONFIG_BT_DEVICE_NAME_MAX + 1] = {};
 
 	if (offset) {
 		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
@@ -181,7 +181,12 @@ static ssize_t read_ppcp(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 	} ppcp;
 
 	#if defined (BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)
-	bt_conn_get_peripheral_pref_params(&ppcp);
+	struct bt_le_conn_param param;
+	bt_conn_get_peripheral_pref_params(&param);
+	ppcp.min_int = param.interval_min;
+	ppcp.max_int = param.interval_max;
+	ppcp.latency = param.latency;
+	ppcp.timeout = param.timeout;
 	#else
 	ppcp.min_int = sys_cpu_to_le16(CONFIG_BT_PERIPHERAL_PREF_MIN_INT);
 	ppcp.max_int = sys_cpu_to_le16(CONFIG_BT_PERIPHERAL_PREF_MAX_INT);
@@ -2566,6 +2571,12 @@ static void gatt_find_type_rsp(struct bt_conn *conn, u8_t err,
 
 	BT_DBG("err 0x%02x", err);
 
+	#if defined(BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK)
+	if(params){
+		params->err = err;
+	}
+	#endif /* BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK */
+
 	if (err) {
 		goto done;
 	}
@@ -2913,6 +2924,12 @@ static void gatt_read_type_rsp(struct bt_conn *conn, u8_t err,
 	struct bt_gatt_discover_params *params = user_data;
 	u16_t handle;
 
+	#if defined(BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK)
+	if(params){
+		params->err = err;
+	}
+	#endif /* BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK */
+
 	BT_DBG("err 0x%02x", err);
 
 	if (err) {
@@ -3057,6 +3074,12 @@ static void gatt_read_group_rsp(struct bt_conn *conn, u8_t err,
 	struct bt_gatt_discover_params *params = user_data;
 	u16_t handle;
 
+	#if defined(BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK)
+	if(params){
+		params->err = err;
+	}
+	#endif /* BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK */
+
 	BT_DBG("err 0x%02x", err);
 
 	if (err) {
@@ -3127,6 +3150,12 @@ static void gatt_find_info_rsp(struct bt_conn *conn, u8_t err,
 	bool skip = false;
 
 	BT_DBG("err 0x%02x", err);
+
+	#if defined(BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK)
+	if(params){
+		params->err = err;
+	}
+	#endif /* BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK */
 
 	if (err) {
 		goto done;
@@ -3801,6 +3830,10 @@ int bt_gatt_subscribe(struct bt_conn *conn,
 		return -ENOTCONN;
 	}
 
+	if(atomic_test_bit(params->flags, BT_GATT_SUBSCRIBE_FLAG_WRITE_PENDING)){
+		return -EALREADY;
+	}
+
 	/* Lookup existing subscriptions */
 	SYS_SLIST_FOR_EACH_CONTAINER(&subscriptions, tmp, node) {
 		/* Fail if entry already exists */
@@ -3900,7 +3933,9 @@ static void add_subscriptions(struct bt_conn *conn)
 
 	/* Lookup existing subscriptions */
 	SYS_SLIST_FOR_EACH_CONTAINER(&subscriptions, params, node) {
-		if (bt_conn_addr_le_cmp(conn, &params->_peer)) {
+		if (bt_conn_addr_le_cmp(conn, &params->_peer) ||
+		    atomic_test_bit(params->flags,
+				     BT_GATT_SUBSCRIBE_FLAG_WRITE_PENDING)) {
 			continue;
 		}
 
@@ -4412,6 +4447,11 @@ int bt_gatt_store_ccc(u8_t id, const bt_addr_le_t *addr)
 		/* No entries to encode, just clear */
 		str = NULL;
 		len = 0;
+		err = settings_delete(key);
+		if (err) {
+			BT_DBG("bt_gatt_store_ccc delete %s(err %d)", key, err);
+		}
+		return 0;
 	}
 
 	err = settings_save_one(key, (const u8_t *)str, len);

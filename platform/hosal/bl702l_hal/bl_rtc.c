@@ -30,17 +30,40 @@
 #include "bl_rtc.h"
 
 
-static void rc32k_cal(void)
+uint32_t rc32k_cnt_by_xtal(void)
+{
+    uint32_t cnt;
+    uint32_t tmpVal;
+    
+    tmpVal = BL_RD_REG(GLB_BASE, GLB_XTAL_DEG_32K);
+    tmpVal = BL_SET_REG_BIT(tmpVal, GLB_CLR_XTAL_CNT_32K_DONE);
+    BL_WR_REG(GLB_BASE, GLB_XTAL_DEG_32K, tmpVal);
+    tmpVal = BL_RD_REG(GLB_BASE, GLB_XTAL_DEG_32K);
+    tmpVal = BL_SET_REG_BIT(tmpVal, GLB_XTAL_CNT_32K_SW_TRIG_PS);
+    BL_WR_REG(GLB_BASE, GLB_XTAL_DEG_32K, tmpVal);
+    
+    do{
+        tmpVal = BL_RD_REG(PDS_BASE, PDS_XTAL_CNT_32K);
+    }while(BL_GET_REG_BITS_VAL(tmpVal, PDS_XTAL_CNT_32K_DONE) == 0);
+    
+    cnt = BL_GET_REG_BITS_VAL(tmpVal, PDS_RO_XTAL_CNT_32K_CNT);
+    cnt <<= 6;
+    cnt += BL_GET_REG_BITS_VAL(tmpVal, PDS_RO_XTAL_CNT_32K_RES);
+    
+    return cnt;
+}
+
+void rc32k_cal(void)
 {
     uint32_t i, j;
     uint32_t cnt;
     uint32_t tmpVal;
     
-#if 1
-    tmpVal = BL_RD_REG(HBN_BASE, HBN_RC32K_CTRL0);
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, HBN_RC32K_CAP_SEL, 6);
-    BL_WR_REG(HBN_BASE, HBN_RC32K_CTRL0, tmpVal);
-#endif
+    if(HBN_Trim_RC32K() != SUCCESS){
+        tmpVal = BL_RD_REG(HBN_BASE, HBN_RC32K_CTRL0);
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, HBN_RC32K_CAP_SEL, 6);
+        BL_WR_REG(HBN_BASE, HBN_RC32K_CTRL0, tmpVal);
+    }
     
     tmpVal = BL_RD_REG(HBN_BASE, HBN_RC32K_CTRL1);
     tmpVal = BL_SET_REG_BITS_VAL(tmpVal, HBN_RC32K_CODE_FR_CAL, 0x200 << 3);
@@ -57,20 +80,7 @@ static void rc32k_cal(void)
         tmpVal |= 1 << j;
         BL_WR_REG(HBN_BASE, HBN_RC32K_CTRL1, tmpVal);
         
-        tmpVal = BL_RD_REG(GLB_BASE, GLB_XTAL_DEG_32K);
-        tmpVal = BL_SET_REG_BIT(tmpVal, GLB_CLR_XTAL_CNT_32K_DONE);
-        BL_WR_REG(GLB_BASE, GLB_XTAL_DEG_32K, tmpVal);
-        tmpVal = BL_RD_REG(GLB_BASE, GLB_XTAL_DEG_32K);
-        tmpVal = BL_SET_REG_BIT(tmpVal, GLB_XTAL_CNT_32K_SW_TRIG_PS);
-        BL_WR_REG(GLB_BASE, GLB_XTAL_DEG_32K, tmpVal);
-        
-        do{
-            tmpVal = BL_RD_REG(PDS_BASE, PDS_XTAL_CNT_32K);
-        }while(BL_GET_REG_BITS_VAL(tmpVal, PDS_XTAL_CNT_32K_DONE) == 0);
-        
-        cnt = BL_GET_REG_BITS_VAL(tmpVal, PDS_RO_XTAL_CNT_32K_CNT);
-        cnt <<= 6;
-        cnt += BL_GET_REG_BITS_VAL(tmpVal, PDS_RO_XTAL_CNT_32K_RES);
+        cnt = rc32k_cnt_by_xtal();
         
         if(cnt > 62500){
             tmpVal = BL_RD_REG(HBN_BASE, HBN_RC32K_CTRL1);
@@ -83,13 +93,12 @@ static void rc32k_cal(void)
 
 void bl_rtc_init(void)
 {
-    rc32k_cal();
-    
 #ifdef CFG_USE_XTAL32K
     HBN_32K_Sel(HBN_32K_XTAL);
     *(volatile uint32_t *)0x4000F204 &= ~(1U << 0);
 #else
     HBN_32K_Sel(HBN_32K_RC);
+    rc32k_cal();
 #endif
     
     HBN_Enable_RTC_Counter();

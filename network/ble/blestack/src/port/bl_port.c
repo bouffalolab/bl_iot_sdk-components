@@ -181,7 +181,7 @@ int k_sem_take(struct k_sem *sem, uint32_t timeout)
         t = BL_NO_WAIT;
     }
 
-    if(NULL == sem){
+    if(NULL == sem || NULL == sem->sem.hdl){
         return -1;
     }
 
@@ -194,7 +194,7 @@ int k_sem_give(struct k_sem *sem)
     BaseType_t ret;
     (void) ret;
     
-    if (NULL == sem) {
+    if (NULL == sem || NULL == sem->sem.hdl) {
         BT_ERR("sem is NULL\n");
         return -EINVAL;
     }
@@ -217,6 +217,11 @@ int k_sem_delete(struct k_sem *sem)
 
 unsigned int k_sem_count_get(struct k_sem *sem)
 {
+    if (NULL == sem || NULL == sem->sem.hdl) {
+        BT_ERR("sem is NULL\n");
+        return 0;
+    }
+    
     return uxQueueMessagesWaiting(sem->sem.hdl);
 }
 

@@ -27,8 +27,10 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "bl702l_glb.h"
 #include "bl702l_rf.h"
 #include "bl_wireless.h"
+#include "bl_efuse.h"
 #include "bl_adc.h"
 #include "hal_hwtimer.h"
 #include "hal_tcal.h"
@@ -43,16 +45,34 @@ static int16_t tcal_temperature = 0;
 
 static void hal_tcal_callback(int16_t tsen_val)
 {
-    if(tcal_init == 0){
-        printf("[tcal] rf702_set_init_tsen_value(%d)\r\n", tsen_val);
-        
-        rf_set_init_tsen_value(tsen_val);
-        
-        tcal_init = 1;
-    }else{
-        printf("[tcal] rf702_inc_cal_tsen_based(%d)\r\n", tsen_val);
-        
-        rf_inc_cal_tsen_based(tsen_val);
+    uint8_t capcode;
+    int8_t offset;
+    
+    if(bl_wireless_power_tcal_en_get() != 0){
+        if(tcal_init == 0){
+            printf("[tcal] rf702_set_init_tsen_value(%d)\r\n", tsen_val);
+            
+            rf_set_init_tsen_value(tsen_val);
+            
+            tcal_init = 1;
+        }else{
+            printf("[tcal] rf702_inc_cal_tsen_based(%d)\r\n", tsen_val);
+            
+            rf_inc_cal_tsen_based(tsen_val);
+        }
+    }
+    
+    if(bl_wireless_capcode_tcal_en_get() != 0){
+        if(bl_efuse_read_capcode(&capcode) == 0){
+            offset = bl_wireless_capcode_offset_get(tsen_val);
+            
+            printf("[tcal] capcode @ efuse: %d, offset @ %d C: %d\r\n", capcode, tsen_val, offset);
+            
+            capcode += offset;
+            AON_Set_Xtal_CapCode(capcode, capcode);
+        }else{
+            printf("[tcal] fail to read capcode from efuse\r\n");
+        }
     }
     
     tcal_temperature = tsen_val;
@@ -69,23 +89,15 @@ int hal_tcal_init(void)
         .tsen_event = hal_tcal_callback,
     };
     
-    if(bl_wireless_tcal_en_get() == 0){
-        return -1;
-    }
+    int status = bl_adc_tsen_dma_init(&tsen_cfg);
     
-    printf("[tcal] hal_tcal_init\r\n");
+    printf("[tcal] hal_tcal_init: %d\r\n", status);
     
-    return bl_adc_tsen_dma_init(&tsen_cfg);
+    return status;
 }
 
 int hal_tcal_restart(void)
 {
-    if(bl_wireless_tcal_en_get() == 0){
-        return -1;
-    }
-    
-    printf("[tcal] hal_tcal_restart\r\n");
-    
     // Stop periodical tcal trigger
     if(tcal_timer != NULL){
         hal_hwtimer_delete(tcal_timer);
@@ -99,15 +111,13 @@ int hal_tcal_restart(void)
     // Start periodical tcal trigger
     tcal_timer = hal_hwtimer_create(TCAL_PERIOD_MS, hal_tcal_trigger, 1);
     
+    printf("[tcal] hal_tcal_restart\r\n");
+    
     return 0;
 }
 
 int hal_tcal_pause(void)
 {
-    if(bl_wireless_tcal_en_get() == 0){
-        return -1;
-    }
-    
     if(tcal_timer != NULL){
         hal_hwtimer_delete(tcal_timer);
         tcal_timer = NULL;
@@ -122,10 +132,6 @@ int hal_tcal_pause(void)
 
 int hal_tcal_resume(void)
 {
-    if(bl_wireless_tcal_en_get() == 0){
-        return -1;
-    }
-    
     if(tcal_timer == NULL){
         tcal_timer = hal_hwtimer_create(TCAL_PERIOD_MS, hal_tcal_trigger, 1);
     }

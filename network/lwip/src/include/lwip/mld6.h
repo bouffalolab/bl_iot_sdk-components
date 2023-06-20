@@ -81,9 +81,6 @@ err_t  mld6_joingroup(const ip6_addr_t *srcaddr, const ip6_addr_t *groupaddr);
 err_t  mld6_joingroup_netif(struct netif *netif, const ip6_addr_t *groupaddr);
 err_t  mld6_leavegroup(const ip6_addr_t *srcaddr, const ip6_addr_t *groupaddr);
 err_t  mld6_leavegroup_netif(struct netif *netif, const ip6_addr_t *groupaddr);
-#ifdef CFG_OTBR_TEST
-char* mld6_group_info(struct netif *netif);
-#endif /* CFG_OTBR_TEST */
 
 /** @ingroup mld6
  * Get list head of MLD6 groups for netif.

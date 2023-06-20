@@ -112,14 +112,11 @@ a lot of data that needs to be copied, this should be set high. */
 #elif defined(CFG_CHIP_BL606P)
 #define PBUF_POOL_SIZE          200
 #else
+
 #if defined(CFG_ETHERNET_ENABLE)
 #define PBUF_POOL_SIZE          12
 #else
-#if defined(CFG_USE_WIFI_BR)
-#define PBUF_POOL_SIZE          16
-#else
 #define PBUF_POOL_SIZE          0
-#endif
 #endif
 #endif /*CFG_ETHERNET_ENABLE*/
 #endif
@@ -344,8 +341,6 @@ a lot of data that needs to be copied, this should be set high. */
 #elif defined(CFG_SDIOWIFI)
 #define TCPIP_THREAD_STACKSIZE          512
 #elif defined(CFG_NETBUS_WIFI_ENABLE)
-#define TCPIP_THREAD_STACKSIZE          1536
-#elif defined(CFG_USE_WIFI_BR)
 #define TCPIP_THREAD_STACKSIZE          1536
 #elif defined(CFG_TCPIP_STACKSIZE)
 #define TCPIP_THREAD_STACKSIZE          CFG_TCPIP_STACKSIZE

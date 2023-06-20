@@ -409,6 +409,8 @@ int hosal_adc_init(hosal_adc_dev_t *adc)
 
 int hosal_adc_add_channel(hosal_adc_dev_t *adc, uint32_t channel)
 {
+    GLB_GPIO_Type pin;
+
     if (NULL == adc) {
         blog_error("parameter is error!\r\n");
         return -1;
@@ -419,6 +421,8 @@ int hosal_adc_add_channel(hosal_adc_dev_t *adc, uint32_t channel)
         return -1;
     }
 
+    pin = (GLB_GPIO_Type)adc->config.pin;
+    GLB_GPIO_Func_Init(GPIO_FUN_ANALOG, &pin, 1);
     hosal_adc_ctx_t *pstctx = (hosal_adc_ctx_t *)adc->priv;
 
     pstctx->chan_init_table |= 1 << channel;

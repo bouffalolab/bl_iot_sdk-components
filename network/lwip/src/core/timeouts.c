@@ -73,7 +73,8 @@
 #define TIME_LESS_THAN(t, compare_to) ( (((u32_t)((t)-(compare_to))) > LWIP_MAX_TIMEOUT) ? 1 : 0 )
 
 #if LWIP_TCP
-static void tcpip_tcp_timer(void);
+static void tcpip_tcp_slow_timer(void);
+static void tcpip_tcp_fast_timer(void);
 static bool tcp_timer_calculate_next_wake(u32_t * next_wake_ms);
 #endif
 
@@ -83,7 +84,8 @@ struct lwip_cyclic_timer lwip_cyclic_timers[] = {
 #if LWIP_TCP
   /* The TCP timer is a special case: it does not have to run always and
      is triggered to start from TCP using tcp_timer_needed() */
-  {LWIP_TIMER_STATUS_RUNNING, TCP_TMR_INTERVAL, HANDLER(tcpip_tcp_timer)},
+  {LWIP_TIMER_STATUS_RUNNING, TCP_SLOW_INTERVAL, HANDLER(tcpip_tcp_slow_timer)},
+  {LWIP_TIMER_STATUS_RUNNING, TCP_FAST_INTERVAL, HANDLER(tcpip_tcp_fast_timer)},
 #endif /* LWIP_TCP */
 #if LWIP_IPV4
 #if IP_REASSEMBLY
@@ -176,7 +178,7 @@ void tcpip_tmr_compensate_tick(void)
  * @param arg unused argument
  */
 static void
-tcpip_tcp_timer(void)
+tcpip_tcp_slow_timer(void)
 {
   u32_t sleep_duration = 0;
 
@@ -184,7 +186,7 @@ tcpip_tcp_timer(void)
   tcpip_tmr_compensate_tick();
 
   /* call TCP timer handler */
-  tcp_tmr();
+  tcp_slowtmr();
   tcpip_timer_pending = 0;
 
   /* timer still needed? */
@@ -198,8 +200,38 @@ tcpip_tcp_timer(void)
     LWIP_DEBUGF(TCP_DEBUG, ("tcpip_tcp_timer: will sleep %ldms\n", sleep_duration));
 
     /* restart timer */
-    sys_untimeout((sys_timeout_handler)tcpip_tcp_timer, NULL);
-    sys_timeout(sleep_duration, (sys_timeout_handler)tcpip_tcp_timer, NULL);
+    sys_untimeout((sys_timeout_handler)tcpip_tcp_slow_timer, NULL);
+    sys_timeout(sleep_duration, (sys_timeout_handler)tcpip_tcp_slow_timer, NULL);
+  } else {
+    LWIP_DEBUGF(TCP_DEBUG, ("tcpip_tcp_timer: do nothing\n"));
+  }
+}
+
+static void
+tcpip_tcp_fast_timer(void)
+{
+  u32_t sleep_duration = 0;
+
+  /* compensate tcp_ticks */
+  tcpip_tmr_compensate_tick();
+
+  /* call TCP timer handler */
+  tcp_fasttmr();
+  tcpip_timer_pending = 0;
+
+  /* timer still needed? */
+  /**
+  * bouffalo lp change
+  * TCP_TMR Optimization, only enable tcp_tmr MAX_TCP_ONCE_RUNNING_TIME
+  */
+  if ((tcp_active_pcbs || tcp_tw_pcbs) && !tcp_timer_calculate_next_wake(&sleep_duration)) {
+  //if (tcp_active_pcbs || tcp_tw_pcbs) {
+  /** bouffalo lp change end */
+    LWIP_DEBUGF(TCP_DEBUG, ("tcpip_tcp_timer: will sleep %ldms\n", sleep_duration));
+
+    /* restart timer */
+    sys_untimeout((sys_timeout_handler)tcpip_tcp_fast_timer, NULL);
+    sys_timeout(sleep_duration, (sys_timeout_handler)tcpip_tcp_fast_timer, NULL);
   } else {
     LWIP_DEBUGF(TCP_DEBUG, ("tcpip_tcp_timer: do nothing\n"));
   }
@@ -220,8 +252,11 @@ tcp_timer_needed(void)
     LWIP_DEBUGF(TCP_DEBUG, ("tcp_timer_needed: start tcp timer\n"));
     tcpip_timer_pending = 1;
     /* (re)start timer */
-    sys_untimeout((sys_timeout_handler)tcpip_tcp_timer, NULL);
-    sys_timeout(TCP_TMR_INTERVAL, (sys_timeout_handler)tcpip_tcp_timer, NULL);
+    sys_untimeout((sys_timeout_handler)tcpip_tcp_slow_timer, NULL);
+    sys_timeout(TCP_SLOW_INTERVAL, (sys_timeout_handler)tcpip_tcp_slow_timer, NULL);
+
+    sys_untimeout((sys_timeout_handler)tcpip_tcp_fast_timer, NULL);
+    sys_timeout(TCP_FAST_INTERVAL, (sys_timeout_handler)tcpip_tcp_fast_timer, NULL);
   }
 }
 #endif /* LWIP_TCP */
@@ -330,7 +365,7 @@ void sys_timeouts_init(void)
 {
   size_t i;
   /* tcp_tmr() at index 0 is started on demand */
-  for (i = (LWIP_TCP ? 1 : 0); i < LWIP_ARRAYSIZE(lwip_cyclic_timers); i++) {
+  for (i = (LWIP_TCP ? 2 : 0); i < LWIP_ARRAYSIZE(lwip_cyclic_timers); i++) {
     /* we have to cast via size_t to get rid of const warning
       (this is OK as cyclic_timer() casts back to const* */
     /**

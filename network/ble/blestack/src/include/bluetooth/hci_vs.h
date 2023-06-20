@@ -152,7 +152,11 @@ struct bt_hci_cp_vs_set_bd_addr {
     bt_addr_t bdaddr;
 }__packed;
 
-
+#define BT_HCI_OP_VS_LE_THROUGHPUT_CALC     BT_OP(BT_OGF_VS, 0x0078)
+struct bt_hci_cp_vs_le_throughput_calc {
+    bool enable;
+    u8_t interval;
+}__packed;
 /* Events */
 
 struct bt_hci_evt_vs {

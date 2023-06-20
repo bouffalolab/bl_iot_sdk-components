@@ -583,11 +583,9 @@ int bl_hbn_enter(hbn_type_t *hbn, uint32_t *time)
 
     uint16_t gpioWakeupSrc = 0;
 
-    if (hbn) {
-        printf("hbn.buflen = %d\r\n", hbn->buflen);
-        printf("hbn.active = %d\r\n", hbn->active);
-        log_buf(hbn->buf, hbn->buflen);
-    }
+    printf("hbn.buflen = %d\r\n", hbn->buflen);
+    printf("hbn.active = %d\r\n", hbn->active);
+    log_buf(hbn->buf, hbn->buflen);
 
     cfg.sleepTime = (*time << 15) / 1000;  // ms -> rtc cycles
     if (hbn->buflen > 10) {

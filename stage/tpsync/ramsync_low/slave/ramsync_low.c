@@ -50,11 +50,7 @@
 static lramsync_spi_config_t _spi_cfg = {
     .port = 0,
     .spi_mode = 0,           /* 0: phase 0, polarity low */
-#ifdef CFG_USE_WIFI_BR
-    .spi_speed = 4000000,
-#else
     .spi_speed = 12000000,
-#endif
     .miso = TPSYNC_SLV_MISO_PIN,
     .mosi = TPSYNC_SLV_MOSI_PIN,
     .clk = TPSYNC_SLV_CLK_PIN,

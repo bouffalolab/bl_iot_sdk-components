@@ -32,7 +32,7 @@ static void ot_uartCli(char* pcWriteBuffer, int xWriteBufferLen, int argc, char*
 {
     char* buf = argv[1];
     int len;
-    if (!argc) {
+    if (argc <= 1) {
         return;
     }
 

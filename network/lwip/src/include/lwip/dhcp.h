@@ -44,6 +44,7 @@
 
 #include "lwip/netif.h"
 #include "lwip/udp.h"
+#include "netif/ethernet.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -113,7 +114,7 @@ void dhcp_release_and_stop(struct netif *netif);
 void dhcp_inform(struct netif *netif);
 void dhcp_network_changed(struct netif *netif);
 #if DHCP_DOES_ARP_CHECK
-void dhcp_arp_reply(struct netif *netif, const ip4_addr_t *addr);
+void dhcp_arp_reply(struct netif *netif, const ip4_addr_t *addr, const struct eth_addr *hwaddr);
 #endif
 u8_t dhcp_supplied_address(const struct netif *netif);
 /* to be called every minute */

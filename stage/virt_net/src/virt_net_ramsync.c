@@ -195,11 +195,7 @@ void virt_net_spi_destroy(virt_net_t *obj)
 {
   assert(obj != NULL && *obj != NULL);
   struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)*obj;
-#if defined(CFG_USE_PSRAM)
   vPortFree(sobj);
-#else
-  free(sobj);
-#endif
   *obj = NULL;
 }
 
@@ -720,6 +716,17 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
       return 0;
     }
     break;
+  case VIRT_NET_CTRL_HBN:
+    {
+      blog_info("enter hbn\r\n");
+
+      pkg_header->type = PKG_CMD_FRAME;
+      pkg_header->length = sizeof(struct pkg_protocol_cmd);
+
+      pkg_cmd->cmd = VIRT_NET_CTRL_HBN;
+      pkg_cmd->msg_id = -1;
+    }
+    break;
   default:
     printf("unsupport cmd:%d\r\n", cmd);
     break;
@@ -778,11 +785,7 @@ virt_net_t virt_net_create(void *ctx)
     memset(sem_slot, 0, sizeof(sem_slot));
   }
 
-#if defined(CFG_USE_PSRAM)
   struct virt_net_ramsync *sobj = pvPortMalloc(sizeof(struct virt_net_ramsync));
-#else
-  struct virt_net_ramsync *sobj = malloc(sizeof(struct virt_net_ramsync));
-#endif
   if (sobj == NULL) {
     return NULL;
   }
@@ -856,11 +859,7 @@ _errout_3:
 _errout_2:
   vSemaphoreDelete(sobj->rx_buf_ind_mutex);
 _errout_1:
-#if defined(CFG_USE_PSRAM)
   vPortFree(sobj);
-#else
-  free(sobj);
-#endif
 
   return NULL;
 }

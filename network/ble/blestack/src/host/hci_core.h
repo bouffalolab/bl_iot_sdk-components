@@ -265,12 +265,11 @@ int bt_le_adv_start_instant(const struct bt_le_adv_param *param,
 #endif
 
 #if defined (BFLB_BLE)
-
 int bt_le_read_rssi(u16_t handle,int8_t *rssi);
 int set_ad_and_rsp_d(u16_t hci_op, u8_t *data, u32_t ad_len);
 int set_adv_enable(bool enable);
 int set_adv_param(const struct bt_le_adv_param *param);
-int set_adv_channel_map(u8_t channel);
+int set_adv_channel_map(bt_gap_adv_chnl_map_t channel);
 int bt_get_local_public_address(bt_addr_le_t *adv_addr);
 int bt_get_local_ramdon_address(bt_addr_le_t *adv_addr);
 int bt_set_local_public_address(u8_t *adv_addr);
@@ -286,6 +285,11 @@ int bt_set_bd_addr(const bt_addr_t *addr);
 int bt_set_tx_pwr(int8_t power);
 #if defined(BL702L) || defined(BL602) || defined(BL702)
 int8_t bt_get_tx_pwr(void);
+#endif
+int bt_le_read_chan_map(struct bt_conn *conn, struct bt_hci_rp_le_read_chan_map *rsp_buf);
+
+#if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
+int bt_le_throughput_calc(bool enable, u8_t interval);
 #endif
 
 #if defined(BFLB_HOST_ASSISTANT)

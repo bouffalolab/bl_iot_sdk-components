@@ -20,6 +20,8 @@
 #include <bl_sec.h>
 #include <hal_boot2.h>
 #include <hal_board.h>
+#include <hal_hwtimer.h>
+#include <hal_tcal.h>
 #include <hosal_uart.h>
 #include <hosal_dma.h>
 
@@ -69,7 +71,10 @@ static HeapRegion_t xHeapRegionsPsram[] =
 #endif
 
 #ifndef CFG_USE_ROM_CODE
-void __attribute__((weak)) vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName )
+void __attribute__((weak)) vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
+#else
+void __attribute__((weak)) user_vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
+#endif
 {
     puts("Stack Overflow checked\r\n");
     if(pcTaskName){
@@ -80,7 +85,11 @@ void __attribute__((weak)) vApplicationStackOverflowHook(TaskHandle_t xTask, cha
     }
 }
 
+#ifndef CFG_USE_ROM_CODE
 void __attribute__((weak)) vApplicationMallocFailedHook(void)
+#else
+void __attribute__((weak)) user_vApplicationMallocFailedHook(void)
+#endif
 {
     printf("Memory Allocate Failed. Current left size is %d bytes\r\n",
         xPortGetFreeHeapSize()
@@ -95,6 +104,7 @@ void __attribute__((weak)) vApplicationMallocFailedHook(void)
     }
 }
 
+#ifndef CFG_USE_ROM_CODE
 void __attribute__((weak)) vApplicationIdleHook(void)
 {
     __asm volatile(
@@ -161,19 +171,27 @@ void __attribute__((weak)) vApplicationGetTimerTaskMemory(StaticTask_t **ppxTime
     configTIMER_TASK_STACK_DEPTH is specified in words, not bytes. */
     *pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
 }
+#endif
 
+#ifndef CFG_USE_ROM_CODE
 void user_vAssertCalled(void) __attribute__ ((weak, alias ("vAssertCalled")));
 void __attribute__((weak)) vAssertCalled(void)
-{
-    taskDISABLE_INTERRUPTS();
-    abort();
-}
 #else
 void __attribute__((weak)) user_vAssertCalled(void)
-{
-    vAssertCalled();
-}
 #endif
+{
+#if 0
+    taskDISABLE_INTERRUPTS();
+    abort();
+#else
+    taskDISABLE_INTERRUPTS();
+    printf("vAssertCalled, ra = %p, taskname %s\r\n", 
+        (void *)__builtin_return_address(0), pcTaskGetName(NULL));
+    while (1) {
+        /*empty here*/
+    }
+#endif
+}
 
 void __attribute__((weak)) _cli_init(int fd_console)
 {
@@ -237,6 +255,11 @@ static void aos_loop_proc(void *pvParameters)
 #elif defined (CFG_OPENTHREAD_CLI_EN)
     extern void ot_cli_init(void);
     ot_cli_init();
+#endif
+
+#if defined(CFG_TCAL_ENABLE)
+    hal_hwtimer_init();
+    hal_tcal_init();
 #endif
 
     xTaskCreate(app_main_entry,
@@ -324,6 +347,17 @@ void setup_heap()
 
     // Invoked during system boot via start.S
     vPortDefineHeapRegions(xHeapRegions);
+
+
+#if defined(CFG_USE_PSRAM)
+    extern uint8_t _psram_start;
+    extern uint8_t _psram_end;
+    extern void bl_psram_init(void);
+
+    bl_psram_init();
+    memset(&_psram_start, 0, &_psram_end - &_psram_start);
+    vPortDefineHeapRegionsPsram(xHeapRegionsPsram);
+#endif /*CFG_USE_PSRAM*/
 }
 
 static void system_early_init(void)
@@ -351,7 +385,7 @@ void bl702_main()
     TaskHandle_t aos_loop_proc_task;
 
     bl_sys_early_init();
-
+    
 #ifdef CFG_USE_ROM_CODE
     rom_freertos_init(256, 400);
     rom_hal_init();
@@ -378,9 +412,6 @@ void bl702_main()
     );
 
 #if defined(CFG_USE_PSRAM)
-    extern void bl_psram_init(void);
-    bl_psram_init();
-    vPortDefineHeapRegionsPsram(xHeapRegionsPsram);
     printf("PSRAM Heap %u@%p\r\n",(unsigned int)&_heap3_size, &_heap3_start);
 #endif
 

@@ -261,8 +261,14 @@ void bt_keys_clear(struct bt_keys *keys)
     memset(keys, 0, sizeof(*keys));
     
     #if defined (CONFIG_BT_SETTINGS)
-    ef_del_env(NV_KEY_POOL);
-    #endif
+    #if (EF_SW_VERSION_NUM == 0x40099)
+    struct env_node_obj env;
+    if(!ef_get_env_obj(NV_KEY_POOL, &env)){
+        BT_DBG("Not found %s in settings", NV_KEY_POOL);
+    }else
+    #endif /* F_SW_VERSION_NUM == 0x40099 */
+        ef_del_env(NV_KEY_POOL);
+    #endif /* CONFIG_BT_SETTINGS */
 #else
 	BT_DBG("%s (keys 0x%04x)", bt_addr_le_str(&keys->addr), keys->keys);
 

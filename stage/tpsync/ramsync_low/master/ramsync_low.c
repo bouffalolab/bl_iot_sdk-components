@@ -40,33 +40,53 @@
 #include <bl_irq.h>
 #include <bl_dma.h>
 #include <bl_gpio.h>
+
+#if defined BL702
 #include <bl702_spi.h>
 #include <bl702_gpio.h>
 #include <bl702_glb.h>
 #include <bl702_dma.h>
+#include <bl702_clock.h>
 #include <bl702.h>
+#elif defined BL702L
+#include <bl702l_spi.h>
+#include <bl702l_gpio.h>
+#include <bl702l_glb.h>
+#include <bl702l_dma.h>
+#include <bl702l_clock.h>
+#include <bl702l.h>
+#endif
+
 #include <hosal_dma.h>
 #include <hosal_spi.h>
 #include <hal_gpio.h>
 #include <bl_gpio.h>
 
-#include "bl702.h"
-#include "bl702_dma.h"
 #include "ramsync_low.h"
 #include "tpdbg.h"
 
+#if defined BL702
 #define TPSYNC_MST_MISO_PIN 4
 #define TPSYNC_MST_MOSI_PIN 5
 #define TPSYNC_MST_CLK_PIN  3
 #define TPSYNC_MST_CS_PIN   6
+#elif defined BL702L
+#define TPSYNC_MST_MISO_PIN 20
+#define TPSYNC_MST_MOSI_PIN 21
+#define TPSYNC_MST_CLK_PIN  19
+#define TPSYNC_MST_CS_PIN   18
+#endif
 
 static lramsync_spi_config_t _spi_cfg = {
     .port = 0,
     .spi_mode = 0,           /* 0: phase 0, polarity low */
-#ifdef CFG_USE_WIFI_BR
-    .spi_speed = 4000000,
-#else
+#if defined BL702
     .spi_speed = 18000000,
+#elif defined BL702L
+    /** SPI_SetClock use 80M for freqency calculation;
+     * 32M for 16M; 25M for 10.67M; 20M for 8M;
+     *  */
+    .spi_speed = 8000000,
 #endif
     .miso = TPSYNC_MST_MISO_PIN,
     .mosi = TPSYNC_MST_MOSI_PIN,
@@ -95,7 +115,9 @@ static int _lli_init(lramsync_ctx_t *ctx)
         dmactrl.SWidth = DMA_TRNS_WIDTH_32BITS;
         dmactrl.DWidth = DMA_TRNS_WIDTH_32BITS;
         dmactrl.Prot = 0;
+#ifdef BL702
         dmactrl.SLargerD = 0;
+#endif
         dmactrl.dst_add_mode = DISABLE;
         dmactrl.dst_min_mode = DISABLE;
         dmactrl.fix_cnt = 0;
@@ -121,7 +143,9 @@ static int _lli_init(lramsync_ctx_t *ctx)
         dmactrl.SWidth = DMA_TRNS_WIDTH_32BITS;
         dmactrl.DWidth = DMA_TRNS_WIDTH_32BITS;
         dmactrl.Prot = 0;
+#ifdef BL702
         dmactrl.SLargerD = 0;
+#endif
         dmactrl.I = 1;
         dmactrl.SI = DMA_MINC_DISABLE;
         dmactrl.DI = DMA_MINC_ENABLE;
@@ -186,22 +210,38 @@ static void _spi_gpio_init(const lramsync_spi_config_t *config)
 static int _spi_hw_init(const lramsync_spi_config_t *config)
 {
     SPI_CFG_Type spicfg;
-    SPI_ClockCfg_Type clockcfg;
     SPI_FifoCfg_Type fifocfg;
     SPI_ID_Type spi_id;
-    uint8_t clk_div;
 
     spi_id = config->port;
+
+#ifdef BL702
+    SPI_ClockCfg_Type clockcfg;
+    uint8_t clk_div;
 
     blog_info("core clk %ld, bclk div %d\r\n", SystemCoreClockGet(), GLB_Get_BCLK_Div());
     clk_div = (uint8_t)((SystemCoreClockGet()/(GLB_Get_BCLK_Div()+1)) / 2 / config->spi_speed);
     GLB_Set_SPI_CLK(ENABLE, 0);
+
     clockcfg.startLen = clk_div;
     clockcfg.stopLen = clk_div;
     clockcfg.dataPhase0Len = clk_div;
     clockcfg.dataPhase1Len = clk_div;
     clockcfg.intervalLen = clk_div;
     SPI_ClockConfig(spi_id, &clockcfg);
+
+    fifocfg.txFifoThreshold = 1;
+    fifocfg.rxFifoThreshold = 1;
+
+#elif defined BL702L
+    spicfg.slavePin = SPI_SLAVE_PIN_4;
+
+    // GLB_Set_SPI_CLK(ENABLE, GLB_SPI_CLK_SRC_BCLK, 0);
+    SPI_SetClock(spi_id,config->spi_speed);
+
+    fifocfg.txFifoThreshold = 0;
+    fifocfg.rxFifoThreshold = 0;
+#endif
 
     /* spi config */
     spicfg.deglitchEnable = DISABLE;
@@ -233,8 +273,6 @@ static int _spi_hw_init(const lramsync_spi_config_t *config)
     SPI_IntMask(spi_id, SPI_INT_ALL, MASK);
 
     /* fifo */
-    fifocfg.txFifoThreshold = 1;
-    fifocfg.rxFifoThreshold = 1;
     fifocfg.txFifoDmaEnable = ENABLE;
     fifocfg.rxFifoDmaEnable = ENABLE;
     SPI_FifoConfig(spi_id, &fifocfg);
@@ -282,6 +320,7 @@ static int _spi_dma_init(lramsync_ctx_t *ctx)
     rxllicfg.srcPeriph = DMA_REQ_SPI_RX;
     rxllicfg.dstPeriph = DMA_REQ_NONE;
 
+#ifdef BL702
     DMA_LLI_Init(ctx->dma_rx_chan, &rxllicfg);
     DMA_LLI_Update(ctx->dma_rx_chan, (uint32_t)&priv->rx_lli[0]);
     hosal_dma_irq_callback_set(ctx->dma_rx_chan, _spi_int_handler_rx, ctx);
@@ -289,6 +328,15 @@ static int _spi_dma_init(lramsync_ctx_t *ctx)
     DMA_LLI_Init(ctx->dma_tx_chan, &txllicfg);
     DMA_LLI_Update(ctx->dma_tx_chan, (uint32_t)&priv->tx_lli[0]);
     hosal_dma_irq_callback_set(ctx->dma_tx_chan, _spi_int_handler_tx, ctx);
+#elif defined BL702L
+    DMA_LLI_Init(ctx->dma_rx_chan, ctx->dma_rx_chan, &rxllicfg);
+    DMA_LLI_Update(DMA0_ID, ctx->dma_rx_chan, (uint32_t)&priv->rx_lli[0]);
+    hosal_dma_irq_callback_set(ctx->dma_rx_chan, _spi_int_handler_rx, ctx);
+
+    DMA_LLI_Init(ctx->dma_tx_chan, ctx->dma_tx_chan, &txllicfg);
+    DMA_LLI_Update(DMA0_ID, ctx->dma_tx_chan, (uint32_t)&priv->tx_lli[0]);
+    hosal_dma_irq_callback_set(ctx->dma_tx_chan, _spi_int_handler_tx, ctx);
+#endif
 
     SPI_Enable(config->port, SPI_WORK_MODE_MASTER);
     return 0;
@@ -318,7 +366,11 @@ void lramsync_reset(lramsync_ctx_t *ctx)
     priv = (struct _ramsync_low_priv *)ctx->priv;
 
     blog_info("lramsync_reset\r\n");
+#ifdef BL702
     GLB_AHB_Slave1_Reset(BL_AHB_SLAVE1_SPI);
+#elif defined BL702L
+    GLB_AHB_MCU_Software_Reset(GLB_AHB_MCU_SW_SPI);
+#endif
     SPI_Disable(ctx->cfg->port, SPI_WORK_MODE_MASTER);
 	hosal_dma_chan_stop(ctx->dma_tx_chan);
 	hosal_dma_chan_stop(ctx->dma_rx_chan);
@@ -327,8 +379,13 @@ void lramsync_reset(lramsync_ctx_t *ctx)
     bl_gpio_output_set(ctx->cfg->cs, 1);
     _spi_hw_init(ctx->cfg);
 
+#ifdef BL702
     DMA_LLI_Update(ctx->dma_rx_chan, (uint32_t)&priv->rx_lli[0]);
     DMA_LLI_Update(ctx->dma_tx_chan, (uint32_t)&priv->tx_lli[0]);
+#elif defined BL702L
+    DMA_LLI_Update(DMA0_ID, ctx->dma_rx_chan, (uint32_t)&priv->rx_lli[0]);
+    DMA_LLI_Update(DMA0_ID, ctx->dma_tx_chan, (uint32_t)&priv->tx_lli[0]);
+#endif
 
     vTaskDelay(pdMS_TO_TICKS(5));
 

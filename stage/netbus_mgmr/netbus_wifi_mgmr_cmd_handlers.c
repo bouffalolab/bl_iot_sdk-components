@@ -701,6 +701,12 @@ static void handle_ping(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t 
     bflbmsg_send(&env->trcver_ctx, BF1B_MSG_TYPE_CMD, &msg, sizeof(msg));
 }
 
+__attribute__((weak)) void app_handle_hbn(void *ptr, uint32_t length) {}
+static void handle_hbn(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t *cmd)
+{
+    app_handle_hbn(cmd->data_ptr, cmd->data_len);
+}
+
 static void handle_default(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t *cmd)
 {
     log_error("unknown cmd %u\r\n", cmd->cmd);
@@ -825,6 +831,11 @@ void netbus_wifi_mgmr_cmd_entry(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_ms
         blog_info("BFLB_CMD_PING start\r\n");
         handle_ping(env, cmd);
         blog_info("BFLB_CMD_PING end\r\n");
+        break;
+    case BFLB_CMD_HBN:
+        blog_info("BFLB_CMD_HBN start\r\n");
+        handle_hbn(env, cmd);
+        blog_info("BFLB_CMD_HBN end\r\n");
         break;
     default:
         blog_info("default start\r\n");

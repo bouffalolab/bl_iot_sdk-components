@@ -364,8 +364,12 @@ static void blhast_host_state_restore(void)
 
 void blhast_bt_reset(void)
 {
+    #if defined(BL602) || defined(BL702)
     ble_controller_reset();
-	blhast_host_state_restore();
+    #else
+    btble_controller_reset();
+    #endif
+    blhast_host_state_restore();
 }
 
 void blhast_init(void)

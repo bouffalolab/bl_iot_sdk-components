@@ -178,12 +178,19 @@ static void cmd_virt_net_disconnect(char *buf, int len, int argc, char **argv)
     __virt_net_init();
     virt_net_disconnect(g_vnet_net);
 }
+
+static void cmd_virt_net_enter_hbn(char *buf, int len, int argc, char **argv)
+{
+    __virt_net_init();
+    virt_net_enter_hbn(g_vnet_net);
+}
 // STATIC_CLI_CMD_ATTRIBUTE makes this(these) command(s) static
 const static struct cli_command cmds_user[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"wifi_connect", "wifi_connect <ssid> <psk>", cmd_virt_net_connect},
     {"wifi_disconnect", "wifi_disconnect", cmd_virt_net_disconnect},
     {"wifi_status", "wifi_status", cmd_virt_net_get_status},
     {"wifi_scan", "wifi_scan", cmd_virt_net_scan},
+    {"wifi_enter_hbn", "wifi_enter_hbn", cmd_virt_net_enter_hbn},
 };
 
 int virt_net_test_cli_init(void)

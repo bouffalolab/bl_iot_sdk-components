@@ -51,7 +51,11 @@ extern "C" {
 #endif
 
 /** DNS timer period */
+#if LWIP_DNS_SERVER
+#define DNS_TMR_INTERVAL          500
+#else
 #define DNS_TMR_INTERVAL          1000
+#endif
 
 /* DNS resolve types: */
 #define LWIP_DNS_ADDRTYPE_IPV4      0
@@ -102,6 +106,19 @@ extern const ip_addr_t dns_mquery_v6group;
 */
 typedef void (*dns_found_callback)(const char *name, const ip_addr_t *ipaddr, void *callback_arg);
 
+#if LWIP_DNS_SERVER
+/** Callback which is invoked when a hostname is found with pbuf.
+ * A function of this type must be implemented by the application using the DNS resolver.
+ * @param name pointer to the name that was looked up.
+ * @param ipaddr pointer to an ip_addr_t containing the IP address of the hostname,
+ *        or NULL if the name could not be found (or on any other error).
+ * @param callback_arg a user-specified callback argument passed to dns_gethostbyname
+ * @param p pbuf containing the encoded hostname in the DNS response
+*/
+typedef void (*dns_found_callback_pbuf)(const char *name, const ip_addr_t *ipaddr, void *callback_arg, struct pbuf *p);
+
+void             dns_server_init(void);
+#endif
 void             dns_init(void);
 void             dns_tmr(void);
 void             dns_setserver(u8_t numdns, const ip_addr_t *dnsserver);

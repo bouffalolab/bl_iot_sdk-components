@@ -85,5 +85,10 @@ int virt_net_get_link_status(virt_net_t obj) {
   assert(obj != NULL);
 
   return obj->ctrl(obj, VIRT_NET_CTRL_GET_LINK_STATUS);
+}
 
+int virt_net_enter_hbn(virt_net_t obj) {
+  assert(obj != NULL);
+
+  return obj->ctrl(obj, VIRT_NET_CTRL_HBN);
 }

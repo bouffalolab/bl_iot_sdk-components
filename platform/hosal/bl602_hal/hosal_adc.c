@@ -64,6 +64,9 @@ typedef struct adc_ctx {
 }hosal_adc_ctx_t;
 
 static hosal_adc_dev_t *pgdevice;
+static int adc_refer_channel = -1;
+static float adc_refer_voltage = 1.0;
+
 
 #ifdef CONF_ADC_ENABLE_TSEN
 static void update_tsen_v(hosal_adc_ctx_t *pstctx, uint8_t flag)
@@ -348,9 +351,9 @@ static void adc_init(hosal_adc_dev_t *adc)
         adccfg.gain2=ADC_PGA_GAIN_1;
         adccfg.chopMode=ADC_CHOP_MOD_AZ_ON;
 #else
-        adccfg.gain1=ADC_PGA_GAIN_NONE;
-        adccfg.gain2=ADC_PGA_GAIN_NONE;
-        adccfg.chopMode=ADC_CHOP_MOD_AZ_ON;
+        adccfg.gain1=ADC_PGA_GAIN_1;
+        adccfg.gain2=ADC_PGA_GAIN_1;
+        adccfg.chopMode=ADC_CHOP_MOD_AZ_PGA_ON;
 #endif
 
     } else {
@@ -360,7 +363,7 @@ static void adc_init(hosal_adc_dev_t *adc)
     }
 
     adccfg.biasSel=ADC_BIAS_SEL_MAIN_BANDGAP;
-    adccfg.vcm=ADC_PGA_VCM_1V;
+    adccfg.vcm=ADC_PGA_VCM_1P2V;
 
 #ifdef CONF_ADC_ENABLE_TSEN
     adccfg.vref=ADC_VREF_2V;
@@ -424,7 +427,7 @@ static int adc_tsen_offset_get(uint16_t *tsen_offset)
         .clkDiv = ADC_CLK_DIV_32,                   /*!< Clock divider */
         .gain1 = ADC_PGA_GAIN_1,                 /*!< PGA gain 1 */
         .gain2 = ADC_PGA_GAIN_1,                 /*!< PGA gain 2 */
-        .chopMode = ADC_CHOP_MOD_AZ_PGA_ON,           /*!< ADC chop mode select */
+        .chopMode = ADC_CHOP_MOD_AZ_ON,           /*!< ADC chop mode select */
         .biasSel = ADC_BIAS_SEL_MAIN_BANDGAP,       /*!< ADC current form main bandgap or aon bandgap */
         .vcm = ADC_PGA_VCM_1V,                      /*!< ADC VCM value */
         .vref = ADC_VREF_2V,                      /*!< ADC voltage reference */
@@ -467,16 +470,12 @@ static int adc_parse_data(uint32_t *parr, int data_size, int channel)
 {
     int i;
     int32_t data;
+    ADC_Result_Type result;
 
     for (i = 0; i < data_size; i++) {
         if (parr[i] >> 21 == channel) {
-            data = parr[i] & 0xFFFF;
-
-#ifdef CONF_ADC_ENABLE_TSEN
-            data = (data * 2000) >> 16;
-#else
-            data = (data * 3200) >> 16;
-#endif
+            ADC_Parse_Result(&parr[i], 1, &result);
+            data = result.volt * 1000;
 
             return data;
         }
@@ -549,6 +548,7 @@ int hosal_adc_init(hosal_adc_dev_t *adc)
 int hosal_adc_add_channel(hosal_adc_dev_t *adc, uint32_t channel)
 {
     hosal_adc_ctx_t *pstctx = (hosal_adc_ctx_t *)adc->priv;
+    GLB_GPIO_Type pin;
 
     if (NULL == adc) {
         blog_error("parameter is error!\r\n");
@@ -559,6 +559,10 @@ int hosal_adc_add_channel(hosal_adc_dev_t *adc, uint32_t channel)
         blog_error("channel is error!");
         return -1;
     }
+    
+    pin = (GLB_GPIO_Type)adc->config.pin;
+    GLB_GPIO_Func_Init(GPIO_FUN_ANALOG, &pin, 1);
+    
     pstctx->chan_init_table |= 1 << channel;
 
     return 0;
@@ -583,6 +587,20 @@ int hosal_adc_remove_channel(hosal_adc_dev_t *adc, uint32_t channel)
     return 0;
 }
 
+int hosal_adc_add_reference_channel(hosal_adc_dev_t *adc, uint32_t refer_channel, float refer_voltage)
+{
+    adc_refer_channel = refer_channel;
+    adc_refer_voltage = refer_voltage;
+    return hosal_adc_add_channel(adc, adc_refer_channel);
+}
+
+int hosal_adc_remove_reference_channel(hosal_adc_dev_t *adc)
+{
+    uint32_t refer_channel = adc_refer_channel;
+    adc_refer_channel = -1;
+    return hosal_adc_remove_channel(adc, refer_channel);
+}
+
 hosal_adc_dev_t *hosal_adc_device_get(void)
 {
     if (NULL == pgdevice) {
@@ -595,7 +613,7 @@ hosal_adc_dev_t *hosal_adc_device_get(void)
 
 int hosal_adc_value_get(hosal_adc_dev_t *adc, uint32_t channel, uint32_t timeout)
 {
-    int val = -1;
+    int val = -1, refer_val = -1, refer_timeout = timeout;
     hosal_adc_ctx_t *pstctx = (hosal_adc_ctx_t *)adc->priv;
  
     if (NULL == adc) {
@@ -623,6 +641,17 @@ int hosal_adc_value_get(hosal_adc_dev_t *adc, uint32_t channel, uint32_t timeout
             return -1;
         }
         vTaskDelay(1);
+    }
+    
+    if (adc_refer_channel < 12 && adc_refer_channel >= 0 ) {
+        while ((refer_val = adc_parse_data(pstctx->channel_data, ADC_CHANNEL_MAX, adc_refer_channel)) == -1) {
+            if (refer_timeout-- == 0) {
+                return -1;
+            }
+            vTaskDelay(1);
+        }
+        
+        return (int)(val * adc_refer_voltage / refer_val);
     }
     
     return val;

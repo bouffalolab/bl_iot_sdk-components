@@ -26,6 +26,9 @@ COMPONENT_SRCDIRS += dbg desc_buf ramsync_low ramsync_upper test blmem
 ifeq ($(CONFIG_USE_DTS_SPI_CONFIG), 1)
 CPPFLAGS += -DCFG_USE_DTS_SPI_CONFIG
 endif
+
+CPPFLAGS += -D${CONFIG_CHIP_NAME}
+
 ##
 #CPPFLAGS +=
 

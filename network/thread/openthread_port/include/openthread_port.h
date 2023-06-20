@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 #ifndef OT_TASK_SIZE
-#if defined CFG_OTBR_ENABLE
+#if defined OPENTHREAD_BORDER_ROUTER
 #define OT_TASK_SIZE (1024 + 512)
 #elif defined CFG_OPENTHREAD_TESTS_UNIT
 #define OT_TASK_SIZE (1024 * 2)

@@ -776,7 +776,7 @@ etharp_input(struct pbuf *p, struct netif *netif)
        * IP address also offered to us by the DHCP server. We do not
        * want to take a duplicate IP address on a single network.
        * @todo How should we handle redundant (fail-over) interfaces? */
-      dhcp_arp_reply(netif, &sipaddr);
+      dhcp_arp_reply(netif, &sipaddr, &(hdr->shwaddr));
 #endif /* (LWIP_DHCP && DHCP_DOES_ARP_CHECK) */
       break;
     default:

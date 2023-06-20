@@ -2,7 +2,7 @@ OUTPUT_ARCH( "riscv" )
 
 ENTRY( bl702_start )
 
-__EM_SIZE = DEFINED(btble_controller_init) ? 16K : 0K;
+__EM_SIZE = DEFINED(btble_controller_init) ? (DEFINED(__EM_SIZE) ? __EM_SIZE : 16K) : 0K;
 __CACHE_SIZE = DEFINED(__CACHE_SIZE) ? __CACHE_SIZE : 8K;
 
 MEMORY
@@ -186,6 +186,11 @@ SECTIONS
     *(.bss .bss.*)
     *(.gnu.linkonce.b.*)
     *(COMMON)
+  } >ocram
+
+  .sha_ocram (NOLOAD) :
+  {
+    *(.sha_ocram*)
   } >ocram
 
   .stack (NOLOAD) : ALIGN(8)

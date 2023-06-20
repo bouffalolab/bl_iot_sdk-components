@@ -283,10 +283,6 @@ static void bl_tx_push(struct bl_sta* sta, struct txdesc_host *txdesc_host, void
 
         /* Free pbuf, dont need it anymore */
         pbuf_free(p);
-
-#ifdef CFG_NETBUS_WIFI_ENABLE
-        update_tx_pbuf_free_cnt_to_scratch_reg();
-#endif
     }
     else
     {
@@ -426,6 +422,10 @@ int bl_tx_cfm(void *pthis, void *host_id)
     ipc_host_txbuf_free((struct txbuf_host *)host_id);
 #else
     pbuf_free(p);
+#endif
+
+#ifdef CFG_NETBUS_WIFI_ENABLE
+    update_tx_pbuf_free_cnt_to_scratch_reg();
 #endif
 
     /* Re-trigger this sta tx */
@@ -618,12 +618,12 @@ err_t bl_output(struct bl_hw *bl_hw, int is_sta, struct pbuf *p, struct bl_tx_cf
     /* Push packet into waiting_list */
     bl_os_enter_critical();
     utils_list_push_back(&sta->waiting_list, &(txhdr->item));
+    tx_cntrl_sta_trigger |= BIT_STA(sta_id);
     /* Whether trigger irq */
     if (bl_tx_cntrl_check_fc(sta))
     {
         bl_irq_handler();
     }
-    tx_cntrl_sta_trigger |= BIT_STA(sta_id);
     bl_os_exit_critical();
 
     return ERR_OK;

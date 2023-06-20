@@ -1,8 +1,6 @@
 # Component Makefile
 #
 
-include $(COMPONENT_PATH)/../openthread_common.mk
-
 ## These include paths would be exported to project level
 COMPONENT_ADD_INCLUDEDIRS += ../openthread/include ../openthread/src/core ../openthread/src ../openthread/examples/platforms
 
@@ -27,12 +25,14 @@ COMPONENT_SRCS := ot_alarm.c \
                   ot_uart.c \
                   ot_freertos.c \
                   ot_memory.c \
-                  ot_linkmetric.c \
-                  ot_extern.cpp
+                  ot_linkmetric.c
+
+ifndef CONFIG_NCP
+COMPONENT_SRCS += ot_extern.cpp
+endif
 
 COMPONENT_OBJS := $(patsubst %.cpp,%.o, $(filter %.cpp,$(COMPONENT_SRCS))) $(patsubst %.c,%.o, $(filter %.c,$(COMPONENT_SRCS))) $(patsubst %.S,%.o, $(filter %.S,$(COMPONENT_SRCS)))
 COMPONENT_SRCDIRS := .
-
 
 ifeq ($(CONFIG_SYS_AOS_LOOP_ENABLE),1)
 CPPFLAGS += -DSYS_AOS_LOOP_ENABLE
@@ -56,6 +56,10 @@ endif
 
 ifeq ($(CONFIG_USE_PSRAM), 1)
 CPPFLAGS += -DCFG_USE_PSRAM=1
+endif
+
+ifeq ($(CONFIG_OTBR),1)
+CFLAGS += -DOPENTHREAD_BORDER_ROUTER
 endif
 
 CPPFLAGS += -D$(CONFIG_CHIP_NAME)

@@ -102,6 +102,8 @@ static void blprog_cmd_calc_sha256(const uint8_t *data, uint32_t len, uint8_t *h
 {
     bflb_hash_handle_t hash_handle;
     
+    GLB_AHB_Slave1_Reset(BL_AHB_SLAVE1_SEC);
+    
     Sec_Eng_PKA_Reset();
     Sec_Eng_PKA_BigEndian_Enable();
     
@@ -349,6 +351,42 @@ int blprog_cmd_run_img(void)
     
     return blprog_cmd_custom(0x1A, NULL, 0, NULL, NULL);
 }
+#else
+int blprog_cmd_set_clk(uint32_t baudrate)
+{
+    uint32_t arg[6];
+    
+    arg[0] = 1;
+    arg[1] = baudrate;
+    arg[2] = 0x47464350;  // magic code
+    arg[3] = 0x01000501;  // xtal_type = 1, pll_clk = 5, hclk_div = 0, bclk_div = 1
+    arg[4] = 0x00000000;  // flash_clk_type = 0, flash_clk_div = 0
+    arg[5] = 0xC6D0D9E0;  // crc
+    
+    printf("# set_clk\r\n");
+    
+    if(blprog_cmd_custom(0x22, (uint8_t *)arg, 24, NULL, NULL) != 0){
+        return -1;
+    }
+    
+    arch_delay_ms(10);
+    
+    return 0;
+}
+
+int blprog_cmd_set_flash_para(uint8_t flash_pin_cfg)
+{
+    uint8_t data[4];
+    
+    data[0] = flash_pin_cfg;  // auto_scan = 0, bank = 0
+    data[1] = 0x00;  // flash_clk_type = 0, flash_clk_div = 0
+    data[2] = 0x01;  // flash_io_mode = 1
+    data[3] = 0x01;  // flash_clk_delay = 1
+    
+    printf("# set_flash_para\r\n");
+    
+    return blprog_cmd_custom(0x3B, data, 4, NULL, NULL);
+}
 #endif
 
 int blprog_cmd_read_flashid(uint8_t **out_data, uint16_t *out_len)
@@ -460,6 +498,46 @@ int blprog_cmd_load_eflash_loader(void)
     }
     
     if(blprog_cmd_run_img() != 0){
+        return -1;
+    }
+    
+    return 0;
+}
+#else
+int blprog_cmd_pre_cfg(uint32_t baudrate)
+{
+    uint8_t *out_data;
+    uint16_t out_len;
+    uint8_t sf_swap_cfg;
+    uint8_t flash_cfg;
+    uint8_t sf_reverse;
+    uint8_t flash_pin_cfg;
+    
+    if(blprog_cmd_get_bootinfo(&out_data, &out_len) != 0){
+        return -1;
+    }
+    
+    sf_swap_cfg = out_data[14] >> 6;
+    flash_cfg = (out_data[15] >> 2) & 0x07;
+    sf_reverse = (out_data[15] >> 5) & 0x01;
+    
+    if(flash_cfg == 0){
+        flash_pin_cfg = 0;
+    }else{
+        if(sf_reverse == 0){
+            flash_pin_cfg = sf_swap_cfg + 1;
+        }else{
+            flash_pin_cfg = sf_swap_cfg + 5;
+        }
+    }
+    
+    printf("flash_pin_cfg: %d\r\n", flash_pin_cfg);
+    
+    if(blprog_cmd_set_clk(baudrate) != 0){
+        return -1;
+    }
+    
+    if(blprog_cmd_set_flash_para(flash_pin_cfg) != 0){
         return -1;
     }
     

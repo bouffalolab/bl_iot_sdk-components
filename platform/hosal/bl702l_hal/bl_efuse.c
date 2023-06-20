@@ -92,7 +92,7 @@ int bl_efuse_read_capcode(uint8_t *capcode)
     return -1;
 }
 
-int bl_efuse_read_pwroft(int8_t poweroffset[2])
+int bl_efuse_read_pwroft(int8_t poweroffset[4])
 {
     uint8_t empty;
 
@@ -120,36 +120,18 @@ int bl_efuse_read_pwroft(int8_t poweroffset[2])
     return -1;
 }
 
-static int8_t bl_efuse_power_offset_interpolation(int8_t poweroffset[2], uint8_t x0, uint8_t x1, uint8_t x)
+int bl_efuse_read_pwroft_ex(int8_t poweroffset_zigbee[16], int8_t poweroffset_ble[4])
 {
-    int8_t y0, y1;
-
-    y0 = poweroffset[0];
-    y1 = poweroffset[1];
-
-    if(y0 == y1){
-        return y0;
-    }else if(x <= x0){
-        return y0;
-    }else if(x >= x1){
-        return y1;
-    }else{
-        return (int8_t)round((double)(y1 - y0)*(x - x0)/(x1 - x0)) + y0;
-    }
-}
-
-int bl_efuse_read_pwroft_ex(int8_t poweroffset_zigbee[16], int8_t poweroffset_ble[40])
-{
-    int8_t poweroffset[2];
+    int8_t poweroffset[4];
     int i;
 
     if(bl_efuse_read_pwroft(poweroffset) == 0){
-        for(i=0; i<16; i++){
-            poweroffset_zigbee[i] = bl_efuse_power_offset_interpolation(poweroffset, 0, 15, i);
-        }
-
-        for(i=0; i<40; i++){
-            poweroffset_ble[i] = bl_efuse_power_offset_interpolation(poweroffset, 0, 39, i);
+        for(i=0; i<4; i++){
+            poweroffset_zigbee[4*i] = poweroffset[i];
+            poweroffset_zigbee[4*i+1] = poweroffset[i];
+            poweroffset_zigbee[4*i+2] = poweroffset[i];
+            poweroffset_zigbee[4*i+3] = poweroffset[i];
+            poweroffset_ble[i] = poweroffset[i];
         }
 
         return 0;

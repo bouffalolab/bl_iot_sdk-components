@@ -131,7 +131,7 @@ err_t            tcp_process_refused_data(struct tcp_pcb *pcb);
 #ifdef BL_TCP_OPTIMIZE
 #define TCP_TMR_INTERVAL       50/* The TCP timer interval in milliseconds. */
 #else
-#define TCP_TMR_INTERVAL       500/* The TCP timer interval in milliseconds. */
+#define TCP_TMR_INTERVAL       250/* The TCP timer interval in milliseconds. */
 #endif
 #endif /* TCP_TMR_INTERVAL */
 
@@ -140,8 +140,7 @@ err_t            tcp_process_refused_data(struct tcp_pcb *pcb);
 #endif /* TCP_FAST_INTERVAL */
 
 #ifndef TCP_SLOW_INTERVAL
-//#define TCP_SLOW_INTERVAL      (2*TCP_TMR_INTERVAL)  /* the coarse grained timeout in milliseconds */
-#define TCP_SLOW_INTERVAL      (TCP_TMR_INTERVAL)  /* the coarse grained timeout in milliseconds */
+#define TCP_SLOW_INTERVAL      (2*TCP_TMR_INTERVAL)  /* the coarse grained timeout in milliseconds */
 #endif /* TCP_SLOW_INTERVAL */
 
 #define TCP_FIN_WAIT_TIMEOUT 20000 /* milliseconds */

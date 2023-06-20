@@ -32,29 +32,40 @@
 #include <stdio.h>
 #include <FreeRTOS.h>
 #include <task.h>
-#include <hosal_uart.h>
+#include <bl_uart.h>
 #include <utils_base64.h>
 #include <utils_crc.h>
 #include <utils_hex.h>
 #include <bl_coredump.h>
 
+/* 1KB Block */
+#define BL_COREDUMP_PRINT_SEG_N_K 1
+
+#define COREDUMP_UART 0
+
 #define REVERSE(a) (((a)&0xff) << 24 | ((a)&0xff00) << 8 | ((a)&0xff0000) >> 8 | ((a)&0xff000000) >> 24)
 
+#undef read_const_csr
 #define read_const_csr(reg) ({ register uintptr_t __tmp; \
   asm ("csrr %0, " #reg : "=r"(__tmp)); __tmp; })
 
+#undef read_csr
 #define read_csr(reg) ({ register uintptr_t __tmp; \
   asm volatile ("csrr %0, " #reg : "=r"(__tmp)); __tmp; })
 
+#undef write_csr
 #define write_csr(reg, val) ({ \
   asm volatile ("csrw " #reg ", %0" :: "rK"(val)); })
 
+#undef swap_csr
 #define swap_csr(reg, val) ({ register uintptr_t __tmp; \
   asm volatile ("csrrw %0, " #reg ", %1" : "=r"(__tmp) : "rK"(val)); __tmp; })
 
+#undef set_csr
 #define set_csr(reg, bit) ({ register uintptr_t __tmp; \
   asm volatile ("csrrs %0, " #reg ", %1" : "=r"(__tmp) : "rK"(bit)); __tmp; })
 
+#undef clear_csr
 #define clear_csr(reg, bit) ({ register uintptr_t __tmp; \
   asm volatile ("csrrc %0, " #reg ", %1" : "=r"(__tmp) : "rK"(bit)); __tmp; })
 
@@ -212,40 +223,39 @@ static inline uintptr_t cd_getsp(void) {
   return sp;
 }
 
-/**
- * Coredump initialize.
- *
- * @return result
- */
-static int cd_getchar(char *inbuf) {
-  extern hosal_uart_dev_t uart_stdio;
-
-  return hosal_uart_receive(&uart_stdio, inbuf, 1);
+static void cd_flush(void) {
+  bl_uart_flush(COREDUMP_UART);
 }
 
-/**
- * Coredump initialize.
- *
- * @return result
- */
+static int cd_getchar(char *inbuf) {
+  int ret;
+  ret =  bl_uart_data_recv(COREDUMP_UART);
+  if (ret < 0) {
+    return 0;
+  }
+  *inbuf = (char)ret;
+  return 1;
+}
+
 static void cd_putchar(const char *buf, size_t len) {
-  extern hosal_uart_dev_t uart_stdio;
-  hosal_uart_send(&uart_stdio, buf, len);
+  size_t i;
+  for (i=0; i<len; i++) {
+    bl_uart_data_send(COREDUMP_UART, buf[i]);
+  }
 }
 
 static void cd_base64_wirte_block(const uint8_t buf[4], void *opaque) {
-  extern hosal_uart_dev_t uart_stdio;
   int *line_wrap = (int *)opaque;
-  hosal_uart_send(&uart_stdio, buf, 4);
+  cd_putchar((const char *)buf, 4);
   if (++(*line_wrap) > (BASE64_LINE_WRAP >> 2)) {
-    hosal_uart_send(&uart_stdio, "\r\n", 2);
+    cd_putchar("\r\n", 2);
     *line_wrap = 0;
   }
 }
 
 static void dump_ascii(const void *data, ssize_t len, struct crc32_stream_ctx *crc_ctx) {
   /* reuse len as index here, for calculate the crc */
-  for (len = 0; len < strlen((const char *)data); len++) {
+  for (len = 0; len < (ssize_t)strlen((const char *)data); len++) {
     utils_crc32_stream_feed(crc_ctx, *((const char *)data + len));
   }
 
@@ -542,6 +552,8 @@ static void bl_coredump_print(uintptr_t addr, uint32_t len, const char *desc, en
   dump_handler_list[DUMP_BASE64_WORD]((const void *)&crc, (ssize_t)sizeof(uint32_t), &crc_ctx);
 
   cd_putchar(COREDUMP_BLOCK_CLOSE_STR, sizeof(COREDUMP_BLOCK_CLOSE_STR));
+
+  cd_flush();
 }
 
 #ifndef BL_COREDUMP_PRINT_SEG_N_K
@@ -550,7 +562,7 @@ static void bl_coredump_print(uintptr_t addr, uint32_t len, const char *desc, en
 static void bl_coredump_print_n_k(uintptr_t addr, uint32_t len, const char *desc, enum dump_type type)
 {
     uint32_t printed_len;
-    int seg;
+    uint32_t seg;
 
     for(seg = 0; seg * BL_COREDUMP_PRINT_SEG_N_K * 1024 < len; seg++) {
         printed_len = seg*BL_COREDUMP_PRINT_SEG_N_K*1024;
@@ -565,7 +577,7 @@ static void bl_coredump_print_n_k(uintptr_t addr, uint32_t len, const char *desc
  */
 void bl_coredump_parse(const uint8_t *buf, unsigned int len) {
   char command;
-  int i = 0;
+  unsigned int i = 0;
 
   command = buf[i++];
 

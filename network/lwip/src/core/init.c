@@ -157,8 +157,14 @@ PACK_STRUCT_END
 #if (LWIP_TCP && (TCP_SND_QUEUELEN < 2))
 #error "TCP_SND_QUEUELEN must be at least 2 for no-copy TCP writes to work"
 #endif
+#ifdef BL_TCP_OPTIMIZE
+#if (LWIP_TCP && ((TCP_MAXRTX > 48) || (TCP_SYNMAXRTX > 48)))
+#error "If you want to use TCP, TCP_MAXRTX and TCP_SYNMAXRTX must less or equal to 48 (due to tcp_backoff table), so, you have to reduce them in your lwipopts.h"
+#endif
+#else
 #if (LWIP_TCP && ((TCP_MAXRTX > 12) || (TCP_SYNMAXRTX > 12)))
 #error "If you want to use TCP, TCP_MAXRTX and TCP_SYNMAXRTX must less or equal to 12 (due to tcp_backoff table), so, you have to reduce them in your lwipopts.h"
+#endif
 #endif
 #if (LWIP_TCP && TCP_LISTEN_BACKLOG && ((TCP_DEFAULT_LISTEN_BACKLOG < 0) || (TCP_DEFAULT_LISTEN_BACKLOG > 0xff)))
 #error "If you want to use TCP backlog, TCP_DEFAULT_LISTEN_BACKLOG must fit into an u8_t"
@@ -370,6 +376,9 @@ lwip_init(void)
 #if LWIP_DNS
   dns_init();
 #endif /* LWIP_DNS */
+#if LWIP_DNS_SERVER
+  dns_server_init();
+#endif /* LWIP_DNS_SERVER */
 #if PPP_SUPPORT
   ppp_init();
 #endif

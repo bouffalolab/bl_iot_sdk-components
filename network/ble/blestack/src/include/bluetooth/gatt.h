@@ -1083,6 +1083,10 @@ struct bt_gatt_discover_params {
 	u16_t end_handle;
 	/** Discover type */
 	u8_t type;
+	#if defined(BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK)
+	/** Discover rsp errno */
+	u8_t err;
+	#endif /* BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK */
 };
 
 /** @brief GATT Discover function

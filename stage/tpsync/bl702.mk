@@ -9,5 +9,4 @@ COMPONENT_SRCS :=   ./ramsync_low/master/ramsync_low.c \
 
 COMPONENT_SRCDIRS := ./ramsync_low/master/
 
-##
-#CPPFLAGS +=
+

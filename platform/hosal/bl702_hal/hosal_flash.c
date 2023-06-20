@@ -127,12 +127,15 @@ int hosal_flash_erase(hosal_flash_dev_t *p_dev, uint32_t off_set, uint32_t size)
 int hosal_flash_write(hosal_flash_dev_t *p_dev, uint32_t *off_set,
                     const void *in_buf, uint32_t in_buf_size)
 {
-    uint32_t addr = *off_set;
+    if (off_set == NULL) {
+        return -1;
+    }
 
     if (in_buf == NULL) {
         return -1;
     }
 
+    uint32_t addr = *off_set;
     char *wbuf = (char *)in_buf;
     uint32_t wlen = in_buf_size;
 

@@ -23,6 +23,7 @@ COMPONENT_SRCS := bl602_std/StdDriver/Src/bl602_uart.c \
                   bl602_std/StdDriver/Src/bl602_sec_eng.c \
                   bl602_std/StdDriver/Src/bl602_dma.c \
                   bl602_std/StdDriver/Src/bl602_common.c \
+                  bl602_std/StdDriver/Src/bl602_acomp.c \
                   bl602_std/StdDriver/Src/bl602_glb.c \
                   bl602_std/StdDriver/Src/bl602_hbn.c \
                   bl602_std/StdDriver/Src/bl602_timer.c \

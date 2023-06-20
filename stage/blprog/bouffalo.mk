@@ -14,7 +14,7 @@ ifeq ("$(CONFIG_PROG_TARGET)", "BL602")
 COMPONENT_SRCS += bl602_eflash_loader_rc32m.c
 else ifeq ("$(CONFIG_PROG_TARGET)", "BL702")
 COMPONENT_SRCS += bl702_eflash_loader_rc32m.c
-else
+else ifeq ("$(CONFIG_PROG_TARGET)", "BL702L")
 CPPFLAGS += -DNO_EFLASH_LOADER
 endif
 

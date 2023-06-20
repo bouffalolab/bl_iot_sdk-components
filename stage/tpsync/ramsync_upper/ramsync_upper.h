@@ -95,8 +95,8 @@ typedef struct __tp_buf {
     char name[4];
 
     /* slot */
-    tp_txbuf_t tx;
-    tp_rxbuf_t rx;
+    tp_txbuf_t * p_tx;
+    tp_rxbuf_t * p_rx;
 
     /* local sequnce */
     uint32_t tx_seq;
@@ -114,7 +114,7 @@ typedef struct __tp_buf {
 #endif
 
     /* calulate crc for rx */
-    tp_payload_t rx_cache;
+    tp_payload_t *p_rx_cache;
 
     /* tx/rx task */
     TaskHandle_t tx_thdr;

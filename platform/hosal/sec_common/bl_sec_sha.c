@@ -50,6 +50,7 @@ static bl_SEC_Eng_SHA_Link_Config_Type working_link_cfg __attribute__((section("
 #elif defined BL702
 static bl_SEC_Eng_SHA_Link_Config_Type working_link_cfg __attribute__((section(".sha_ocram")));
 #elif defined BL702L
+static bl_SEC_Eng_SHA_Link_Config_Type working_link_cfg __attribute__((section(".sha_ocram")));
 #else
 #error "No support for this chip"
 #endif
@@ -91,6 +92,22 @@ static bool is_tcm_addr(void *addr)
     if (addr_masked < BL602_END_OF_DTCM) {
         return true;
     }
+    return false;
+}
+#endif
+
+#if defined(BL702L)
+static bool is_psram_cache(void * addr)
+{
+#define BL704L_PSRAM_CACHE_REGION 0x24000000UL
+#define BL704L_PSRAM_ADDRESS_MASK 0xff000000UL
+#define BL704L_PSRAM_RAW_REGION 0x26000000UL
+
+    if (BL704L_PSRAM_CACHE_REGION == (BL704L_PSRAM_ADDRESS_MASK & (uint32_t) addr))
+    {
+        return true;
+    }
+
     return false;
 }
 #endif
@@ -143,6 +160,11 @@ int bl_sha_init(bl_sha_ctx_t *ctx, const bl_sha_type_t type)
     if (is_tcm_addr(ctx)) {
         link_cfg = &working_link_cfg;
     }
+#elif defined(BL702L)
+    if (is_psram_cache(ctx))
+    {
+        link_cfg = &working_link_cfg;
+    }
 #endif
     Sec_Eng_SHA256_Link_Init((SEC_Eng_SHA256_Link_Ctx *)&ctx->ctx, BL_SHA_ID, (uint32_t)link_cfg, ctx->tmp, ctx->pad);
     return 0;
@@ -167,10 +189,16 @@ int bl_sha_clone(bl_sha_ctx_t *dst, const bl_sha_ctx_t *src)
     *dst = *src;
     dst->ctx.shaBuf = dst->tmp;
     dst->ctx.shaPadding = dst->pad;
-    dst->ctx.linkAddr = (uint32_t)&dst->link_cfg;
-#if defined (BL602) || defined (BL702)
-    if (is_tcm_addr(dst)) {
-        dst->ctx.linkAddr = (uint32_t)&working_link_cfg;
+    dst->ctx.linkAddr   = (uint32_t) &dst->link_cfg;
+#if defined(BL602) || defined(BL702)
+    if (is_tcm_addr(dst))
+    {
+        dst->ctx.linkAddr = (uint32_t) &working_link_cfg;
+    }
+#elif defined(BL702L)
+    if (is_psram_cache(dst))
+    {
+        dst->ctx.linkAddr = (uint32_t) &working_link_cfg;
     }
 #endif
     return 0;
@@ -178,8 +206,14 @@ int bl_sha_clone(bl_sha_ctx_t *dst, const bl_sha_ctx_t *src)
 
 int bl_sha_update(bl_sha_ctx_t *ctx, const uint8_t *input, uint32_t len)
 {
-#if defined (BL602) || defined (BL702)
-    if (is_tcm_addr(ctx)) {
+#if defined(BL602) || defined(BL702)
+    if (is_tcm_addr(ctx))
+    {
+        ARCH_MemCpy_Fast(&working_link_cfg, &ctx->link_cfg, sizeof(working_link_cfg));
+    }
+#elif defined(BL702L)
+    if (is_psram_cache(ctx))
+    {
         ARCH_MemCpy_Fast(&working_link_cfg, &ctx->link_cfg, sizeof(working_link_cfg));
     }
 #elif defined BL616
@@ -191,9 +225,15 @@ int bl_sha_update(bl_sha_ctx_t *ctx, const uint8_t *input, uint32_t len)
         L1C_DCache_Clean_Invalid_By_Addr((uintptr_t)input, len);
     }
 #endif
-    Sec_Eng_SHA256_Link_Update((SEC_Eng_SHA256_Link_Ctx *)&ctx->ctx, BL_SHA_ID, input, len);
-#if defined (BL602) || defined (BL702)
-    if (is_tcm_addr(ctx)) {
+    Sec_Eng_SHA256_Link_Update((SEC_Eng_SHA256_Link_Ctx *) &ctx->ctx, BL_SHA_ID, input, len);
+#if defined(BL602) || defined(BL702)
+    if (is_tcm_addr(ctx))
+    {
+        ARCH_MemCpy_Fast(&ctx->link_cfg, &working_link_cfg, sizeof(working_link_cfg));
+    }
+#elif defined(BL702L)
+    if (is_psram_cache(ctx))
+    {
         ARCH_MemCpy_Fast(&ctx->link_cfg, &working_link_cfg, sizeof(working_link_cfg));
     }
 #endif
@@ -202,8 +242,14 @@ int bl_sha_update(bl_sha_ctx_t *ctx, const uint8_t *input, uint32_t len)
 
 int bl_sha_finish(bl_sha_ctx_t *ctx, uint8_t *hash)
 {
-#if defined (BL602) || defined (BL702)
-    if (is_tcm_addr(ctx)) {
+#if defined(BL602) || defined(BL702)
+    if (is_tcm_addr(ctx))
+    {
+        ARCH_MemCpy_Fast(&working_link_cfg, &ctx->link_cfg, sizeof(working_link_cfg));
+    }
+#elif defined(BL702L)
+    if (is_psram_cache(ctx))
+    {
         ARCH_MemCpy_Fast(&working_link_cfg, &ctx->link_cfg, sizeof(working_link_cfg));
     }
 #elif defined BL616

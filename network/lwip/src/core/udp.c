@@ -65,6 +65,10 @@
 
 #include <string.h>
 
+#ifdef BL_DUAL_STACK
+#include <bl_dual_stack_input.h>
+#endif
+
 #ifndef UDP_LOCAL_PORT_RANGE_START
 /* From http://www.iana.org/assignments/port-numbers:
    "The Dynamic and/or Private Ports are those from 49152 through 65535" */
@@ -411,6 +415,13 @@ udp_input(struct pbuf *p, struct netif *inp)
       LWIP_DEBUGF(UDP_DEBUG | LWIP_DBG_TRACE, ("udp_input: not for us.\n"));
 
 #if LWIP_ICMP || LWIP_ICMP6
+#ifdef BL_DUAL_STACK
+      pbuf_header_force(p, (s16_t)(SIZEOF_ETH_HDR + ip_current_header_tot_len() + UDP_HLEN));
+      pbuf_ref(p);
+      if (bl_dual_stack_peer_input(p, NULL)) {
+        pbuf_free(p);
+      }
+#else
       /* No match was found, send ICMP destination port unreachable unless
          destination address was broadcast/multicast. */
       if (!broadcast && !ip_addr_ismulticast(ip_current_dest_addr())) {
@@ -418,6 +429,7 @@ udp_input(struct pbuf *p, struct netif *inp)
         pbuf_header_force(p, (s16_t)(ip_current_header_tot_len() + UDP_HLEN));
         icmp_port_unreach(ip_current_is_v6(), p);
       }
+#endif
 #endif /* LWIP_ICMP || LWIP_ICMP6 */
       UDP_STATS_INC(udp.proterr);
       UDP_STATS_INC(udp.drop);

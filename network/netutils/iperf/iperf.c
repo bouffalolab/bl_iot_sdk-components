@@ -803,7 +803,7 @@ static void iperf_exit_cmd(char *buf, int len, int argc, char **argv)
 {
     exit_flag = 1;
 }
-#if 0
+#if 1
 static void iperf_cmd(char *buf, int len, int argc, char **argv)
 {
     iperf_param_t *iperf_param;
@@ -902,7 +902,7 @@ const static struct cli_command cmds_user[] STATIC_CLI_CMD_ATTRIBUTE = {
     { "ipu", "iperf UDP client", ipu_test_cmd},
     { "ipus", "iperf UDP server", ipus_test_cmd},
     { "iperf_stop", "stop iperf", iperf_exit_cmd},
-    // { "iperf", "iperf cmd", iperf_cmd},
+    { "iperf", "iperf cmd", iperf_cmd},
 };
 
 int network_netutils_iperf_cli_register()

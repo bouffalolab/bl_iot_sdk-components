@@ -1,5 +1,20 @@
 # Changes
 
+## 2023-06-16
+1. Optimize error log.
+
+## 2023-06-15
+1. Add ble auto clean le key when key missing.
+
+## 2023-06-06
+1. Add the function for ble tx/rx throughput.
+
+## 2023-05-31
+1. Add an error response value in the discover function callback.
+
+## 2023-05-24
+1. Fix a crash when call bt_gatt_subscribe function in ble connected callback.
+
 ## 2023-05-10
 1. Supplement EIR/AD data type definitions.
 2. Add API to make upper layer can disable pair.

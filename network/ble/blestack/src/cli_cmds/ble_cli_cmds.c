@@ -38,13 +38,6 @@ bool 			ble_inited 	= false;
 struct bt_conn *default_conn = NULL;
 #endif
 
-uint8_t non_disc = BT_LE_AD_NO_BREDR;
-uint8_t gen_disc = BT_LE_AD_NO_BREDR | BT_LE_AD_GENERAL;
-uint8_t lim_disc = BT_LE_AD_NO_BREDR | BT_LE_AD_LIMITED;
-struct bt_data ad_discov[2] = {
-    BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_NO_BREDR | BT_LE_AD_GENERAL),
-    BT_DATA_BYTES(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME),
-};
 #if defined(CONFIG_BLE_MULTI_ADV)
 static int ble_adv_id;
 #endif
@@ -101,6 +94,9 @@ static void blecli_connect_test_psm(char *pcWriteBuffer, int xWriteBufferLen, in
 #endif
 static void blecli_read_rssi(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 static void blecli_unpair(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+#if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
+static void blecli_ble_throughput_calc(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+#endif
 #endif
 #if defined(CONFIG_BT_SMP)
 static void blecli_security(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
@@ -228,7 +224,10 @@ const struct cli_command btStackCmdSet[] STATIC_CLI_CMD_ATTRIBUTE = {
     Parameter [Conn Interval Min,0x0006-0C80,e.g.0030]\r\n\
     [Conn Interval Max,0x0006-0C80,e.g.0030]\r\n\
     [Conn Latency,0x0000-01f3,e.g.0004]\r\n\
-    [Supervision Timeout,0x000A-0C80,e.g.0010]\r\n", blecli_send_l2cap_conn_param_update_req}, 
+    [Supervision Timeout,0x000A-0C80,e.g.0010]\r\n", blecli_send_l2cap_conn_param_update_req},
+    #if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
+    {"ble_set_throughput_calc", "ble set throughputcalc\r\nParameter [enable]\r\n [duration]\r\n", blecli_ble_throughput_calc},
+    #endif
     #if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)
     {"ble_l2cap_send_test_data", "ble send l2cap data\r\nParameter [channel id]\r\n", blecli_l2cap_send_test_data}, 
     {"ble_l2cap_disconnect", "ble send l2cap data\r\nParameter [channel id]\r\n", blecli_l2cap_disconnect},
@@ -503,6 +502,9 @@ void btcli_enable_cb(int err)
 
 static void blecli_enable(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
+    if (atomic_test_bit(bt_dev.flags, BT_DEV_ENABLE)) {
+        return;
+    }
     // Initialize BLE controller
     #if defined(BL702) || defined(BL602)
     ble_controller_init(configMAX_PRIORITIES - 1);
@@ -818,6 +820,15 @@ static void blecli_start_advertise(char *pcWriteBuffer, int xWriteBufferLen, int
         return;
     }
 
+    uint8_t non_disc = BT_LE_AD_NO_BREDR;
+    uint8_t gen_disc = BT_LE_AD_NO_BREDR | BT_LE_AD_GENERAL;
+    uint8_t lim_disc = BT_LE_AD_NO_BREDR | BT_LE_AD_LIMITED;
+    char *adv_name = bt_get_name();
+    struct bt_data ad_discov[2] = {
+        BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_NO_BREDR | BT_LE_AD_GENERAL),
+        BT_DATA(BT_DATA_NAME_COMPLETE, adv_name, strlen(adv_name)),
+    };
+ 
     param.id = selected_id;
     param.interval_min = BT_GAP_ADV_FAST_INT_MIN_2;
     param.interval_max = BT_GAP_ADV_FAST_INT_MAX_2;
@@ -1368,6 +1379,32 @@ static void blecli_read_rssi(char *pcWriteBuffer, int xWriteBufferLen, int argc,
     }
 }
 
+#if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
+static void blecli_ble_throughput_calc(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{  
+    int err;
+    bool enable;
+    u8_t interval;
+    if(argc != 3){
+       vOutputString("Number of Parameters is not correct\r\n");
+       return;
+    }
+    get_uint8_from_string(&argv[1], &enable); 
+    get_uint8_from_string(&argv[2], &interval); 
+    extern int bt_le_throughput_calc(bool enable, u8_t interval);
+    err = bt_le_throughput_calc(enable,interval);
+    if(err)
+    {
+        vOutputString("set le throughput calculation failed (err %d)\r\n", err); 
+    }
+    else
+    {
+        vOutputString("set le throughput calculation success\r\n");
+    }
+    
+}
+#endif
+
 #endif //#if defined(CONFIG_BT_CONN)
 
 #if defined(CONFIG_BT_SMP)
@@ -1621,6 +1658,11 @@ u8_t discover_func(struct bt_conn *conn, const struct bt_gatt_attr *attr, struct
 
 	if (!attr) {
 		vOutputString( "Discover complete\r\n");
+		#if defined(BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK)
+		if(params->err != 0){
+			printf("Discover erro %x\n", params->err);
+		}
+		#endif /* BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK */
 		(void)memset(params, 0, sizeof(*params));
 		return BT_GATT_ITER_STOP;
 	}

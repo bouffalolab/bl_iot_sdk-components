@@ -173,6 +173,11 @@ SECTIONS
     *(COMMON)
   } >tcm_ocram
 
+  .sha_ocram (NOLOAD) :
+  {
+    *(.sha_ocram*)
+  } >tcm_ocram
+
   .stack (NOLOAD) : ALIGN(8)
   {
     PROVIDE ( _sp_base = . );

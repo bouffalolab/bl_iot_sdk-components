@@ -64,6 +64,10 @@ COMPONENT_OBJS := $(patsubst %.c,%.o, $(COMPONENT_SRCS1))
 COMPONENT_OBJS := $(patsubst %.S,%.o, $(COMPONENT_OBJS))
 endif
 
+ifeq ($(CONFIG_USE_PSRAM), 1)
+CPPFLAGS += -DCFG_USE_PSRAM=1
+endif
+
 else
 $(error "Please Set PROJECT_BOARD:= [your board name] at Makefile")
 endif

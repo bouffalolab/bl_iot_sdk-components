@@ -254,6 +254,7 @@ struct netif_hint {
 #define LWIP_NETIF_USE_HINTS              0
 #endif /* LWIP_NETIF_HWADDRHINT */
 
+typedef void (*dhcp_quick_connect_callback_fn)(struct netif *netif);
 /** Generic data structure used for all lwIP network interfaces.
  *  The following fields should be filled in by the initialization
  *  function for the device driver: hwaddr_len, hwaddr[], mtu, flags */
@@ -392,7 +393,13 @@ struct netif {
   u16_t loop_cnt_current;
 #endif /* LWIP_LOOPBACK_MAX_PBUFS */
 #endif /* ENABLE_LOOPBACK */
+#if LWIP_IPV4 && IP_NAPT
+  u8_t napt;
+#endif
+  dhcp_quick_connect_callback_fn qc_callback;
 };
+void dhcp_set_dhcp_quick_connect_callback(struct netif *netif, dhcp_quick_connect_callback_fn qc_callback);
+void dhcp_unset_dhcp_quick_connect_callback(struct netif *netif);
 
 #if LWIP_CHECKSUM_CTRL_PER_NETIF
 #define NETIF_SET_CHECKSUM_CTRL(netif, chksumflags) do { \

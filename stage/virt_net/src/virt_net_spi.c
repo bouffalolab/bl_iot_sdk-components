@@ -66,11 +66,7 @@ struct spi_custom_pbuf {
 #define VIRT_NET_RXBUFF_OFFSET (sizeof(struct spi_custom_pbuf))
 
 /* 头部的假数据，绕过DMA/SPI FIFO缓存 */
-#if defined(CFG_USE_PSRAM)
 #define VIRT_NET_RXBUFF_CNT (4)
-#else
-#define VIRT_NET_RXBUFF_CNT (4)
-#endif /* CFG_USE_PSRAM */
 #define VIRT_NET_BUFF_SIZE (4096 - 32 - 8 - 16 + VIRT_NET_RXBUFF_OFFSET) /* + sizeof(pbuf header) */
 #define VIRT_NET_MAX_PENDING_CMD (4)
 
@@ -194,11 +190,7 @@ virt_net_t virt_net_spi_create(tp_spi_config_t *spi_config) {
     memset(sem_slot, 0, sizeof(sem_slot));
   }
 
-#if defined(CFG_USE_PSRAM)
   struct virt_net_spi *sobj = pvPortMalloc(sizeof(struct virt_net_spi));
-#else
-  struct virt_net_spi *sobj = malloc(sizeof(struct virt_net_spi));
-#endif
   if (sobj == NULL) {
     return NULL;
   }
@@ -223,11 +215,7 @@ virt_net_t virt_net_spi_create(tp_spi_config_t *spi_config) {
     goto _errout_1;
   }
 
-#if defined(CFG_USE_PSRAM)
   sobj->rx_buff = (rx_buff_t)pvPortMalloc(VIRT_NET_BUFF_SIZE * VIRT_NET_RXBUFF_CNT);
-#else
-  sobj->rx_buff = (rx_buff_t)malloc(VIRT_NET_BUFF_SIZE * VIRT_NET_RXBUFF_CNT);
-#endif
   if (sobj->rx_buff == NULL) {
     printf("alloc spi rx buffer failed\r\n");
     goto _errout_2;
@@ -265,19 +253,11 @@ virt_net_t virt_net_spi_create(tp_spi_config_t *spi_config) {
   return &sobj->vnet;
 
 _errout_3:
-#if defined(CFG_USE_PSRAM)
   vPortFree(sobj->rx_buff);
-#else
-  free(sobj->rx_buff);
-#endif
 _errout_2:
   vSemaphoreDelete(sobj->rx_buf_ind_mutex);
 _errout_1:
-#if defined(CFG_USE_PSRAM)
   vPortFree(sobj);
-#else
-  free(sobj);
-#endif
 
   return NULL;
 }
@@ -285,11 +265,7 @@ _errout_1:
 void virt_net_spi_destroy(virt_net_t *obj) {
   assert(obj != NULL && *obj != NULL);
   struct virt_net_spi *sobj = (struct virt_net_spi *)*obj;
-#if defined(CFG_USE_PSRAM)
   vPortFree(sobj->rx_buff);
-#else
-  free(sobj->rx_buff);
-#endif
   *obj = NULL;
 }
 

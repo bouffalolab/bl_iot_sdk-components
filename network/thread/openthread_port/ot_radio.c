@@ -413,7 +413,7 @@ otError otPlatRadioSleep(otInstance *aInstance)
 {
     lmac154_disableRx();
 
-#if OPENTHREAD_FTD || OPENTHREAD_MTD
+#if !defined(CONFIG_NCP) || CONFIG_NCP == 0
     lmac154_setRxStateWhenIdle(otThreadGetLinkMode(aInstance).mRxOnWhenIdle);
 #endif
 
@@ -425,7 +425,7 @@ otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel)
 
     lmac154_enableRx();
     lmac154_setChannel((lmac154_channel_t)ch);
-#if OPENTHREAD_FTD || OPENTHREAD_MTD
+#if !defined(CONFIG_NCP) || CONFIG_NCP == 0
     lmac154_setRxStateWhenIdle(otThreadGetLinkMode(aInstance).mRxOnWhenIdle);
 #endif
 

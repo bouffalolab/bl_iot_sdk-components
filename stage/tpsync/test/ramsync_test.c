@@ -63,8 +63,8 @@ static void ramsync_loop_task(void *arg)
 {
     while (1) {
         if ((NULL != mst) && (NULL != slv) ) {
-            memcpy(&mst->p_ramsync->rx, &slv->p_ramsync->tx, sizeof(tp_txbuf_t));
-            memcpy(&slv->p_ramsync->rx, &mst->p_ramsync->tx, sizeof(tp_txbuf_t));
+            memcpy(mst->p_ramsync->p_rx, slv->p_ramsync->p_tx, sizeof(tp_txbuf_t));
+            memcpy(slv->p_ramsync->p_rx, mst->p_ramsync->p_tx, sizeof(tp_txbuf_t));
 
             if (slv->p_ramsync->hw.tx_cb) {
                 slv->p_ramsync->hw.tx_cb(slv->p_ramsync->hw.tx_arg);
@@ -177,7 +177,7 @@ static void ramsync_loop_cmd(char *buf, int len, int argc, char **argv)
 
 static void ramsync_reset1_cmd(char *buf, int len, int argc, char **argv)
 {
-    slv->p_ramsync->tx.st.magic = (TP_ST_MAGIC + 1);// only for test reset
+    slv->p_ramsync->p_tx->st.magic = (TP_ST_MAGIC + 1);// only for test reset
 }
 
 static void ramsync_reset2_cmd(char *buf, int len, int argc, char **argv)

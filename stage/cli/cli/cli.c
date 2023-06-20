@@ -483,13 +483,6 @@ static int get_input(char *inbuf, unsigned int *bp, char *buffer_cb, int count)
 
     /*return data from buffer_cb or get data from cli_getchar*/
     while (1 == (buffer_cb ? ((pos < count) ? (c = buffer_cb[pos], pos++, 1) : 0) : (cli_getchar(&c)))) {
-        if (*bp >= INBUF_SIZE) {
-            aos_cli_printf("Error: input buffer overflow\r\n");
-            aos_cli_printf(PROMPT);
-            *bp = 0;
-            return 0;
-        }
-
         if (c == RET_CHAR || c == END_CHAR) { /* end of input line */
             inbuf[*bp] = '\0';
             *bp        = 0;
@@ -578,7 +571,7 @@ static int get_input(char *inbuf, unsigned int *bp, char *buffer_cb, int count)
 #endif
 
             /* ESC_TAG */
-            if (esc_tag_len >= sizeof(esc_tag)) {
+            if (esc_tag_len >= sizeof(esc_tag) - 1) {
                 esc_tag[0]  = '\x0';
                 esc_tag_len = 0;
                 esc         = 0; /* quit escape sequence */
@@ -623,6 +616,12 @@ static int get_input(char *inbuf, unsigned int *bp, char *buffer_cb, int count)
         }
 
         (*bp)++;
+        if (*bp >= INBUF_SIZE) {
+            aos_cli_printf("Error: input buffer overflow\r\n");
+            aos_cli_printf(PROMPT);
+            *bp = 0;
+            return 0;
+        }
     }
 
     return 0;

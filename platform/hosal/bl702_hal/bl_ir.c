@@ -40,6 +40,12 @@ static void bl_ir_irq(void)
     bl_ir_swm_tx_done_callback();
 }
 
+static void bl_ir_tx_interrupt_cfg(void)
+{
+    bl_irq_register(IRTX_IRQn, bl_ir_irq);
+    bl_irq_enable(IRTX_IRQn);
+}
+
 
 void bl_ir_led_drv_cfg(uint8_t led0_en, uint8_t led1_en)
 {
@@ -77,6 +83,7 @@ void bl_ir_custom_tx_cfg(IR_TxCfg_Type *txCfg, IR_TxPulseWidthCfg_Type *txPWCfg)
     GLB_Set_IR_CLK(ENABLE, GLB_IR_CLK_SRC_XCLK, 15);
 
     IR_Disable(IR_TX);
+    IR_TxSWM(DISABLE);
     IR_TxInit(txCfg);
     IR_TxPulseWidthConfig(txPWCfg);
 }
@@ -147,9 +154,9 @@ void bl_ir_rc5_tx_cfg(void)
 
 void bl_ir_swm_tx_cfg(float freq_hz, float duty_cycle)
 {
-    uint16_t mod_width = (uint16_t)(2000000 / freq_hz);
-    uint8_t mod_width_0 = (uint8_t)(mod_width * duty_cycle + 0.5);
-    uint8_t mod_width_1 = mod_width - mod_width_0;
+    uint16_t pw_unit = (uint16_t)(2000000 / freq_hz);
+    uint8_t mod_width_0 = (uint8_t)(pw_unit * duty_cycle + 0.5);
+    uint8_t mod_width_1 = pw_unit - mod_width_0;
 
     IR_TxCfg_Type txCfg = {
         1,                                                   /* Number of pulse */
@@ -175,64 +182,61 @@ void bl_ir_swm_tx_cfg(float freq_hz, float duty_cycle)
         0,                                                   /* Don't care when SWM is enabled */
         mod_width_1,                                         /* Modulation phase 1 width */
         mod_width_0,                                         /* Modulation phase 0 width */
-        1125                                                 /* Pulse width unit */
+        pw_unit                                              /* Pulse width unit */
     };
 
     bl_ir_custom_tx_cfg(&txCfg, &txPWCfg);
-
-    bl_irq_register(IRTX_IRQn, bl_ir_irq);
-    bl_irq_enable(IRTX_IRQn);
+    bl_ir_tx_interrupt_cfg();
 }
 
 void bl_ir_nec_tx(uint32_t wdata)
 {
-    IR_TxSWM(DISABLE);
     IR_SendCommand(0, wdata);
 }
 
 void bl_ir_rc5_tx(uint32_t wdata)
 {
-    IR_TxSWM(DISABLE);
     IR_SendCommand(0, wdata);
 }
 
-void bl_ir_swm_tx(int pw_unit, int pw_mul, int out_level)
+int bl_ir_swm_tx(uint16_t data[], uint8_t len)
 {
     uint32_t tmpVal;
     uint32_t pwVal;
-
-    if(pw_unit > 4096){
-        pw_unit = 4096;
-    }
-
-    if(pw_unit < 1){
-        pw_unit = 1;
-    }
-
-    if(pw_mul > 16){
-        pw_mul = 16;
-    }
-
-    if(pw_mul < 1){
-        pw_mul = 1;
-    }
-
-    tmpVal = BL_RD_REG(IR_BASE, IRTX_PULSE_WIDTH);
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_PW_UNIT, pw_unit - 1);
-    BL_WR_REG(IR_BASE, IRTX_PULSE_WIDTH, tmpVal);
+    int i, j;
 
     tmpVal = BL_RD_REG(IR_BASE, IRTX_CONFIG);
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_MOD_EN, !!out_level);
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_OUT_INV, !out_level);
+    if(BL_GET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_EN)){
+        return -1;
+    }
+
+    tmpVal = BL_RD_REG(IR_BASE, IRTX_CONFIG);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_DATA_NUM, len - 1);
     BL_WR_REG(IR_BASE, IRTX_CONFIG, tmpVal);
 
-    pwVal = (pw_mul - 1) & 0x0F;
-    BL_WR_REG(IR_BASE, IRTX_SWM_PW_0, pwVal);
+    pwVal = 0;
+    for(i=0; i<len; i++){
+        j = i % 8;
+        pwVal |= ((data[i] - 1) & 0x0F) << 4 * j;
+        if(i == len - 1 || j == 7){
+            *(volatile uint32_t *)(IR_BASE + IRTX_SWM_PW_0_OFFSET + i / 8 * 4) = pwVal;
+            pwVal = 0;
+        }
+    }
 
-    IR_ClrIntStatus(IR_INT_TX);
     IR_IntMask(IR_INT_TX, UNMASK);
     IR_TxSWM(ENABLE);
     IR_Enable(IR_TX);
+
+    return 0;
+}
+
+int bl_ir_swm_tx_busy(void)
+{
+    uint32_t tmpVal;
+
+    tmpVal = BL_RD_REG(IR_BASE, IRTX_CONFIG);
+    return BL_GET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_EN);
 }
 
 __attribute__((weak)) void bl_ir_swm_tx_done_callback(void)

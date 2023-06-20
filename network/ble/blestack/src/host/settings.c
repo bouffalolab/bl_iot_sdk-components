@@ -280,6 +280,13 @@ int bt_settings_get_bin(const char *key, u8_t *value, size_t exp_len, size_t *re
 
 int settings_delete(const char *key)
 {
+#if (EF_SW_VERSION_NUM == 0x40099)
+    struct env_node_obj env;
+    if(!ef_get_env_obj(key, &env)){
+        BT_DBG("Not found %s in settings", key);
+        return 0;
+    }
+#endif /* EF_SW_VERSION_NUM == 0x40099 */
     return ef_del_env(key);
 }
 

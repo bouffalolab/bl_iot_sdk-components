@@ -40,10 +40,10 @@ void bl_ir_rc5_tx_cfg(void);
 void bl_ir_swm_tx_cfg(float freq_hz, float duty_cycle);
 void bl_ir_nec_tx(uint32_t wdata);
 void bl_ir_rc5_tx(uint32_t wdata);
-// pw_unit: pulse width unit ranging from 1 to 4096
-// pw_mul: multiples ranging from 1 to 16; pw_unit * pw_mul is the pulse width @2MHz clock cycles, e.g. 1125 -> 562.5us
-// out_level: output low for 0 and output high otherwise
-void bl_ir_swm_tx(int pw_unit, int pw_mul, int out_level);
+// data: number of carriers ranging from 1 to 16
+// len: number of data ranging from 1 to 64
+int bl_ir_swm_tx(uint16_t data[], uint8_t len);
+int bl_ir_swm_tx_busy(void);
 void bl_ir_swm_tx_done_callback(void);
 
 #endif

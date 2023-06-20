@@ -4,7 +4,9 @@
 
 #include <utils_list.h>
 #include <bl_timer.h>
-
+#ifdef BL702L
+#include <bl_pds.h>
+#endif
 #include <FreeRTOS.h>
 #include <timers.h>
 #include <openthread/config.h>
@@ -13,6 +15,8 @@
 #include <openthread/platform/time.h>
 #include <openthread/platform/diag.h>
 #include <openthread_port.h>
+
+#define OT_TIMER_MS_TO_TICKS(xTimeInMs) ((xTimeInMs) / 1000 * configTICK_RATE_HZ + ((xTimeInMs) % 1000) * configTICK_RATE_HZ / 1000)
 
 #if defined(BL702)
 
@@ -44,7 +48,8 @@ void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
     uint32_t elapseTime = (uint32_t)(bl_timer_now_us64() / 1000) - aT0;
 
     if (elapseTime < aDt) {
-        ret = xTimerChangePeriod( otAlarm_timerHandle, pdMS_TO_TICKS(aDt - elapseTime), 0 );
+
+        ret = xTimerChangePeriod( otAlarm_timerHandle, OT_TIMER_MS_TO_TICKS(aDt - elapseTime), 0 );
         configASSERT(ret == pdPASS);
 
         return;
@@ -108,6 +113,30 @@ void otPlatAlarmMicroStop(otInstance *aInstance)
 uint32_t otPlatAlarmMicroGetNow(void)
 {
    return bl_timer_now_us64();
+}
+#elif defined BL702L
+typedef struct {
+    uint32_t timerId;
+    TimerHandle_t handle;
+} otAlarm_t;
+extern otAlarm_t otAlarm;
+
+ATTR_PDS_SECTION
+void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
+{
+    BaseType_t ret;
+
+    uint32_t elapseTime = (uint32_t)(bl_timer_now_us64() / 1000) - aT0;
+
+    if (elapseTime < aDt) {
+
+        ret = xTimerChangePeriod( otAlarm.handle, OT_TIMER_MS_TO_TICKS(aDt - elapseTime), 0 );
+        configASSERT(ret == pdPASS);
+
+        return;
+    }
+
+    otrNotifyEvent(OT_SYSTEM_EVENT_ALARM_MS_EXPIRED);
 }
 #endif
 

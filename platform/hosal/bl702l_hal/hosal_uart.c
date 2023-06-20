@@ -603,7 +603,7 @@ int hosal_uart_finalize(hosal_uart_dev_t *uart)
 
 // Support dma mode for cli
 __attribute__((section(".tcm_data")))
-static uint8_t uart_dma_rx_buf[128];
+static uint8_t uart_dma_rx_buf[256];
 
 int hosal_uart_dma_rx_init(hosal_uart_dev_t *uart)
 {

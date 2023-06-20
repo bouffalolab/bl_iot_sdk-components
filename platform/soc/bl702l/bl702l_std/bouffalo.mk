@@ -48,6 +48,7 @@ COMPONENT_SRCS := BSP_Driver/std_drv/src/bl702l_acomp.c \
 
 ifeq ($(CONFIG_BL702_USE_ROM_DRIVER),1)
 #COMPONENT_SRCS += BSP_Driver/std_drv/src/bl702l_romapi.c
+COMPONENT_SRCS += bl702l_romapi_patch.c
 else
 COMPONENT_SRCS += BSP_Driver/std_drv/src/bl702l_aon.c
 COMPONENT_SRCS += BSP_Driver/std_drv/src/bl702l_clock.c
@@ -104,6 +105,7 @@ COMPONENT_SRCDIRS := BSP_Driver/startup \
                      MCU_Common/ring_buffer \
                      MCU_Common/soft_crc \
                      cipher_suite/src \
+                     . \
 
 ifeq ($(CONFIG_BL702_USE_BSP_STARTUP),1)
 COMPONENT_SRCDIRS += BSP_Board

@@ -49,18 +49,29 @@ const struct file_ops uart_ops =
     .sync = vfs_uart_sync,
 };
 
+hosal_uart_dev_t *g_vfs_uart = NULL;
+
 #if defined(BL702L)
 #define CFG_VFS_UART_DMA_ENABLE
 
 extern int hosal_uart_dma_rx_init(hosal_uart_dev_t *uart);
 extern int hosal_uart_dma_rx_start(hosal_uart_dev_t *uart);
 extern int hosal_uart_dma_rx_get_data(hosal_uart_dev_t *uart, uint8_t *buf, uint32_t buf_size);
+
+void vfs_uart_restore(void)
+{
+    hosal_dma_finalize();
+
+    hosal_uart_init(g_vfs_uart);
+    hosal_uart_dma_rx_init(g_vfs_uart);
+    hosal_uart_dma_rx_start(g_vfs_uart);
+}
 #endif
 
 static int __uart_rx_irq(void *p_arg)
 {
 #if defined(CFG_VFS_UART_DMA_ENABLE)
-    uint8_t tmp_buf[128];
+    uint8_t tmp_buf[256];
 #else
     uint8_t tmp_buf[64];
 #endif
@@ -120,8 +131,6 @@ static int __uart_tx_irq(void *p_arg)
     }
     return 0;
 }
-
-hosal_uart_dev_t *g_vfs_uart = NULL;
 
 int vfs_uart_open(inode_t *inode, file_t *fp)
 {

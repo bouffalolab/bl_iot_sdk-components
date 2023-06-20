@@ -580,6 +580,11 @@ dhcp_timeout(struct netif *netif)
   struct dhcp *dhcp = netif_dhcp_data(netif);
 
   LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_timeout()\n"));
+  /* only quick connect check renew fail, side effect for normal renew */
+  if(netif->qc_callback && dhcp->state == DHCP_STATE_RENEWING) {
+      LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_timeout(): quick connect renew timeout\n"));
+      dhcp_start(netif);
+  }
   /* back-off period has passed, or server selection timed out */
   if ((dhcp->state == DHCP_STATE_BACKING_OFF) || (dhcp->state == DHCP_STATE_SELECTING)) {
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_timeout(): restarting discovery\n"));
@@ -993,7 +998,7 @@ dhcp_network_changed(struct netif *netif)
  * @param addr The IP address we received a reply from
  */
 void
-dhcp_arp_reply(struct netif *netif, const ip4_addr_t *addr)
+dhcp_arp_reply(struct netif *netif, const ip4_addr_t *addr, const struct eth_addr *hwaddr)
 {
   struct dhcp *dhcp;
 
@@ -1006,7 +1011,7 @@ dhcp_arp_reply(struct netif *netif, const ip4_addr_t *addr)
                 ip4_addr_get_u32(addr)));
     /* did a host respond with the address we
        were offered by the DHCP server? */
-    if (ip4_addr_cmp(addr, &dhcp->offered_ip_addr)) {
+    if (ip4_addr_cmp(addr, &dhcp->offered_ip_addr) && memcmp(netif->hwaddr, hwaddr, ETH_HWADDR_LEN)) {
       /* we will not accept the offered address */
       LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE | LWIP_DBG_LEVEL_WARNING,
                   ("dhcp_arp_reply(): arp reply matched with offered address, declining\n"));
@@ -1041,6 +1046,8 @@ dhcp_decline(struct netif *netif)
     struct dhcp_msg *msg_out = (struct dhcp_msg *)p_out->payload;
     options_out_len = dhcp_option(options_out_len, msg_out->options, DHCP_OPTION_REQUESTED_IP, 4);
     options_out_len = dhcp_option_long(options_out_len, msg_out->options, lwip_ntohl(ip4_addr_get_u32(&dhcp->offered_ip_addr)));
+    options_out_len = dhcp_option(options_out_len, msg_out->options, DHCP_OPTION_SERVER_ID, 4);
+    options_out_len = dhcp_option_long(options_out_len, msg_out->options, lwip_ntohl(ip4_addr_get_u32(ip_2_ip4(&dhcp->server_ip_addr))));
 
     LWIP_HOOK_DHCP_APPEND_OPTIONS(netif, dhcp, DHCP_STATE_BACKING_OFF, msg_out, DHCP_DECLINE, &options_out_len);
     dhcp_option_trailer(options_out_len, msg_out->options, p_out);
@@ -1134,6 +1141,17 @@ dhcp_discover(struct netif *netif)
   return result;
 }
 
+void dhcp_set_dhcp_quick_connect_callback(struct netif *netif, dhcp_quick_connect_callback_fn qc_callback)
+{
+    if(netif)
+        netif->qc_callback = qc_callback;
+}
+
+void dhcp_unset_dhcp_quick_connect_callback(struct netif *netif)
+{
+    if(netif)
+        netif->qc_callback = NULL;
+}
 
 /**
  * Bind the interface to the offered IP address.
@@ -1245,7 +1263,12 @@ dhcp_bind(struct netif *netif)
        to ensure the callback can use dhcp_supplied_address() */
     dhcp_set_state(dhcp, DHCP_STATE_BOUND);
 
-    netif_set_addr(netif, &dhcp->offered_ip_addr, &sn_mask, &gw_addr);
+    if(netif->qc_callback && !ip4_addr_cmp(netif_ip4_addr(netif), &dhcp->offered_ip_addr)) {
+        netif_set_addr(netif, &dhcp->offered_ip_addr, &sn_mask, &gw_addr);
+        netif->qc_callback(netif);
+    } else {
+        netif_set_addr(netif, &dhcp->offered_ip_addr, &sn_mask, &gw_addr);
+    }
     /* interface is used by routing now that an address is set */
     // Add dhcp_timer_coarse_needed to fix the timer runs when WiFi have not connected
     dhcp_timer_coarse_needed();

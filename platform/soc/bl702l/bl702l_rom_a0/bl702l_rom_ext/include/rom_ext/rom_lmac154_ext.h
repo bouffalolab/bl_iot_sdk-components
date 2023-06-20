@@ -166,4 +166,15 @@ void lmac154_fptClear(void);
 *******************************************************************************/
 void lmac154_fptDump(int print_func(const char *fmt, ...));
 
+
+/****************************************************************************//**
+ * @brief  Set tx-rx transition time
+ *
+ * @param  time: us
+ *
+ * @return None
+ *
+*******************************************************************************/
+void lmac154_setTxRxTransTime(uint8_t timeInUs);
+
 #endif

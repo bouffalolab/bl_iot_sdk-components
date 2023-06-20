@@ -60,6 +60,18 @@
 #define EVT_EMPTYSLOT_BIT      (1<<0)
 #define EVT_TX_DONE_BIT        (1<<1)
 
+#if defined (BL702L)
+/** For BL702L
+ *  1. region [0x42028000, 0x4202C000] is reserved for rf calibration. 
+ *     malloc may put these buffers in this region.
+ *  2. TCM data region is suitable for these buffers.
+ *  3. seperate variable can be placed at any place with linker file
+ *   */
+static tp_txbuf_t    g_uramsync_tx;
+static tp_rxbuf_t    g_uramsync_rx;
+static tp_payload_t  g_uramsync_rx_cache;
+#endif
+
 #if RAMSYNC_FAST_COPY_ENABLE
 static void *ramsync_fast_memcpy(void *dst, const void *src, uint32_t count)
 {
@@ -123,22 +135,22 @@ void uramsync_dump(tp_uramsync_t *rs)
 {
     uint32_t i;
 
-    tpdbg_log("rs->tx.st.magic       = 0x%08lx\r\n" , rs->tx.st.magic);
-    tpdbg_log("rs->tx.st.rseq        = %ld\r\n" , rs->tx.st.rseq);
+    tpdbg_log("rs->p_tx->st.magic       = 0x%08lx\r\n" , rs->p_tx->st.magic);
+    tpdbg_log("rs->p_tx->st.rseq        = %ld\r\n" , rs->p_tx->st.rseq);
     for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
-        tpdbg_log("rs->tx.payload[%ld].len = %ld\r\n" , i, rs->tx.payload[i].len);
-        tpdbg_log("rs->tx.payload[%ld].seq = %ld\r\n" , i, rs->tx.payload[i].seq);
-        tpdbg_log("rs->tx.payload[%ld].crc = 0x%08lx\r\n" , i, rs->tx.payload[i].crc);
-        tpdbg_buf("tx", &rs->tx.payload[i], 20);
+        tpdbg_log("rs->p_tx->payload[%ld].len = %ld\r\n" , i, rs->p_tx->payload[i].len);
+        tpdbg_log("rs->p_tx->payload[%ld].seq = %ld\r\n" , i, rs->p_tx->payload[i].seq);
+        tpdbg_log("rs->p_tx->payload[%ld].crc = 0x%08lx\r\n" , i, rs->p_tx->payload[i].crc);
+        tpdbg_buf("tx", &rs->p_tx->payload[i], 20);
     }
 
-    tpdbg_log("rs->rx.st.magic       = 0x%08lx\r\n" , rs->rx.st.magic);
-    tpdbg_log("rs->rx.st.rseq        = %ld\r\n" , rs->rx.st.rseq);
+    tpdbg_log("rs->p_rx->st.magic       = 0x%08lx\r\n" , rs->p_rx->st.magic);
+    tpdbg_log("rs->p_rx->st.rseq        = %ld\r\n" , rs->p_rx->st.rseq);
     for (i = 0; i < TP_RXPAYLOAD_NUM; i++) {
-        tpdbg_log("rs->rx.payload[%ld].len = %ld\r\n" , i, rs->rx.payload[i].len);
-        tpdbg_log("rs->rx.payload[%ld].seq = %ld\r\n" , i, rs->rx.payload[i].seq);
-        tpdbg_log("rs->rx.payload[%ld].crc = 0x%08lx\r\n" , i, rs->rx.payload[i].crc);
-        tpdbg_buf("rx", &rs->rx.payload[i], 20);
+        tpdbg_log("rs->p_rx->payload[%ld].len = %ld\r\n" , i, rs->p_rx->payload[i].len);
+        tpdbg_log("rs->p_rx->payload[%ld].seq = %ld\r\n" , i, rs->p_rx->payload[i].seq);
+        tpdbg_log("rs->p_rx->payload[%ld].crc = 0x%08lx\r\n" , i, rs->p_rx->payload[i].crc);
+        tpdbg_buf("rx", &rs->p_rx->payload[i], 20);
     }
 }
 
@@ -151,10 +163,10 @@ void uramsync_dump(tp_uramsync_t *rs)
 static void __uramsync_reset_logic(tp_uramsync_t *uramsync)
 {
     /* slot */
-    memset(&uramsync->tx, 0, sizeof(tp_txbuf_t));
-    uramsync->tx.st.magic = TP_ST_MAGIC;
+    memset(uramsync->p_tx, 0, sizeof(tp_txbuf_t));
+    uramsync->p_tx->st.magic = TP_ST_MAGIC;
 
-    memset(&uramsync->rx, 0, sizeof(tp_rxbuf_t));
+    memset(uramsync->p_rx, 0, sizeof(tp_rxbuf_t));
 
     /* local sequnce */
     memset(&uramsync->tx_seq, 0, sizeof(uint32_t));
@@ -171,7 +183,7 @@ static void __uramsync_reset_logic(tp_uramsync_t *uramsync)
     #endif
 
     /* calulate crc for rx */
-    memset(&uramsync->rx_cache, 0, sizeof(tp_payload_t));
+    memset(uramsync->p_rx_cache, 0, sizeof(tp_payload_t));
 }
 
 static void ramsynck_reset_entry(void *arg)
@@ -198,17 +210,17 @@ static void ramsynck_reset_entry(void *arg)
             while (1) {
                 lramsync_reset(&uramsync->hw);
                 vTaskDelay(pdMS_TO_TICKS(2));// wait for one slot sync complete
-                if (TP_ST_MAGIC == uramsync->rx.st.magic) {
+                if (TP_ST_MAGIC == uramsync->p_rx->st.magic) {
                     break;
                 }
                 for (i = 0; i < 1; i++) {
                     tpdbg_log("[%s][tp_reset_task] sync clock error, wait %ldS\r\n", uramsync->name, i); // delete it when test pass
                     vTaskDelay(pdMS_TO_TICKS(1000));                            // delete it when test pass
-                    if (TP_ST_MAGIC == uramsync->rx.st.magic) {
+                    if (TP_ST_MAGIC == uramsync->p_rx->st.magic) {
                         break;
                     }
                 }
-                if (TP_ST_MAGIC == uramsync->rx.st.magic) {
+                if (TP_ST_MAGIC == uramsync->p_rx->st.magic) {
                     break;
                 }
             }
@@ -500,24 +512,39 @@ static int __ramsync_low_init(tp_uramsync_t *arg, uint32_t type)
     node_mem_t node_rxbuf[TP_RXPAYLOAD_NUM * 2];
 
     memset(uramsync, 0, sizeof(tp_uramsync_t));
+
+#if defined (BL702L)
+    uramsync->p_tx = &g_uramsync_tx;
+    uramsync->p_rx = &g_uramsync_rx;
+    uramsync->p_rx_cache = &g_uramsync_rx_cache;
+#else
+    uramsync->p_tx = (tp_txbuf_t *)pvPortMalloc(sizeof(tp_txbuf_t));
+    uramsync->p_rx = (tp_rxbuf_t *)pvPortMalloc(sizeof(tp_rxbuf_t));
+    uramsync->p_rx_cache = (tp_payload_t *)pvPortMalloc(sizeof(tp_payload_t));
+#endif
+
+    memset(uramsync->p_tx, 0, sizeof(tp_txbuf_t));
+    memset(uramsync->p_rx, 0, sizeof(tp_rxbuf_t));
+    memset(uramsync->p_rx_cache, 0, sizeof(tp_payload_t));
+
     uramsync->devtype = type;
 
     for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
-        node_txbuf[i * 2].buf = &uramsync->tx.st;
+        node_txbuf[i * 2].buf = &uramsync->p_tx->st;
         node_txbuf[i * 2].len = sizeof(tp_st_t);
-        node_txbuf[i * 2 + 1].buf = &uramsync->tx.payload[i];
+        node_txbuf[i * 2 + 1].buf = &uramsync->p_tx->payload[i];
         node_txbuf[i * 2 + 1].len = sizeof(tp_payload_t);
     }
 
     for (i = 0; i < TP_RXPAYLOAD_NUM; i++) {
-        node_rxbuf[i * 2].buf = &uramsync->rx.st;
+        node_rxbuf[i * 2].buf = &uramsync->p_rx->st;
         node_rxbuf[i * 2].len = sizeof(tp_st_t);
-        node_rxbuf[i * 2 + 1].buf = &uramsync->rx.payload[i];
+        node_rxbuf[i * 2 + 1].buf = &uramsync->p_rx->payload[i];
         node_rxbuf[i * 2 + 1].len = sizeof(tp_payload_t);
     }
 
     /* set magic */
-    uramsync->tx.st.magic = TP_ST_MAGIC;
+    uramsync->p_tx->st.magic = TP_ST_MAGIC;
 
 #if defined(CFG_USE_DTS_SPI_CONFIG)
     lramsync_spi_config_t* spi_cfg = NULL;
@@ -581,7 +608,7 @@ static int __ramsync_low_deinit(tp_uramsync_t *arg)
 }
 
 /*---------------------- tx moudule ------------------------*/
-static void uramsync_task_tx(void *arg)
+static void  uramsync_task_tx(void *arg)
 {
     uint32_t lentmp;
     uint32_t slottmp = 0;
@@ -649,7 +676,7 @@ static void uramsync_task_tx(void *arg)
             xSemaphoreTake(uramsync->tx_sem, POLL_UNIT_TIME_MS);
             #endif
             for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
-                if (uramsync->tx.payload[i].seq <= uramsync->rx.st.rseq) {
+                if (uramsync->p_tx->payload[i].seq <= uramsync->p_rx->st.rseq) {
                     // have empty slot
                     slottmp = i;
                     ensure_empty_slot = 1;
@@ -670,36 +697,36 @@ static void uramsync_task_tx(void *arg)
         }
 
         /* desc to slot,  update buf + len */
-        uramsync->tx.payload[slottmp].len = 4 + 4;// len(4) + seq(4) + buf(x) crc(4)
+        uramsync->p_tx->payload[slottmp].len = 4 + 4;// len(4) + seq(4) + buf(x) crc(4)
 
         desc_pop(&uramsync->tx_desc,
-                uramsync->tx.payload[slottmp].buf,
+                uramsync->p_tx->payload[slottmp].buf,
                 &poplentmp ,
                 0);// 0-noblock DESC_FOREVER-block
 
-        uramsync->tx.payload[slottmp].len += poplentmp;// len(4) + seq(4) + buf(x) crc(4)
+        uramsync->p_tx->payload[slottmp].len += poplentmp;// len(4) + seq(4) + buf(x) crc(4)
 
         // seq crc update
         uramsync->tx_seq++;
-        uramsync->tx.payload[slottmp].seq = uramsync->tx_seq;
+        uramsync->p_tx->payload[slottmp].seq = uramsync->tx_seq;
 
         utils_crc32_stream_init(&crc_ctx);
         utils_crc32_stream_feed_block(&crc_ctx,
-                (uint8_t *)&uramsync->tx.payload[slottmp],
-                uramsync->tx.payload[slottmp].len);
+                (uint8_t *)&uramsync->p_tx->payload[slottmp],
+                uramsync->p_tx->payload[slottmp].len);
 
-        uramsync->tx.payload[slottmp].crc = utils_crc32_stream_results(&crc_ctx);
+        uramsync->p_tx->payload[slottmp].crc = utils_crc32_stream_results(&crc_ctx);
 
         tpdbg_log("[%s] [task_tx] 3. desc to slot, payload len = %ld, seq = %ld, poplentmp = %ld, crc = 0x%08lx\r\n",
                 uramsync->name,
-                uramsync->tx.payload[slottmp].len,
-                uramsync->tx.payload[slottmp].seq,
+                uramsync->p_tx->payload[slottmp].len,
+                uramsync->p_tx->payload[slottmp].seq,
                 poplentmp,
-                uramsync->tx.payload[slottmp].crc
+                uramsync->p_tx->payload[slottmp].crc
                 );
 
-        //tpdbg_buf(uramsync->name, &uramsync->tx.st, sizeof(uramsync->tx.st));
-        //tpdbg_buf(uramsync->name, &uramsync->tx.payload[slottmp], uramsync->tx.payload[slottmp].len);
+        //tpdbg_buf(uramsync->name, &uramsync->p_tx->st, sizeof(uramsync->p_tx->st));
+        //tpdbg_buf(uramsync->name, &uramsync->p_tx->payload[slottmp], uramsync->p_tx->payload[slottmp].len);
     }
 }
 
@@ -775,15 +802,15 @@ static void uramsync_task_rx(void *arg)
                     break;
                 }
                 if (URAMSYNC_MASTER_DEV_TYPE == uramsync->devtype) {
-                    if (uramsync->rx.st.magic != TP_ST_MAGIC) {
+                    if (uramsync->p_rx->st.magic != TP_ST_MAGIC) {
                         reset_signal(uramsync);
                         break;
                     }
                         }
                 // judge seq len valid
-                seqtmp = uramsync->rx.payload[i].seq;
-                lentmp = uramsync->rx.payload[i].len;
-                rseqtmp = uramsync->tx.st.rseq;
+                seqtmp = uramsync->p_rx->payload[i].seq;
+                lentmp = uramsync->p_rx->payload[i].len;
+                rseqtmp = uramsync->p_tx->st.rseq;
 
                 if ((lentmp > (TP_PAYLOAD_LEN + 4 + 4)) ||
                     (lentmp > (TP_PAYLOAD_LEN + 4 + 4)) ||
@@ -793,10 +820,10 @@ static void uramsync_task_rx(void *arg)
                 }
 
                 // memcpy + crc
-                ramsync_fast_memcpy(&uramsync->rx_cache, &uramsync->rx.payload[i], lentmp);
-                uramsync->rx_cache.crc = uramsync->rx.payload[i].crc;
-                if ((uramsync->rx_cache.seq != seqtmp) ||
-                    (uramsync->rx_cache.len != lentmp)
+                ramsync_fast_memcpy(uramsync->p_rx_cache, &uramsync->p_rx->payload[i], lentmp);
+                uramsync->p_rx_cache->crc = uramsync->p_rx->payload[i].crc;
+                if ((uramsync->p_rx_cache->seq != seqtmp) ||
+                    (uramsync->p_rx_cache->len != lentmp)
                     ) {
                     continue;
                 }
@@ -804,16 +831,15 @@ static void uramsync_task_rx(void *arg)
                 // judge crc
                 utils_crc32_stream_init(&crc_ctx);
                 utils_crc32_stream_feed_block(&crc_ctx,
-                        (uint8_t *)&uramsync->rx_cache,
-                        uramsync->rx_cache.len);
+                        (uint8_t *)uramsync->p_rx_cache,
+                        uramsync->p_rx_cache->len);
                 crctmp = utils_crc32_stream_results(&crc_ctx);
 
-
                 tpdbg_log("[%s] [task_rx] crctmp = 0x%08lx, cache.crc = 0x%08lx\r\n",
-                        uramsync->name, crctmp, uramsync->rx_cache.crc);
+                        uramsync->name, crctmp, uramsync->p_rx_cache->crc);
                 //vTaskDelay(pdMS_TO_TICKS(100));// fixme, can use isr notify
 
-                if (uramsync->rx_cache.crc != crctmp) {
+                if (uramsync->p_rx_cache->crc != crctmp) {
                     continue;
                 }
 
@@ -833,8 +859,8 @@ static void uramsync_task_rx(void *arg)
         /* slot to desc */
         while (1) {
             res = desc_push_toback(&uramsync->rx_desc,
-                    &uramsync->rx_cache.buf,
-                    uramsync->rx_cache.len,
+                    uramsync->p_rx_cache->buf,
+                    uramsync->p_rx_cache->len,
                     POLL_UNIT_TIME_MS);//DESC_FOREVER
             if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
                 break;
@@ -849,10 +875,10 @@ static void uramsync_task_rx(void *arg)
         }
 
         tpdbg_log("[%s] [task_rx] 2. slot2desc,update rseq = %ld cache.crc = 0x%08lx.\r\n",
-                uramsync->name, uramsync->rx_cache.seq, uramsync->rx_cache.crc);
+                uramsync->name, uramsync->p_rx_cache->seq, uramsync->p_rx_cache->crc);
 
         // update txtxtxtxtxtxtx!!!!! st rseq
-        uramsync->tx.st.rseq = uramsync->rx_cache.seq;  // __rx_rseq_update
+        uramsync->p_tx->st.rseq = uramsync->p_rx_cache->seq;  // __rx_rseq_update
     }
 }
 

@@ -179,6 +179,11 @@ SECTIONS
     *(COMMON)
   } >ocram
 
+  .sha_ocram (NOLOAD) :
+  {
+    *(.sha_ocram*)
+  } >ocram
+
   .stack (NOLOAD) : ALIGN(8)
   {
     PROVIDE ( _sp_base = . );

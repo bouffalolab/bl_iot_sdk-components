@@ -130,7 +130,7 @@ void bl_packet_to_host(uint8_t pkt_type, uint16_t src_id, uint8_t *param, uint8_
 
     uint8_t *buf_data = net_buf_tail(buf);
     bt_buf_set_rx_adv(buf, false);
-	
+
     switch(pkt_type)
     {
         case BT_HCI_CMD_CMP_EVT:
@@ -187,6 +187,18 @@ void bl_packet_to_host(uint8_t pkt_type, uint16_t src_id, uint8_t *param, uint8_
             prio = false;
             bt_buf_set_type(buf, BT_BUF_ACL_IN);
             tlt_len = bt_onchiphci_hanlde_rx_acl(param, buf_data);
+            break;
+        }
+        #endif
+        #if !defined(BL702) && !defined(BL602)
+        case BT_HCI_DBG_EVT:
+        {
+            prio = false;
+            bt_buf_set_type(buf, BT_BUF_EVT);
+            tlt_len = BT_HCI_EVT_DBG_PARAM_OFFSET + param_len;
+            *buf_data++ = BT_HCI_EVT_VENDOR;
+            *buf_data++ = param_len;
+            memcpy(buf_data, param, param_len);
             break;
         }
         #endif

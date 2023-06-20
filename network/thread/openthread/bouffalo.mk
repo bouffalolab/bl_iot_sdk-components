@@ -1,8 +1,6 @@
 # Component Makefile
 #
 
-include $(COMPONENT_PATH)/../openthread_common.mk
-
 # src/core
 otlib := src/core
 otlib_module_srcdir := $(otlib)
@@ -602,6 +600,12 @@ CPPFLAGS += -DBL702
 endif
 ifeq ($(CONFIG_CHIP_NAME),BL702L)
 CPPFLAGS += -DBL702L
+endif
+
+ifeq ($(CONFIG_OTBR), 1)
+CPPFLAGS += -Dtcp_input=tcp_input_ot
+CPPFLAGS += -Dtcp_output=tcp_output_ot
+CPPFLAGS += -Dtcp_close=tcp_close_ot
 endif
 
 ## This component's src 

@@ -42,9 +42,13 @@
 typedef struct _bl_wireless_env {
     uint8_t mac_addr[8];
     int8_t power_offset_zigbee[16];
-    int8_t power_offset_ble[40];
-    uint8_t tcal_en;
+    int8_t power_offset_ble[4];
+    int8_t capcode_temp[MAX_CAPCODE_TABLE_SIZE];
+    int8_t capcode_offset[MAX_CAPCODE_TABLE_SIZE];
+    uint8_t capcode_size;
     int8_t default_tx_power;
+    uint8_t power_tcal_en;
+    uint8_t capcode_tcal_en;
 } bl_wireless_env_t;
 
 ATTR_HBN_DATA_SECTION
@@ -63,48 +67,51 @@ int bl_wireless_mac_addr_get(uint8_t mac[8])
     return 0;
 }
 
-int bl_wireless_power_offset_set(int8_t poweroffset_zigbee[16], int8_t poweroffset_ble[40])
+int bl_wireless_power_offset_set(int8_t poweroffset_zigbee[16], int8_t poweroffset_ble[4])
 {
     memcpy(wireless_env.power_offset_zigbee, poweroffset_zigbee, 16);
-    memcpy(wireless_env.power_offset_ble, poweroffset_ble, 40);
+    memcpy(wireless_env.power_offset_ble, poweroffset_ble, 4);
     return 0;
 }
 
-int bl_wireless_power_offset_get(int8_t poweroffset_zigbee[16], int8_t poweroffset_ble[40])
+int bl_wireless_power_offset_get(int8_t poweroffset_zigbee[16], int8_t poweroffset_ble[4])
 {
     memcpy(poweroffset_zigbee, wireless_env.power_offset_zigbee, 16);
-    memcpy(poweroffset_ble, wireless_env.power_offset_ble, 40);
+    memcpy(poweroffset_ble, wireless_env.power_offset_ble, 4);
     return 0;
 }
 
-int8_t bl_wireless_power_offset_zigbee_get(uint8_t ch)
+int bl_wireless_capcode_offset_table_set(int8_t temp[], int8_t offset[], uint8_t size)
 {
-    if(ch < 11){
-        return wireless_env.power_offset_zigbee[0];
-    }else if(ch > 26){
-        return wireless_env.power_offset_zigbee[15];
-    }else{
-        return wireless_env.power_offset_zigbee[ch - 11];
+    if(size > MAX_CAPCODE_TABLE_SIZE){
+        return -1;
     }
+    
+    memcpy(wireless_env.capcode_temp, temp, size);
+    memcpy(wireless_env.capcode_offset, offset, size);
+    wireless_env.capcode_size = size;
+    return 0;
 }
 
-int8_t bl_wireless_power_offset_ble_get(uint8_t ch)
+int bl_wireless_capcode_offset_table_get(int8_t temp[], int8_t offset[], uint8_t *size)
 {
-    if(ch > 39){
-        return wireless_env.power_offset_ble[39];
-    }else{
-        return wireless_env.power_offset_ble[ch];
+    memcpy(temp, wireless_env.capcode_temp, wireless_env.capcode_size);
+    memcpy(offset, wireless_env.capcode_offset, wireless_env.capcode_size);
+    *size = wireless_env.capcode_size;
+    return 0;
+}
+
+int8_t bl_wireless_capcode_offset_get(int8_t temp)
+{
+    int i;
+    
+    for(i=1; i<wireless_env.capcode_size; i++){
+        if(temp < wireless_env.capcode_temp[i]){
+            return wireless_env.capcode_offset[i - 1];
+        }
     }
-}
-
-void bl_wireless_tcal_en_set(uint8_t en)
-{
-    wireless_env.tcal_en = en;
-}
-
-uint8_t bl_wireless_tcal_en_get(void)
-{
-    return wireless_env.tcal_en;
+    
+    return wireless_env.capcode_offset[i - 1];
 }
 
 void bl_wireless_default_tx_power_set(int8_t power)
@@ -115,6 +122,26 @@ void bl_wireless_default_tx_power_set(int8_t power)
 int8_t bl_wireless_default_tx_power_get(void)
 {
     return wireless_env.default_tx_power;
+}
+
+void bl_wireless_power_tcal_en_set(uint8_t en)
+{
+    wireless_env.power_tcal_en = en;
+}
+
+uint8_t bl_wireless_power_tcal_en_get(void)
+{
+    return wireless_env.power_tcal_en;
+}
+
+void bl_wireless_capcode_tcal_en_set(uint8_t en)
+{
+    wireless_env.capcode_tcal_en = en;
+}
+
+uint8_t bl_wireless_capcode_tcal_en_get(void)
+{
+    return wireless_env.capcode_tcal_en;
 }
 
 
@@ -193,5 +220,10 @@ void rf_reset_done_callback(void)
 #endif
 #else
     rf_set_bz_mode(MODE_ZB_ONLY);
+#endif
+
+#if defined(CFG_TCAL_ENABLE)
+    extern int hal_tcal_restart(void);
+    hal_tcal_restart();
 #endif
 }

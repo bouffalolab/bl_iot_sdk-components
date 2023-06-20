@@ -820,11 +820,9 @@ int bl_hbn_enter(hbn_type_t *hbn, uint32_t *time)
     EF_Ctrl_Read_Device_Info(&dev_info);
     dev_info.flash_cfg &= 0x03;
 
-    if (hbn) {
-        printf("hbn.buflen = %d\r\n", hbn->buflen);
-        printf("hbn.active = %d\r\n", hbn->active);
-        log_buf(hbn->buf, hbn->buflen);
-    }
+    printf("hbn.buflen = %d\r\n", hbn->buflen);
+    printf("hbn.active = %d\r\n", hbn->active);
+    log_buf(hbn->buf, hbn->buflen);
 
     cfg.sleepTime = (*time << 15) / 1000;  // ms -> rtc cycles
     if (hbn->buflen > 5) {
