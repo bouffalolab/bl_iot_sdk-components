@@ -39,6 +39,11 @@
 
 #define PHY_MAX_RETRY      (0x3F0)
 
+#if defined(DISABLE_PRINT) && DISABLE_PRINT
+#undef log_info
+#define log_info(...)
+#endif
+
 /****************************************************************************//**
  * @brief  Set MAC Address
  *
@@ -161,7 +166,9 @@ int emac_phy_reset(void)
     uint16_t regval = PHY_RESET;
 
     log_info("emac_phy_reset start\r\n");
+#if !defined(DISABLE_PRINT) || DISABLE_PRINT == 0
     phy_lan8720_dump_registers();
+#endif
     if(emac_phy_write(PHY_BCR, PHY_RESET) != SUCCESS){
         return ERROR;
     }

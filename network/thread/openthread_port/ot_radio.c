@@ -219,8 +219,19 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
 
     if (otRadioVar_ptr->pTxFrame == NULL) {
 
+#if defined(BL702L)
+        uint8_t *pRxChannelAfterTxDone = &(aFrame->mInfo.mTxInfo.mRxChannelAfterTxDone);
+        uint8_t mRxChannelAfterTxDone = pRxChannelAfterTxDone[0];
+        pRxChannelAfterTxDone[0] = pRxChannelAfterTxDone[1];
+
         iret = ot_radioSend(aFrame);
 
+        pRxChannelAfterTxDone[1] = pRxChannelAfterTxDone[0];
+        pRxChannelAfterTxDone[0] = mRxChannelAfterTxDone;
+#else
+        iret = ot_radioSend(aFrame);
+
+#endif
         if (iret) {
             otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_ERROR);
         }

@@ -1,29 +1,36 @@
-#include "emac_reg.h"
-#include "bl_irq.h"
-#include "bl702_common.h"
-#include "bl702_glb.h"
-#include "bl_emac.h"
-#include <lwip/netifapi.h>
-#include "lwip/mem.h"
-#include "netif/etharp.h"
-#include "ethernetif.h"
-#include "eth_bd.h"
-#include <bl_timer.h>
-#include <bl_gpio.h>
+
 #include <string.h>
+
 #include <utils_log.h>
 #include <utils_list.h>
-#include <FreeRTOS.h>
-#include <task.h>
-#include <aos/kernel.h>
-#include <aos/yloop.h>
 
+#include <emac_reg.h>
+#include <bl_irq.h>
+#include <bl702_common.h>
+#include <bl702_glb.h>
+#include <bl_emac.h>
+
+#include <bl_timer.h>
+#include <bl_gpio.h>
+
+#include <lwip/netifapi.h>
+#include <lwip/mem.h>
+#include <netif/etharp.h>
+#include <ethernetif.h>
 #if LWIP_IPV6
 #include <lwip/ethip6.h>
 #include <lwip/dhcp6.h>
 #endif /* LWIP_IPV6 */
 
+#include <FreeRTOS.h>
+#include <task.h>
 
+#include "eth_bd.h"
+
+#if defined(DISABLE_PRINT) && DISABLE_PRINT
+#undef log_info
+#define log_info(...)
+#endif
 #define printf(...)  do {}while(0)
 #define MSG(...)     do {}while(0)
 
@@ -119,7 +126,7 @@ void EMAC_TX_Done_Callback(void)
 
 void EMAC_TX_Error_Callback(void)
 {
-    puts("Tx error\r\n");
+    MSG("Tx error\r\n");
 }
 
 #if 0
@@ -180,7 +187,7 @@ static struct pbuf *low_level_input(struct netif *netif)
             MSG("RX bd %x\r\n", bd->C_S_L & 0xFF);
         }
         if ((bd->C_S_L >>16) == ETH_MAX_BUFFER_SIZE) {
-            puts("Bug now...\r\n");
+            MSG("Bug now...\r\n");
         }
 #if 0
         //TODO more check
@@ -254,7 +261,7 @@ void EMAC_RX_Done_Callback(void)
 
 void EMAC_RX_Error_Callback(void)
 {
-    puts("Rx error\r\n");
+    MSG("Rx error\r\n");
 }
 void EMAC_RX_Busy_Callback(void)
 {
@@ -494,7 +501,7 @@ static int _emac_phy_linkstatus(void)
 {
     uint16_t phy_bsr = 0;
 
-    //puts("Read link\r\n");
+    //MSG("Read link\r\n");
     if (SUCCESS != emac_phy_read(PHY_BSR, &phy_bsr)) {
         printf("%s:%d\r\n", __func__, __LINE__);
         return ERROR;
@@ -624,7 +631,7 @@ static void _emac_phy_if_init(void)
     }
 }
 
-void borad_eth_init(void)
+void borad_eth_init(uint8_t*addr)
 {
     EMAC_CFG_Type emacCfg={
         .recvSmallFrame=ENABLE,                     /*!< Receive small frmae or not */
@@ -641,14 +648,9 @@ void borad_eth_init(void)
         .minFrameLen=64,                            /*!< Minimum frame length */
         .maxFrameLen=ETH_MAX_BUFFER_SIZE,           /*!< Maximum frame length */
         .collisionValid=16,                         /*!< Collision valid value */
-        .macAddr[0]=0x18,                           /*!< MAC Address */
-        .macAddr[1]=0xB0,                          
-        .macAddr[2]=0x09,
-        .macAddr[3]=0x00,
-        .macAddr[4]=0x12,
-        .macAddr[5]=0x34,
     };
 
+    memcpy(emacCfg.macAddr, addr, sizeof(emacCfg.macAddr));
     EMAC_GPIO_Init();
 
 #if USER_EMAC_OUTSIDE_CLK  // use outside clk
@@ -670,6 +672,30 @@ void borad_eth_init(void)
     //bflb_platform_start_time();
 }
 
+void eth_get_mac(uint8_t mac[6]) 
+{
+    uint8_t addr[8];
+
+    extern int bl_wireless_mac_addr_get(uint8_t mac[8]);
+    bl_wireless_mac_addr_get(addr);
+    if (addr[0] == 0) {
+        mac[0] = 0x18;
+        mac[1] = 0xB0;
+        mac[2] = 0x09;
+        mac[3] = addr[5];
+        mac[4] = addr[6];
+        mac[5] = addr[7];
+    }
+    else {
+        mac[0] = addr[0];
+        mac[1] = addr[1];
+        mac[2] = addr[2];
+        mac[3] = addr[5];
+        mac[4] = addr[6];
+        mac[5] = addr[7];
+    }
+}
+
 /**
  * In this function, the hardware should be initialized.
  * Called from ethernetif_init().
@@ -677,17 +703,14 @@ void borad_eth_init(void)
  * @param netif the already initialized lwip network interface structure
  *        for this ethernetif
  */
+
 static void low_level_init(struct netif *netif)
 {
     netif->hwaddr_len = ETHARP_HWADDR_LEN;
     netif->mtu = 1500;
     netif->flags = NETIF_FLAG_BROADCAST|NETIF_FLAG_ETHARP|NETIF_FLAG_LINK_UP|NETIF_FLAG_IGMP;
-    netif->hwaddr[0] = 0x18;
-    netif->hwaddr[1] = 0xB0;
-    netif->hwaddr[2] = 0x09;
-    netif->hwaddr[3] = 0x00;
-    netif->hwaddr[4] = 0x12;
-    netif->hwaddr[5] = 0x34;
+    eth_get_mac(netif->hwaddr);
+
     printf("low level init\r\n");
 
 #if LWIP_IPV6
@@ -695,7 +718,7 @@ static void low_level_init(struct netif *netif)
       netif->output_ip6 = ethip6_output;
 #endif
 
-    borad_eth_init();
+    borad_eth_init(netif->hwaddr);
 }
 
 static inline void bl702ethernetif_output(struct netif *netif)

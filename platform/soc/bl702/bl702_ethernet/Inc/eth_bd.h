@@ -1,5 +1,10 @@
 #ifndef __ETH_BD_H__
 #define __ETH_BD_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <lwip/netif.h>
 #include <bl_emac.h>
 #include <utils_list.h>
@@ -50,4 +55,11 @@ typedef int (*eth_callback)(eth_link_state val);
 extern struct netif eth_mac;
 
 int ethernet_init(eth_callback cb);
+err_t eth_init(struct netif *netif);
+void eth_get_mac(uint8_t addr[6]);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
