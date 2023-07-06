@@ -39,8 +39,7 @@
 EMAC_Handle_Type ethHandle = {0};
 static EMAC_Handle_Type *thiz = NULL;
 eth_context *ctx = NULL;
-TaskHandle_t DequeueTaskHandle;
-TaskHandle_t OutputTaskHandle;
+TaskHandle_t DequeueTaskHandle = NULL;
 struct netif eth_mac = {0};
 #define ETH_MAX_BUFFER_SIZE        (1536)
 #if 0
@@ -120,6 +119,9 @@ void EMAC_TX_Done_Callback(void)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
+    if (NULL == DequeueTaskHandle) {
+        return;
+    } 
     xTaskNotifyFromISR(DequeueTaskHandle, 0x01, eSetBits, &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
@@ -254,7 +256,9 @@ static inline err_t bl702ethernetif_input(struct netif *netif)
 void EMAC_RX_Done_Callback(void)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
+    if (NULL == DequeueTaskHandle) {
+        return;
+    }
     xTaskNotifyFromISR(DequeueTaskHandle, 0x02, eSetBits, &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
@@ -717,8 +721,6 @@ static void low_level_init(struct netif *netif)
       netif->flags |= (NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6);
       netif->output_ip6 = ethip6_output;
 #endif
-
-    borad_eth_init(netif->hwaddr);
 }
 
 static inline void bl702ethernetif_output(struct netif *netif)
@@ -767,6 +769,8 @@ void unsent_recv_task(void *pvParameters)
     BaseType_t recv;
     struct netif *netif = (struct netif *)pvParameters;
 
+    borad_eth_init(netif->hwaddr);
+
     log_info("unsent_recv_task.\r\n");
     while(1) {
         NotifyValue = 0;
@@ -798,8 +802,11 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
     item = (struct unsent_item *)(((uintptr_t)(p->payload + 3))&(~3));
     item->p = p;
 
-
     pbuf_ref(p);
+
+    if (NULL == DequeueTaskHandle) {
+        return ERR_IF;
+    } 
     __disable_irq();
     utils_list_push_back(&ctx->unsent, (struct utils_list_hdr *)&(item->hdr));
     ctx->unsent_num++;
@@ -811,18 +818,18 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
 
 err_t eth_init(struct netif *netif)
 {
-  LWIP_ASSERT("netif != NULL", (netif != NULL));
+    LWIP_ASSERT("netif != NULL", (netif != NULL));
+    
+    netif->name[0] = 'e';
+    netif->name[1] = 't';
+    netif->hostname = "702";
+    netif->output = etharp_output;
+    netif->linkoutput = low_level_output;
+    log_info("eth_init.\r\n");
+    low_level_init(netif);
+    xTaskCreate(unsent_recv_task, (const char *)"Ontput_Unsent_queue", 1024, netif, 29, &DequeueTaskHandle);
 
-  netif->name[0] = 'e';
-  netif->name[1] = 't';
-  netif->hostname = "702";
-  netif->output = etharp_output;
-  netif->linkoutput = low_level_output;
-  log_info("eth_init.\r\n");
-  low_level_init(netif);
-  xTaskCreate(unsent_recv_task, (const char *)"Ontput_Unsent_queue", 1024, netif, 29, &DequeueTaskHandle);
-
-  return ERR_OK;
+    return ERR_OK;
 }
 
 int ethernet_init(eth_callback cb)
