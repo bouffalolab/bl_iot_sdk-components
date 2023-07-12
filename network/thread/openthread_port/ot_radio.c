@@ -219,14 +219,7 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
 
     if (otRadioVar_ptr->pTxFrame == NULL) {
 
-        uint8_t *pRxChannelAfterTxDone = &(aFrame->mInfo.mTxInfo.mRxChannelAfterTxDone);
-        uint8_t mRxChannelAfterTxDone = pRxChannelAfterTxDone[0];
-        pRxChannelAfterTxDone[0] = pRxChannelAfterTxDone[1];
-
         iret = ot_radioSend(aFrame);
-
-        pRxChannelAfterTxDone[1] = pRxChannelAfterTxDone[0];
-        pRxChannelAfterTxDone[0] = mRxChannelAfterTxDone;
 
         if (iret) {
             otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_ERROR);
@@ -430,11 +423,16 @@ otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel)
 {
     uint8_t ch = aChannel - OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN;
 
-    lmac154_enableRx();
+#ifdef BL702L
+    extern bool bz_phy_optimize_tx_channel(uint32_t channel);
+    bz_phy_optimize_tx_channel(2405 + 5 * ch);
+#endif
+
     lmac154_setChannel((lmac154_channel_t)ch);
 #if !defined(CONFIG_NCP) || CONFIG_NCP == 0
     lmac154_setRxStateWhenIdle(otThreadGetLinkMode(aInstance).mRxOnWhenIdle);
 #endif
+    lmac154_enableRx();
 
     return OT_ERROR_NONE;
 }

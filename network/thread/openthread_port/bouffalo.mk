@@ -24,7 +24,6 @@ COMPONENT_SRCS := ot_alarm.c \
                   ot_radio.c \
                   ot_uart.c \
                   ot_freertos.c \
-                  ot_memory.c \
                   ot_linkmetric.c
 
 ifndef CONFIG_NCP

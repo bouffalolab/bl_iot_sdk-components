@@ -241,6 +241,8 @@ ot_system_event_t otrGetNotifyEvent(void);
 
 bool ot_radioIdle(void);
 
+uint32_t ot_lwip_get_ipv6_num_address (void);
+
 /****************************************************************************//**
  * @brief  Macro OT_THREAD_SAFE provides a method to access OpenThread with 
  * thread-safe in other tasks running context.
