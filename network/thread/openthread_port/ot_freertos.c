@@ -122,6 +122,15 @@ __attribute__((weak)) void otrAppProcess(ot_system_event_t sevent)
 {
 }
 
+__attribute__((weak)) void ot_uartTask (ot_system_event_t sevent) 
+{
+}
+
+__attribute__((weak)) void otrInitUser(otInstance * instance)
+{
+
+}
+
 void otTaskletsSignalPending(otInstance *aInstance)
 {
     if (aInstance) {
