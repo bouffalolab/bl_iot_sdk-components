@@ -97,7 +97,7 @@ static void EMAC_GPIO_Init(void)
 
     GLB_SWAP_EMAC_CAM_Pin(GLB_EMAC_CAM_PIN_EMAC);
 
-    GLB_GPIO_Func_Init(GPIO_FUN_ETHER_MAC,(GLB_GPIO_Type *)emacPins,sizeof(emacPins));
+    GLB_GPIO_Func_Init(GPIO_FUN_ETHER_MAC,(GLB_GPIO_Type *)emacPins,sizeof(emacPins) / sizeof(GLB_GPIO_Type));
 }
 
 int EMAC_BD_Init(void)
@@ -206,7 +206,11 @@ static struct pbuf *low_level_input(struct netif *netif)
             thiz->rxIndexCPU = thiz->txBuffLimit + 1;
         }
 #else
+#if PBUF_POOL_SIZE
         h = pbuf_alloc(PBUF_RAW, pkt_len, PBUF_POOL);
+#else
+        h = pbuf_alloc(PBUF_RAW, pkt_len, PBUF_RAM);
+#endif
         if (h) {
             pbuf_take(h, (const void*)bd->Buffer, pkt_len);
         }
@@ -827,7 +831,7 @@ err_t eth_init(struct netif *netif)
     netif->linkoutput = low_level_output;
     log_info("eth_init.\r\n");
     low_level_init(netif);
-    xTaskCreate(unsent_recv_task, (const char *)"Ontput_Unsent_queue", 1024, netif, 29, &DequeueTaskHandle);
+    xTaskCreate(unsent_recv_task, (const char *)"Ontput_Unsent_queue", 1024, netif, 15, &DequeueTaskHandle);
 
     return ERR_OK;
 }
