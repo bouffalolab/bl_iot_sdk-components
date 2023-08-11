@@ -9,6 +9,10 @@
 
 #include <openthread/platform/memory.h>
 
+#if ENABLE_OPENTHREAD_BORDER_ROUTER
+#include <lwipopts.h>
+#endif
+
 void *otPlatCAlloc(size_t aNum, size_t aSize)
 {
     return calloc(aNum, aSize);

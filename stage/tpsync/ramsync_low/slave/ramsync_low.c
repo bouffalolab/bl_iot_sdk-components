@@ -341,7 +341,7 @@ void lramsync_deinit(lramsync_ctx_t *ctx)
 
     priv = (struct _ramsync_low_priv *)ctx->priv;
 
-    SPI_Disable(ctx->cfg->port, SPI_WORK_MODE_MASTER);
+    SPI_Disable(ctx->cfg->port, SPI_WORK_MODE_SLAVE);
 
 	hosal_dma_chan_release(ctx->dma_tx_chan);
 	hosal_dma_chan_release(ctx->dma_rx_chan);

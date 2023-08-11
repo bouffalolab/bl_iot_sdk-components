@@ -177,7 +177,9 @@ static void ramsync_loop_cmd(char *buf, int len, int argc, char **argv)
 
 static void ramsync_reset1_cmd(char *buf, int len, int argc, char **argv)
 {
-    slv->p_ramsync->p_tx->st.magic = (TP_ST_MAGIC + 1);// only for test reset
+    for (int i = 0; i < TP_TXPAYLOAD_NUM; i++) {
+        slv->p_ramsync->p_tx->payload[i].magic = (TP_ST_MAGIC + 1);// only for test reset
+    }
 }
 
 static void ramsync_reset2_cmd(char *buf, int len, int argc, char **argv)

@@ -75,7 +75,7 @@ struct virt_net_custom_pbuf {
 #define VIRT_NET_RXBUFF_CNT (4)
 #endif
 #define VIRT_NET_BUFF_SIZE (TP_PAYLOAD_LEN + VIRT_NET_RXBUFF_OFFSET) /* + sizeof(pbuf header) */
-#define VIRT_NET_MAX_PENDING_CMD (4)
+#define VIRT_NET_MAX_PENDING_CMD (32)
 
 BITSET_DEFINE(rx_buf_ind, VIRT_NET_RXBUFF_CNT);
 
@@ -136,12 +136,13 @@ static inline int acquire_semaphore_slot(SemaphoreHandle_t sem) {
 
 static inline SemaphoreHandle_t release_semaphore_slot(int idx) {
   assert(idx >= 0 && idx < (sizeof(sem_slot) / sizeof(sem_slot[0])));
-  SemaphoreHandle_t ret;
+  SemaphoreHandle_t ret = NULL;
 
   xSemaphoreTake(slot_mutex, portMAX_DELAY);
-  assert(sem_slot[idx] != NULL);
-  ret = sem_slot[idx];
-  sem_slot[idx] = NULL;
+  if (sem_slot[idx]) {
+    ret = sem_slot[idx];
+    sem_slot[idx] = NULL;
+  }
   xSemaphoreGive(slot_mutex);
 
   return ret;
@@ -200,36 +201,22 @@ void virt_net_spi_destroy(virt_net_t *obj)
 }
 
 static void netif_status_callback(struct netif *netif) {
-  uint32_t is_got_ip = 0;
 
   if (netif->flags & NETIF_FLAG_UP) {
     /** interface is up status */
     struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)netif->state;
 
 #if LWIP_IPV4
-    is_got_ip = !ip4_addr_isany(netif_ip4_addr(netif)) ? 1 : 0;
-    if (is_got_ip){
-      printf("IP Got, Delete dhcp timer.\r\n");
+    if (!ip4_addr_isany(netif_ip4_addr(netif))){
       if (sobj->dhcp_start) {
         xTimerStop(sobj->dhcp_timer, 0);
         xTimerDelete(sobj->dhcp_timer, 0);
         sobj->dhcp_start = 0;
       }
-    }
-#endif
 
-#if LWIP_IPV6
-  for (uint32_t i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i ++ ) {
-    if (!ip6_addr_isany(netif_ip6_addr(netif, i)) && !ip6_addr_islinklocal(netif_ip6_addr(netif, i))
-      && ip6_addr_ispreferred(netif_ip6_addr_state(netif, i))) {
-      is_got_ip |= 2;
-    }
-  }
-#endif
-
-    if (is_got_ip && sobj) {
       event_propagate(sobj, VIRT_NET_EV_ON_GOT_IP, (void *)netif);
     }
+#endif
   }
   else {
     printf("Interface is down status.\r\n");
@@ -316,7 +303,7 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
   struct pkg_protocol_cmd *pkg_cmd = (struct pkg_protocol_cmd *)pkg_header->payload;
   SemaphoreHandle_t sem;
 
-  blog_info("pkg_protocol_cmd cmd:0x%x.\r\n", pkg_cmd->cmd);
+  blog_info("pkg_protocol_cmd_handler cmd:0x%x.\r\n", pkg_cmd->cmd);
   switch (pkg_cmd->cmd) {
   case VIRT_NET_CTRL_AP_CONNECTED_IND:
     {
@@ -370,13 +357,15 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
       uint8_t *mac = (uint8_t *)sem_context[pkg_cmd->msg_id];
       assert(mac != NULL);
 
-      memcpy(mac, pkg_cmd->payload, 6);
-      memcpy(sobj->vnet.mac, pkg_cmd->payload, 6);
-      blog_info("got mac:%x:%x:%x:%x:%x:%x\r\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
       sem = release_semaphore_slot(pkg_cmd->msg_id);
-      xSemaphoreGive(sem);
+      if (sem) {
 
+        memcpy(mac, pkg_cmd->payload, 6);
+        memcpy(sobj->vnet.mac, pkg_cmd->payload, 6);
+        blog_info("got mac:%x:%x:%x:%x:%x:%x\r\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+        xSemaphoreGive(sem);
+      }
     }
     break;
   case VIRT_NET_CTRL_SCAN_IND:
@@ -390,10 +379,12 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
             , msg->records[i].channel, msg->records[i].auth_mode
             , msg->records[i].cipher);
       }
-      event_propagate(sobj, VIRT_NET_EV_ON_SCAN_DONE, pkg_header);
-      sem = release_semaphore_slot(pkg_cmd->msg_id);
 
-      xSemaphoreGive(sem);
+      sem = release_semaphore_slot(pkg_cmd->msg_id);
+      if (sem) {
+        event_propagate(sobj, VIRT_NET_EV_ON_SCAN_DONE, pkg_header);
+        xSemaphoreGive(sem);
+      }
     } while (0);
     break;
   case VIRT_NET_CTRL_GET_LINK_STATUS_IND:
@@ -408,7 +399,7 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
       strcpy(ip_str, ip4addr_ntoa(&ip));
       strcpy(gw_str, ip4addr_ntoa(&gw));
       strcpy(mask_str, ip4addr_ntoa(&mask));
-	    blog_info("%s,%s,%s\r\n", ip_str, gw_str, mask_str);
+      blog_info("%s,%s,%s\r\n", ip_str, gw_str, mask_str);
       if (status->record.link_status == BF1B_WIFI_LINK_STATUS_UP) {
         blog_info("link status up!\r\n");
       } else if (status->record.link_status == BF1B_WIFI_LINK_STATUS_DOWN){
@@ -431,10 +422,12 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
         status->record.bssid[4],
         status->record.bssid[5]
       );
-
       event_propagate(sobj, VIRT_NET_EV_ON_LINK_STATUS_DONE, pkg_header);
+
       sem = release_semaphore_slot(pkg_cmd->msg_id);
-      xSemaphoreGive(sem);
+      if (sem) {
+        xSemaphoreGive(sem);
+      }
 
     } while (0);
     break;
@@ -640,8 +633,12 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
       
         /* waiting response */
       if (xSemaphoreTake(sem, 3000) != pdTRUE) {
-          printf("get mac failed!!!!\r\n");
+        release_semaphore_slot(msg_id);
+        printf("get mac failed!!!!\r\n");
+        return -1;
       }
+          
+      release_semaphore_slot(msg_id);
       return 0;
     }
     break;
@@ -677,9 +674,12 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
 
       /* waiting response */
       if (xSemaphoreTake(sem, 10000) != pdTRUE) {
+          release_semaphore_slot(msg_id);
           printf("scan failed!!!!\r\n");
+          return -1;
       }
 
+      release_semaphore_slot(msg_id);
       return 0;
     } while (0);
     break;
@@ -711,8 +711,12 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
 
       /* waiting response */
       if (xSemaphoreTake(sem, 3000) != pdTRUE) {
-          printf("get link status failed!!!!\r\n");
+        release_semaphore_slot(msg_id);
+        printf("get link status failed!!!!\r\n");
+        return -1;
       }
+
+      release_semaphore_slot(msg_id);
       return 0;
     }
     break;
