@@ -219,15 +219,16 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
 
     if (otRadioVar_ptr->pTxFrame == NULL) {
 
+#ifndef NO_RX_CHANNEL_AFTER_TX_DONE
         uint8_t *pRxChannelAfterTxDone = &(aFrame->mInfo.mTxInfo.mRxChannelAfterTxDone);
         uint8_t mRxChannelAfterTxDone = pRxChannelAfterTxDone[0];
         pRxChannelAfterTxDone[0] = pRxChannelAfterTxDone[1];
-
+#endif
         iret = ot_radioSend(aFrame);
-
+#ifndef NO_RX_CHANNEL_AFTER_TX_DONE
         pRxChannelAfterTxDone[1] = pRxChannelAfterTxDone[0];
         pRxChannelAfterTxDone[0] = mRxChannelAfterTxDone;
-
+#endif
         if (iret) {
             otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_ERROR);
         }
