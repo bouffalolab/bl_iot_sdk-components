@@ -7,6 +7,22 @@
 #include <semphr.h>
 #include <bl_sys.h>
 
+#include <openthread/platform/memory.h>
+
+#if ENABLE_OPENTHREAD_BORDER_ROUTER
+#include <lwipopts.h>
+#endif
+
+void *otPlatCAlloc(size_t aNum, size_t aSize)
+{
+    return calloc(aNum, aSize);
+}
+
+void otPlatFree(void *aPtr)
+{
+    free(aPtr);
+}
+
 void otPlatReset(otInstance *aInstance) 
 {
 #if CFG_USE_PSRAM
@@ -74,4 +90,13 @@ otError otPlatSetMcuPowerState(otInstance *aInstance, otPlatMcuPowerState aState
 otPlatMcuPowerState otPlatGetMcuPowerState(otInstance *aInstance)
 {
     return OT_PLAT_MCU_POWER_STATE_ON;
+}
+
+uint32_t ot_lwip_get_ipv6_num_address (void) 
+{
+#ifndef LWIP_IPV6_NUM_ADDRESSES
+    return 0;
+#else    
+    return LWIP_IPV6_NUM_ADDRESSES;
+#endif
 }
