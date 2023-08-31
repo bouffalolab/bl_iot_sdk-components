@@ -33,32 +33,8 @@
   *
   ******************************************************************************
   */
-#ifdef BL602
-#include <stdbool.h>
-#include <bl602_ef_ctrl.h>
-#include <bl602_sec_eng.h>
 
-bool efuse_slot_decrypt(uint8_t *p, uint32_t len, uint32_t *pIv)
-{
-    SEC_Eng_AES_Ctx aesCtx;
-    uint8_t keySel = 1;
-
-    if (0 == len) {
-        return false;
-    }
-
-    Sec_Eng_AES_Enable_BE(SEC_ENG_AES_ID0);
-
-    Sec_Eng_AES_Init(&aesCtx, SEC_ENG_AES_ID0, SEC_ENG_AES_CBC, SEC_ENG_AES_KEY_128BITS, SEC_ENG_AES_DECRYPTION);
-    Sec_Eng_AES_Set_Key_IV_BE(SEC_ENG_AES_ID0, SEC_ENG_AES_KEY_HW, &keySel, (const uint8_t *)pIv);
-
-    Sec_Eng_AES_Crypt(&aesCtx, SEC_ENG_AES_ID0, p, len, p);
-    Sec_Eng_AES_Finish(SEC_ENG_AES_ID0);
-
-    return true;
-}
-
-#elif defined BL616
+#ifdef BL616
 
 #include <stdbool.h>
 #include <bl616.h>
@@ -84,6 +60,50 @@ bool efuse_slot_decrypt(uint8_t *p, uint32_t len, uint32_t *pIv)
 
     bflb_aes_deinit(aes);
     bflb_group0_release_aes_access(aes);
+
+    return true;
+}
+
+#else 
+
+#include <stdbool.h>
+#ifdef BL602
+#include <bl602_ef_ctrl.h>
+#include <bl602_sec_eng.h>
+#elif defined BL702
+#include <bl702_ef_ctrl.h>
+#include <bl702_sec_eng.h>
+#elif defined BL702L
+#include <bl702l_ef_ctrl.h>
+#include <bl702l_sec_eng.h>
+#else
+#error "No support chip for Matter Factory Data"
+#endif
+
+bool efuse_slot_decrypt(uint8_t *p, uint32_t len, uint32_t *pIv)
+{
+    SEC_Eng_AES_Ctx aesCtx;
+#if defined BL702L
+    uint8_t aes_key[16] = {0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78};
+#else
+    uint8_t keySel = 1;
+#endif
+
+    if (0 == len) {
+        return false;
+    }
+
+    Sec_Eng_AES_Enable_BE(SEC_ENG_AES_ID0);
+
+    Sec_Eng_AES_Init(&aesCtx, SEC_ENG_AES_ID0, SEC_ENG_AES_CBC, SEC_ENG_AES_KEY_128BITS, SEC_ENG_AES_DECRYPTION);
+#if defined BL702L
+    Sec_Eng_AES_Set_Key_IV_BE(SEC_ENG_AES_ID0, SEC_ENG_AES_KEY_SW, aes_key, (const uint8_t *)pIv);
+#else
+    Sec_Eng_AES_Set_Key_IV_BE(SEC_ENG_AES_ID0, SEC_ENG_AES_KEY_HW, &keySel, (const uint8_t *)pIv);
+#endif
+
+    Sec_Eng_AES_Crypt(&aesCtx, SEC_ENG_AES_ID0, p, len, p);
+    Sec_Eng_AES_Finish(SEC_ENG_AES_ID0);
 
     return true;
 }

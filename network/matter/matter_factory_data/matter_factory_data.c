@@ -10,16 +10,18 @@
 #ifdef BL602
 #include <bl602.h>
 #include <bl602_romdriver.h>
+#define MFD_XIP_BASE BL602_FLASH_XIP_BASE
 #elif defined BL702
 #include <bl702.h>
-#include <bl602_romdriver.h>
+#include <bl702_romdriver.h>
+#define MFD_XIP_BASE BL702_FLASH_XIP_BASE
 #else
 #include <bl702l.h>
-#include <bl602_romdriver.h>
+#include <bl702l_romdriver.h>
+#define MFD_XIP_BASE BL702L_FLASH_XIP_BASE
 #endif
 #include <softcrc.h>
 #include <hal_boot2.h>
-#define MFD_XIP_BASE BL602_FLASH_XIP_BASE
 #else
 #error "No chipname specified."
 #endif
