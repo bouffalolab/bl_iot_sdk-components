@@ -131,7 +131,6 @@ __attribute__((weak)) void otrInitUser(otInstance * instance)
 
 }
 
-
 void otTaskletsSignalPending(otInstance *aInstance)
 {
     if (aInstance) {

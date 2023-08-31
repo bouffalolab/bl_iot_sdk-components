@@ -31,8 +31,6 @@
 #undef log_info
 #define log_info(...)
 #endif
-#define printf(...)  do {}while(0)
-#define MSG(...)     do {}while(0)
 
 #define USER_EMAC_OUTSIDE_CLK  (1)
 
@@ -110,7 +108,7 @@ int EMAC_BD_Init(void)
     /* init the BDs in emac with buffer address */
     //err = EMAC_DMABDListInit(thiz, NULL, ETH_TXNB, (uint8_t*)rx_buf, ETH_RXNB);
     err = EMAC_DMABDListInit(thiz, (uint8_t*)tx_buf, ETH_TXNB, (uint8_t*)rx_buf, ETH_RXNB);
-    printf("bd init success\r\n");
+    log_info("bd init success\r\n");
 
     return err;
 }
@@ -128,7 +126,7 @@ void EMAC_TX_Done_Callback(void)
 
 void EMAC_TX_Error_Callback(void)
 {
-    MSG("Tx error\r\n");
+    log_info("Tx error\r\n");
 }
 
 #if 0
@@ -139,7 +137,7 @@ static void rx_free_custom(struct pbuf *p)
     EMAC_BD_Desc_Type *bd;
     bd = my_pbuf->bd;
     bd->C_S_L |= EMAC_BD_FIELD_MSK(RX_E);
-    printf("release bd idx %ld\r\n", my_pbuf->idx);
+    log_info("release bd idx %ld\r\n", my_pbuf->idx);
 
 #else
     eth_pbuf_custom_t *my_pbuf = (eth_pbuf_custom_t *)p;
@@ -170,31 +168,31 @@ static struct pbuf *low_level_input(struct netif *netif)
     //uint8_t *payload;
     EMAC_BD_Desc_Type *bd;
 	bd = &thiz->bd[thiz->rxIndexCPU];
-    printf("low level input idx %d\r\n", thiz->rxIndexCPU);
+    log_info("low level input idx %d\r\n", thiz->rxIndexCPU);
 	if(bd->C_S_L & EMAC_BD_FIELD_MSK(RX_E)){
-        printf("RX BD is empty\r\n");
+        log_info("RX BD is empty\r\n");
         h = NULL;
 	} else {
         temval = BL_RD_REG(EMAC_BASE, EMAC_PACKETLEN);
         max_len = BL_GET_REG_BITS_VAL(temval, EMAC_MAXFL);
         pkt_len = (bd->C_S_L & EMAC_BD_FIELD_MSK(RX_LEN)) >> BD_RX_LEN_POS;
-        printf("max_len %u, min_len %lu, pkt_len %u\r\n", max_len,
+        log_info("max_len %u, min_len %lu, pkt_len %u\r\n", max_len,
                 BL_GET_REG_BITS_VAL(temval, EMAC_MINFL), pkt_len);
         //check length
         if (pkt_len > max_len) {
-            MSG("pkt is too huge %d\r\n", pkt_len);
+            log_info("pkt is too huge %d\r\n", pkt_len);
             return NULL;
         }
         if (bd->C_S_L & 0xFF) {
-            MSG("RX bd %x\r\n", bd->C_S_L & 0xFF);
+            log_info("RX bd %x\r\n", bd->C_S_L & 0xFF);
         }
         if ((bd->C_S_L >>16) == ETH_MAX_BUFFER_SIZE) {
-            MSG("Bug now...\r\n");
+            log_info("Bug now...\r\n");
         }
 #if 0
         //TODO more check
         payload = (uint8_t *)bd->Buffer;
-        printf("input idx %d\r\n", thiz->rxIndexCPU);
+        log_info("input idx %d\r\n", thiz->rxIndexCPU);
         eth_pbuf_custom_t *my_pbuf = (eth_pbuf_custom_t *)(payload - 64);
         my_pbuf->p.custom_free_function = rx_free_custom;
         my_pbuf->bd = bd;
@@ -223,7 +221,7 @@ static struct pbuf *low_level_input(struct netif *netif)
         }
 #endif
     }
-    printf("h addr %p\r\n", h);
+    log_info("h addr %p\r\n", h);
     return h;
 }
 
@@ -249,7 +247,7 @@ static inline err_t bl702ethernetif_input(struct netif *netif)
         if (err != ERR_OK)
         {
             LWIP_DEBUGF(NETIF_DEBUG, ("ethernetif_input: IP input error\n"));
-            printf("ethernetif_input: IP input error\n");
+            log_info("ethernetif_input: IP input error\n");
             pbuf_free(p);
         }
     } while (!(bd->C_S_L & EMAC_BD_FIELD_MSK(RX_E)));
@@ -269,11 +267,11 @@ void EMAC_RX_Done_Callback(void)
 
 void EMAC_RX_Error_Callback(void)
 {
-    MSG("Rx error\r\n");
+    log_info("Rx error\r\n");
 }
 void EMAC_RX_Busy_Callback(void)
 {
-    MSG("RX busy %u\r\n", rx_counter);
+    log_info("RX busy %u\r\n", rx_counter);
 }
 
 void emac_irq_process(void)
@@ -283,44 +281,44 @@ void emac_irq_process(void)
     tmpVal = BL_RD_REG(EMAC_BASE,EMAC_INT_MASK);
 
     if (SET == emac_getintstatus(EMAC_INT_TX_DONE) && !BL_IS_REG_BIT_SET(tmpVal,EMAC_TXB_M)) {
-        //printf("EMAC_INT_TX_DONE\r\n");
+        //log_info("EMAC_INT_TX_DONE\r\n");
         emac_clrintstatus(EMAC_INT_TX_DONE);
         emac_intmask(EMAC_INT_TX_DONE, MASK);
         EMAC_TX_Done_Callback();
     }
 
     if (SET == emac_getintstatus(EMAC_INT_TX_ERROR) && !BL_IS_REG_BIT_SET(tmpVal,EMAC_TXE_M)) {
-        //printf("EMAC_INT_TX_ERROR\r\n");
+        //log_info("EMAC_INT_TX_ERROR\r\n");
         emac_clrintstatus(EMAC_INT_TX_ERROR);
         EMAC_TX_Error_Callback();
     }
 
     if (SET == emac_getintstatus(EMAC_INT_RX_DONE) && !BL_IS_REG_BIT_SET(tmpVal,EMAC_RXB_M)) {
-        //printf("EMAC_INT_RX_DONE\r\n");
+        //log_info("EMAC_INT_RX_DONE\r\n");
         emac_clrintstatus(EMAC_INT_RX_DONE);
         emac_intmask(EMAC_INT_RX_DONE, MASK);
         EMAC_RX_Done_Callback();
     }
 
     if (SET == emac_getintstatus(EMAC_INT_RX_ERROR) && !BL_IS_REG_BIT_SET(tmpVal,EMAC_RXE_M)) {
-        //printf("EMAC_INT_RX_ERROR\r\n");
+        //log_info("EMAC_INT_RX_ERROR\r\n");
         emac_clrintstatus(EMAC_INT_RX_ERROR);
         EMAC_RX_Error_Callback();
     }
 
     if (SET == emac_getintstatus(EMAC_INT_RX_BUSY) && !BL_IS_REG_BIT_SET(tmpVal,EMAC_BUSY_M)) {
-        //printf("EMAC_INT_RX_BUSY\r\n");
+        //log_info("EMAC_INT_RX_BUSY\r\n");
         emac_clrintstatus(EMAC_INT_RX_BUSY);
         EMAC_RX_Busy_Callback();
     }
 
     if (SET == emac_getintstatus(EMAC_INT_TX_CTRL) && !BL_IS_REG_BIT_SET(tmpVal,EMAC_TXC_M)) {
-        //printf("EMAC_INT_TX_CTRL\r\n");
+        //log_info("EMAC_INT_TX_CTRL\r\n");
         emac_clrintstatus(EMAC_INT_TX_CTRL);
     }
 
     if (SET == emac_getintstatus(EMAC_INT_RX_CTRL) && !BL_IS_REG_BIT_SET(tmpVal,EMAC_RXC_M)) {
-        //printf("EMAC_INT_RX_CTRL\r\n");
+        //log_info("EMAC_INT_RX_CTRL\r\n");
         emac_clrintstatus(EMAC_INT_RX_CTRL);
     }
 }
@@ -425,14 +423,14 @@ static int _emac_phy_autonegotiation(ETHPHY_CFG_Type *cfg)
             }
 
             if (!(--timeout)) {
-                printf("%s:%d\r\n", __func__, __LINE__);
+                log_info("%s:%d\r\n", __func__, __LINE__);
                 return TIMEOUT;
             }
         }
 
         //BL702_Delay_MS(5000);
         if (SUCCESS != emac_phy_read(PHY_LPA, &lpa)) {
-            printf("%s:%d\r\n", __func__, __LINE__);
+            log_info("%s:%d\r\n", __func__, __LINE__);
             return ERROR;
         }
 
@@ -509,14 +507,14 @@ static int _emac_phy_linkstatus(void)
 {
     uint16_t phy_bsr = 0;
 
-    //MSG("Read link\r\n");
+    //log_info("Read link\r\n");
     if (SUCCESS != emac_phy_read(PHY_BSR, &phy_bsr)) {
-        printf("%s:%d\r\n", __func__, __LINE__);
+        log_info("%s:%d\r\n", __func__, __LINE__);
         return ERROR;
     }
 
     if (!(PHY_LINKED_STATUS & phy_bsr)) {
-        printf("%s:%d\r\n", __func__, __LINE__);
+        log_info("%s:%d\r\n", __func__, __LINE__);
         return ERROR;
     }
 
@@ -593,24 +591,24 @@ static void _emac_phy_if_init(void)
             err = _emac_phy_linkup(&phyCfg);
             log_info("speed %d\r\n", phyCfg.speed);
             if(TIMEOUT==err){
-                MSG("PHY Init timeout\r\n");
+                log_info("PHY Init timeout\r\n");
                 while(1);
             }
             if(ERROR==err){
-                MSG("PHY Init error\r\n");
+                log_info("PHY Init error\r\n");
                 while(1);
             }
             if(phyCfg.duplex==EMAC_MODE_FULLDUPLEX){
-                MSG("EMAC_MODE_FULLDUPLEX\r\n");
+                log_info("EMAC_MODE_FULLDUPLEX\r\n");
             }else{
-                MSG("EMAC_MODE_HALFDUPLEX\r\n");
+                log_info("EMAC_MODE_HALFDUPLEX\r\n");
             }
             if(phyCfg.speed==EMAC_SPEED_100M){
-                MSG("EMAC_SPEED_100M\r\n");
+                log_info("EMAC_SPEED_100M\r\n");
             }else{
-                MSG("EMAC_SPEED_50M\r\n");
+                log_info("EMAC_SPEED_50M\r\n");
             }
-            MSG("PHY Init done\r\n");
+            log_info("PHY Init done\r\n");
             if(p_eth_callback){
                 p_eth_callback(ETH_INIT_STEP_LINKUP);
             }
@@ -673,7 +671,7 @@ void borad_eth_init(uint8_t*addr)
     GLB_AHB_Slave1_Clock_Gate(0,BL_AHB_SLAVE1_EMAC);
 	EMAC_Interrupt_Init();
     emac_init(&emacCfg);
-    MSG("emac_init sucess\r\n");
+    log_info("emac_init sucess\r\n");
     EMAC_BD_Init();
     emac_enable();
     //bflb_platform_init_time();
@@ -719,7 +717,7 @@ static void low_level_init(struct netif *netif)
     netif->flags = NETIF_FLAG_BROADCAST|NETIF_FLAG_ETHARP|NETIF_FLAG_LINK_UP|NETIF_FLAG_IGMP;
     eth_get_mac(netif->hwaddr);
 
-    printf("low level init\r\n");
+    log_info("low level init\r\n");
 
 #if LWIP_IPV6
       netif->flags |= (NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6);
@@ -800,7 +798,7 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
     struct unsent_item *item;
 
     if (pbuf_header(p, PBUF_LINK_ENCAPSULATION_HLEN)) {
-        printf("[TX] Reserve room failed for header\r\n");
+        log_info("[TX] Reserve room failed for header\r\n");
         return ERR_IF;
     }
     item = (struct unsent_item *)(((uintptr_t)(p->payload + 3))&(~3));
@@ -831,7 +829,7 @@ err_t eth_init(struct netif *netif)
     netif->linkoutput = low_level_output;
     log_info("eth_init.\r\n");
     low_level_init(netif);
-    xTaskCreate(unsent_recv_task, (const char *)"Ontput_Unsent_queue", 1024, netif, 15, &DequeueTaskHandle);
+    xTaskCreate(unsent_recv_task, (const char *)"Ontput_Unsent_queue", 1024, netif, 29, &DequeueTaskHandle);
 
     return ERR_OK;
 }
