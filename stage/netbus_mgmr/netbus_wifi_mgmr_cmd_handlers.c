@@ -198,7 +198,12 @@ static void handle_connect_ap(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_
     wifi_mgmr_sta_autoconnect_enable();
     wifi_interface = wifi_mgmr_sta_enable();
     blog_info("connect ssid %s, password %s\r\n", ccmd->ssid, ccmd->password);
-    wifi_mgmr_sta_connect(wifi_interface, (char *)ccmd->ssid, (char *)ccmd->password, NULL, NULL, 0, 0);
+    if (strlen((char *)ccmd->password)) {
+        wifi_mgmr_sta_connect(wifi_interface, (char *)ccmd->ssid, (char *)ccmd->password, NULL, NULL, 0, 0);
+    }
+    else {
+        wifi_mgmr_sta_connect(wifi_interface, (char *)ccmd->ssid, NULL, NULL, NULL, 0, 0);
+    }
 ret:
     vPortFree(cmd->data_ptr);
 }

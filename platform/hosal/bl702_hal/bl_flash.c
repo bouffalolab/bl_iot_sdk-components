@@ -132,6 +132,10 @@ int bl_flash_read(uint32_t addr, uint8_t *dst, int len)
         return -1;
     }
 
+    if (0 == len) {
+    	return 0;
+    }
+
 #ifdef CFG_USE_PSRAM
     if(IS_PSARAM((uint32_t)dst)){
         _data = (uint8_t*)pvPortMalloc(len);
