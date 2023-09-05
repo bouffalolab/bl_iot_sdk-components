@@ -6,19 +6,23 @@
 #ifdef BL616
 #include <bl616_romdriver_e907.h>
 #define MFD_XIP_BASE BL616_FLASH_XIP_BASE
+#define MFD_XIP_END BL616_FLASH_XIP_END
 #elif defined BL602 || defined BL702 || defined BL702L
 #ifdef BL602
 #include <bl602.h>
 #include <bl602_romdriver.h>
 #define MFD_XIP_BASE BL602_FLASH_XIP_BASE
+#define MFD_XIP_END BL602_FLASH_XIP_END
 #elif defined BL702
 #include <bl702.h>
 #include <bl702_romdriver.h>
 #define MFD_XIP_BASE BL702_FLASH_XIP_BASE
+#define MFD_XIP_END BL702_FLASH_XIP_END
 #else
 #include <bl702l.h>
 #include <bl702l_romdriver.h>
 #define MFD_XIP_BASE BL702L_FLASH_XIP_BASE
+#define MFD_XIP_END BL702L_FLASH_XIP_END
 #endif
 #include <softcrc.h>
 #include <hal_boot2.h>
@@ -96,7 +100,7 @@ FactoryData_t g_mfd_var;
 
 extern bool efuse_slot_decrypt(uint8_t *p, uint32_t len, uint8_t *pIv);
 
-#define IS_FLASH_ADDR(x) ((uint32_t)x > (uint32_t)MFD_XIP_BASE)
+#define IS_FLASH_ADDR(x) ((uint32_t)MFD_XIP_BASE <= (uint32_t)x && (uint32_t)x < (uint32_t)MFD_XIP_END )
 
 static bool mfd_parsePartitionData(uint32_t size, uint8_t *pData, uint8_t *pIv) 
 {

@@ -83,27 +83,27 @@ bool efuse_slot_decrypt(uint8_t *p, uint32_t len, uint32_t *pIv)
 bool efuse_slot_decrypt(uint8_t *p, uint32_t len, uint32_t *pIv)
 {
     SEC_Eng_AES_Ctx aesCtx;
-#if defined BL702L
-    uint8_t aes_key[16] = {0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78};
-#else
     uint8_t keySel = 1;
-#endif
 
     if (0 == len) {
         return false;
     }
 
+#if defined BL702L
+    Sec_Eng_Group0_Request_AES_Access();
+#endif
+
     Sec_Eng_AES_Enable_BE(SEC_ENG_AES_ID0);
 
     Sec_Eng_AES_Init(&aesCtx, SEC_ENG_AES_ID0, SEC_ENG_AES_CBC, SEC_ENG_AES_KEY_128BITS, SEC_ENG_AES_DECRYPTION);
-#if defined BL702L
-    Sec_Eng_AES_Set_Key_IV_BE(SEC_ENG_AES_ID0, SEC_ENG_AES_KEY_SW, aes_key, (const uint8_t *)pIv);
-#else
     Sec_Eng_AES_Set_Key_IV_BE(SEC_ENG_AES_ID0, SEC_ENG_AES_KEY_HW, &keySel, (const uint8_t *)pIv);
-#endif
 
     Sec_Eng_AES_Crypt(&aesCtx, SEC_ENG_AES_ID0, p, len, p);
     Sec_Eng_AES_Finish(SEC_ENG_AES_ID0);
+
+#if defined BL702L
+    Sec_Eng_Group0_Release_AES_Access();
+#endif
 
     return true;
 }
