@@ -13,11 +13,15 @@
 #include <bl602_romdriver.h>
 #define MFD_XIP_BASE BL602_FLASH_XIP_BASE
 #define MFD_XIP_END BL602_FLASH_XIP_END
+#define MFD_WRAM_START BL602_WRAM_BASE
+#define MFD_WRAM_END BL602_WRAM_END
 #elif defined BL702
 #include <bl702.h>
 #include <bl702_romdriver.h>
 #define MFD_XIP_BASE BL702_FLASH_XIP_BASE
 #define MFD_XIP_END BL702_FLASH_XIP_END
+#define MFD_WRAM_START BL702_WRAM_BASE
+#define MFD_WRAM_END BL702_WRAM_END
 #else
 #include <bl702l.h>
 #include <bl702l_romdriver.h>
@@ -151,6 +155,11 @@ static bool mfd_parsePartitionData(uint32_t size, uint8_t *pData, uint8_t *pIv)
 static bool mfd_parseData(void) 
 {
     uint32_t mfd_decrypt_buf[2048 / sizeof(uint32_t)];
+
+#ifdef MFD_WRAM_START
+    /** mfd_decrypt_buf requires OCRAM memory for bl602 and bl702 */
+    configASSERT(MFD_WRAM_START <= (uint32_t) mfd_decrypt_buf && (uint32_t) mfd_decrypt_buf < MFD_WRAM_END);
+#endif
 
 /** mfd cipher data and plaintext data structure as following:
  * 0xaa 0xaa 0xaa 0xaa  : the length of cipher data
