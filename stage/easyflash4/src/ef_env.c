@@ -1919,6 +1919,7 @@ static bool env_cache_cb (env_node_obj_t env, void *arg1, void *arg2)
 
 void ef_load_env_cache(void) 
 {
+    memset(env_cache_table, 0 ,sizeof(env_cache_table));
     ef_print_env_cb(env_cache_cb);
 }
 #endif
