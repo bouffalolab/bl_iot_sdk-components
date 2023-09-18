@@ -256,12 +256,6 @@ int8_t otPlatRadioGetReceiveSensitivity(otInstance *aInstance)
 }
 void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64) 
 {
-    int index = 0;
-
-    // Set the MAC Address Block Larger (MA-L) formerly called OUI.
-    aIeeeEui64[index++] = (OPENTHREAD_CONFIG_STACK_VENDOR_OUI >> 16) & 0xff;
-    aIeeeEui64[index++] = (OPENTHREAD_CONFIG_STACK_VENDOR_OUI >> 8) & 0xff;
-    aIeeeEui64[index++] = OPENTHREAD_CONFIG_STACK_VENDOR_OUI & 0xff;
     bl_wireless_mac_addr_get(aIeeeEui64);
 }
 
