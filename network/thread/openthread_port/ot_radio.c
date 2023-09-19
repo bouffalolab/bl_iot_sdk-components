@@ -256,7 +256,21 @@ int8_t otPlatRadioGetReceiveSensitivity(otInstance *aInstance)
 }
 void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64) 
 {
+    uint8_t temp;
+
     bl_wireless_mac_addr_get(aIeeeEui64);
+
+    for (int i = 0; i < OT_EXT_ADDRESS_SIZE / 2; i ++) {
+        temp = aIeeeEui64[OT_EXT_ADDRESS_SIZE - i - 1];
+        aIeeeEui64[OT_EXT_ADDRESS_SIZE - i - 1] = aIeeeEui64[i];
+        aIeeeEui64[i] = temp;
+    }
+
+    if (aIeeeEui64[OT_EXT_ADDRESS_SIZE - 1] == 0 && aIeeeEui64[OT_EXT_ADDRESS_SIZE - 2] == 0) {
+        aIeeeEui64[OT_EXT_ADDRESS_SIZE - 1] = aIeeeEui64[OT_EXT_ADDRESS_SIZE - 3];
+        aIeeeEui64[OT_EXT_ADDRESS_SIZE - 2] = aIeeeEui64[OT_EXT_ADDRESS_SIZE - 4];
+        aIeeeEui64[OT_EXT_ADDRESS_SIZE - 3] = aIeeeEui64[OT_EXT_ADDRESS_SIZE - 5];
+    }
 }
 
 void otPlatRadioSetPanId(otInstance *aInstance, otPanId aPanId) 
