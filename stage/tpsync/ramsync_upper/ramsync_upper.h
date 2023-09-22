@@ -38,7 +38,6 @@
 #include <queue.h>
 #include <event_groups.h>
 
-#define DONT_CHANGE 0
 
 /* ramsync_upper config macro */
 #define TP_ST_MAGIC              (0x11223344)
@@ -46,7 +45,7 @@
 #define TP_TXDESC_NUM            (2)
 #define TP_RXPAYLOAD_NUM         (2)
 #define TP_RXDESC_NUM            (2)
-#define TP_PAYLOAD_LEN           (1024 + 512 + 128)// 512
+#define TP_PAYLOAD_LEN           (1024 + 512)// 512
 
 #define RAMSYNC_TX_STACK_SIZE    (1024)// Bytes
 #define RAMSYNC_RX_STACK_SIZE    (1024)// Bytes
@@ -69,12 +68,9 @@
 #define URAMSYNC_SLAVE_DEV_TYPE  (2)
 
 /* Structure for tp_uramsync_t */
-typedef struct __tp_status {
+typedef struct __tp_payload {
     uint32_t magic;
     uint32_t rseq;
-} tp_st_t;
-
-typedef struct __tp_payload {
     uint32_t len;
     uint32_t seq;
     uint8_t buf[TP_PAYLOAD_LEN];
@@ -82,12 +78,10 @@ typedef struct __tp_payload {
 } tp_payload_t;
 
 typedef struct __tp_txbuf {
-    tp_st_t st;
     tp_payload_t payload[TP_TXPAYLOAD_NUM];
 } tp_txbuf_t;
 
 typedef struct __tp_rxbuf {
-    tp_st_t st;
     tp_payload_t payload[TP_RXPAYLOAD_NUM];
 } tp_rxbuf_t;
 
@@ -104,25 +98,15 @@ typedef struct __tp_buf {
     /* tx/rx desc hdr */
     desc_msg_t tx_desc;
     desc_msg_t rx_desc;
-#if DONT_CHANGE
-    /* for rx notify */
-    void *emptyslot_evt;
-    StaticEventGroup_t xEventGroupBuffer;
-#else
     SemaphoreHandle_t tx_sem;
     SemaphoreHandle_t rx_sem;
-#endif
 
     /* calulate crc for rx */
     tp_payload_t *p_rx_cache;
 
     /* tx/rx task */
     TaskHandle_t tx_thdr;
-    StaticTask_t tx_task;
-    //uint32_t tx_stack[RAMSYNC_TX_STACK_SIZE/sizeof(uint32_t)];
     TaskHandle_t rx_thdr;
-    StaticTask_t rx_task;
-    //uint32_t rx_stack[RAMSYNC_RX_STACK_SIZE/sizeof(uint32_t)];
 
     TaskHandle_t reset_thdr;
 

@@ -83,10 +83,7 @@ static lramsync_spi_config_t _spi_cfg = {
 #if defined BL702
     .spi_speed = 18000000,
 #elif defined BL702L
-    /** SPI_SetClock use 80M for freqency calculation;
-     * 32M for 16M; 25M for 10.67M; 20M for 8M;
-     *  */
-    .spi_speed = 8000000,
+    .spi_speed = 16000000,
 #endif
     .miso = TPSYNC_MST_MISO_PIN,
     .mosi = TPSYNC_MST_MOSI_PIN,
@@ -197,11 +194,11 @@ static ATTR_TCM_SECTION void _spi_int_handler_rx(
 
 static void _spi_gpio_init(const lramsync_spi_config_t *config)
 {
-	GLB_GPIO_Type gpiopins[4];
-    gpiopins[0] = config->cs;
-    gpiopins[1] = config->clk;
-    gpiopins[2] = config->mosi;
-    gpiopins[3] = config->miso;
+    GLB_GPIO_Type gpiopins[3];
+
+    gpiopins[0] = config->clk;
+    gpiopins[1] = config->mosi;
+    gpiopins[2] = config->miso;
     GLB_GPIO_Func_Init(GPIO_FUN_SPI, gpiopins,
                        sizeof(gpiopins) / sizeof(gpiopins[0]));
     GLB_Set_SPI_0_ACT_MOD_Sel(GLB_SPI_PAD_ACT_AS_MASTER);
@@ -215,13 +212,18 @@ static int _spi_hw_init(const lramsync_spi_config_t *config)
 
     spi_id = config->port;
 
-#ifdef BL702
     SPI_ClockCfg_Type clockcfg;
     uint8_t clk_div;
 
+#ifdef BL702
+    GLB_Set_SPI_CLK(ENABLE, 0);
+#elif defined(BL702L)
+    spicfg.slavePin = SPI_SLAVE_PIN_3;
+    GLB_Set_SPI_CLK(ENABLE, GLB_SPI_CLK_SRC_BCLK, 0);
+#endif /* BL702L */
+
     blog_info("core clk %ld, bclk div %d\r\n", SystemCoreClockGet(), GLB_Get_BCLK_Div());
     clk_div = (uint8_t)((SystemCoreClockGet()/(GLB_Get_BCLK_Div()+1)) / 2 / config->spi_speed);
-    GLB_Set_SPI_CLK(ENABLE, 0);
 
     clockcfg.startLen = clk_div;
     clockcfg.stopLen = clk_div;
@@ -232,16 +234,6 @@ static int _spi_hw_init(const lramsync_spi_config_t *config)
 
     fifocfg.txFifoThreshold = 1;
     fifocfg.rxFifoThreshold = 1;
-
-#elif defined BL702L
-    spicfg.slavePin = SPI_SLAVE_PIN_4;
-
-    // GLB_Set_SPI_CLK(ENABLE, GLB_SPI_CLK_SRC_BCLK, 0);
-    SPI_SetClock(spi_id,config->spi_speed);
-
-    fifocfg.txFifoThreshold = 0;
-    fifocfg.rxFifoThreshold = 0;
-#endif
 
     /* spi config */
     spicfg.deglitchEnable = DISABLE;
@@ -287,7 +279,6 @@ static int _spi_dma_init(lramsync_ctx_t *ctx)
     int ret;
     DMA_LLI_Cfg_Type txllicfg;
     DMA_LLI_Cfg_Type rxllicfg;
-    const lramsync_spi_config_t *config = ctx->cfg;
     struct _ramsync_low_priv *priv;
 
     if (ctx->dma_tx_chan == -1) {
@@ -337,8 +328,7 @@ static int _spi_dma_init(lramsync_ctx_t *ctx)
     DMA_LLI_Update(DMA0_ID, ctx->dma_tx_chan, (uint32_t)&priv->tx_lli[0]);
     hosal_dma_irq_callback_set(ctx->dma_tx_chan, _spi_int_handler_tx, ctx);
 #endif
-
-    SPI_Enable(config->port, SPI_WORK_MODE_MASTER);
+    
     return 0;
 }
 
@@ -355,8 +345,10 @@ void lramsync_callback_register(
 
 void lramsync_start(lramsync_ctx_t *ctx)
 {
-	hosal_dma_chan_start(ctx->dma_rx_chan);
-	hosal_dma_chan_start(ctx->dma_tx_chan);
+    hosal_dma_chan_start(ctx->dma_rx_chan);
+    hosal_dma_chan_start(ctx->dma_tx_chan);
+	
+    SPI_Enable(ctx->cfg->port, SPI_WORK_MODE_MASTER);
 }
 
 void lramsync_reset(lramsync_ctx_t *ctx)
@@ -364,16 +356,18 @@ void lramsync_reset(lramsync_ctx_t *ctx)
     struct _ramsync_low_priv *priv;
 
     priv = (struct _ramsync_low_priv *)ctx->priv;
-
+    
     blog_info("lramsync_reset\r\n");
+
+    SPI_Disable(ctx->cfg->port, SPI_WORK_MODE_MASTER);
+    hosal_dma_chan_stop(ctx->dma_tx_chan);
+    hosal_dma_chan_stop(ctx->dma_rx_chan);
+
 #ifdef BL702
     GLB_AHB_Slave1_Reset(BL_AHB_SLAVE1_SPI);
 #elif defined BL702L
     GLB_AHB_MCU_Software_Reset(GLB_AHB_MCU_SW_SPI);
 #endif
-    SPI_Disable(ctx->cfg->port, SPI_WORK_MODE_MASTER);
-	hosal_dma_chan_stop(ctx->dma_tx_chan);
-	hosal_dma_chan_stop(ctx->dma_rx_chan);
 
     _spi_gpio_init(ctx->cfg);
     bl_gpio_output_set(ctx->cfg->cs, 1);
@@ -391,11 +385,9 @@ void lramsync_reset(lramsync_ctx_t *ctx)
 
     SPI_ClrTxFifo(ctx->cfg->port);
     SPI_ClrRxFifo(ctx->cfg->port);
-    SPI_Enable(ctx->cfg->port, SPI_WORK_MODE_MASTER);
     bl_gpio_output_set(ctx->cfg->cs, 0);
 
-    hosal_dma_chan_start(ctx->dma_rx_chan);
-    hosal_dma_chan_start(ctx->dma_tx_chan);
+    lramsync_start(ctx);
 }
 
 void lramsync_deinit(lramsync_ctx_t *ctx)
@@ -410,14 +402,24 @@ void lramsync_deinit(lramsync_ctx_t *ctx)
 
     SPI_Disable(ctx->cfg->port, SPI_WORK_MODE_MASTER);
 
-	hosal_dma_chan_release(ctx->dma_tx_chan);
-	hosal_dma_chan_release(ctx->dma_rx_chan);
+    hosal_dma_chan_release(ctx->dma_tx_chan);
+    hosal_dma_chan_release(ctx->dma_rx_chan);
 
-    vPortFree(ctx->node_rx);
-    vPortFree(ctx->node_tx);
-    vPortFree(priv->tx_lli);
-    vPortFree(priv->rx_lli);
-    vPortFree(ctx->priv);
+    if(ctx->node_rx){
+        vPortFree(ctx->node_rx);
+    }
+    if(ctx->node_tx){
+        vPortFree(ctx->node_tx);
+    }
+    if(priv->tx_lli){
+        vPortFree(priv->tx_lli);
+    }
+    if(priv->rx_lli){
+        vPortFree(priv->rx_lli);
+    }
+    if(ctx->priv){
+        vPortFree(ctx->priv);
+    }
 }
 
 void lramsync_init(

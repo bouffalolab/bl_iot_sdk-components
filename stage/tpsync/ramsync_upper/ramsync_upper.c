@@ -60,18 +60,6 @@
 #define EVT_EMPTYSLOT_BIT      (1<<0)
 #define EVT_TX_DONE_BIT        (1<<1)
 
-#if defined (BL702L)
-/** For BL702L
- *  1. region [0x42028000, 0x4202C000] is reserved for rf calibration. 
- *     malloc may put these buffers in this region.
- *  2. TCM data region is suitable for these buffers.
- *  3. seperate variable can be placed at any place with linker file
- *   */
-static tp_txbuf_t    g_uramsync_tx;
-static tp_rxbuf_t    g_uramsync_rx;
-static tp_payload_t  g_uramsync_rx_cache;
-#endif
-
 #if RAMSYNC_FAST_COPY_ENABLE
 static void *ramsync_fast_memcpy(void *dst, const void *src, uint32_t count)
 {
@@ -135,18 +123,18 @@ void uramsync_dump(tp_uramsync_t *rs)
 {
     uint32_t i;
 
-    tpdbg_log("rs->p_tx->st.magic       = 0x%08lx\r\n" , rs->p_tx->st.magic);
-    tpdbg_log("rs->p_tx->st.rseq        = %ld\r\n" , rs->p_tx->st.rseq);
     for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
+        tpdbg_log("rs->p_tx->payload[%ld].magic = 0x%08lx\r\n" , rs->p_tx->payload[i].magic);
+        tpdbg_log("rs->p_tx->payload[%ld].rseq = %ld\r\n" , rs->p_tx->payload[i].rseq);
         tpdbg_log("rs->p_tx->payload[%ld].len = %ld\r\n" , i, rs->p_tx->payload[i].len);
         tpdbg_log("rs->p_tx->payload[%ld].seq = %ld\r\n" , i, rs->p_tx->payload[i].seq);
         tpdbg_log("rs->p_tx->payload[%ld].crc = 0x%08lx\r\n" , i, rs->p_tx->payload[i].crc);
         tpdbg_buf("tx", &rs->p_tx->payload[i], 20);
     }
 
-    tpdbg_log("rs->p_rx->st.magic       = 0x%08lx\r\n" , rs->p_rx->st.magic);
-    tpdbg_log("rs->p_rx->st.rseq        = %ld\r\n" , rs->p_rx->st.rseq);
     for (i = 0; i < TP_RXPAYLOAD_NUM; i++) {
+        tpdbg_log("rs->p_rx->payload[%ld].magic = 0x%08lx\r\n" , rs->p_rx->payload[i].magic);
+        tpdbg_log("rs->p_rx->payload[%ld].rseq = %ld\r\n" , rs->p_rx->payload[i].rseq);
         tpdbg_log("rs->p_rx->payload[%ld].len = %ld\r\n" , i, rs->p_rx->payload[i].len);
         tpdbg_log("rs->p_rx->payload[%ld].seq = %ld\r\n" , i, rs->p_rx->payload[i].seq);
         tpdbg_log("rs->p_rx->payload[%ld].crc = 0x%08lx\r\n" , i, rs->p_rx->payload[i].crc);
@@ -164,9 +152,11 @@ static void __uramsync_reset_logic(tp_uramsync_t *uramsync)
 {
     /* slot */
     memset(uramsync->p_tx, 0, sizeof(tp_txbuf_t));
-    uramsync->p_tx->st.magic = TP_ST_MAGIC;
-
     memset(uramsync->p_rx, 0, sizeof(tp_rxbuf_t));
+
+    for (int i = 0; i < TP_TXPAYLOAD_NUM; i++) {
+        uramsync->p_tx->payload[i].magic = TP_ST_MAGIC;
+    }
 
     /* local sequnce */
     memset(&uramsync->tx_seq, 0, sizeof(uint32_t));
@@ -175,12 +165,8 @@ static void __uramsync_reset_logic(tp_uramsync_t *uramsync)
     // need tx_desc rx_desc set empty???
 
     /* for rx notify */
-    #if DONT_CHANGE
-    xEventGroupClearBits(uramsync->emptyslot_evt, EVT_EMPTYSLOT_BIT);
-    #else
     xSemaphoreTake(uramsync->tx_sem, 0);
     xSemaphoreTake(uramsync->rx_sem, 0);
-    #endif
 
     /* calulate crc for rx */
     memset(uramsync->p_rx_cache, 0, sizeof(tp_payload_t));
@@ -189,7 +175,6 @@ static void __uramsync_reset_logic(tp_uramsync_t *uramsync)
 static void ramsynck_reset_entry(void *arg)
 {
     tp_uramsync_t *uramsync = (tp_uramsync_t *)arg;
-    uint32_t i;
 
     tpdbg_log("[%s][tp_reset_task] 1. wait tx rx enter loop\r\n", uramsync->name);
 
@@ -209,20 +194,12 @@ static void ramsynck_reset_entry(void *arg)
 
             while (1) {
                 lramsync_reset(&uramsync->hw);
-                vTaskDelay(pdMS_TO_TICKS(2));// wait for one slot sync complete
-                if (TP_ST_MAGIC == uramsync->p_rx->st.magic) {
+                vTaskDelay(pdMS_TO_TICKS(1000));// wait for one slot sync complete
+                #if (TP_TXPAYLOAD_NUM > 1)
+                if (TP_ST_MAGIC == uramsync->p_rx->payload[0].magic) {
                     break;
                 }
-                for (i = 0; i < 1; i++) {
-                    tpdbg_log("[%s][tp_reset_task] sync clock error, wait %ldS\r\n", uramsync->name, i); // delete it when test pass
-                    vTaskDelay(pdMS_TO_TICKS(1000));                            // delete it when test pass
-                    if (TP_ST_MAGIC == uramsync->p_rx->st.magic) {
-                        break;
-                    }
-                }
-                if (TP_ST_MAGIC == uramsync->p_rx->st.magic) {
-                    break;
-                }
+                #endif /* (TP_TXPAYLOAD_NUM > 1) */
             }
             tpdbg_log("[%s][tp_reset_task] 4. update status\r\n", uramsync->name);
         } else {
@@ -273,33 +250,24 @@ static void reset_signal(tp_uramsync_t *uramsync)
 }
 
 /*---------------------- app module -----------------------*/
-static void __ramsync_low_cb(void *arg)
+static void __ramsync_low_rx_cb(void *arg)
 {
     tp_uramsync_t *uramsync = (tp_uramsync_t *)arg;
 
     BaseType_t xHigherPriorityTaskWoken, xResult;
-#if DONT_CHANGE
-    if (uramsync->emptyslot_evt) {
-        if (xPortIsInsideInterrupt()) {
-            xHigherPriorityTaskWoken = pdFALSE;
-            xResult = xEventGroupSetBitsFromISR(
-                    uramsync->emptyslot_evt,    /* The event group being updated. */
-                    EVT_EMPTYSLOT_BIT,          /* The bits being set. */
-                    &xHigherPriorityTaskWoken
-            );
+    uint32_t flag = 0;
 
-            /* Was the message posted successfully? */
-            if( xResult != pdFAIL ) {
-                portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
-            }
-        } else {
-            xEventGroupSetBits(
-                    uramsync->emptyslot_evt,    /* The event group being updated. */
-                    EVT_EMPTYSLOT_BIT           /* The bits being set. */
-            );
+    for (int i = 0; i < TP_TXPAYLOAD_NUM; i++) {
+        if (uramsync->p_rx->payload[i].magic == TP_ST_MAGIC && 
+            ((uramsync->p_rx->payload[i].len <= (TP_PAYLOAD_LEN + 4 + 4)) &&
+            (uramsync->p_rx->payload[i].seq == (uramsync->p_tx->payload[i].rseq + 1)))) {
+            flag = 1;
         }
     }
-#else
+    if(!(flag || uramsync->p_rx->payload[0].magic != TP_ST_MAGIC)){
+        return;
+    }
+    
     if (uramsync->rx_sem) {
         if (xPortIsInsideInterrupt()) {
             xHigherPriorityTaskWoken = pdFALSE;
@@ -316,7 +284,6 @@ static void __ramsync_low_cb(void *arg)
              xSemaphoreGive(uramsync->rx_sem);
         }
     }
-#endif
 }
 
 static void __ramsync_low_tx_cb(void *arg)
@@ -324,27 +291,7 @@ static void __ramsync_low_tx_cb(void *arg)
     tp_uramsync_t *uramsync = (tp_uramsync_t *)arg;
 
     BaseType_t xHigherPriorityTaskWoken, xResult;
-#if DONT_CHANGE
-    if (uramsync->emptyslot_evt) {
-        if (xPortIsInsideInterrupt()) {
-            xHigherPriorityTaskWoken = pdFALSE;
-            xResult = xEventGroupSetBitsFromISR(
-                    uramsync->emptyslot_evt,    /* The event group being updated. */
-                    EVT_TX_DONE_BIT,          /* The bits being set. */
-                    &xHigherPriorityTaskWoken
-            );
 
-            /* Was the message posted successfully? */
-            if( xResult != pdFAIL ) {
-                portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
-            }
-        } else {
-            xEventGroupSetBits(
-                    uramsync->emptyslot_evt,      /* The event group being updated. */
-                    EVT_TX_DONE_BIT);           /* The bits being set. */
-        }
-    }
-#else
     if (uramsync->tx_sem) {
         if (xPortIsInsideInterrupt()) {
             xHigherPriorityTaskWoken = pdFALSE;
@@ -361,7 +308,6 @@ static void __ramsync_low_tx_cb(void *arg)
              xSemaphoreGive(uramsync->tx_sem);
         }
     }
-#endif
 }
 
 static void __reset_signal_cb(void *arg)
@@ -508,20 +454,14 @@ static int __ramsync_low_init(tp_uramsync_t *arg, uint32_t type)
     uint32_t i;
     tp_uramsync_t *uramsync = (tp_uramsync_t *)arg;
 
-    node_mem_t node_txbuf[TP_TXPAYLOAD_NUM * 2];
-    node_mem_t node_rxbuf[TP_RXPAYLOAD_NUM * 2];
+    node_mem_t node_txbuf[TP_TXPAYLOAD_NUM];
+    node_mem_t node_rxbuf[TP_RXPAYLOAD_NUM];
 
     memset(uramsync, 0, sizeof(tp_uramsync_t));
 
-#if defined (BL702L)
-    uramsync->p_tx = &g_uramsync_tx;
-    uramsync->p_rx = &g_uramsync_rx;
-    uramsync->p_rx_cache = &g_uramsync_rx_cache;
-#else
     uramsync->p_tx = (tp_txbuf_t *)pvPortMalloc(sizeof(tp_txbuf_t));
     uramsync->p_rx = (tp_rxbuf_t *)pvPortMalloc(sizeof(tp_rxbuf_t));
-    uramsync->p_rx_cache = (tp_payload_t *)pvPortMalloc(sizeof(tp_payload_t));
-#endif
+    uramsync->p_rx_cache = (tp_payload_t *)malloc(sizeof(tp_payload_t));
 
     memset(uramsync->p_tx, 0, sizeof(tp_txbuf_t));
     memset(uramsync->p_rx, 0, sizeof(tp_rxbuf_t));
@@ -530,21 +470,19 @@ static int __ramsync_low_init(tp_uramsync_t *arg, uint32_t type)
     uramsync->devtype = type;
 
     for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
-        node_txbuf[i * 2].buf = &uramsync->p_tx->st;
-        node_txbuf[i * 2].len = sizeof(tp_st_t);
-        node_txbuf[i * 2 + 1].buf = &uramsync->p_tx->payload[i];
-        node_txbuf[i * 2 + 1].len = sizeof(tp_payload_t);
+        node_txbuf[i].buf = &uramsync->p_tx->payload[i];
+        node_txbuf[i].len = sizeof(tp_payload_t);
     }
 
     for (i = 0; i < TP_RXPAYLOAD_NUM; i++) {
-        node_rxbuf[i * 2].buf = &uramsync->p_rx->st;
-        node_rxbuf[i * 2].len = sizeof(tp_st_t);
-        node_rxbuf[i * 2 + 1].buf = &uramsync->p_rx->payload[i];
-        node_rxbuf[i * 2 + 1].len = sizeof(tp_payload_t);
+        node_rxbuf[i].buf = &uramsync->p_rx->payload[i];
+        node_rxbuf[i].len = sizeof(tp_payload_t);
     }
 
     /* set magic */
-    uramsync->p_tx->st.magic = TP_ST_MAGIC;
+    for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
+        uramsync->p_tx->payload[i].magic = TP_ST_MAGIC;
+    }
 
 #if defined(CFG_USE_DTS_SPI_CONFIG)
     lramsync_spi_config_t* spi_cfg = NULL;
@@ -566,20 +504,20 @@ static int __ramsync_low_init(tp_uramsync_t *arg, uint32_t type)
         strncpy(uramsync->name, "mst", sizeof(uramsync->name) - 1);
         lramsync_init(
             &uramsync->hw,
-            node_txbuf, TP_TXPAYLOAD_NUM * 2,
+            node_txbuf, TP_TXPAYLOAD_NUM,
             __ramsync_low_tx_cb, uramsync,
-            node_rxbuf, TP_RXPAYLOAD_NUM * 2,
-            __ramsync_low_cb, uramsync,
+            node_rxbuf, TP_RXPAYLOAD_NUM,
+            __ramsync_low_rx_cb, uramsync,
             NULL,NULL 
             );
     } else if (URAMSYNC_SLAVE_DEV_TYPE == uramsync->devtype) {
         strncpy(uramsync->name, "slv", sizeof(uramsync->name) - 1);
         lramsync_init(
             &uramsync->hw,
-            node_txbuf, TP_TXPAYLOAD_NUM * 2,
+            node_txbuf, TP_TXPAYLOAD_NUM,
             __ramsync_low_tx_cb, uramsync,
-            node_rxbuf, TP_RXPAYLOAD_NUM * 2,
-            __ramsync_low_cb, uramsync,
+            node_rxbuf, TP_RXPAYLOAD_NUM,
+            __ramsync_low_rx_cb, uramsync,
             __reset_signal_cb, uramsync
             );
     } else {
@@ -592,7 +530,6 @@ static int __ramsync_low_init(tp_uramsync_t *arg, uint32_t type)
     }
 #endif /* CFG_USE_DTS_SPI_CONFIG */
 
-    lramsync_start(&uramsync->hw);
     reset_signal_first_init(uramsync);
 
     return 0;
@@ -603,6 +540,9 @@ static int __ramsync_low_deinit(tp_uramsync_t *arg)
     tp_uramsync_t *uramsync = (tp_uramsync_t *)arg;
 
     lramsync_deinit(&uramsync->hw);
+    vPortFree( uramsync->p_tx);
+    vPortFree(uramsync->p_rx);
+    free(uramsync->p_rx_cache);
 
     return 0;
 }
@@ -626,6 +566,7 @@ static void  uramsync_task_tx(void *arg)
     tpdbg_log("[%s] uramsync_task_tx\r\n", uramsync->name);
 
     while (1) {
+first_point:
         /* ensure status tx enter loop */
         while (URAMSYNC_STATUE_RUNNING != uramsync->status) {
             if (URAMSYNC_STATUE_IDLE == uramsync->status) {
@@ -636,19 +577,12 @@ static void  uramsync_task_tx(void *arg)
 
         /* ensure desc have valid data */
         while (1) {
-            while (1) {
-                //desc_peek(&uramsync->tx_desc, &lentmp, DESC_FOREVER);
-                desc_peek(&uramsync->tx_desc, &lentmp, POLL_UNIT_TIME_MS);
-                if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-                    break;
-                }
-                if (0 != lentmp) {
-                    break;
-                }
-            }
-
+            desc_peek(&uramsync->tx_desc, &lentmp, POLL_UNIT_TIME_MS);
             if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-                break;
+                goto first_point;
+            }
+            if (0 == lentmp) {
+                continue;
             }
 
             if (lentmp > TP_PAYLOAD_LEN) {
@@ -659,24 +593,13 @@ static void  uramsync_task_tx(void *arg)
             //tpdbg_log("[%s] [task_tx] 1. ensure desc have valid data.\r\n", uramsync->name);
             break;
         }
-        if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-            continue;
-        }
 
         /* ensure empty slot */
         ensure_empty_slot = 0;
         while (1) {
-            #if DONT_CHANGE
-            xEventGroupWaitBits(uramsync->emptyslot_evt,
-                             EVT_TX_DONE_BIT,
-                             pdTRUE,/* should be cleared before returning */
-                             pdTRUE,/* Don't wait for both bits, either bit will do */
-                             POLL_UNIT_TIME_MS);//portMAX_DELAY
-            #else
             xSemaphoreTake(uramsync->tx_sem, POLL_UNIT_TIME_MS);
-            #endif
             for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
-                if (uramsync->p_tx->payload[i].seq <= uramsync->p_rx->st.rseq) {
+                if (uramsync->p_tx->payload[i].seq <= uramsync->p_rx->payload[i].rseq) {
                     // have empty slot
                     slottmp = i;
                     ensure_empty_slot = 1;
@@ -689,11 +612,8 @@ static void  uramsync_task_tx(void *arg)
             }
             //vTaskDelay(pdMS_TO_TICKS(1));// fixme, can use isr notify
             if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-                break;
+                goto first_point;
             }
-        }
-        if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-            continue;
         }
 
         /* desc to slot,  update buf + len */
@@ -712,7 +632,7 @@ static void  uramsync_task_tx(void *arg)
 
         utils_crc32_stream_init(&crc_ctx);
         utils_crc32_stream_feed_block(&crc_ctx,
-                (uint8_t *)&uramsync->p_tx->payload[slottmp],
+                (uint8_t *)&uramsync->p_tx->payload[slottmp].len,
                 uramsync->p_tx->payload[slottmp].len);
 
         uramsync->p_tx->payload[slottmp].crc = utils_crc32_stream_results(&crc_ctx);
@@ -742,11 +662,7 @@ static void uramsync_task_rx(void *arg)
     uint32_t rseqtmp;
     struct crc32_stream_ctx crc_ctx;
 
-    #if DONT_CHANGE
-    EventBits_t uxBits;
-    #else
     BaseType_t ret;
-    #endif
     int res;
 
     tp_uramsync_t *uramsync = (tp_uramsync_t *)arg;
@@ -758,6 +674,7 @@ static void uramsync_task_rx(void *arg)
     tpdbg_log("[%s] uramsync_task_rx\r\n", uramsync->name);
 
     while (1) {
+first_point:
         /* ensure status rx enter loop */
         while (URAMSYNC_STATUE_RUNNING != uramsync->status) {
             if (URAMSYNC_STATUE_TXRESET_DONE == uramsync->status) {
@@ -770,57 +687,41 @@ static void uramsync_task_rx(void *arg)
         slot_have_validdata = 0;
         while (1) {
             if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-                break;
+                goto first_point;
             }
             while (1) {
-                #if DONT_CHANGE
-                uxBits = xEventGroupWaitBits(uramsync->emptyslot_evt,
-                                         EVT_EMPTYSLOT_BIT,
-                                         pdTRUE,/* should be cleared before returning */
-                                         pdTRUE,/* Don't wait for both bits, either bit will do */
-                                         POLL_UNIT_TIME_MS);//portMAX_DELAY
-                #else
-                ret = xSemaphoreTake(uramsync->tx_sem, POLL_UNIT_TIME_MS);
-                #endif
+                ret = xSemaphoreTake(uramsync->rx_sem, POLL_UNIT_TIME_MS);
                 if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-                    break;
+                    goto first_point;
                 }
-                #if DONT_CHANGE
-                if (uxBits & EVT_EMPTYSLOT_BIT) {
-                #else
                 if (ret == pdPASS){
-                #endif
                     break;
                 }
-            }
-            if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-                break;
             }
 
             for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
                 if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-                    break;
+                    goto first_point;
                 }
                 if (URAMSYNC_MASTER_DEV_TYPE == uramsync->devtype) {
-                    if (uramsync->p_rx->st.magic != TP_ST_MAGIC) {
+                    if (uramsync->p_rx->payload[i].magic != TP_ST_MAGIC) {
                         reset_signal(uramsync);
                         break;
                     }
-                        }
+                }
                 // judge seq len valid
                 seqtmp = uramsync->p_rx->payload[i].seq;
                 lentmp = uramsync->p_rx->payload[i].len;
-                rseqtmp = uramsync->p_tx->st.rseq;
+                rseqtmp = uramsync->p_tx->payload[i].rseq;
 
                 if ((lentmp > (TP_PAYLOAD_LEN + 4 + 4)) ||
-                    (lentmp > (TP_PAYLOAD_LEN + 4 + 4)) ||
                     (seqtmp != (rseqtmp + 1))
                     ) {// seq len invalid
                     continue;
                 }
 
                 // memcpy + crc
-                ramsync_fast_memcpy(uramsync->p_rx_cache, &uramsync->p_rx->payload[i], lentmp);
+                ramsync_fast_memcpy(uramsync->p_rx_cache, &uramsync->p_rx->payload[i], lentmp + 8);
                 uramsync->p_rx_cache->crc = uramsync->p_rx->payload[i].crc;
                 if ((uramsync->p_rx_cache->seq != seqtmp) ||
                     (uramsync->p_rx_cache->len != lentmp)
@@ -831,15 +732,15 @@ static void uramsync_task_rx(void *arg)
                 // judge crc
                 utils_crc32_stream_init(&crc_ctx);
                 utils_crc32_stream_feed_block(&crc_ctx,
-                        (uint8_t *)uramsync->p_rx_cache,
+                        (uint8_t *)&uramsync->p_rx_cache->len,
                         uramsync->p_rx_cache->len);
                 crctmp = utils_crc32_stream_results(&crc_ctx);
 
-                tpdbg_log("[%s] [task_rx] crctmp = 0x%08lx, cache.crc = 0x%08lx\r\n",
-                        uramsync->name, crctmp, uramsync->p_rx_cache->crc);
                 //vTaskDelay(pdMS_TO_TICKS(100));// fixme, can use isr notify
 
                 if (uramsync->p_rx_cache->crc != crctmp) {
+                    tpdbg_log("[%s] [task_rx] crctmp = 0x%08lx, cache.crc = 0x%08lx\r\n",
+                        uramsync->name, crctmp, uramsync->p_rx_cache->crc);
                     continue;
                 }
 
@@ -852,9 +753,6 @@ static void uramsync_task_rx(void *arg)
                 break;
             }
         }
-        if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-            continue;
-        }
 
         /* slot to desc */
         while (1) {
@@ -863,22 +761,23 @@ static void uramsync_task_rx(void *arg)
                     uramsync->p_rx_cache->len,
                     POLL_UNIT_TIME_MS);//DESC_FOREVER
             if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-                break;
+                goto first_point;
             }
             if (res != 0) {
                 continue;
             }
             break;
         }
-        if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-            continue;
-        }
 
         tpdbg_log("[%s] [task_rx] 2. slot2desc,update rseq = %ld cache.crc = 0x%08lx.\r\n",
                 uramsync->name, uramsync->p_rx_cache->seq, uramsync->p_rx_cache->crc);
 
         // update txtxtxtxtxtxtx!!!!! st rseq
-        uramsync->p_tx->st.rseq = uramsync->p_rx_cache->seq;  // __rx_rseq_update
+        taskENTER_CRITICAL();
+        for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
+            uramsync->p_tx->payload[i].rseq = uramsync->p_rx_cache->seq;  // __rx_rseq_update
+        }
+        taskEXIT_CRITICAL();
     }
 }
 
@@ -891,13 +790,6 @@ int uramsync_init(tp_uramsync_t *uramsync, uint32_t type)
     uramsync->reset_thdr = NULL;
     // init lramsync mem set 0, hw stream
     __ramsync_low_init(uramsync, type);
-#if DONT_CHANGE
-    uramsync->emptyslot_evt =
-        xEventGroupCreateStatic(&uramsync->xEventGroupBuffer);// rx_isr -> rx_task
-    if (NULL == uramsync->emptyslot_evt) {
-        return -2;
-    }
-#else
     uramsync->tx_sem = xSemaphoreCreateBinary();
     if(uramsync->tx_sem == NULL){
         return -2;
@@ -907,7 +799,6 @@ int uramsync_init(tp_uramsync_t *uramsync, uint32_t type)
         vSemaphoreDelete(uramsync->tx_sem);
         return -2;
     }
-#endif
 
     desc_init(&uramsync->tx_desc, TP_TXDESC_NUM);
     desc_init(&uramsync->rx_desc, TP_RXDESC_NUM);
@@ -936,14 +827,16 @@ int uramsync_deinit(tp_uramsync_t *uramsync)
     __ramsync_low_deinit(uramsync);
     desc_deinit(&uramsync->tx_desc);
     desc_deinit(&uramsync->rx_desc);
-    #if DONT_CHANGE
-    vEventGroupDelete(uramsync->emptyslot_evt);
-    #else
-    vSemaphoreDelete(uramsync->tx_sem);
-    vSemaphoreDelete(uramsync->rx_sem);
-    #endif
+    if(uramsync->tx_sem){
+        vSemaphoreDelete(uramsync->tx_sem);
+    }
+    if(uramsync->rx_sem){ 
+        vSemaphoreDelete(uramsync->rx_sem);
+    }
 
     /* delete task */
+    if(uramsync->reset_thdr)
+        vTaskDelete(uramsync->reset_thdr);
     vTaskDelete(uramsync->tx_thdr);
     vTaskDelete(uramsync->rx_thdr);
 
