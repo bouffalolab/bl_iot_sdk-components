@@ -1116,7 +1116,7 @@ static void stateConnectedIPNoEnter(void *stateData, struct event *event )
     bl_os_printf("Entering %s state, up time is %.1fs, cost time is %.1fs\r\n", (char *)stateData, now/1000.0, (now - wifiMgmr.connect_time)/1000.0);
 #endif
 
-#if (!CFG_NETBUS_WIFI_ENABLE)
+#ifndef CFG_NETBUS_WIFI_ENABLE
     /* timeout 15 seconds for ip obtaining */
     if (use_dhcp) {
         stateConnectedIPNo_data->timer = bl_os_timer_create(ip_obtaining_timeout, stateConnectedIPNo_data);

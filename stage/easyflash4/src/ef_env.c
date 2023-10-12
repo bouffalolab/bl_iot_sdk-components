@@ -1090,11 +1090,8 @@ static EfErrCode del_env(const char *key, env_node_obj_t old_env, bool complete_
     uint32_t dirty_status_addr;
     static bool last_is_complete_del = false;
 
-#if (ENV_STATUS_TABLE_SIZE >= DIRTY_STATUS_TABLE_SIZE)
-    uint8_t status_table[ENV_STATUS_TABLE_SIZE];
-#else
-    uint8_t status_table[DIRTY_STATUS_TABLE_SIZE];
-#endif
+    uint8_t env_status_table[ENV_STATUS_TABLE_SIZE];
+    uint8_t dirty_status_table[DIRTY_STATUS_TABLE_SIZE];
 
     /* need find ENV */
     if (!old_env) {
@@ -1109,10 +1106,10 @@ static EfErrCode del_env(const char *key, env_node_obj_t old_env, bool complete_
     }
     /* change and save the new status */
     if (!complete_del) {
-        result = write_status(old_env->addr.start, status_table, ENV_STATUS_NUM, ENV_PRE_DELETE);
+        result = write_status(old_env->addr.start, env_status_table, ENV_STATUS_NUM, ENV_PRE_DELETE);
         last_is_complete_del = true;
     } else {
-        result = write_status(old_env->addr.start, status_table, ENV_STATUS_NUM, ENV_DELETED);
+        result = write_status(old_env->addr.start, env_status_table, ENV_STATUS_NUM, ENV_DELETED);
 
         if (!last_is_complete_del && result == EF_NO_ERR) {
 #ifdef EF_ENV_USING_CACHE
@@ -1133,8 +1130,8 @@ static EfErrCode del_env(const char *key, env_node_obj_t old_env, bool complete_
     dirty_status_addr = EF_ALIGN_DOWN(old_env->addr.start, SECTOR_SIZE) + SECTOR_DIRTY_OFFSET;
     /* read and change the sector dirty status */
     if (result == EF_NO_ERR
-            && read_status(dirty_status_addr, status_table, SECTOR_DIRTY_STATUS_NUM) == SECTOR_DIRTY_FALSE) {
-        result = write_status(dirty_status_addr, status_table, SECTOR_DIRTY_STATUS_NUM, SECTOR_DIRTY_TRUE);
+            && read_status(dirty_status_addr, dirty_status_table, SECTOR_DIRTY_STATUS_NUM) == SECTOR_DIRTY_FALSE) {
+        result = write_status(dirty_status_addr, dirty_status_table, SECTOR_DIRTY_STATUS_NUM, SECTOR_DIRTY_TRUE);
     }
 
     return result;

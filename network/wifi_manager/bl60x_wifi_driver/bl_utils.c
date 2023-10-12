@@ -361,7 +361,7 @@ static inline struct pbuf *_handle_frame_from_stack_with_zerocopy(void *swdesc, 
     return h;
 }
 
-#if CFG_NETBUS_WIFI_ENABLE
+#ifdef CFG_NETBUS_WIFI_ENABLE
 void pbuf_cfm_cb(int idx, void *arg)
 {
     /* printf("pbuf_cfm free %d %p\r\n", idx, arg); */
@@ -473,7 +473,7 @@ int tcpip_stack_input(void *swdesc, uint8_t status, void *hwhdr, unsigned int ms
         }
 #endif
 
-#if CFG_NETBUS_WIFI_ENABLE
+#ifdef CFG_NETBUS_WIFI_ENABLE
         #ifdef LWIP_IPV6
         struct ethhdr *hdr = (struct ethhdr *)(skb_payload);
         if (bl_vif->dev && tcpip_src_addr_cmp(hdr, (bl_vif->dev)->hwaddr) &&

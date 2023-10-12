@@ -4,6 +4,7 @@
 #include <sys/time.h>
 
 #include <openthread/config.h>
+#include <openthread-core-config.h>
 #include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/radio.h>
 

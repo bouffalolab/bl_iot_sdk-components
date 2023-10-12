@@ -124,9 +124,7 @@ void otPds_init(otPds_sleep_opCb_t callback);
  * @return None
  *
 *******************************************************************************/
-#if OPENTHREAD_CONFIG_CHILD_SUPERVISION_ENABLE
 void otPds_supervisionListener_init(uint32_t childSupervisionCheckTimeout);
-#endif
 
 /****************************************************************************//**
  * @brief  initialize CSl receiver module running in Bouffalo Lab PDS mode
@@ -138,9 +136,7 @@ void otPds_supervisionListener_init(uint32_t childSupervisionCheckTimeout);
  * @return None
  *
 *******************************************************************************/
-#if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
 void otPds_cslReceiver_init(uint32_t cslReceiveAhead, uint32_t cslMinWindow);
-#endif
 
 /****************************************************************************//**
  * @brief  set delay to retry running in Bouffalo Lab PDS mode
@@ -152,9 +148,7 @@ void otPds_cslReceiver_init(uint32_t cslReceiveAhead, uint32_t cslMinWindow);
  * @return None
  *
 *******************************************************************************/
-#if OPENTHREAD_CONFIG_MAC_ADD_DELAY_ON_NO_ACK_ERROR_BEFORE_RETRY
 void otPds_setDelayBeforeRetry(uint32_t macRetryBackoffMinExp, uint32_t macRetryBackoffMaxExp);
-#endif
 
 /****************************************************************************//**
  * @brief  Active state wakeup from Bouffalo Lab Thread PDS has two states

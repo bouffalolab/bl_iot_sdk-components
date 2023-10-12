@@ -1,13 +1,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <openthread/platform/misc.h>
 #include <FreeRTOS.h>
 #include <task.h>
 #include <semphr.h>
 #include <bl_sys.h>
 
+#include <openthread-core-config.h>
+
 #include <openthread/platform/memory.h>
+#include <openthread/platform/misc.h>
 
 #if ENABLE_OPENTHREAD_BORDER_ROUTER
 #include <lwipopts.h>

@@ -94,7 +94,7 @@ static void bl_tx_notify(void *cb_arg, bool tx_ok)
     return;
 }
 
-#if CFG_NETBUS_WIFI_ENABLE
+#ifdef CFG_NETBUS_WIFI_ENABLE
 /* ethernet device interface */
 /* Transmit packet. */
 err_t wifi_tx(struct netif *netif, struct pbuf* p)
