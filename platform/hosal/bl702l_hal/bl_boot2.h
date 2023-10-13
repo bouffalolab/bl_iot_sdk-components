@@ -73,10 +73,13 @@ typedef enum {
 /**
  *  @brief Partition id type definition
  */
+#ifndef BL702L_PT_ENTRY_MAX
+#define BL702L_PT_ENTRY_MAX 5
+#endif
 typedef enum {
     PT_ENTRY_FW_CPU0,                       /*!< Partition entry type:CPU0 firmware */
     PT_ENTRY_FW_CPU1,                       /*!< Partition entry type:CPU1 firmware */
-    PT_ENTRY_MAX=5,                         /*!< Partition entry type:Max */
+    PT_ENTRY_MAX=BL702L_PT_ENTRY_MAX,       /*!< Partition entry type:Max */
 }PtTable_Entry_Type;
 
 /**

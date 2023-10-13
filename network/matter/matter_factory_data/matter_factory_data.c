@@ -296,6 +296,7 @@ static inline int mfd_copyDataItem(uint32_t id, uint8_t *pBuf, uint32_t size)
     }
 
     if (size >= p->mLength) {
+        memset(pBuf, 0, size);
         memcpy(pBuf, p->mValuePtr, p->mLength);
         return p->mLength;
     }
@@ -354,7 +355,6 @@ int mfd_getCd(uint8_t *p, uint32_t size)
 
 int mfd_getSerialNumber(char *p, uint32_t size) 
 {
-    memset(p, 0, size);
     return mfd_copyDataItem(ELEMENT_TYPE_SERIAL_NUMBER, (uint8_t *)p, size);
 }
 
