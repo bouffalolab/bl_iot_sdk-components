@@ -36,6 +36,7 @@
 #include <openthread/srp_client.h>
 
 #include "common/as_core_type.hpp"
+#include "common/callback.hpp"
 #include "common/clearable.hpp"
 #include "common/linked_list.hpp"
 #include "common/locator.hpp"
@@ -64,7 +65,7 @@ namespace Srp {
 #endif
 
 /**
- * This class implements SRP client.
+ * Implements SRP client.
  *
  */
 class Client : public InstanceLocator, private NonCopyable
@@ -76,7 +77,7 @@ class Client : public InstanceLocator, private NonCopyable
 
 public:
     /**
-     * This enumeration types represents an SRP client item (service or host info) state.
+     * Types represents an SRP client item (service or host info) state.
      *
      */
     enum ItemState : uint8_t
@@ -92,15 +93,15 @@ public:
     };
 
     /**
-     * This function pointer type defines the callback used by SRP client to notify user of a changes/events/errors.
+     * Pointer type defines the callback used by SRP client to notify user of a changes/events/errors.
      *
      * Please see `otSrpClientCallback` for more details.
      *
      */
-    typedef otSrpClientCallback Callback;
+    typedef otSrpClientCallback ClientCallback;
 
     /**
-     * This type represents an SRP client host info.
+     * Represents an SRP client host info.
      *
      */
     class HostInfo : public otSrpClientHostInfo, private Clearable<HostInfo>
@@ -110,19 +111,19 @@ public:
 
     public:
         /**
-         * This method initializes the `HostInfo` object.
+         * Initializes the `HostInfo` object.
          *
          */
         void Init(void);
 
         /**
-         * This method clears the `HostInfo` object.
+         * Clears the `HostInfo` object.
          *
          */
         void Clear(void);
 
         /**
-         * This method gets the host name (label) string.
+         * Gets the host name (label) string.
          *
          * @returns The host name (label) string, or `nullptr` if not yet set.
          *
@@ -130,7 +131,7 @@ public:
         const char *GetName(void) const { return mName; }
 
         /**
-         * This method indicates whether or not the host auto address mode is enabled.
+         * Indicates whether or not the host auto address mode is enabled.
          *
          * @retval TRUE  If the auto address mode is enabled.
          * @retval FALSE If the auto address mode is disabled.
@@ -139,7 +140,7 @@ public:
         bool IsAutoAddressEnabled(void) const { return mAutoAddress; }
 
         /**
-         * This method gets the number of host IPv6 addresses.
+         * Gets the number of host IPv6 addresses.
          *
          * @returns The number of host IPv6 addresses.
          *
@@ -147,7 +148,7 @@ public:
         uint8_t GetNumAddresses(void) const { return mNumAddresses; }
 
         /**
-         * This method gets the host IPv6 address at a given index.
+         * Gets the host IPv6 address at a given index.
          *
          * @param[in] aIndex  The index to get (MUST be smaller than `GetNumAddresses()`).
          *
@@ -157,7 +158,7 @@ public:
         const Ip6::Address &GetAddress(uint8_t aIndex) const { return AsCoreType(&mAddresses[aIndex]); }
 
         /**
-         * This method gets the state of `HostInfo`.
+         * Gets the state of `HostInfo`.
          *
          * @returns The `HostInfo` state.
          *
@@ -172,7 +173,7 @@ public:
     };
 
     /**
-     * This type represents an SRP client service.
+     * Represents an SRP client service.
      *
      */
     class Service : public otSrpClientService, public LinkedListEntry<Service>
@@ -182,7 +183,7 @@ public:
 
     public:
         /**
-         * This method initializes and validates the `Service` object and its fields.
+         * Initializes and validates the `Service` object and its fields.
          *
          * @retval kErrorNone         Successfully initialized and validated the `Service` object.
          * @retval kErrorInvalidArgs  The info in `Service` object is not valid (e.g. null name or bad `TxtEntry`).
@@ -191,7 +192,7 @@ public:
         Error Init(void);
 
         /**
-         * This method gets the service name labels string.
+         * Gets the service name labels string.
          *
          * @returns The service name label string (e.g., "_chip._udp", not the full domain name).
          *
@@ -199,7 +200,7 @@ public:
         const char *GetName(void) const { return mName; }
 
         /**
-         * This method gets the service instance name label (not the full name).
+         * Gets the service instance name label (not the full name).
          *
          * @returns The service instance name label string.
          *
@@ -207,7 +208,7 @@ public:
         const char *GetInstanceName(void) const { return mInstanceName; }
 
         /**
-         * This method indicates whether or not the service has any subtypes.
+         * Indicates whether or not the service has any subtypes.
          *
          * @retval TRUE   The service has at least one subtype.
          * @retval FALSE  The service does not have any subtype.
@@ -216,9 +217,9 @@ public:
         bool HasSubType(void) const { return (mSubTypeLabels != nullptr); }
 
         /**
-         * This method gets the subtype label at a given index.
+         * Gets the subtype label at a given index.
          *
-         * This method MUST be used only after `HasSubType()` indicates that service has a subtype.
+         * MUST be used only after `HasSubType()` indicates that service has a subtype.
          *
          * @param[in] aIndex  The index into list of subtype labels.
          *
@@ -229,7 +230,7 @@ public:
         const char *GetSubTypeLabelAt(uint16_t aIndex) const { return mSubTypeLabels[aIndex]; }
 
         /**
-         * This method gets the service port number.
+         * Gets the service port number.
          *
          * @returns The service port number.
          *
@@ -237,7 +238,7 @@ public:
         uint16_t GetPort(void) const { return mPort; }
 
         /**
-         * This method gets the service priority.
+         * Gets the service priority.
          *
          * @returns The service priority.
          *
@@ -245,7 +246,7 @@ public:
         uint16_t GetPriority(void) const { return mPriority; }
 
         /**
-         * This method gets the service weight.
+         * Gets the service weight.
          *
          * @returns The service weight.
          *
@@ -253,7 +254,7 @@ public:
         uint16_t GetWeight(void) const { return mWeight; }
 
         /**
-         * This method gets the array of service TXT entries.
+         * Gets the array of service TXT entries.
          *
          * @returns A pointer to an array of service TXT entries.
          *
@@ -261,7 +262,7 @@ public:
         const Dns::TxtEntry *GetTxtEntries(void) const { return AsCoreTypePtr(mTxtEntries); }
 
         /**
-         * This method gets the number of entries in the service TXT entry array.
+         * Gets the number of entries in the service TXT entry array.
          *
          * @returns The number of entries in the service TXT entry array.
          *
@@ -269,7 +270,7 @@ public:
         uint8_t GetNumTxtEntries(void) const { return mNumTxtEntries; }
 
         /**
-         * This method gets the state of service.
+         * Gets the state of service.
          *
          * @returns The service state.
          *
@@ -277,7 +278,7 @@ public:
         ItemState GetState(void) const { return static_cast<ItemState>(mState); }
 
         /**
-         * This method gets the desired lease interval to request when registering this service.
+         * Gets the desired lease interval to request when registering this service.
          *
          * @returns The desired lease interval in sec. Zero indicates to use default.
          *
@@ -285,7 +286,7 @@ public:
         uint32_t GetLease(void) const { return (mLease & kLeaseMask); }
 
         /**
-         * This method gets the desired key lease interval to request when registering this service.
+         * Gets the desired key lease interval to request when registering this service.
          *
          * @returns The desired lease interval in sec. Zero indicates to use default.
          *
@@ -313,7 +314,7 @@ public:
     };
 
     /**
-     * This constructor initializes the SRP `Client` object.
+     * Initializes the SRP `Client` object.
      *
      * @param[in]  aInstance  A reference to the OpenThread instance.
      *
@@ -321,7 +322,7 @@ public:
     explicit Client(Instance &aInstance);
 
     /**
-     * This method starts the SRP client operation.
+     * Starts the SRP client operation.
      *
      * SRP client will prepare and send "SRP Update" message to the SRP server once all the following conditions are
      * met:
@@ -347,9 +348,9 @@ public:
     Error Start(const Ip6::SockAddr &aServerSockAddr) { return Start(aServerSockAddr, kRequesterUser); }
 
     /**
-     * This method stops the SRP client operation.
+     * Stops the SRP client operation.
      *
-     * This method stops any further interactions with the SRP server. Note that it does not remove or clear host info
+     * Stops any further interactions with the SRP server. Note that it does not remove or clear host info
      * and/or list of services. It marks all services to be added/removed again once the client is started again.
      *
      * If `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE` (auto-start feature) is enabled, a call to this method
@@ -360,14 +361,14 @@ public:
 
 #if OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE
     /**
-     * This function pointer type defines the callback used by SRP client to notify user when it is auto-started or
+     * Pointer type defines the callback used by SRP client to notify user when it is auto-started or
      * stopped.
      *
      */
     typedef otSrpClientAutoStartCallback AutoStartCallback;
 
     /**
-     * This method enables the auto-start mode.
+     * Enables the auto-start mode.
      *
      * Config option `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_DEFAULT_MODE` specifies the default auto-start mode
      * (whether it is enabled or disabled at the start of OT stack).
@@ -405,7 +406,7 @@ public:
     void EnableAutoStartMode(AutoStartCallback aCallback, void *aContext);
 
     /**
-     * This method disables the auto-start mode.
+     * Disables the auto-start mode.
      *
      * Disabling the auto-start mode will not stop the client if it is already running but the client stops monitoring
      * the Thread Network Data to verify that the selected SRP server is still present in it.
@@ -416,7 +417,7 @@ public:
     void DisableAutoStartMode(void) { mAutoStart.SetState(AutoStart::kDisabled); }
 
     /**
-     * This method indicates the current state of auto-start mode (enabled or disabled).
+     * Indicates the current state of auto-start mode (enabled or disabled).
      *
      * @returns TRUE if the auto-start mode is enabled, FALSE otherwise.
      *
@@ -424,7 +425,7 @@ public:
     bool IsAutoStartModeEnabled(void) const { return mAutoStart.GetState() != AutoStart::kDisabled; }
 
     /**
-     * This method indicates whether or not the current SRP server's address is selected by auto-start.
+     * Indicates whether or not the current SRP server's address is selected by auto-start.
      *
      * @returns TRUE if the SRP server's address is selected by auto-start, FALSE otherwise.
      *
@@ -433,7 +434,7 @@ public:
 #endif // OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE
 
     /**
-     * This method indicates whether the SRP client is running or not.
+     * Indicates whether the SRP client is running or not.
      *
      * @returns TRUE if the SRP client is running, FALSE otherwise.
      *
@@ -441,7 +442,7 @@ public:
     bool IsRunning(void) const { return (mState != kStateStopped); }
 
     /**
-     * This method gets the socket address (IPv6 address and port number) of the SRP server which is being used by SRP
+     * Gets the socket address (IPv6 address and port number) of the SRP server which is being used by SRP
      * client.
      *
      * If the client is not running, the address is unspecified (all zero) with zero port number.
@@ -452,7 +453,7 @@ public:
     const Ip6::SockAddr &GetServerAddress(void) const { return mSocket.GetPeerName(); }
 
     /**
-     * This method sets the callback used to notify caller of events/changes.
+     * Sets the callback used to notify caller of events/changes.
      *
      * The SRP client allows a single callback to be registered. So consecutive calls to this method will overwrite any
      * previously set callback functions.
@@ -461,10 +462,10 @@ public:
      * @param[in] aContext         An arbitrary context used with @p aCallback.
      *
      */
-    void SetCallback(Callback aCallback, void *aContext);
+    void SetCallback(ClientCallback aCallback, void *aContext) { mCallback.Set(aCallback, aContext); }
 
     /**
-     * This method gets the TTL used in SRP update requests.
+     * Gets the TTL used in SRP update requests.
      *
      * Note that this is the TTL requested by the SRP client. The server may choose to accept a different TTL.
      *
@@ -477,7 +478,7 @@ public:
     uint32_t GetTtl(void) const { return mTtl; }
 
     /**
-     * This method sets the TTL used in SRP update requests.
+     * Sets the TTL used in SRP update requests.
      *
      * Changing the TTL does not impact the TTL of already registered services/host-info.
      * It only changes any future SRP update messages (i.e adding new services and/or refreshes of existing services).
@@ -489,7 +490,7 @@ public:
     void SetTtl(uint32_t aTtl) { mTtl = aTtl; }
 
     /**
-     * This method gets the lease interval used in SRP update requests.
+     * Gets the lease interval used in SRP update requests.
      *
      * Note that this is lease duration that would be requested by the SRP client. Server may choose to accept a
      * different lease interval.
@@ -500,7 +501,7 @@ public:
     uint32_t GetLeaseInterval(void) const { return mDefaultLease; }
 
     /**
-     * This method sets the lease interval used in SRP update requests.
+     * Sets the lease interval used in SRP update requests.
      *
      * Changing the lease interval does not impact the accepted lease interval of already registered services/host-info.
      * It only changes any future SRP update messages (i.e adding new services and/or refreshes of existing services).
@@ -511,7 +512,7 @@ public:
     void SetLeaseInterval(uint32_t aInterval) { mDefaultLease = DetermineLeaseInterval(aInterval, kDefaultLease); }
 
     /**
-     * This method gets the key lease interval used in SRP update requests.
+     * Gets the key lease interval used in SRP update requests.
      *
      * @returns The key lease interval (in seconds).
      *
@@ -519,7 +520,7 @@ public:
     uint32_t GetKeyLeaseInterval(void) const { return mDefaultKeyLease; }
 
     /**
-     * This method sets the key lease interval used in SRP update requests.
+     * Sets the key lease interval used in SRP update requests.
      *
      * Changing the lease interval does not impact the accepted lease interval of already registered services/host-info.
      * It only changes any future SRP update messages (i.e adding new services and/or refreshes of existing services).
@@ -534,7 +535,7 @@ public:
     }
 
     /**
-     * This method gets the host info.
+     * Gets the host info.
      *
      * @returns A reference to host info structure.
      *
@@ -542,7 +543,7 @@ public:
     const HostInfo &GetHostInfo(void) const { return mHostInfo; }
 
     /**
-     * This method sets the host name label.
+     * Sets the host name label.
      *
      * After a successful call to this method, `Callback` will be called to report the status of host info
      *  registration with SRP server.
@@ -561,7 +562,7 @@ public:
     Error SetHostName(const char *aName);
 
     /**
-     * This method enables auto host address mode.
+     * Enables auto host address mode.
      *
      * When enabled host IPv6 addresses are automatically set by SRP client using all the unicast addresses on Thread
      * netif excluding the link-local and mesh-local addresses. If there is no valid address, then Mesh Local EID
@@ -582,7 +583,7 @@ public:
     Error EnableAutoHostAddress(void);
 
     /**
-     * This method sets/updates the list of host IPv6 address.
+     * Sets/updates the list of host IPv6 address.
      *
      * Host IPv6 addresses can be set/changed before start or even during operation of SRP client (e.g. to add/remove
      * or change a previously registered host address), except when the host info is being removed (client is busy
@@ -607,7 +608,7 @@ public:
     Error SetHostAddresses(const Ip6::Address *aAddresses, uint8_t aNumAddresses);
 
     /**
-     * This method adds a service to be registered with server.
+     * Adds a service to be registered with server.
      *
      * After a successful call to this method, `Callback` will be called to report the status of the service
      * addition/registration with SRP server.
@@ -624,7 +625,7 @@ public:
     Error AddService(Service &aService);
 
     /**
-     * This method removes a service to be unregistered with server.
+     * Removes a service to be unregistered with server.
      *
      * @param[in] aService         A `Service` to remove (the instance must persist and remain unchanged after
      *                             successful return from this method).
@@ -638,7 +639,7 @@ public:
     Error RemoveService(Service &aService);
 
     /**
-     * This method clears a service, immediately removing it from the client service list.
+     * Clears a service, immediately removing it from the client service list.
      *
      * Unlike `RemoveService()` which sends an update message to the server to remove the service, this method clears
      * the service from the client's service list without any interaction with the server. On a successful call
@@ -654,7 +655,7 @@ public:
     Error ClearService(Service &aService);
 
     /**
-     * This method gets the list of services being managed by client.
+     * Gets the list of services being managed by client.
      *
      * @returns The list of services.
      *
@@ -662,7 +663,7 @@ public:
     const LinkedList<Service> &GetServices(void) const { return mServices; }
 
     /**
-     * This method starts the remove process of the host info and all services.
+     * Starts the remove process of the host info and all services.
      *
      * After returning from this method, `Callback` will be called to report the status of remove request with
      * SRP server.
@@ -696,7 +697,7 @@ public:
     Error RemoveHostAndServices(bool aShouldRemoveKeyLease, bool aSendUnregToServer = false);
 
     /**
-     * This method clears all host info and all the services.
+     * Clears all host info and all the services.
      *
      * Unlike `RemoveHostAndServices()` which sends an update message to the server to remove all the info, this method
      * clears all the info immediately without any interaction with the server.
@@ -706,7 +707,7 @@ public:
 
 #if OPENTHREAD_CONFIG_SRP_CLIENT_DOMAIN_NAME_API_ENABLE
     /**
-     * This method gets the domain name being used by SRP client.
+     * Gets the domain name being used by SRP client.
      *
      * If domain name is not set, "default.service.arpa" will be used.
      *
@@ -716,7 +717,7 @@ public:
     const char *GetDomainName(void) const { return mDomainName; }
 
     /**
-     * This method sets the domain name to be used by SRP client.
+     * Sets the domain name to be used by SRP client.
      *
      * This is an optional method. If not set "default.service.arpa" will be used.
      *
@@ -733,7 +734,7 @@ public:
 #endif // OPENTHREAD_CONFIG_SRP_CLIENT_DOMAIN_NAME_API_ENABLE
 
     /**
-     * This static method converts a `ItemState` to a string.
+     * Converts a `ItemState` to a string.
      *
      * @param[in] aState   An `ItemState`.
      *
@@ -744,7 +745,7 @@ public:
 
 #if OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
     /**
-     * This method enables/disables "service key record inclusion" mode.
+     * Enables/disables "service key record inclusion" mode.
      *
      * When enabled, SRP client will include KEY record in Service Description Instructions in the SRP update messages
      * that it sends.
@@ -759,17 +760,43 @@ public:
     void SetServiceKeyRecordEnabled(bool aEnabled) { mServiceKeyRecordEnabled = aEnabled; }
 
     /**
-     * This method indicates whether the "service key record inclusion" mode is enabled or disabled.
+     * Indicates whether the "service key record inclusion" mode is enabled or disabled.
      *
      * @returns TRUE if "service key record inclusion" mode is enabled, FALSE otherwise.
      *
      */
     bool IsServiceKeyRecordEnabled(void) const { return mServiceKeyRecordEnabled; }
+
+    /**
+     * Enables/disables "use short Update Lease Option" behavior.
+     *
+     * When enabled, the SRP client will use the short variant format of Update Lease Option in its message. The short
+     * format only includes the lease interval.
+     *
+     * Is added under `REFERENCE_DEVICE` config and is intended to override the default behavior for
+     * testing only.
+     *
+     * @param[in] aUseShort    TRUE to enable, FALSE to disable the "use short Update Lease Option" mode.
+     *
+     */
+    void SetUseShortLeaseOption(bool aUseShort) { mUseShortLeaseOption = aUseShort; }
+
+    /**
+     * Gets the current "use short Update Lease Option" mode.
+     *
+     * @returns TRUE if "use short Update Lease Option" mode is enabled, FALSE otherwise.
+     *
+     */
+    bool GetUseShortLeaseOption(void) const { return mUseShortLeaseOption; }
 #endif // OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
 
 private:
     // Number of fast data polls after SRP Update tx (11x 188ms = ~2 seconds)
     static constexpr uint8_t kFastPollsAfterUpdateTx = 11;
+
+#if OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE
+    static constexpr uint32_t kSrpEcdsaKeyRef = Crypto::Storage::kEcdsaRef;
+#endif
 
 #if OPENTHREAD_CONFIG_SRP_CLIENT_SWITCH_SERVER_ON_FAILURE
     static constexpr uint8_t kMaxTimeoutFailuresToSwitchServer =
@@ -831,7 +858,7 @@ private:
     // will retry after a short interval `kTxFailureRetryInterval`
     // up to `kMaxTxFailureRetries` attempts. After this, the retry
     // wait interval will be used (which keeps growing on each failure
-    // - please see bellow).
+    // - please see below).
     //
     // If the update message is sent successfully but there is no
     // response from server or if server rejects the update, the
@@ -925,17 +952,17 @@ private:
         void    SetState(State aState);
         uint8_t GetAnycastSeqNum(void) const { return mAnycastSeqNum; }
         void    SetAnycastSeqNum(uint8_t aAnycastSeqNum) { mAnycastSeqNum = aAnycastSeqNum; }
-        void    SetCallback(AutoStartCallback aCallback, void *aContext);
+        void    SetCallback(AutoStartCallback aCallback, void *aContext) { mCallback.Set(aCallback, aContext); }
         void    InvokeCallback(const Ip6::SockAddr *aServerSockAddr) const;
 
 #if OPENTHREAD_CONFIG_SRP_CLIENT_SWITCH_SERVER_ON_FAILURE
-        uint8_t GetTimoutFailureCount(void) const { return mTimoutFailureCount; }
-        void    ResetTimoutFailureCount(void) { mTimoutFailureCount = 0; }
-        void    IncrementTimoutFailureCount(void)
+        uint8_t GetTimeoutFailureCount(void) const { return mTimeoutFailureCount; }
+        void    ResetTimeoutFailureCount(void) { mTimeoutFailureCount = 0; }
+        void    IncrementTimeoutFailureCount(void)
         {
-            if (mTimoutFailureCount < NumericLimits<uint8_t>::kMax)
+            if (mTimeoutFailureCount < NumericLimits<uint8_t>::kMax)
             {
-                mTimoutFailureCount++;
+                mTimeoutFailureCount++;
             }
         }
 #endif
@@ -945,12 +972,11 @@ private:
 
         static const char *StateToString(State aState);
 
-        AutoStartCallback mCallback;
-        void *            mContext;
-        State             mState;
-        uint8_t           mAnycastSeqNum;
+        Callback<AutoStartCallback> mCallback;
+        State                       mState;
+        uint8_t                     mAnycastSeqNum;
 #if OPENTHREAD_CONFIG_SRP_CLIENT_SWITCH_SERVER_ON_FAILURE
-        uint8_t mTimoutFailureCount; // Number of no-response timeout failures with the currently selected server.
+        uint8_t mTimeoutFailureCount; // Number of no-response timeout failures with the currently selected server.
 #endif
     };
 #endif // OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE
@@ -959,29 +985,37 @@ private:
     {
         static constexpr uint16_t kUnknownOffset = 0; // Unknown offset value (used when offset is not yet set).
 
-        uint16_t                     mDomainNameOffset; // Offset of domain name serialization
-        uint16_t                     mHostNameOffset;   // Offset of host name serialization.
-        uint16_t                     mRecordCount;      // Number of resource records in Update section.
-        Crypto::Ecdsa::P256::KeyPair mKeyPair;          // The ECDSA key pair.
+        uint16_t mDomainNameOffset; // Offset of domain name serialization
+        uint16_t mHostNameOffset;   // Offset of host name serialization.
+        uint16_t mRecordCount;      // Number of resource records in Update section.
+#if OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE
+        Crypto::Ecdsa::P256::KeyPairAsRef mKeyRef; // The ECDSA key ref for key-pair.
+#else
+        Crypto::Ecdsa::P256::KeyPair mKeyPair; // The ECDSA key pair.
+#endif
     };
 
-    Error        Start(const Ip6::SockAddr &aServerSockAddr, Requester aRequester);
-    void         Stop(Requester aRequester, StopMode aMode);
-    void         Resume(void);
-    void         Pause(void);
-    void         HandleNotifierEvents(Events aEvents);
-    void         HandleRoleChanged(void);
-    Error        UpdateHostInfoStateOnAddressChange(void);
-    void         UpdateServiceStateToRemove(Service &aService);
-    State        GetState(void) const { return mState; }
-    void         SetState(State aState);
-    void         ChangeHostAndServiceStates(const ItemState *aNewStates, ServiceStateChangeMode aMode);
-    void         InvokeCallback(Error aError) const;
-    void         InvokeCallback(Error aError, const HostInfo &aHostInfo, const Service *aRemovedServices) const;
-    void         HandleHostInfoOrServiceChange(void);
-    void         SendUpdate(void);
-    Error        PrepareUpdateMessage(Message &aMessage);
-    Error        ReadOrGenerateKey(Crypto::Ecdsa::P256::KeyPair &aKeyPair);
+    Error Start(const Ip6::SockAddr &aServerSockAddr, Requester aRequester);
+    void  Stop(Requester aRequester, StopMode aMode);
+    void  Resume(void);
+    void  Pause(void);
+    void  HandleNotifierEvents(Events aEvents);
+    void  HandleRoleChanged(void);
+    Error UpdateHostInfoStateOnAddressChange(void);
+    void  UpdateServiceStateToRemove(Service &aService);
+    State GetState(void) const { return mState; }
+    void  SetState(State aState);
+    void  ChangeHostAndServiceStates(const ItemState *aNewStates, ServiceStateChangeMode aMode);
+    void  InvokeCallback(Error aError) const;
+    void  InvokeCallback(Error aError, const HostInfo &aHostInfo, const Service *aRemovedServices) const;
+    void  HandleHostInfoOrServiceChange(void);
+    void  SendUpdate(void);
+    Error PrepareUpdateMessage(Message &aMessage);
+#if OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE
+    Error ReadOrGenerateKey(Crypto::Ecdsa::P256::KeyPairAsRef &aKeyRef);
+#else
+    Error ReadOrGenerateKey(Crypto::Ecdsa::P256::KeyPair &aKeyPair);
+#endif
     Error        AppendServiceInstructions(Message &aMessage, Info &aInfo);
     bool         CanAppendService(const Service &aService);
     Error        AppendServiceInstruction(Service &aService, Message &aMessage, Info &aInfo);
@@ -1035,6 +1069,7 @@ private:
     bool    mSingleServiceMode : 1;
 #if OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
     bool mServiceKeyRecordEnabled : 1;
+    bool mUseShortLeaseOption : 1;
 #endif
 
     uint16_t mUpdateMessageId;
@@ -1049,12 +1084,11 @@ private:
 
     Ip6::Udp::Socket mSocket;
 
-    Callback            mCallback;
-    void *              mCallbackContext;
-    const char *        mDomainName;
-    HostInfo            mHostInfo;
-    LinkedList<Service> mServices;
-    DelayTimer          mTimer;
+    Callback<ClientCallback> mCallback;
+    const char              *mDomainName;
+    HostInfo                 mHostInfo;
+    LinkedList<Service>      mServices;
+    DelayTimer               mTimer;
 #if OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE
     AutoStart mAutoStart;
 #endif

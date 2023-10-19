@@ -109,10 +109,7 @@ void test_addr_sizes(void)
     VerifyOrQuit(sizeof(otNetifAddress) == otNetifAddress_Size_c(), "otNetifAddress should the same in C & C++");
 }
 
-void test_addr_bitfield(void)
-{
-    VerifyOrQuit(CreateNetif_c().mScopeOverrideValid == true, "test_addr_size_cpp");
-}
+void test_addr_bitfield(void) { VerifyOrQuit(CreateNetif_c().mScopeOverrideValid == true, "test_addr_size_cpp"); }
 
 void test_packed_alignment(void)
 {
@@ -135,7 +132,7 @@ void test_packed_alignment(void)
     packedStruct.mByte   = 0xfe;
     packedStruct.mUint16 = 0xabcd;
 
-    for (uint16_t start = 0; start < sizeof(PackedStruct); start++)
+    for (size_t start = 0; start < sizeof(PackedStruct); start++)
     {
         uint8_t *ptr = &buffer[start];
 
@@ -143,14 +140,14 @@ void test_packed_alignment(void)
 
         *reinterpret_cast<PackedStruct *>(ptr) = packedStruct;
 
-        for (uint16_t i = 0; i < start; i++)
+        for (size_t i = 0; i < start; i++)
         {
             VerifyOrQuit(buffer[i] == 0, "OT_TOOL_PACKED alignment failed - pre-size write");
         }
 
         VerifyOrQuit(memcmp(ptr, packedStructBytes, sizeof(PackedStruct)) == 0, "OT_TOOL_PACKED alignment failed");
 
-        for (uint16_t i = start + sizeof(packedStruct); i < sizeof(buffer); i++)
+        for (size_t i = start + sizeof(packedStruct); i < sizeof(buffer); i++)
         {
             VerifyOrQuit(buffer[i] == 0, "OT_TOOL_PACKED alignment failed - post-size write");
         }

@@ -43,6 +43,7 @@
 #include "coap/coap_message.hpp"
 #include "coap/coap_secure.hpp"
 #include "common/as_core_type.hpp"
+#include "common/callback.hpp"
 #include "common/locator.hpp"
 #include "common/log.hpp"
 #include "common/message.hpp"
@@ -64,7 +65,7 @@ class Joiner : public InstanceLocator, private NonCopyable
 
 public:
     /**
-     * This enumeration type defines the Joiner State.
+     * Type defines the Joiner State.
      *
      */
     enum State : uint8_t
@@ -78,7 +79,7 @@ public:
     };
 
     /**
-     * This constructor initializes the Joiner object.
+     * Initializes the Joiner object.
      *
      * @param[in]  aInstance     A reference to the OpenThread instance.
      *
@@ -86,7 +87,7 @@ public:
     explicit Joiner(Instance &aInstance);
 
     /**
-     * This method starts the Joiner service.
+     * Starts the Joiner service.
      *
      * @param[in]  aPskd             A pointer to the PSKd.
      * @param[in]  aProvisioningUrl  A pointer to the Provisioning URL (may be `nullptr`).
@@ -102,23 +103,23 @@ public:
      * @retval kErrorInvalidState  The IPv6 stack is not enabled or Thread stack is fully enabled.
      *
      */
-    Error Start(const char *     aPskd,
-                const char *     aProvisioningUrl,
-                const char *     aVendorName,
-                const char *     aVendorModel,
-                const char *     aVendorSwVersion,
-                const char *     aVendorData,
+    Error Start(const char      *aPskd,
+                const char      *aProvisioningUrl,
+                const char      *aVendorName,
+                const char      *aVendorModel,
+                const char      *aVendorSwVersion,
+                const char      *aVendorData,
                 otJoinerCallback aCallback,
-                void *           aContext);
+                void            *aContext);
 
     /**
-     * This method stops the Joiner service.
+     * Stops the Joiner service.
      *
      */
     void Stop(void);
 
     /**
-     * This method gets the Joiner State.
+     * Gets the Joiner State.
      *
      * @returns The Joiner state (see `State`).
      *
@@ -126,7 +127,7 @@ public:
     State GetState(void) const { return mState; }
 
     /**
-     * This method retrieves the Joiner ID.
+     * Retrieves the Joiner ID.
      *
      * @returns The Joiner ID.
      *
@@ -134,7 +135,7 @@ public:
     const Mac::ExtAddress &GetId(void) const { return mId; }
 
     /**
-     * This method gets the Jointer Discerner.
+     * Gets the Jointer Discerner.
      *
      * @returns A pointer to the current Joiner Discerner or `nullptr` if none is set.
      *
@@ -142,7 +143,7 @@ public:
     const JoinerDiscerner *GetDiscerner(void) const;
 
     /**
-     * This method sets the Joiner Discerner.
+     * Sets the Joiner Discerner.
      *
      * The Joiner Discerner is used to calculate the Joiner ID used during commissioning/joining process.
      *
@@ -160,7 +161,7 @@ public:
     Error SetDiscerner(const JoinerDiscerner &aDiscerner);
 
     /**
-     * This method clears any previously set Joiner Discerner.
+     * Clears any previously set Joiner Discerner.
      *
      * When cleared, Joiner ID is derived as first 64 bits of SHA-256 of factory-assigned IEEE EUI-64.
      *
@@ -171,7 +172,7 @@ public:
     Error ClearDiscerner(void);
 
     /**
-     * This method converts a given Joiner state to its human-readable string representation.
+     * Converts a given Joiner state to its human-readable string representation.
      *
      * @param[in] aState  The Joiner state to convert.
      *
@@ -184,7 +185,7 @@ private:
     static constexpr uint16_t kJoinerUdpPort = OPENTHREAD_CONFIG_JOINER_UDP_PORT;
 
     static constexpr uint32_t kConfigExtAddressDelay = 100;  // in msec.
-    static constexpr uint32_t kReponseTimeout        = 4000; ///< Max wait time to receive response (in msec).
+    static constexpr uint32_t kResponseTimeout       = 4000; ///< Max wait time to receive response (in msec).
 
     struct JoinerRouter
     {
@@ -201,8 +202,8 @@ private:
     static void HandleSecureCoapClientConnect(bool aConnected, void *aContext);
     void        HandleSecureCoapClientConnect(bool aConnected);
 
-    static void HandleJoinerFinalizeResponse(void *               aContext,
-                                             otMessage *          aMessage,
+    static void HandleJoinerFinalizeResponse(void                *aContext,
+                                             otMessage           *aMessage,
                                              const otMessageInfo *aMessageInfo,
                                              Error                aResult);
     void HandleJoinerFinalizeResponse(Coap::Message *aMessage, const Ip6::MessageInfo *aMessageInfo, Error aResult);
@@ -239,8 +240,7 @@ private:
 
     State mState;
 
-    otJoinerCallback mCallback;
-    void *           mContext;
+    Callback<otJoinerCallback> mCallback;
 
     JoinerRouter mJoinerRouters[OPENTHREAD_CONFIG_JOINER_MAX_CANDIDATES];
     uint16_t     mJoinerRouterIndex;

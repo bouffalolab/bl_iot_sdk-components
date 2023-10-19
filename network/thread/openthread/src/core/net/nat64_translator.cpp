@@ -36,6 +36,8 @@
 
 #if OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE
 
+#include <openthread/platform/toolchain.h>
+
 #include "common/code_utils.hpp"
 #include "common/locator_getters.hpp"
 #include "common/log.hpp"
@@ -48,12 +50,29 @@ namespace Nat64 {
 
 RegisterLogModule("Nat64");
 
+const char *StateToString(State aState)
+{
+    static const char *const kStateString[] = {
+        "Disabled",
+        "NotRunning",
+        "Idle",
+        "Active",
+    };
+
+    static_assert(0 == kStateDisabled, "kStateDisabled value is incorrect");
+    static_assert(1 == kStateNotRunning, "kStateNotRunning value is incorrect");
+    static_assert(2 == kStateIdle, "kStateIdle value is incorrect");
+    static_assert(3 == kStateActive, "kStateActive value is incorrect");
+
+    return kStateString[aState];
+}
+
 Translator::Translator(Instance &aInstance)
     : InstanceLocator(aInstance)
-    , mEnabled(false)
+    , mState(State::kStateDisabled)
     , mMappingExpirerTimer(aInstance)
 {
-    Random::NonCrypto::FillBuffer(reinterpret_cast<uint8_t *>(&mNextMappingId), sizeof(mNextMappingId));
+    Random::NonCrypto::Fill(mNextMappingId);
 
     mNat64Prefix.Clear();
     mIp4Cidr.Clear();
@@ -98,7 +117,7 @@ Translator::Result Translator::TranslateFromIp6(Message &aMessage)
     ErrorCounters::Reason dropReason = ErrorCounters::kUnknown;
     Ip6::Header           ip6Header;
     Ip4::Header           ip4Header;
-    AddressMapping *      mapping = nullptr;
+    AddressMapping       *mapping = nullptr;
 
     if (mIp4Cidr.mLength == 0 || !mNat64Prefix.IsValidNat64())
     {
@@ -185,7 +204,7 @@ Translator::Result Translator::TranslateToIp6(Message &aMessage)
     ErrorCounters::Reason dropReason = ErrorCounters::kUnknown;
     Ip6::Header           ip6Header;
     Ip4::Header           ip4Header;
-    AddressMapping *      mapping = nullptr;
+    AddressMapping       *mapping = nullptr;
 
     // Ip6::Header::ParseFrom may return an error value when the incoming message is an IPv4 datagram.
     // If the message is already an IPv6 datagram, forward it directly.
@@ -274,7 +293,7 @@ exit:
     return res;
 }
 
-Translator::AddressMapping::InfoString Translator::AddressMapping::ToString(void)
+Translator::AddressMapping::InfoString Translator::AddressMapping::ToString(void) const
 {
     InfoString string;
 
@@ -397,7 +416,7 @@ Error Translator::TranslateIcmp4(Message &aMessage)
     {
     case Ip4::Icmp::Header::Type::kTypeEchoReply:
     {
-        // The only difference between ICMPv6 echo and ICMP4 echo is the message type field, so we can reinteprete it as
+        // The only difference between ICMPv6 echo and ICMP4 echo is the message type field, so we can reinterpret it as
         // ICMP6 header and set the message type.
         SuccessOrExit(err = aMessage.Read(0, icmp6Header));
         icmp6Header.SetType(Ip6::Icmp::Header::Type::kTypeEchoReply);
@@ -427,7 +446,7 @@ Error Translator::TranslateIcmp6(Message &aMessage)
     {
     case Ip6::Icmp::Header::Type::kTypeEchoRequest:
     {
-        // The only difference between ICMPv6 echo and ICMP4 echo is the message type field, so we can reinteprete it as
+        // The only difference between ICMPv6 echo and ICMP4 echo is the message type field, so we can reinterpret it as
         // ICMP6 header and set the message type.
         SuccessOrExit(err = aMessage.Read(0, icmp4Header));
         icmp4Header.SetType(Ip4::Icmp::Header::Type::kTypeEchoRequest);
@@ -490,17 +509,36 @@ Error Translator::SetIp4Cidr(const Ip4::Cidr &aCidr)
             numberOfHosts);
     mIp4Cidr = aCidr;
 
+    // Always notify the platform when the CIDR is changed.
+    UpdateState(true /* aAlwaysNotify */);
+
 exit:
     return err;
 }
 
 void Translator::SetNat64Prefix(const Ip6::Prefix &aNat64Prefix)
 {
-    if (mNat64Prefix != aNat64Prefix)
+    if (aNat64Prefix.GetLength() == 0)
+    {
+        ClearNat64Prefix();
+    }
+    else if (mNat64Prefix != aNat64Prefix)
     {
         LogInfo("IPv6 Prefix for NAT64 updated to %s", aNat64Prefix.ToString().AsCString());
         mNat64Prefix = aNat64Prefix;
+        UpdateState();
     }
+}
+
+void Translator::ClearNat64Prefix(void)
+{
+    VerifyOrExit(mNat64Prefix.GetLength() != 0);
+    mNat64Prefix.Clear();
+    LogInfo("IPv6 Prefix for NAT64 cleared");
+    UpdateState();
+
+exit:
+    return;
 }
 
 void Translator::HandleMappingExpirerTimer(void)
@@ -596,16 +634,38 @@ void Translator::ProtocolCounters::Count4To6Packet(uint8_t aProtocol, uint64_t a
     mTotal.m4To6Bytes += aPacketSize;
 }
 
-State Translator::GetState(void) const
+void Translator::UpdateState(bool aAlwaysNotify)
 {
-    State ret = kStateDisabled;
+    State newState;
 
-    VerifyOrExit(mEnabled);
-    VerifyOrExit(mIp4Cidr.mLength > 0 && mNat64Prefix.IsValidNat64(), ret = kStateNotRunning);
-    ret = kStateActive;
+    if (mEnabled)
+    {
+        if (mIp4Cidr.mLength > 0 && mNat64Prefix.IsValidNat64())
+        {
+            newState = kStateActive;
+        }
+        else
+        {
+            newState = kStateNotRunning;
+        }
+    }
+    else
+    {
+        newState = kStateDisabled;
+    }
+
+    if (aAlwaysNotify)
+    {
+        Get<Notifier>().Signal(kEventNat64TranslatorStateChanged);
+    }
+    else
+    {
+        SuccessOrExit(Get<Notifier>().Update(mState, newState, kEventNat64TranslatorStateChanged));
+    }
+    LogInfo("NAT64 translator is now %s", StateToString(mState));
 
 exit:
-    return ret;
+    return;
 }
 
 void Translator::SetEnabled(bool aEnabled)
@@ -618,7 +678,7 @@ void Translator::SetEnabled(bool aEnabled)
         ReleaseMappings(mActiveAddressMappings);
     }
 
-    LogInfo("NAT64 translator %s", aEnabled ? "enabled" : "disabled");
+    UpdateState();
 
 exit:
     return;

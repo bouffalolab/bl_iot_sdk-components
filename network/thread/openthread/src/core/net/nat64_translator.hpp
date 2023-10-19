@@ -56,10 +56,20 @@ enum State : uint8_t
     kStateActive     = OT_NAT64_STATE_ACTIVE,      ///< The component is running.
 };
 
+/**
+ * Converts a `State` into a string.
+ *
+ * @param[in]  aState     A state.
+ *
+ * @returns  A string representation of @p aState.
+ *
+ */
+const char *StateToString(State aState);
+
 #if OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE
 
 /**
- * This class implements the NAT64 translator.
+ * Implements the NAT64 translator.
  *
  */
 class Translator : public InstanceLocator, private NonCopyable
@@ -143,7 +153,7 @@ public:
     };
 
     /**
-     * This constructor initializes the NAT64 translator.
+     * Initializes the NAT64 translator.
      *
      */
     explicit Translator(Instance &aInstance);
@@ -166,10 +176,10 @@ public:
      * @retval  kNat64StateActive    The translator is translating packets.
      *
      */
-    State GetState(void) const;
+    State GetState(void) const { return mState; }
 
     /**
-     * This method translates an IPv4 datagram to an IPv6 datagram and sends it via Thread interface.
+     * Translates an IPv4 datagram to an IPv6 datagram and sends it via Thread interface.
      *
      * The caller transfers ownership of @p aMessage when making this call. OpenThread will free @p aMessage when
      * processing is complete, including when a value other than `kErrorNone` is returned.
@@ -205,7 +215,7 @@ public:
      * @param[in,out] aMessage the message to be processed.
      *
      * @retval kNotTranslated The message is already an IPv6 datagram. @p aMessage is not updated.
-     * @retval kForward       The caller should contiue forwarding the datagram.
+     * @retval kForward       The caller should continue forwarding the datagram.
      * @retval kDrop          The caller should drop the datagram silently.
      *
      */
@@ -219,7 +229,7 @@ public:
      * @param[in,out] aMessage the message to be processed.
      *
      * @retval kNotTranslated The datagram is not sending to the configured NAT64 prefix.
-     * @retval kForward       The caller should contiue forwarding the datagram.
+     * @retval kForward       The caller should continue forwarding the datagram.
      * @retval kDrop          The caller should drop the datagram silently.
      *
      */
@@ -243,13 +253,19 @@ public:
 
     /**
      * Sets the prefix of NAT64-mapped addresses in the thread network. The address mapping table will not be cleared.
-     * If an empty NAT64 prefix is set, the translator will return kNotTranslated for all IPv6 datagrams and kDrop for
-     * all IPv4 datagrams.
+     * Equals to `ClearNat64Prefix` when an empty prefix is provided.
      *
      * @param[in] aNat64Prefix The prefix of the NAT64-mapped addresses.
      *
      */
     void SetNat64Prefix(const Ip6::Prefix &aNat64Prefix);
+
+    /**
+     * Clear the prefix of NAT64-mapped addresses in the thread network. The address mapping table will not be cleared.
+     * The translator will return kNotTranslated for all IPv6 datagrams and kDrop for all IPv4 datagrams.
+     *
+     */
+    void ClearNat64Prefix(void);
 
     /**
      * Initializes an `otNat64AddressMappingIterator`.
@@ -331,7 +347,7 @@ private:
         typedef String<Ip6::Address::kInfoStringSize + Ip4::Address::kAddressStringSize + 4> InfoString;
 
         void       Touch(TimeMilli aNow) { mExpiry = aNow + kAddressMappingIdleTimeoutMsec; }
-        InfoString ToString(void);
+        InfoString ToString(void) const;
         void       CopyTo(otNat64AddressMapping &aMapping, TimeMilli aNow) const;
 
         uint64_t mId; // The unique id for a mapping session.
@@ -364,7 +380,10 @@ private:
 
     using MappingTimer = TimerMilliIn<Translator, &Translator::HandleMappingExpirerTimer>;
 
-    bool mEnabled;
+    void UpdateState(bool aAlwaysNotify = false);
+
+    bool  mEnabled;
+    State mState;
 
     uint64_t mNextMappingId;
 

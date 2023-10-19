@@ -252,7 +252,7 @@ void TestParsingHexStrings(void)
     uint8_t        buffer[sizeof(kEvenParsedArray)];
     uint8_t        buf3[3];
     uint16_t       len;
-    const char *   string;
+    const char    *string;
     const uint8_t *bufPtr;
 
     // Verify `ParseAsHexString(const char *aString, uint8_t *aBuffer, uint16_t aSize)`
@@ -309,7 +309,7 @@ void TestParsingHexStrings(void)
 
     for (uint8_t testIter = 0; testIter <= 1; testIter++)
     {
-        for (uint8_t segmentLen = 1; segmentLen <= sizeof(buffer); segmentLen++)
+        for (size_t segmentLen = 1; segmentLen <= sizeof(buffer); segmentLen++)
         {
             if (testIter == 0)
             {
@@ -324,7 +324,7 @@ void TestParsingHexStrings(void)
 
             len = segmentLen;
 
-            printf("\"%s\" segLen:%d -> ", string, segmentLen);
+            printf("\"%s\" segLen:%zu -> ", string, segmentLen);
 
             while (true)
             {

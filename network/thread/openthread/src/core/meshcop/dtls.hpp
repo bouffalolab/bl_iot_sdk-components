@@ -42,8 +42,10 @@
 #include <mbedtls/version.h>
 
 #if OPENTHREAD_CONFIG_COAP_SECURE_API_ENABLE
-#ifdef MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
+#if defined(MBEDTLS_BASE64_C) && defined(MBEDTLS_SSL_KEEP_PEER_CERTIFICATE)
 #include <mbedtls/base64.h>
+#endif
+#ifdef MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
 #include <mbedtls/x509.h>
 #include <mbedtls/x509_crl.h>
 #include <mbedtls/x509_crt.h>
@@ -51,6 +53,7 @@
 #endif
 #endif
 
+#include "common/callback.hpp"
 #include "common/locator.hpp"
 #include "common/message.hpp"
 #include "common/random.hpp"
@@ -70,7 +73,7 @@ public:
     static constexpr uint8_t kPskMaxLength = 32; ///< Maximum PSK length.
 
     /**
-     * This constructor initializes the DTLS object.
+     * Initializes the DTLS object.
      *
      * @param[in]  aInstance            A reference to the OpenThread instance.
      * @param[in]  aLayerTwoSecurity    Specifies whether to use layer two security or not.
@@ -79,7 +82,7 @@ public:
     explicit Dtls(Instance &aInstance, bool aLayerTwoSecurity);
 
     /**
-     * This function pointer is called when a connection is established or torn down.
+     * Pointer is called when a connection is established or torn down.
      *
      * @param[in]  aContext    A pointer to application-specific context.
      * @param[in]  aConnected  TRUE if a connection was established, FALSE otherwise.
@@ -88,7 +91,7 @@ public:
     typedef void (*ConnectedHandler)(void *aContext, bool aConnected);
 
     /**
-     * This function pointer is called when data is received from the DTLS session.
+     * Pointer is called when data is received from the DTLS session.
      *
      * @param[in]  aContext  A pointer to application-specific context.
      * @param[in]  aBuf      A pointer to the received data buffer.
@@ -98,7 +101,7 @@ public:
     typedef void (*ReceiveHandler)(void *aContext, uint8_t *aBuf, uint16_t aLength);
 
     /**
-     * This function pointer is called when secure CoAP server want to send encrypted message.
+     * Pointer is called when secure CoAP server want to send encrypted message.
      *
      * @param[in]  aContext      A pointer to arbitrary context information.
      * @param[in]  aMessage      A reference to the message to send.
@@ -108,7 +111,7 @@ public:
     typedef Error (*TransportCallback)(void *aContext, ot::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 
     /**
-     * This method opens the DTLS socket.
+     * Opens the DTLS socket.
      *
      * @param[in]  aReceiveHandler      A pointer to a function that is called to receive DTLS payload.
      * @param[in]  aConnectedHandler    A pointer to a function that is called when connected or disconnected.
@@ -121,7 +124,7 @@ public:
     Error Open(ReceiveHandler aReceiveHandler, ConnectedHandler aConnectedHandler, void *aContext);
 
     /**
-     * This method binds this DTLS to a UDP port.
+     * Binds this DTLS to a UDP port.
      *
      * @param[in]  aPort              The port to bind.
      *
@@ -133,7 +136,7 @@ public:
     Error Bind(uint16_t aPort);
 
     /**
-     * This method gets the UDP port of this session.
+     * Gets the UDP port of this session.
      *
      * @returns  UDP port number.
      *
@@ -141,7 +144,7 @@ public:
     uint16_t GetUdpPort(void) const;
 
     /**
-     * This method binds this DTLS with a transport callback.
+     * Binds this DTLS with a transport callback.
      *
      * @param[in]  aCallback  A pointer to a function for sending messages.
      * @param[in]  aContext   A pointer to arbitrary context information.
@@ -154,7 +157,7 @@ public:
     Error Bind(TransportCallback aCallback, void *aContext);
 
     /**
-     * This method establishes a DTLS session.
+     * Establishes a DTLS session.
      *
      * For CoAP Secure API do first:
      * Set X509 Pk and Cert for use DTLS mode ECDHE ECDSA with AES 128 CCM 8 or
@@ -169,7 +172,7 @@ public:
     Error Connect(const Ip6::SockAddr &aSockAddr);
 
     /**
-     * This method indicates whether or not the DTLS session is active.
+     * Indicates whether or not the DTLS session is active.
      *
      * @retval TRUE  If DTLS session is active.
      * @retval FALSE If DTLS session is not active.
@@ -178,7 +181,7 @@ public:
     bool IsConnectionActive(void) const { return mState >= kStateConnecting; }
 
     /**
-     * This method indicates whether or not the DTLS session is connected.
+     * Indicates whether or not the DTLS session is connected.
      *
      * @retval TRUE   The DTLS session is connected.
      * @retval FALSE  The DTLS session is not connected.
@@ -187,19 +190,19 @@ public:
     bool IsConnected(void) const { return mState == kStateConnected; }
 
     /**
-     * This method disconnects the DTLS session.
+     * Disconnects the DTLS session.
      *
      */
     void Disconnect(void);
 
     /**
-     * This method closes the DTLS socket.
+     * Closes the DTLS socket.
      *
      */
     void Close(void);
 
     /**
-     * This method sets the PSK.
+     * Sets the PSK.
      *
      * @param[in]  aPsk  A pointer to the PSK.
      *
@@ -212,7 +215,7 @@ public:
 #if OPENTHREAD_CONFIG_COAP_SECURE_API_ENABLE
 #ifdef MBEDTLS_KEY_EXCHANGE_PSK_ENABLED
     /**
-     * This method sets the Pre-Shared Key (PSK) for DTLS sessions-
+     * Sets the Pre-Shared Key (PSK) for DTLS sessions-
      * identified by a PSK.
      *
      * DTLS mode "PSK with AES 128 CCM 8" for Application CoAPS.
@@ -231,7 +234,7 @@ public:
 
 #ifdef MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
     /**
-     * This method sets a reference to the own x509 certificate with corresponding private key.
+     * Sets a reference to the own x509 certificate with corresponding private key.
      *
      * DTLS mode "ECDHE ECDSA with AES 128 CCM 8" for Application CoAPS.
      *
@@ -247,7 +250,7 @@ public:
                         uint32_t       aPrivateKeyLength);
 
     /**
-     * This method sets the trusted top level CAs. It is needed for validate the
+     * Sets the trusted top level CAs. It is needed for validate the
      * certificate of the peer.
      *
      * DTLS mode "ECDHE ECDSA with AES 128 CCM 8" for Application CoAPS.
@@ -261,7 +264,7 @@ public:
 
 #if defined(MBEDTLS_BASE64_C) && defined(MBEDTLS_SSL_KEEP_PEER_CERTIFICATE)
     /**
-     * This method returns the peer x509 certificate base64 encoded.
+     * Returns the peer x509 certificate base64 encoded.
      *
      * DTLS mode "ECDHE ECDSA with AES 128 CCM 8" for Application CoAPS.
      *
@@ -278,7 +281,7 @@ public:
 #endif // defined(MBEDTLS_BASE64_C) && defined(MBEDTLS_SSL_KEEP_PEER_CERTIFICATE)
 
     /**
-     * This method set the authentication mode for a dtls connection.
+     * Set the authentication mode for a dtls connection.
      *
      * Disable or enable the verification of peer certificate.
      * Must called before start.
@@ -291,7 +294,7 @@ public:
 
 #ifdef MBEDTLS_SSL_SRV_C
     /**
-     * This method sets the Client ID used for generating the Hello Cookie.
+     * Sets the Client ID used for generating the Hello Cookie.
      *
      * @param[in]  aClientId  A pointer to the Client ID.
      * @param[in]  aLength    Number of bytes in the Client ID.
@@ -303,7 +306,7 @@ public:
 #endif
 
     /**
-     * This method sends data within the DTLS session.
+     * Sends data within the DTLS session.
      *
      * @param[in]  aMessage  A message to send via DTLS.
      * @param[in]  aLength   Number of bytes in the data buffer.
@@ -315,7 +318,7 @@ public:
     Error Send(Message &aMessage, uint16_t aLength);
 
     /**
-     * This method provides a received DTLS message to the DTLS object.
+     * Provides a received DTLS message to the DTLS object.
      *
      * @param[in]  aMessage  A reference to the message.
      *
@@ -323,7 +326,7 @@ public:
     void Receive(Message &aMessage);
 
     /**
-     * This method sets the default message sub-type that will be used for all messages without defined
+     * Sets the default message sub-type that will be used for all messages without defined
      * sub-type.
      *
      * @param[in]  aMessageSubType  The default message sub-type.
@@ -332,7 +335,7 @@ public:
     void SetDefaultMessageSubType(Message::SubType aMessageSubType) { mMessageDefaultSubType = aMessageSubType; }
 
     /**
-     * This method returns the DTLS session's peer address.
+     * Returns the DTLS session's peer address.
      *
      * @return DTLS session's message info.
      *
@@ -394,16 +397,16 @@ private:
 #ifdef MBEDTLS_SSL_EXPORT_KEYS
 #if (MBEDTLS_VERSION_NUMBER >= 0x03000000)
 
-    static void HandleMbedtlsExportKeys(void *                      aContext,
+    static void HandleMbedtlsExportKeys(void                       *aContext,
                                         mbedtls_ssl_key_export_type aType,
-                                        const unsigned char *       aMasterSecret,
+                                        const unsigned char        *aMasterSecret,
                                         size_t                      aMasterSecretLen,
                                         const unsigned char         aClientRandom[32],
                                         const unsigned char         aServerRandom[32],
                                         mbedtls_tls_prf_types       aTlsPrfType);
 
     void HandleMbedtlsExportKeys(mbedtls_ssl_key_export_type aType,
-                                 const unsigned char *       aMasterSecret,
+                                 const unsigned char        *aMasterSecret,
                                  size_t                      aMasterSecretLen,
                                  const unsigned char         aClientRandom[32],
                                  const unsigned char         aServerRandom[32],
@@ -411,7 +414,7 @@ private:
 
 #else
 
-    static int       HandleMbedtlsExportKeys(void *               aContext,
+    static int       HandleMbedtlsExportKeys(void                *aContext,
                                              const unsigned char *aMasterSecret,
                                              const unsigned char *aKeyBlock,
                                              size_t               aMacLength,
@@ -458,11 +461,11 @@ private:
 
 #if OPENTHREAD_CONFIG_COAP_SECURE_API_ENABLE
 #ifdef MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
-    const uint8_t *    mCaChainSrc;
+    const uint8_t     *mCaChainSrc;
     uint32_t           mCaChainLength;
-    const uint8_t *    mOwnCertSrc;
+    const uint8_t     *mOwnCertSrc;
     uint32_t           mOwnCertLength;
-    const uint8_t *    mPrivateKeySrc;
+    const uint8_t     *mPrivateKeySrc;
     uint32_t           mPrivateKeyLength;
     mbedtls_x509_crt   mCaChain;
     mbedtls_x509_crt   mOwnCert;
@@ -494,15 +497,13 @@ private:
 
     Message *mReceiveMessage;
 
-    ConnectedHandler mConnectedHandler;
-    ReceiveHandler   mReceiveHandler;
-    void *           mContext;
+    Callback<ConnectedHandler> mConnectedCallback;
+    Callback<ReceiveHandler>   mReceiveCallback;
 
     Ip6::MessageInfo mMessageInfo;
     Ip6::Udp::Socket mSocket;
 
-    TransportCallback mTransportCallback;
-    void *            mTransportContext;
+    Callback<TransportCallback> mTransportCallback;
 
     Message::SubType mMessageSubType;
     Message::SubType mMessageDefaultSubType;

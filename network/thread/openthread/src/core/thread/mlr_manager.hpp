@@ -44,6 +44,7 @@
 
 #include "backbone_router/bbr_leader.hpp"
 #include "coap/coap_message.hpp"
+#include "common/callback.hpp"
 #include "common/locator.hpp"
 #include "common/non_copyable.hpp"
 #include "common/notifier.hpp"
@@ -70,7 +71,7 @@ namespace ot {
  */
 
 /**
- * This class implements MLR management.
+ * Implements MLR management.
  *
  */
 class MlrManager : public InstanceLocator, private NonCopyable
@@ -80,7 +81,7 @@ class MlrManager : public InstanceLocator, private NonCopyable
 
 public:
     /**
-     * This constructor initializes the object.
+     * Initializes the object.
      *
      * @param[in]  aInstance     A reference to the OpenThread instance.
      *
@@ -88,32 +89,32 @@ public:
     explicit MlrManager(Instance &aInstance);
 
     /**
-     * This method notifies Primary Backbone Router status.
+     * Notifies Primary Backbone Router status.
      *
      * @param[in]  aState   The state or state change of Primary Backbone Router.
      * @param[in]  aConfig  The Primary Backbone Router service.
      *
      */
-    void HandleBackboneRouterPrimaryUpdate(BackboneRouter::Leader::State               aState,
-                                           const BackboneRouter::BackboneRouterConfig &aConfig);
+    void HandleBackboneRouterPrimaryUpdate(BackboneRouter::Leader::State aState, const BackboneRouter::Config &aConfig);
 
 #if OPENTHREAD_FTD && OPENTHREAD_CONFIG_TMF_PROXY_MLR_ENABLE
+    static constexpr uint16_t kMaxMlrAddresses = OPENTHREAD_CONFIG_MLE_IP_ADDRS_PER_CHILD - 1; ///< Max MLR addresses
+
+    typedef Array<Ip6::Address, kMaxMlrAddresses> MlrAddressArray; ///< Registered MLR addresses array.
+
     /**
-     * This method updates the Multicast Subscription Table according to the Child information.
+     * Updates the Multicast Subscription Table according to the Child information.
      *
      * @param[in]  aChild                       A reference to the child information.
-     * @param[in]  aOldMlrRegisteredAddresses   Pointer to an array of the Child's previously registered IPv6 addresses.
-     * @param[in]  aOldMlrRegisteredAddressNum  The number of previously registered IPv6 addresses.
+     * @param[in]  aOldMlrRegisteredAddresses   Array of the Child's previously registered IPv6 addresses.
      *
      */
-    void UpdateProxiedSubscriptions(Child &             aChild,
-                                    const Ip6::Address *aOldMlrRegisteredAddresses,
-                                    uint16_t            aOldMlrRegisteredAddressNum);
+    void UpdateProxiedSubscriptions(Child &aChild, const MlrAddressArray &aOldMlrRegisteredAddresses);
 #endif
 
 #if OPENTHREAD_FTD && OPENTHREAD_CONFIG_TMF_PROXY_MLR_ENABLE && OPENTHREAD_CONFIG_COMMISSIONER_ENABLE
     /**
-     * This method registers Multicast Listeners to Primary Backbone Router.
+     * Registers Multicast Listeners to Primary Backbone Router.
      *
      * Note: only available when both `(OPENTHREAD_FTD && OPENTHREAD_CONFIG_TMF_PROXY_MLR_ENABLE)` and
      * `OPENTHREAD_CONFIG_COMMISSIONER_ENABLE` are enabled)
@@ -134,42 +135,42 @@ public:
      * @retval kErrorNoBufs        If insufficient message buffers available.
      *
      */
-    Error RegisterMulticastListeners(const otIp6Address *                    aAddresses,
+    Error RegisterMulticastListeners(const otIp6Address                     *aAddresses,
                                      uint8_t                                 aAddressNum,
-                                     const uint32_t *                        aTimeout,
+                                     const uint32_t                         *aTimeout,
                                      otIp6RegisterMulticastListenersCallback aCallback,
-                                     void *                                  aContext);
+                                     void                                   *aContext);
 #endif
 
 private:
     void HandleNotifierEvents(Events aEvents);
 
     void  SendMulticastListenerRegistration(void);
-    Error SendMulticastListenerRegistrationMessage(const otIp6Address *  aAddresses,
+    Error SendMulticastListenerRegistrationMessage(const otIp6Address   *aAddresses,
                                                    uint8_t               aAddressNum,
-                                                   const uint32_t *      aTimeout,
+                                                   const uint32_t       *aTimeout,
                                                    Coap::ResponseHandler aResponseHandler,
-                                                   void *                aResponseContext);
+                                                   void                 *aResponseContext);
 
-    static void  HandleMulticastListenerRegistrationResponse(void *               aContext,
-                                                             otMessage *          aMessage,
+    static void  HandleMulticastListenerRegistrationResponse(void                *aContext,
+                                                             otMessage           *aMessage,
                                                              const otMessageInfo *aMessageInfo,
                                                              Error                aResult);
-    void         HandleMulticastListenerRegistrationResponse(Coap::Message *         aMessage,
+    void         HandleMulticastListenerRegistrationResponse(Coap::Message          *aMessage,
                                                              const Ip6::MessageInfo *aMessageInfo,
                                                              Error                   aResult);
     static Error ParseMulticastListenerRegistrationResponse(Error          aResult,
                                                             Coap::Message *aMessage,
-                                                            uint8_t &      aStatus,
-                                                            Ip6::Address * aFailedAddresses,
-                                                            uint8_t &      aFailedAddressNum);
+                                                            uint8_t       &aStatus,
+                                                            Ip6::Address  *aFailedAddresses,
+                                                            uint8_t       &aFailedAddressNum);
 
 #if OPENTHREAD_FTD && OPENTHREAD_CONFIG_COMMISSIONER_ENABLE
-    static void HandleRegisterMulticastListenersResponse(void *               aContext,
-                                                         otMessage *          aMessage,
+    static void HandleRegisterMulticastListenersResponse(void                *aContext,
+                                                         otMessage           *aMessage,
                                                          const otMessageInfo *aMessageInfo,
                                                          Error                aResult);
-    void        HandleRegisterMulticastListenersResponse(otMessage *          aMessage,
+    void        HandleRegisterMulticastListenersResponse(otMessage           *aMessage,
                                                          const otMessageInfo *aMessageInfo,
                                                          Error                aResult);
 #endif
@@ -193,7 +194,7 @@ private:
                                              uint8_t             aFailedAddressNum);
 
     void        AppendToUniqueAddressList(Ip6::Address (&aAddresses)[Ip6AddressesTlv::kMaxAddresses],
-                                          uint8_t &           aAddressNum,
+                                          uint8_t            &aAddressNum,
                                           const Ip6::Address &aAddress);
     static bool AddressListContains(const Ip6::Address *aAddressList,
                                     uint8_t             aAddressListSize,
@@ -214,8 +215,7 @@ private:
                                uint8_t             aFailedAddressNum);
 
 #if (OPENTHREAD_FTD && OPENTHREAD_CONFIG_TMF_PROXY_MLR_ENABLE) && OPENTHREAD_CONFIG_COMMISSIONER_ENABLE
-    otIp6RegisterMulticastListenersCallback mRegisterMulticastListenersCallback;
-    void *                                  mRegisterMulticastListenersContext;
+    Callback<otIp6RegisterMulticastListenersCallback> mRegisterMulticastListenersCallback;
 #endif
 
     uint32_t mReregistrationDelay;

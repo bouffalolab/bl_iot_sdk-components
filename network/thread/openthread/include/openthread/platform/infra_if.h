@@ -57,7 +57,7 @@ extern "C" {
  */
 
 /**
- * This method tells whether an infra interface has the given IPv6 address assigned.
+ * Tells whether an infra interface has the given IPv6 address assigned.
  *
  * @param[in]  aInfraIfIndex  The index of the infra interface.
  * @param[in]  aAddress       The IPv6 address.
@@ -68,7 +68,7 @@ extern "C" {
 bool otPlatInfraIfHasAddress(uint32_t aInfraIfIndex, const otIp6Address *aAddress);
 
 /**
- * This method sends an ICMPv6 Neighbor Discovery message on given infrastructure interface.
+ * Sends an ICMPv6 Neighbor Discovery message on given infrastructure interface.
  *
  * See RFC 4861: https://tools.ietf.org/html/rfc4861.
  *
@@ -87,7 +87,7 @@ bool otPlatInfraIfHasAddress(uint32_t aInfraIfIndex, const otIp6Address *aAddres
  */
 otError otPlatInfraIfSendIcmp6Nd(uint32_t            aInfraIfIndex,
                                  const otIp6Address *aDestAddress,
-                                 const uint8_t *     aBuffer,
+                                 const uint8_t      *aBuffer,
                                  uint16_t            aBufferLength);
 
 /**
@@ -106,10 +106,10 @@ otError otPlatInfraIfSendIcmp6Nd(uint32_t            aInfraIfIndex,
  *        address and the IP Hop Limit MUST be 255.
  *
  */
-extern void otPlatInfraIfRecvIcmp6Nd(otInstance *        aInstance,
+extern void otPlatInfraIfRecvIcmp6Nd(otInstance         *aInstance,
                                      uint32_t            aInfraIfIndex,
                                      const otIp6Address *aSrcAddress,
-                                     const uint8_t *     aBuffer,
+                                     const uint8_t      *aBuffer,
                                      uint16_t            aBufferLength);
 
 /**
@@ -150,7 +150,7 @@ otError otPlatInfraIfDiscoverNat64Prefix(uint32_t aInfraIfIndex);
  * The infra interface driver calls this method to notify OpenThread that
  * the discovery of NAT64 prefix is done.
  *
- * This method is expected to be invoked after calling otPlatInfraIfDiscoverNat64Prefix.
+ * Is expected to be invoked after calling otPlatInfraIfDiscoverNat64Prefix.
  * If no NAT64 prefix is discovered, @p aIp6Prefix shall point to an empty prefix with zero length.
  *
  * @param[in]  aInstance      The OpenThread instance structure.
@@ -158,7 +158,7 @@ otError otPlatInfraIfDiscoverNat64Prefix(uint32_t aInfraIfIndex);
  * @param[in]  aIp6Prefix     A pointer to NAT64 prefix.
  *
  */
-extern void otPlatInfraIfDiscoverNat64PrefixDone(otInstance *       aInstance,
+extern void otPlatInfraIfDiscoverNat64PrefixDone(otInstance        *aInstance,
                                                  uint32_t           aInfraIfIndex,
                                                  const otIp6Prefix *aIp6Prefix);
 

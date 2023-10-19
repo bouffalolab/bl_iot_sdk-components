@@ -71,7 +71,7 @@
 #include "lib/platform/reset_util.h"
 
 /**
- * This function initializes NCP app.
+ * Initializes NCP app.
  *
  * @param[in]  aInstance    A pointer to the OpenThread instance.
  *
@@ -79,13 +79,13 @@
 void otAppNcpInit(otInstance *aInstance);
 
 /**
- * This function deinitializes NCP app.
+ * Deinitializes NCP app.
  *
  */
 void otAppNcpUpdate(otSysMainloopContext *aContext);
 
 /**
- * This function updates the file descriptor sets with file descriptors used by console.
+ * Updates the file descriptor sets with file descriptors used by console.
  *
  * @param[in,out]   aMainloop   A pointer to the mainloop context.
  *
@@ -93,7 +93,7 @@ void otAppNcpUpdate(otSysMainloopContext *aContext);
 void otAppNcpProcess(const otSysMainloopContext *aContext);
 
 /**
- * This function initializes CLI app.
+ * Initializes CLI app.
  *
  * @param[in]  aInstance    A pointer to the OpenThread instance.
  *
@@ -101,13 +101,13 @@ void otAppNcpProcess(const otSysMainloopContext *aContext);
 void otAppCliInit(otInstance *aInstance);
 
 /**
- * This function deinitializes CLI app.
+ * Deinitializes CLI app.
  *
  */
 void otAppCliDeinit(void);
 
 /**
- * This function updates the file descriptor sets with file descriptors used by console.
+ * Updates the file descriptor sets with file descriptors used by console.
  *
  * @param[in,out]   aMainloop   A pointer to the mainloop context.
  *
@@ -115,7 +115,7 @@ void otAppCliDeinit(void);
 void otAppCliUpdate(otSysMainloopContext *aMainloop);
 
 /**
- * This function performs console driver processing.
+ * Performs console driver processing.
  *
  * @param[in]    aMainloop      A pointer to the mainloop context.
  *
@@ -131,7 +131,7 @@ typedef struct PosixConfig
 } PosixConfig;
 
 /**
- * This enumeration defines the argument return values.
+ * Defines the argument return values.
  *
  */
 enum
@@ -197,6 +197,7 @@ static void ParseArg(int aArgCount, char *aArgVector[], PosixConfig *aConfig)
     aConfig->mPlatformConfig.mPersistentInterface = false;
     aConfig->mPlatformConfig.mSpeedUpFactor       = 1;
     aConfig->mLogLevel                            = OT_LOG_LEVEL_CRIT;
+    aConfig->mPlatformConfig.mInterfaceName       = OPENTHREAD_POSIX_CONFIG_THREAD_NETIF_DEFAULT_NAME;
 #ifdef __linux__
     aConfig->mPlatformConfig.mRealTimeSignal = SIGRTMIN;
 #endif
@@ -315,10 +316,7 @@ static otInstance *InitInstance(PosixConfig *aConfig)
     return instance;
 }
 
-void otTaskletsSignalPending(otInstance *aInstance)
-{
-    OT_UNUSED_VARIABLE(aInstance);
-}
+void otTaskletsSignalPending(otInstance *aInstance) { OT_UNUSED_VARIABLE(aInstance); }
 
 void otPlatReset(otInstance *aInstance)
 {
@@ -383,7 +381,7 @@ int main(int argc, char *argv[])
 #if !OPENTHREAD_POSIX_CONFIG_DAEMON_ENABLE
     otAppCliInit(instance);
 #endif
-    otCliSetUserCommands(kCommands, OT_ARRAY_LENGTH(kCommands), instance);
+    IgnoreError(otCliSetUserCommands(kCommands, OT_ARRAY_LENGTH(kCommands), instance));
 
     while (true)
     {

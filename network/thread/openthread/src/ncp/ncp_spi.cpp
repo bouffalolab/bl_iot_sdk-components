@@ -49,7 +49,7 @@
 #if OPENTHREAD_CONFIG_DIAG_ENABLE
 static_assert(OPENTHREAD_CONFIG_DIAG_OUTPUT_BUFFER_SIZE <=
                   OPENTHREAD_CONFIG_NCP_SPI_BUFFER_SIZE - ot::Ncp::NcpBase::kSpinelCmdHeaderSize -
-                      ot::Ncp::NcpBase::kSpinelPropIdSize - ot::Ncp::SpiFrame::kHeaderSize,
+                      ot::Ncp::NcpBase::kSpinelPropIdSize - ot::Spinel::SpiFrame::kHeaderSize,
               "diag output should be smaller than NCP SPI tx buffer");
 static_assert(OPENTHREAD_CONFIG_DIAG_CMD_LINE_BUFFER_SIZE <= OPENTHREAD_CONFIG_NCP_SPI_BUFFER_SIZE,
               "diag command line should be smaller than NCP SPI rx buffer");
@@ -58,13 +58,15 @@ static_assert(OPENTHREAD_CONFIG_DIAG_CMD_LINE_BUFFER_SIZE <= OPENTHREAD_CONFIG_N
 namespace ot {
 namespace Ncp {
 
+using Spinel::SpiFrame;
+
 #if OPENTHREAD_ENABLE_NCP_VENDOR_HOOK == 0
 
 static OT_DEFINE_ALIGNED_VAR(sNcpRaw, sizeof(NcpSpi), uint64_t);
 
 extern "C" void otNcpSpiInit(otInstance *aInstance)
 {
-    NcpSpi *  ncpSpi   = nullptr;
+    NcpSpi   *ncpSpi   = nullptr;
     Instance *instance = static_cast<Instance *>(aInstance);
 
     ncpSpi = new (&sNcpRaw) NcpSpi(instance);
@@ -114,7 +116,7 @@ NcpSpi::NcpSpi(Instance *aInstance)
                                                  /* aRequestTransactionFlag */ true));
 }
 
-bool NcpSpi::SpiTransactionComplete(void *   aContext,
+bool NcpSpi::SpiTransactionComplete(void    *aContext,
                                     uint8_t *aOutputBuf,
                                     uint16_t aOutputLen,
                                     uint8_t *aInputBuf,
@@ -224,10 +226,7 @@ exit:
     return shouldProcess;
 }
 
-void NcpSpi::SpiTransactionProcess(void *aContext)
-{
-    reinterpret_cast<NcpSpi *>(aContext)->SpiTransactionProcess();
-}
+void NcpSpi::SpiTransactionProcess(void *aContext) { reinterpret_cast<NcpSpi *>(aContext)->SpiTransactionProcess(); }
 
 void NcpSpi::SpiTransactionProcess(void)
 {
@@ -242,10 +241,10 @@ void NcpSpi::SpiTransactionProcess(void)
     }
 }
 
-void NcpSpi::HandleFrameAddedToTxBuffer(void *                   aContext,
+void NcpSpi::HandleFrameAddedToTxBuffer(void                    *aContext,
                                         Spinel::Buffer::FrameTag aTag,
                                         Spinel::Buffer::Priority aPriority,
-                                        Spinel::Buffer *         aBuffer)
+                                        Spinel::Buffer          *aBuffer)
 {
     OT_UNUSED_VARIABLE(aBuffer);
     OT_UNUSED_VARIABLE(aTag);

@@ -60,7 +60,7 @@ For a more in-depth example, see [this video](https://youtu.be/ppZ784YUKlI).
 - [bind](#bind-ip-port)
 - [connect](#connect-ip-port)
 - [send](#send-message)
-- [benchmark](#benchmark-size)
+- [benchmark](#benchmark-run-size)
 - [sendend](#sendend)
 - [abort](#abort)
 - [listen](#listen-ip-port)
@@ -78,17 +78,32 @@ TCP: Connection reset
 Done
 ```
 
-### benchmark [\<size\>]
+### benchmark run [\<size\>]
 
 Transfers the specified number of bytes using the TCP connection currently associated with the example TCP endpoint (this TCP connection must be established before using this command).
 
 - size: the number of bytes to send for the benchmark. If it is left unspecified, the default size is used.
 
 ```bash
-> tcp benchmark
+> tcp benchmark run
 Done
 TCP Benchmark Complete: Transferred 73728 bytes in 7233 milliseconds
 TCP Goodput: 81.546 kb/s
+```
+
+### benchmark result
+
+Get the last result of TCP benchmark. If the benchmark is ongoing, it will show that benchmark is ongoing. This command is used for test scripts which automate the tcp benchmark test.
+
+```
+> tcp benchmark result
+TCP Benchmark Status: Ongoing
+Done
+
+> tcp benchmark result
+TCP Benchmark Status: Completed
+TCP Benchmark Complete: Transferred 73728 bytes in 7056 milliseconds
+TCP Goodput: 83.592 kb/s
 ```
 
 ### bind \<ip\> \<port\>
@@ -157,14 +172,19 @@ stoplistening
 Done
 ```
 
-### init [\<size\>]
+### init [\<mode\>]&nbsp;[\<size\>]
 
 Initializes the example TCP listener and the example TCP endpoint.
 
+- mode: this specifies the buffering strategy and whether to use TLS. The possible values are "linked", "circular" (default), and "tls".
 - size: the size of the receive buffer to associate with the example TCP endpoint. If left unspecified, the maximum size is used.
 
+If "tls" is used, then the TLS protocol will be used for the connection (on top of TCP). When communicating over TCP between two nodes, either both should use TLS or neither should (a non-TLS endpoint cannot communicate with a TLS endpoint). The first two options, "linked" and "circular", specify that TLS should not be used and specify a buffering strategy to use with TCP; two endpoints of a TCP connection may use different buffering strategies.
+
+The behaviors of "linked" and "circular" buffering are identical, but the option is provided so that users of TCP can inspect the code to see an example of using the two buffering strategies.
+
 ```bash
-> tcp init
+> tcp init tls
 Done
 ```
 

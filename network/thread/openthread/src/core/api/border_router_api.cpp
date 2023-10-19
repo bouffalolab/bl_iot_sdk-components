@@ -83,9 +83,9 @@ otError otBorderRouterRemoveOnMeshPrefix(otInstance *aInstance, const otIp6Prefi
     return error;
 }
 
-otError otBorderRouterGetNextOnMeshPrefix(otInstance *           aInstance,
+otError otBorderRouterGetNextOnMeshPrefix(otInstance            *aInstance,
                                           otNetworkDataIterator *aIterator,
-                                          otBorderRouterConfig * aConfig)
+                                          otBorderRouterConfig  *aConfig)
 {
     AssertPointerIsNotNull(aIterator);
 
@@ -102,7 +102,7 @@ otError otBorderRouterRemoveRoute(otInstance *aInstance, const otIp6Prefix *aPre
     return AsCoreType(aInstance).Get<NetworkData::Local>().RemoveHasRoutePrefix(AsCoreType(aPrefix));
 }
 
-otError otBorderRouterGetNextRoute(otInstance *           aInstance,
+otError otBorderRouterGetNextRoute(otInstance            *aInstance,
                                    otNetworkDataIterator *aIterator,
                                    otExternalRouteConfig *aConfig)
 {
@@ -117,5 +117,14 @@ otError otBorderRouterRegister(otInstance *aInstance)
 
     return kErrorNone;
 }
+
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+void otBorderRouterSetNetDataFullCallback(otInstance                       *aInstance,
+                                          otBorderRouterNetDataFullCallback aCallback,
+                                          void                             *aContext)
+{
+    AsCoreType(aInstance).Get<NetworkData::Notifier>().SetNetDataFullCallback(aCallback, aContext);
+}
+#endif
 
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE

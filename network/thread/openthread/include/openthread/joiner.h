@@ -56,7 +56,7 @@ extern "C" {
  */
 
 /**
- * This enumeration defines the Joiner State.
+ * Defines the Joiner State.
  *
  */
 typedef enum otJoinerState
@@ -72,7 +72,7 @@ typedef enum otJoinerState
 #define OT_JOINER_MAX_DISCERNER_LENGTH 64 ///< Maximum length of a Joiner Discerner in bits.
 
 /**
- * This structure represents a Joiner Discerner.
+ * Represents a Joiner Discerner.
  *
  */
 typedef struct otJoinerDiscerner
@@ -82,7 +82,7 @@ typedef struct otJoinerDiscerner
 } otJoinerDiscerner;
 
 /**
- * This function pointer is called to notify the completion of a join operation.
+ * Pointer is called to notify the completion of a join operation.
  *
  * @param[in]  aError    OT_ERROR_NONE if the join process succeeded.
  *                       OT_ERROR_SECURITY if the join process failed due to security credentials.
@@ -112,15 +112,15 @@ typedef void (*otJoinerCallback)(otError aError, void *aContext);
  * @retval OT_ERROR_INVALID_STATE     The IPv6 stack is not enabled or Thread stack is fully enabled.
  *
  */
-otError otJoinerStart(otInstance *     aInstance,
-                      const char *     aPskd,
-                      const char *     aProvisioningUrl,
-                      const char *     aVendorName,
-                      const char *     aVendorModel,
-                      const char *     aVendorSwVersion,
-                      const char *     aVendorData,
+otError otJoinerStart(otInstance      *aInstance,
+                      const char      *aPskd,
+                      const char      *aProvisioningUrl,
+                      const char      *aVendorName,
+                      const char      *aVendorModel,
+                      const char      *aVendorSwVersion,
+                      const char      *aVendorData,
                       otJoinerCallback aCallback,
-                      void *           aContext);
+                      void            *aContext);
 
 /**
  * Disables the Thread Joiner role.
@@ -188,7 +188,7 @@ otError otJoinerSetDiscerner(otInstance *aInstance, otJoinerDiscerner *aDiscerne
 const otJoinerDiscerner *otJoinerGetDiscerner(otInstance *aInstance);
 
 /**
- * This function converts a given joiner state enumeration value to a human-readable string.
+ * Converts a given joiner state enumeration value to a human-readable string.
  *
  * @param[in] aState   The joiner state.
  *

@@ -312,7 +312,7 @@ extern "C" bool otGetMeshForwarderInfo(otInstance *aInstance, uint8_t *pLinkFail
 
 extern "C" bool otSetMeshForwarderInfo(otInstance *aInstance, uint8_t linkFailures) 
 {
-    uint8_t aFailLimit = Mle::kFailedRouterTransmissions;
+    uint8_t aFailLimit = Mle::kFailedChildTransmissions;
 
     if (otInstanceIsInitialized(aInstance)) {
 

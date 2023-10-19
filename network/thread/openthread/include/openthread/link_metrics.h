@@ -56,7 +56,7 @@ extern "C" {
  */
 
 /**
- * This structure represents the result (value) for a Link Metrics query.
+ * Represents the result (value) for a Link Metrics query.
  *
  */
 typedef struct otLinkMetricsValues
@@ -70,7 +70,7 @@ typedef struct otLinkMetricsValues
 } otLinkMetricsValues;
 
 /**
- * This structure represents which frames are accounted in a Forward Tracking Series.
+ * Represents which frames are accounted in a Forward Tracking Series.
  *
  */
 typedef struct otLinkMetricsSeriesFlags
@@ -108,7 +108,7 @@ typedef enum otLinkMetricsStatus
 } otLinkMetricsStatus;
 
 /**
- * This function pointer is called when a Link Metrics report is received.
+ * Pointer is called when a Link Metrics report is received.
  *
  * @param[in]  aSource         A pointer to the source address.
  * @param[in]  aMetricsValues  A pointer to the Link Metrics values (the query result).
@@ -116,22 +116,24 @@ typedef enum otLinkMetricsStatus
  * @param[in]  aContext        A pointer to application-specific context.
  *
  */
-typedef void (*otLinkMetricsReportCallback)(const otIp6Address *       aSource,
+typedef void (*otLinkMetricsReportCallback)(const otIp6Address        *aSource,
                                             const otLinkMetricsValues *aMetricsValues,
-                                            uint8_t                    aStatus,
-                                            void *                     aContext);
+                                            otLinkMetricsStatus        aStatus,
+                                            void                      *aContext);
 /**
- * This function pointer is called when a Link Metrics Management Response is received.
+ * Pointer is called when a Link Metrics Management Response is received.
  *
  * @param[in]  aSource         A pointer to the source address.
  * @param[in]  aStatus         The status code in the response.
  * @param[in]  aContext        A pointer to application-specific context.
  *
  */
-typedef void (*otLinkMetricsMgmtResponseCallback)(const otIp6Address *aSource, uint8_t aStatus, void *aContext);
+typedef void (*otLinkMetricsMgmtResponseCallback)(const otIp6Address *aSource,
+                                                  otLinkMetricsStatus aStatus,
+                                                  void               *aContext);
 
 /**
- * This function pointer is called when Enh-ACK Probing IE is received.
+ * Pointer is called when Enh-ACK Probing IE is received.
  *
  * @param[in] aShortAddress     The Mac short address of the Probing Subject.
  * @param[in] aExtAddress       A pointer to the Mac extended address of the Probing Subject.
@@ -140,12 +142,12 @@ typedef void (*otLinkMetricsMgmtResponseCallback)(const otIp6Address *aSource, u
  *
  */
 typedef void (*otLinkMetricsEnhAckProbingIeReportCallback)(otShortAddress             aShortAddress,
-                                                           const otExtAddress *       aExtAddress,
+                                                           const otExtAddress        *aExtAddress,
                                                            const otLinkMetricsValues *aMetricsValues,
-                                                           void *                     aContext);
+                                                           void                      *aContext);
 
 /**
- * This function sends an MLE Data Request to query Link Metrics.
+ * Sends an MLE Data Request to query Link Metrics.
  *
  * It could be either Single Probe or Forward Tracking Series.
  *
@@ -162,12 +164,12 @@ typedef void (*otLinkMetricsEnhAckProbingIeReportCallback)(otShortAddress       
  * @retval OT_ERROR_NOT_CAPABLE       The neighbor is not a Thread 1.2 device and does not support Link Metrics.
  *
  */
-otError otLinkMetricsQuery(otInstance *                aInstance,
-                           const otIp6Address *        aDestination,
+otError otLinkMetricsQuery(otInstance                 *aInstance,
+                           const otIp6Address         *aDestination,
                            uint8_t                     aSeriesId,
-                           const otLinkMetrics *       aLinkMetricsFlags,
+                           const otLinkMetrics        *aLinkMetricsFlags,
                            otLinkMetricsReportCallback aCallback,
-                           void *                      aCallbackContext);
+                           void                       *aCallbackContext);
 
 /**
  * Sends an MLE Link Metrics Management Request to configure or clear a Forward Tracking Series.
@@ -189,16 +191,16 @@ otError otLinkMetricsQuery(otInstance *                aInstance,
  * @retval OT_ERROR_NOT_CAPABLE       The neighbor is not a Thread 1.2 device and does not support Link Metrics.
  *
  */
-otError otLinkMetricsConfigForwardTrackingSeries(otInstance *                      aInstance,
-                                                 const otIp6Address *              aDestination,
+otError otLinkMetricsConfigForwardTrackingSeries(otInstance                       *aInstance,
+                                                 const otIp6Address               *aDestination,
                                                  uint8_t                           aSeriesId,
                                                  otLinkMetricsSeriesFlags          aSeriesFlags,
-                                                 const otLinkMetrics *             aLinkMetricsFlags,
+                                                 const otLinkMetrics              *aLinkMetricsFlags,
                                                  otLinkMetricsMgmtResponseCallback aCallback,
-                                                 void *                            aCallbackContext);
+                                                 void                             *aCallbackContext);
 
 /**
- * This function sends an MLE Link Metrics Management Request to configure/clear an Enhanced-ACK Based Probing.
+ * Sends an MLE Link Metrics Management Request to configure/clear an Enhanced-ACK Based Probing.
  * This functionality requires OT_LINK_METRICS_INITIATOR feature enabled.
  *
  * @param[in] aInstance          A pointer to an OpenThread instance.
@@ -218,14 +220,14 @@ otError otLinkMetricsConfigForwardTrackingSeries(otInstance *                   
  * @retval OT_ERROR_NOT_CAPABLE       The neighbor is not a Thread 1.2 device and does not support Link Metrics.
  *
  */
-otError otLinkMetricsConfigEnhAckProbing(otInstance *                               aInstance,
-                                         const otIp6Address *                       aDestination,
+otError otLinkMetricsConfigEnhAckProbing(otInstance                                *aInstance,
+                                         const otIp6Address                        *aDestination,
                                          otLinkMetricsEnhAckFlags                   aEnhAckFlags,
-                                         const otLinkMetrics *                      aLinkMetricsFlags,
+                                         const otLinkMetrics                       *aLinkMetricsFlags,
                                          otLinkMetricsMgmtResponseCallback          aCallback,
-                                         void *                                     aCallbackContext,
+                                         void                                      *aCallbackContext,
                                          otLinkMetricsEnhAckProbingIeReportCallback aEnhAckCallback,
-                                         void *                                     aEnhAckCallbackContext);
+                                         void                                      *aEnhAckCallbackContext);
 
 /**
  * Sends an MLE Link Probe message.
@@ -242,7 +244,7 @@ otError otLinkMetricsConfigEnhAckProbing(otInstance *                           
  * @retval OT_ERROR_NOT_CAPABLE       The neighbor is not a Thread 1.2 device and does not support Link Metrics.
  *
  */
-otError otLinkMetricsSendLinkProbe(otInstance *        aInstance,
+otError otLinkMetricsSendLinkProbe(otInstance         *aInstance,
                                    const otIp6Address *aDestination,
                                    uint8_t             aSeriesId,
                                    uint8_t             aLength);

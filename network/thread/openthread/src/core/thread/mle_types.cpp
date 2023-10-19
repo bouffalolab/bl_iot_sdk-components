@@ -35,9 +35,14 @@
 
 #include "common/array.hpp"
 #include "common/code_utils.hpp"
+#include "common/message.hpp"
+#include "common/random.hpp"
 
 namespace ot {
 namespace Mle {
+
+//---------------------------------------------------------------------------------------------------------------------
+// DeviceMode
 
 void DeviceMode::Get(ModeConfig &aModeConfig) const
 {
@@ -63,6 +68,120 @@ DeviceMode::InfoString DeviceMode::ToString(void) const
 
     return string;
 }
+
+//---------------------------------------------------------------------------------------------------------------------
+// DeviceProperties
+
+#if OPENTHREAD_FTD && (OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_3_1)
+
+DeviceProperties::DeviceProperties(void)
+{
+    Clear();
+
+    mPowerSupply            = OPENTHREAD_CONFIG_DEVICE_POWER_SUPPLY;
+    mLeaderWeightAdjustment = kDefaultAdjustment;
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
+    mIsBorderRouter = true;
+#endif
+}
+
+void DeviceProperties::ClampWeightAdjustment(void)
+{
+    mLeaderWeightAdjustment = Clamp(mLeaderWeightAdjustment, kMinAdjustment, kMaxAdjustment);
+}
+
+uint8_t DeviceProperties::CalculateLeaderWeight(void) const
+{
+    static const int8_t kPowerSupplyIncs[] = {
+        kPowerBatteryInc,          // (0) kPowerSupplyBattery
+        kPowerExternalInc,         // (1) kPowerSupplyExternal
+        kPowerExternalStableInc,   // (2) kPowerSupplyExternalStable
+        kPowerExternalUnstableInc, // (3) kPowerSupplyExternalUnstable
+    };
+
+    static_assert(0 == kPowerSupplyBattery, "kPowerSupplyBattery value is incorrect");
+    static_assert(1 == kPowerSupplyExternal, "kPowerSupplyExternal value is incorrect");
+    static_assert(2 == kPowerSupplyExternalStable, "kPowerSupplyExternalStable value is incorrect");
+    static_assert(3 == kPowerSupplyExternalUnstable, "kPowerSupplyExternalUnstable value is incorrect");
+
+    uint8_t     weight      = kBaseWeight;
+    PowerSupply powerSupply = MapEnum(mPowerSupply);
+
+    if (mIsBorderRouter)
+    {
+        weight += (mSupportsCcm ? kCcmBorderRouterInc : kBorderRouterInc);
+    }
+
+    if (powerSupply < GetArrayLength(kPowerSupplyIncs))
+    {
+        weight += kPowerSupplyIncs[powerSupply];
+    }
+
+    if (mIsUnstable)
+    {
+        switch (powerSupply)
+        {
+        case kPowerSupplyBattery:
+        case kPowerSupplyExternalUnstable:
+            break;
+
+        default:
+            weight += kIsUnstableInc;
+        }
+    }
+
+    weight += mLeaderWeightAdjustment;
+
+    return weight;
+}
+
+#endif // #if OPENTHREAD_FTD && (OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_3_1)
+
+//---------------------------------------------------------------------------------------------------------------------
+// RouterIdSet
+
+uint8_t RouterIdSet::GetNumberOfAllocatedIds(void) const
+{
+    uint8_t count = 0;
+
+    for (uint8_t byte : mRouterIdSet)
+    {
+        count += CountBitsInMask(byte);
+    }
+
+    return count;
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+// TxChallenge
+
+void TxChallenge::GenerateRandom(void) { IgnoreError(Random::Crypto::Fill(*this)); }
+
+//---------------------------------------------------------------------------------------------------------------------
+// RxChallenge
+
+Error RxChallenge::ReadFrom(const Message &aMessage, uint16_t aOffset, uint16_t aLength)
+{
+    Error error = kErrorNone;
+
+    Clear();
+
+    aLength = Min<uint16_t>(aLength, kMaxSize);
+    VerifyOrExit(kMinSize <= aLength, error = kErrorParse);
+
+    SuccessOrExit(error = aMessage.Read(aOffset, mArray.GetArrayBuffer(), aLength));
+    mArray.SetLength(static_cast<uint8_t>(aLength));
+
+exit:
+    return error;
+}
+
+bool RxChallenge::operator==(const TxChallenge &aTxChallenge) const
+{
+    return (mArray.GetLength() == kMaxSize) && (memcmp(mArray.GetArrayBuffer(), aTxChallenge.m8, kMaxSize) == 0);
+}
+
+//---------------------------------------------------------------------------------------------------------------------
 
 const char *RoleToString(DeviceRole aRole)
 {

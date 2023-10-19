@@ -61,7 +61,7 @@ namespace ot {
  */
 
 /**
- * This class implements the EID-to-RLOC mapping and caching.
+ * Implements the EID-to-RLOC mapping and caching.
  *
  */
 class AddressResolver : public InstanceLocator, private NonCopyable
@@ -74,7 +74,7 @@ class AddressResolver : public InstanceLocator, private NonCopyable
 
 public:
     /**
-     * This type represents an iterator used for iterating through the EID cache table entries.
+     * Represents an iterator used for iterating through the EID cache table entries.
      *
      */
     class Iterator : public otCacheEntryIterator, public Clearable<Iterator>
@@ -84,14 +84,14 @@ public:
         static constexpr uint8_t kListIndex  = 0;
         static constexpr uint8_t kEntryIndex = 1;
 
-        const CacheEntry *    GetEntry(void) const { return static_cast<const CacheEntry *>(mData[kEntryIndex]); }
+        const CacheEntry     *GetEntry(void) const { return static_cast<const CacheEntry *>(mData[kEntryIndex]); }
         void                  SetEntry(const CacheEntry *aEntry) { mData[kEntryIndex] = aEntry; }
         const CacheEntryList *GetList(void) const { return static_cast<const CacheEntryList *>(mData[kListIndex]); }
         void                  SetList(const CacheEntryList *aList) { mData[kListIndex] = aList; }
     };
 
     /**
-     * This type represents an EID cache entry.
+     * Represents an EID cache entry.
      *
      */
     class EntryInfo : public otCacheEntryInfo, public Clearable<EntryInfo>
@@ -107,20 +107,20 @@ public:
     };
 
     /**
-     * This constructor initializes the object.
+     * Initializes the object.
      *
      */
     explicit AddressResolver(Instance &aInstance);
 
 #if OPENTHREAD_FTD
     /**
-     * This method clears the EID-to-RLOC cache.
+     * Clears the EID-to-RLOC cache.
      *
      */
     void Clear(void);
 
     /**
-     * This method gets the information about the next EID cache entry (using an iterator).
+     * Gets the information about the next EID cache entry (using an iterator).
      *
      * @param[out]    aInfo      An `EntryInfo` where the EID cache entry information is placed.
      * @param[in,out] aIterator  An iterator. It will be updated to point to the next entry on success.
@@ -134,31 +134,40 @@ public:
     Error GetNextCacheEntry(EntryInfo &aInfo, Iterator &aIterator) const;
 
     /**
-     * This method removes the EID-to-RLOC cache entries corresponding to an RLOC16.
+     * Removes the EID-to-RLOC cache entries corresponding to an RLOC16.
      *
      * @param[in]  aRloc16  The RLOC16 address.
      *
      */
-    void Remove(Mac::ShortAddress aRloc16);
+    void RemoveEntriesForRloc16(Mac::ShortAddress aRloc16);
 
     /**
-     * This method removes all EID-to-RLOC cache entries associated with a Router ID.
+     * Removes all EID-to-RLOC cache entries associated with a Router ID.
      *
      * @param[in]  aRouterId  The Router ID.
      *
      */
-    void Remove(uint8_t aRouterId);
+    void RemoveEntriesForRouterId(uint8_t aRouterId);
 
     /**
-     * This method removes the cache entry for the EID.
+     * Removes the cache entry for the EID.
      *
      * @param[in]  aEid               A reference to the EID.
      *
      */
-    void Remove(const Ip6::Address &aEid);
+    void RemoveEntryForAddress(const Ip6::Address &aEid);
 
     /**
-     * This method updates an existing entry or adds a snooped cache entry for a given EID.
+     * Replaces all EID-to-RLOC cache entries corresponding to an old RLOC16 with a new RLOC16.
+     *
+     * @param[in] aOldRloc16    The old RLOC16.
+     * @param[in] aNewRloc16    The new RLOC16.
+     *
+     */
+    void ReplaceEntriesForRloc16(uint16_t aOldRloc16, uint16_t aNewRloc16);
+
+    /**
+     * Updates an existing entry or adds a snooped cache entry for a given EID.
      *
      * The method is intended to add an entry for snoop optimization (inspection of a received message to create a
      * cache entry mapping an EID to a RLOC).
@@ -171,7 +180,7 @@ public:
     void UpdateSnoopedCacheEntry(const Ip6::Address &aEid, Mac::ShortAddress aRloc16, Mac::ShortAddress aDest);
 
     /**
-     * This method returns the RLOC16 for a given EID, initiates an Address Query if the mapping is not known.
+     * Returns the RLOC16 for a given EID, initiates an Address Query if the mapping is not known.
      *
      * @param[in]   aEid                A reference to the EID.
      * @param[out]  aRloc16             The RLOC16 corresponding to @p aEid.
@@ -188,7 +197,7 @@ public:
     }
 
     /**
-     * This method looks up the RLOC16 for a given EID in the address cache.
+     * Looks up the RLOC16 for a given EID in the address cache.
      *
      * @param[in]   aEid                A reference to the EID.
      *
@@ -198,7 +207,7 @@ public:
     Mac::ShortAddress LookUp(const Ip6::Address &aEid);
 
     /**
-     * This method restarts any ongoing address queries.
+     * Restarts any ongoing address queries.
      *
      * Any existing address queries will be restarted as if they are being sent for the first time.
      *
@@ -206,7 +215,7 @@ public:
     void RestartAddressQueries(void);
 
     /**
-     * This method sends an Address Notification (ADDR_NTF.ans) message.
+     * Sends an Address Notification (ADDR_NTF.ans) message.
      *
      * @param[in]  aTarget                  The target address of the ADDR_NTF.ans message.
      * @param[in]  aMeshLocalIid            The ML-IID of the ADDR_NTF.ans message.
@@ -215,22 +224,22 @@ public:
      * @param[in]  aDestination             The destination to send the ADDR_NTF.ans message.
      *
      */
-    void SendAddressQueryResponse(const Ip6::Address &            aTarget,
+    void SendAddressQueryResponse(const Ip6::Address             &aTarget,
                                   const Ip6::InterfaceIdentifier &aMeshLocalIid,
-                                  const uint32_t *                aLastTransactionTimeTlv,
-                                  const Ip6::Address &            aDestination);
+                                  const uint32_t                 *aLastTransactionTimeTlv,
+                                  const Ip6::Address             &aDestination);
 
     /**
-     * This method sends an Address Error Notification (ADDR_ERR.ntf) message.
+     * Sends an Address Error Notification (ADDR_ERR.ntf) message.
      *
      * @param aTarget        The target address of the ADDR_ERR.ntf message.
      * @param aMeshLocalIid  The ML-IID of the ADDR_ERR.ntf message.
      * @param aDestination   The destination to send the ADDR_ERR.ntf message.
      *
      */
-    void SendAddressError(const Ip6::Address &            aTarget,
+    void SendAddressError(const Ip6::Address             &aTarget,
                           const Ip6::InterfaceIdentifier &aMeshLocalIid,
-                          const Ip6::Address *            aDestination);
+                          const Ip6::Address             *aDestination);
 
 private:
     static constexpr uint16_t kCacheEntries                  = OPENTHREAD_CONFIG_TMF_ADDRESS_CACHE_ENTRIES;
@@ -247,7 +256,7 @@ private:
     public:
         void Init(Instance &aInstance);
 
-        CacheEntry *      GetNext(void);
+        CacheEntry       *GetNext(void);
         const CacheEntry *GetNext(void) const;
         void              SetNext(CacheEntry *aEntry);
 
@@ -276,6 +285,9 @@ private:
         bool CanEvict(void) const { return mInfo.mOther.mCanEvict; }
         void SetCanEvict(bool aCanEvict) { mInfo.mOther.mCanEvict = aCanEvict; }
 
+        bool IsInRampDown(void) const { return mInfo.mOther.mRampDown; }
+        void SetRampDown(bool aRampDown) { mInfo.mOther.mRampDown = aRampDown; }
+
         bool Matches(const Ip6::Address &aEid) const { return GetTarget() == aEid; }
 
     private:
@@ -299,6 +311,7 @@ private:
                 uint16_t mTimeout;
                 uint16_t mRetryDelay;
                 bool     mCanEvict;
+                bool     mRampDown;
             } mOther;
 
         } mInfo;
@@ -351,19 +364,19 @@ private:
 
 #if OPENTHREAD_FTD
 
-    static void HandleIcmpReceive(void *               aContext,
-                                  otMessage *          aMessage,
+    static void HandleIcmpReceive(void                *aContext,
+                                  otMessage           *aMessage,
                                   const otMessageInfo *aMessageInfo,
                                   const otIcmp6Header *aIcmpHeader);
-    void        HandleIcmpReceive(Message &                aMessage,
-                                  const Ip6::MessageInfo & aMessageInfo,
+    void        HandleIcmpReceive(Message                 &aMessage,
+                                  const Ip6::MessageInfo  &aMessageInfo,
                                   const Ip6::Icmp::Header &aIcmpHeader);
 
     void        HandleTimeTick(void);
     void        LogCacheEntryChange(EntryChange       aChange,
                                     Reason            aReason,
                                     const CacheEntry &aEntry,
-                                    CacheEntryList *  aList = nullptr);
+                                    CacheEntryList   *aList = nullptr);
     const char *ListToString(const CacheEntryList *aList) const;
 
     static AddressResolver::CacheEntry *GetEntryAfter(CacheEntry *aPrev, CacheEntryList &aList);

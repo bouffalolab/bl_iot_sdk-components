@@ -79,7 +79,7 @@ extern "C" {
  * @returns  TRUE if after this call returns the platform should invoke the process callback `aProcessCallback`,
  *           FALSE if there is nothing to process and no need to invoke the process callback.
  */
-typedef bool (*otPlatSpiSlaveTransactionCompleteCallback)(void *   aContext,
+typedef bool (*otPlatSpiSlaveTransactionCompleteCallback)(void    *aContext,
                                                           uint8_t *aOutputBuf,
                                                           uint16_t aOutputBufLen,
                                                           uint8_t *aInputBuf,
@@ -115,7 +115,7 @@ typedef void (*otPlatSpiSlaveTransactionProcessCallback)(void *aContext);
  */
 otError otPlatSpiSlaveEnable(otPlatSpiSlaveTransactionCompleteCallback aCompleteCallback,
                              otPlatSpiSlaveTransactionProcessCallback  aProcessCallback,
-                             void *                                    aContext);
+                             void                                     *aContext);
 
 /**
  * Shutdown and disable the SPI slave interface.
@@ -126,7 +126,7 @@ void otPlatSpiSlaveDisable(void);
  * Prepare data for the next SPI transaction. Data pointers MUST remain valid until the transaction complete callback
  * is called by the SPI slave driver, or until after the next call to `otPlatSpiSlavePrepareTransaction()`.
  *
- * This function may be called more than once before the SPI master initiates the transaction. Each *successful* call
+ * May be called more than once before the SPI master initiates the transaction. Each *successful* call
  * to this function will cause the previous values from earlier calls to be discarded.
  *
  * Not calling this function after a completed transaction is the same as if this function was previously called with

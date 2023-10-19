@@ -31,6 +31,10 @@
 
 #include "openthread-core-config.h"
 
+#ifdef OPENTHREAD_POSIX_CONFIG_FILE
+#include OPENTHREAD_POSIX_CONFIG_FILE
+#endif
+
 /**
  * @file
  * @brief
@@ -162,7 +166,7 @@
 /**
  * @def OPENTHREAD_POSIX_CONFIG_OMR_ROUTES_PRIORITY
  *
- * This macro defines the priority of OMR routes added to kernel. The larger the number, the lower the priority. We
+ * Defines the priority of OMR routes added to kernel. The larger the number, the lower the priority. We
  * need to assign a high priority to such routes so that kernel prefers the Thread link rather than infrastructure.
  * Otherwise we may unnecessarily transmit packets via infrastructure, which potentially causes looping issue.
  *
@@ -174,7 +178,7 @@
 /**
  * @def OPENTHREAD_POSIX_CONFIG_MAX_OMR_ROUTES_NUM
  *
- * This macro defines the max number of OMR routes that can be added to kernel.
+ * Defines the max number of OMR routes that can be added to kernel.
  *
  */
 #ifndef OPENTHREAD_POSIX_CONFIG_MAX_OMR_ROUTES_NUM
@@ -194,7 +198,7 @@
 /**
  * @def OPENTHREAD_POSIX_CONFIG_EXTERNAL_ROUTE_PRIORITY
  *
- * This macro defines the priority of external routes added to kernel. The larger the number, the lower the priority. We
+ * Defines the priority of external routes added to kernel. The larger the number, the lower the priority. We
  * need to assign a low priority to such routes so that kernel prefers the infra link rather than thread. Otherwise we
  * may unnecessarily transmit packets via thread, which potentially causes performance issue. In linux, normally infra
  * link routes' metric value is not greater than 1024, hence 65535 should be big enough.
@@ -207,7 +211,7 @@
 /**
  * @def OPENTHREAD_POSIX_CONFIG_MAX_EXTERNAL_ROUTE_NUM
  *
- * This macro defines the max number of external routes that can be added to kernel.
+ * Defines the max number of external routes that can be added to kernel.
  *
  */
 #ifndef OPENTHREAD_POSIX_CONFIG_MAX_EXTERNAL_ROUTE_NUM
@@ -246,6 +250,16 @@
 #ifndef OPENTHREAD_POSIX_CONFIG_IPSET_BINARY
 #define OPENTHREAD_POSIX_CONFIG_IPSET_BINARY "ipset"
 #endif
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_THREAD_NETIF_DEFAULT_NAME
+ *
+ * Define the Thread default network interface name.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_THREAD_NETIF_DEFAULT_NAME
+#define OPENTHREAD_POSIX_CONFIG_THREAD_NETIF_DEFAULT_NAME "wpan0"
 #endif
 
 #ifdef __APPLE__
@@ -304,4 +318,69 @@
 #define OPENTHREAD_POSIX_CONFIG_NAT64_CIDR "192.168.255.0/24"
 #endif
 
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_BACKTRACE_ENABLE
+ *
+ * Define as 1 to enable backtrace support.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_BACKTRACE_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_BACKTRACE_ENABLE 1
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_ANDROID_ENABLE
+ *
+ * Define as 1 to enable android support.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_ANDROID_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_ANDROID_ENABLE 0
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
+ *
+ * Defines `1` to enable the posix implementation of platform/infra_if.h APIs.
+ * The default value is set to `OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE` if it's
+ * not explicit defined.
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_FACTORY_CONFIG_FILE
+ *
+ * Define the path of the factory config file.
+ *
+ * Note: The factory config file contains the persist data that configured by the factory. And it won't be changed
+ *       after a device firmware update OTA is done.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_FACTORY_CONFIG_FILE
+#define OPENTHREAD_POSIX_CONFIG_FACTORY_CONFIG_FILE "src/posix/platform/openthread.conf.example"
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_PRODUCT_CONFIG_FILE
+ *
+ * Define the path of the product config file.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_PRODUCT_CONFIG_FILE
+#define OPENTHREAD_POSIX_CONFIG_PRODUCT_CONFIG_FILE "src/posix/platform/openthread.conf.example"
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_RCP_TIME_SYNC_INTERVAL
+ *
+ * This setting configures the interval (in units of microseconds) for host-rcp
+ * time sync. The host will recalculate the time offset between host and RCP
+ * every interval.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_RCP_TIME_SYNC_INTERVAL
+#define OPENTHREAD_POSIX_CONFIG_RCP_TIME_SYNC_INTERVAL (60 * 1000 * 1000)
+#endif
 #endif // OPENTHREAD_PLATFORM_CONFIG_H_

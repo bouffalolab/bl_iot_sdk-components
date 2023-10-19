@@ -36,6 +36,7 @@
 
 #include "openthread-core-config.h"
 
+#include "common/callback.hpp"
 #include "common/locator.hpp"
 #include "common/non_copyable.hpp"
 #include "common/tasklet.hpp"
@@ -53,7 +54,7 @@ class MeshForwarder;
 namespace Mle {
 
 /**
- * This class implements MLE Discover Scan.
+ * Implements MLE Discover Scan.
  *
  */
 class DiscoverScanner : public InstanceLocator, private NonCopyable
@@ -70,13 +71,13 @@ public:
     static constexpr uint32_t kDefaultScanDuration = Mac::kScanDurationDefault;
 
     /**
-     * This type represents Discover Scan result.
+     * Represents Discover Scan result.
      *
      */
     typedef otActiveScanResult ScanResult;
 
     /**
-     * This type represents the handler function pointer called with any Discover Scan result or when the scan
+     * Represents the handler function pointer called with any Discover Scan result or when the scan
      * completes.
      *
      * The handler function format is `void (*oHandler)(ScanResult *aResult, void *aContext);`. End of scan is
@@ -86,7 +87,7 @@ public:
     typedef otHandleActiveScanResult Handler;
 
     /**
-     * This type represents the filter indexes, i.e., hash bit index values for the bloom filter (calculated from a
+     * Represents the filter indexes, i.e., hash bit index values for the bloom filter (calculated from a
      * Joiner ID).
      *
      * This is used when filtering is enabled during Discover Scan, i.e., received MLE Discovery Responses with steering
@@ -96,7 +97,7 @@ public:
     typedef MeshCoP::SteeringData::HashBitIndexes FilterIndexes;
 
     /**
-     * This constructor initializes the object.
+     * Initializes the object.
      *
      * @param[in]  aInstance     A reference to the OpenThread instance.
      *
@@ -104,7 +105,7 @@ public:
     explicit DiscoverScanner(Instance &aInstance);
 
     /**
-     * This method starts a Thread Discovery Scan.
+     * Starts a Thread Discovery Scan.
      *
      * @param[in]  aScanChannels      Channel mask listing channels to scan (if empty, use all supported channels).
      * @param[in]  aPanId             The PAN ID filter (set to Broadcast PAN to disable filter).
@@ -127,12 +128,12 @@ public:
                    Mac::PanId              aPanId,
                    bool                    aJoiner,
                    bool                    aEnableFiltering,
-                   const FilterIndexes *   aFilterIndexes,
+                   const FilterIndexes    *aFilterIndexes,
                    Handler                 aCallback,
-                   void *                  aContext);
+                   void                   *aContext);
 
     /**
-     * This method indicates whether or not an MLE Thread Discovery Scan is currently in progress.
+     * Indicates whether or not an MLE Thread Discovery Scan is currently in progress.
      *
      * @returns true if an MLE Thread Discovery Scan is in progress, false otherwise.
      *
@@ -140,7 +141,7 @@ public:
     bool IsInProgress(void) const { return (mState != kStateIdle); }
 
     /**
-     * This method sets Joiner Advertisement.
+     * Sets Joiner Advertisement.
      *
      * @param[in]  aOui             The Vendor OUI for Joiner Advertisement.
      * @param[in]  aAdvData         A pointer to AdvData for Joiner Advertisement.
@@ -177,19 +178,18 @@ private:
     using ScanTimer    = TimerMilliIn<DiscoverScanner, &DiscoverScanner::HandleTimer>;
     using ScanDoneTask = TaskletIn<DiscoverScanner, &DiscoverScanner::HandleScanDoneTask>;
 
-    Handler          mHandler;
-    void *           mHandlerContext;
-    ScanDoneTask     mScanDoneTask;
-    ScanTimer        mTimer;
-    FilterIndexes    mFilterIndexes;
-    Mac::ChannelMask mScanChannels;
-    State            mState;
-    uint32_t         mOui;
-    uint8_t          mScanChannel;
-    uint8_t          mAdvDataLength;
-    uint8_t          mAdvData[MeshCoP::JoinerAdvertisementTlv::kAdvDataMaxLength];
-    bool             mEnableFiltering : 1;
-    bool             mShouldRestorePanId : 1;
+    Callback<Handler> mCallback;
+    ScanDoneTask      mScanDoneTask;
+    ScanTimer         mTimer;
+    FilterIndexes     mFilterIndexes;
+    Mac::ChannelMask  mScanChannels;
+    State             mState;
+    uint32_t          mOui;
+    uint8_t           mScanChannel;
+    uint8_t           mAdvDataLength;
+    uint8_t           mAdvData[MeshCoP::JoinerAdvertisementTlv::kAdvDataMaxLength];
+    bool              mEnableFiltering : 1;
+    bool              mShouldRestorePanId : 1;
 };
 
 } // namespace Mle

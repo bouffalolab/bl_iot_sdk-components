@@ -40,6 +40,7 @@
 #include <openthread/platform/udp.h>
 
 #include "common/as_core_type.hpp"
+#include "common/callback.hpp"
 #include "common/clearable.hpp"
 #include "common/linked_list.hpp"
 #include "common/locator.hpp"
@@ -66,7 +67,7 @@ class Udp;
 #endif
 
 /**
- * This enumeration defines the network interface identifiers.
+ * Defines the network interface identifiers.
  *
  */
 enum NetifIdentifier : uint8_t
@@ -77,14 +78,14 @@ enum NetifIdentifier : uint8_t
 };
 
 /**
- * This class implements core UDP message handling.
+ * Implements core UDP message handling.
  *
  */
 class Udp : public InstanceLocator, private NonCopyable
 {
 public:
     /**
-     * This class implements a UDP/IPv6 socket.
+     * Implements a UDP/IPv6 socket.
      *
      */
     class SocketHandle : public otUdpSocket, public LinkedListEntry<SocketHandle>, public Clearable<SocketHandle>
@@ -94,7 +95,7 @@ public:
 
     public:
         /**
-         * This method indicates whether or not the socket is bound.
+         * Indicates whether or not the socket is bound.
          *
          * @retval TRUE if the socket is bound (i.e. source port is non-zero).
          * @retval FALSE if the socket is not bound (source port is zero).
@@ -103,7 +104,7 @@ public:
         bool IsBound(void) const { return mSockName.mPort != 0; }
 
         /**
-         * This method returns the local socket address.
+         * Returns the local socket address.
          *
          * @returns A reference to the local socket address.
          *
@@ -111,7 +112,7 @@ public:
         SockAddr &GetSockName(void) { return AsCoreType(&mSockName); }
 
         /**
-         * This method returns the local socket address.
+         * Returns the local socket address.
          *
          * @returns A reference to the local socket address.
          *
@@ -119,7 +120,7 @@ public:
         const SockAddr &GetSockName(void) const { return AsCoreType(&mSockName); }
 
         /**
-         * This method returns the peer's socket address.
+         * Returns the peer's socket address.
          *
          * @returns A reference to the peer's socket address.
          *
@@ -127,7 +128,7 @@ public:
         SockAddr &GetPeerName(void) { return AsCoreType(&mPeerName); }
 
         /**
-         * This method returns the peer's socket address.
+         * Returns the peer's socket address.
          *
          * @returns A reference to the peer's socket address.
          *
@@ -144,7 +145,7 @@ public:
     };
 
     /**
-     * This class implements a UDP/IPv6 socket.
+     * Implements a UDP/IPv6 socket.
      *
      */
     class Socket : public InstanceLocator, public SocketHandle
@@ -153,7 +154,7 @@ public:
 
     public:
         /**
-         * This constructor initializes the object.
+         * Initializes the object.
          *
          * @param[in]  aInstance  A reference to OpenThread instance.
          *
@@ -161,7 +162,25 @@ public:
         explicit Socket(Instance &aInstance);
 
         /**
-         * This method returns a new UDP message with sufficient header space reserved.
+         * Returns a new UDP message with default settings (link security enabled and `kPriorityNormal`)
+         *
+         * @returns A pointer to the message or `nullptr` if no buffers are available.
+         *
+         */
+        Message *NewMessage(void);
+
+        /**
+         * Returns a new UDP message with default settings (link security enabled and `kPriorityNormal`)
+         *
+         * @param[in]  aReserved  The number of header bytes to reserve after the UDP header.
+         *
+         * @returns A pointer to the message or `nullptr` if no buffers are available.
+         *
+         */
+        Message *NewMessage(uint16_t aReserved);
+
+        /**
+         * Returns a new UDP message with sufficient header space reserved.
          *
          * @param[in]  aReserved  The number of header bytes to reserve after the UDP header.
          * @param[in]  aSettings  The message settings (default is used if not provided).
@@ -169,10 +188,10 @@ public:
          * @returns A pointer to the message or `nullptr` if no buffers are available.
          *
          */
-        Message *NewMessage(uint16_t aReserved, const Message::Settings &aSettings = Message::Settings::GetDefault());
+        Message *NewMessage(uint16_t aReserved, const Message::Settings &aSettings);
 
         /**
-         * This method opens the UDP socket.
+         * Opens the UDP socket.
          *
          * @param[in]  aHandler  A pointer to a function that is called when receiving UDP messages.
          * @param[in]  aContext  A pointer to arbitrary context information.
@@ -184,7 +203,7 @@ public:
         Error Open(otUdpReceive aHandler, void *aContext);
 
         /**
-         * This method returns if the UDP socket is open.
+         * Returns if the UDP socket is open.
          *
          * @returns If the UDP socket is open.
          *
@@ -192,7 +211,7 @@ public:
         bool IsOpen(void) const;
 
         /**
-         * This method binds the UDP socket.
+         * Binds the UDP socket.
          *
          * @param[in]  aSockAddr            A reference to the socket address.
          * @param[in]  aNetifIdentifier     The network interface identifier.
@@ -205,7 +224,7 @@ public:
         Error Bind(const SockAddr &aSockAddr, NetifIdentifier aNetifIdentifier = kNetifThread);
 
         /**
-         * This method binds the UDP socket.
+         * Binds the UDP socket.
          *
          * @param[in]  aPort                A port number.
          * @param[in]  aNetifIdentifier     The network interface identifier.
@@ -217,7 +236,7 @@ public:
         Error Bind(uint16_t aPort, NetifIdentifier aNetifIdentifier = kNetifThread);
 
         /**
-         * This method binds the UDP socket.
+         * Binds the UDP socket.
          *
          * @retval kErrorNone    Successfully bound the socket.
          * @retval kErrorFailed  Failed to bind UDP Socket.
@@ -226,7 +245,7 @@ public:
         Error Bind(void) { return Bind(0); }
 
         /**
-         * This method connects the UDP socket.
+         * Connects the UDP socket.
          *
          * @param[in]  aSockAddr  A reference to the socket address.
          *
@@ -237,7 +256,7 @@ public:
         Error Connect(const SockAddr &aSockAddr);
 
         /**
-         * This method connects the UDP socket.
+         * Connects the UDP socket.
          *
          * @param[in]  aPort        A port number.
          *
@@ -248,7 +267,7 @@ public:
         Error Connect(uint16_t aPort);
 
         /**
-         * This method connects the UDP socket.
+         * Connects the UDP socket.
          *
          * @retval kErrorNone    Successfully connected the socket.
          * @retval kErrorFailed  Failed to connect UDP Socket.
@@ -257,7 +276,7 @@ public:
         Error Connect(void) { return Connect(0); }
 
         /**
-         * This method closes the UDP socket.
+         * Closes the UDP socket.
          *
          * @retval kErrorNone    Successfully closed the UDP socket.
          * @retval kErrorFailed  Failed to close UDP Socket.
@@ -266,7 +285,7 @@ public:
         Error Close(void);
 
         /**
-         * This method sends a UDP message.
+         * Sends a UDP message.
          *
          * @param[in]  aMessage      The message to send.
          * @param[in]  aMessageInfo  The message info associated with @p aMessage.
@@ -280,7 +299,7 @@ public:
 
 #if OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
         /**
-         * This method configures the UDP socket to join a mutlicast group on a Host network interface.
+         * Configures the UDP socket to join a multicast group on a Host network interface.
          *
          * @param[in]  aNetifIdentifier     The network interface identifier.
          * @param[in]  aAddress             The multicast group address.
@@ -292,7 +311,7 @@ public:
         Error JoinNetifMulticastGroup(NetifIdentifier aNetifIdentifier, const Address &aAddress);
 
         /**
-         * This method configures the UDP socket to leave a multicast group on a Host network interface.
+         * Configures the UDP socket to leave a multicast group on a Host network interface.
          *
          * @param[in]  aNetifIdentifier     The network interface identifier.
          * @param[in]  aAddress             The multicast group address.
@@ -306,7 +325,7 @@ public:
     };
 
     /**
-     * This class implements a UDP receiver.
+     * Implements a UDP receiver.
      *
      */
     class Receiver : public otUdpReceiver, public LinkedListEntry<Receiver>
@@ -315,7 +334,7 @@ public:
 
     public:
         /**
-         * This constructor initializes the UDP receiver.
+         * Initializes the UDP receiver.
          *
          * @param[in]   aHandler     A pointer to the function to handle UDP message.
          * @param[in]   aContext     A pointer to arbitrary context information.
@@ -336,7 +355,7 @@ public:
     };
 
     /**
-     * This class implements UDP header generation and parsing.
+     * Implements UDP header generation and parsing.
      *
      */
     OT_TOOL_PACKED_BEGIN
@@ -349,7 +368,7 @@ public:
         static constexpr uint16_t kChecksumFieldOffset   = 6; ///< Byte offset of Checksum field in UDP header.
 
         /**
-         * This method returns the UDP Source Port.
+         * Returns the UDP Source Port.
          *
          * @returns The UDP Source Port.
          *
@@ -357,7 +376,7 @@ public:
         uint16_t GetSourcePort(void) const { return HostSwap16(mSourcePort); }
 
         /**
-         * This method sets the UDP Source Port.
+         * Sets the UDP Source Port.
          *
          * @param[in]  aPort  The UDP Source Port.
          *
@@ -365,7 +384,7 @@ public:
         void SetSourcePort(uint16_t aPort) { mSourcePort = HostSwap16(aPort); }
 
         /**
-         * This method returns the UDP Destination Port.
+         * Returns the UDP Destination Port.
          *
          * @returns The UDP Destination Port.
          *
@@ -373,7 +392,7 @@ public:
         uint16_t GetDestinationPort(void) const { return HostSwap16(mDestinationPort); }
 
         /**
-         * This method sets the UDP Destination Port.
+         * Sets the UDP Destination Port.
          *
          * @param[in]  aPort  The UDP Destination Port.
          *
@@ -381,7 +400,7 @@ public:
         void SetDestinationPort(uint16_t aPort) { mDestinationPort = HostSwap16(aPort); }
 
         /**
-         * This method returns the UDP Length.
+         * Returns the UDP Length.
          *
          * @returns The UDP Length.
          *
@@ -389,7 +408,7 @@ public:
         uint16_t GetLength(void) const { return HostSwap16(mLength); }
 
         /**
-         * This method sets the UDP Length.
+         * Sets the UDP Length.
          *
          * @param[in]  aLength  The UDP Length.
          *
@@ -397,7 +416,7 @@ public:
         void SetLength(uint16_t aLength) { mLength = HostSwap16(aLength); }
 
         /**
-         * This method returns the UDP Checksum.
+         * Returns the UDP Checksum.
          *
          * @returns The UDP Checksum.
          *
@@ -405,7 +424,7 @@ public:
         uint16_t GetChecksum(void) const { return HostSwap16(mChecksum); }
 
         /**
-         * This method sets the UDP Checksum.
+         * Sets the UDP Checksum.
          *
          * @param[in]  aChecksum  The UDP Checksum.
          *
@@ -421,7 +440,7 @@ public:
     } OT_TOOL_PACKED_END;
 
     /**
-     * This constructor initializes the object.
+     * Initializes the object.
      *
      * @param[in]  aInstance  A reference to OpenThread instance.
      *
@@ -429,7 +448,7 @@ public:
     explicit Udp(Instance &aInstance);
 
     /**
-     * This method adds a UDP receiver.
+     * Adds a UDP receiver.
      *
      * @param[in]  aReceiver  A reference to the UDP receiver.
      *
@@ -440,7 +459,7 @@ public:
     Error AddReceiver(Receiver &aReceiver);
 
     /**
-     * This method removes a UDP receiver.
+     * Removes a UDP receiver.
      *
      * @param[in]  aReceiver  A reference to the UDP receiver.
      *
@@ -451,7 +470,7 @@ public:
     Error RemoveReceiver(Receiver &aReceiver);
 
     /**
-     * This method opens a UDP socket.
+     * Opens a UDP socket.
      *
      * @param[in]  aSocket   A reference to the socket.
      * @param[in]  aHandler  A pointer to a function that is called when receiving UDP messages.
@@ -464,7 +483,7 @@ public:
     Error Open(SocketHandle &aSocket, otUdpReceive aHandler, void *aContext);
 
     /**
-     * This method returns if a UDP socket is open.
+     * Returns if a UDP socket is open.
      *
      * @param[in]  aSocket   A reference to the socket.
      *
@@ -474,7 +493,7 @@ public:
     bool IsOpen(const SocketHandle &aSocket) const { return mSockets.Contains(aSocket); }
 
     /**
-     * This method binds a UDP socket.
+     * Binds a UDP socket.
      *
      * @param[in]  aSocket          A reference to the socket.
      * @param[in]  aSockAddr        A reference to the socket address.
@@ -488,7 +507,7 @@ public:
     Error Bind(SocketHandle &aSocket, const SockAddr &aSockAddr, NetifIdentifier aNetifIdentifier);
 
     /**
-     * This method connects a UDP socket.
+     * Connects a UDP socket.
      *
      * @param[in]  aSocket    A reference to the socket.
      * @param[in]  aSockAddr  A reference to the socket address.
@@ -500,7 +519,7 @@ public:
     Error Connect(SocketHandle &aSocket, const SockAddr &aSockAddr);
 
     /**
-     * This method closes the UDP socket.
+     * Closes the UDP socket.
      *
      * @param[in]  aSocket    A reference to the socket.
      *
@@ -511,7 +530,7 @@ public:
     Error Close(SocketHandle &aSocket);
 
     /**
-     * This method sends a UDP message using a socket.
+     * Sends a UDP message using a socket.
      *
      * @param[in]  aSocket       A reference to the socket.
      * @param[in]  aMessage      The message to send.
@@ -525,7 +544,7 @@ public:
     Error SendTo(SocketHandle &aSocket, Message &aMessage, const MessageInfo &aMessageInfo);
 
     /**
-     * This method returns a new ephemeral port.
+     * Returns a new ephemeral port.
      *
      * @returns A new ephemeral port.
      *
@@ -533,7 +552,25 @@ public:
     uint16_t GetEphemeralPort(void);
 
     /**
-     * This method returns a new UDP message with sufficient header space reserved.
+     * Returns a new UDP message with default settings (link security enabled and `kPriorityNormal`)
+     *
+     * @returns A pointer to the message or `nullptr` if no buffers are available.
+     *
+     */
+    Message *NewMessage(void);
+
+    /**
+     * Returns a new UDP message with default settings (link security enabled and `kPriorityNormal`)
+     *
+     * @param[in]  aReserved  The number of header bytes to reserve after the UDP header.
+     *
+     * @returns A pointer to the message or `nullptr` if no buffers are available.
+     *
+     */
+    Message *NewMessage(uint16_t aReserved);
+
+    /**
+     * Returns a new UDP message with sufficient header space reserved.
      *
      * @param[in]  aReserved  The number of header bytes to reserve after the UDP header.
      * @param[in]  aSettings  The message settings.
@@ -541,10 +578,10 @@ public:
      * @returns A pointer to the message or `nullptr` if no buffers are available.
      *
      */
-    Message *NewMessage(uint16_t aReserved, const Message::Settings &aSettings = Message::Settings::GetDefault());
+    Message *NewMessage(uint16_t aReserved, const Message::Settings &aSettings);
 
     /**
-     * This method sends an IPv6 datagram.
+     * Sends an IPv6 datagram.
      *
      * @param[in]  aMessage      A reference to the message.
      * @param[in]  aMessageInfo  A reference to the message info associated with @p aMessage.
@@ -557,7 +594,7 @@ public:
     Error SendDatagram(Message &aMessage, MessageInfo &aMessageInfo, uint8_t aIpProto);
 
     /**
-     * This method handles a received UDP message.
+     * Handles a received UDP message.
      *
      * @param[in]  aMessage      A reference to the UDP message to process.
      * @param[in]  aMessageInfo  A reference to the message info associated with @p aMessage.
@@ -569,7 +606,7 @@ public:
     Error HandleMessage(Message &aMessage, MessageInfo &aMessageInfo);
 
     /**
-     * This method handles a received UDP message with offset set to the payload.
+     * Handles a received UDP message with offset set to the payload.
      *
      * @param[in]  aMessage      A reference to the UDP message to process.
      * @param[in]  aMessageInfo  A reference to the message info associated with @p aMessage.
@@ -578,7 +615,7 @@ public:
     void HandlePayload(Message &aMessage, MessageInfo &aMessageInfo);
 
     /**
-     * This method returns the head of UDP Sockets list.
+     * Returns the head of UDP Sockets list.
      *
      * @returns A pointer to the head of UDP Socket linked list.
      *
@@ -587,21 +624,17 @@ public:
 
 #if OPENTHREAD_CONFIG_UDP_FORWARD_ENABLE
     /**
-     * This method sets the forward sender.
+     * Sets the forward sender.
      *
      * @param[in]   aForwarder  A function pointer to forward UDP packets.
      * @param[in]   aContext    A pointer to arbitrary context information.
      *
      */
-    void SetUdpForwarder(otUdpForwarder aForwarder, void *aContext)
-    {
-        mUdpForwarder        = aForwarder;
-        mUdpForwarderContext = aContext;
-    }
+    void SetUdpForwarder(otUdpForwarder aForwarder, void *aContext) { mUdpForwarder.Set(aForwarder, aContext); }
 #endif
 
     /**
-     * This method returns whether a udp port is being used by OpenThread or any of it's optional
+     * Returns whether a udp port is being used by OpenThread or any of it's optional
      * features, e.g. CoAP API.
      *
      * @param[in]   aPort       The udp port
@@ -613,7 +646,7 @@ public:
     bool IsPortInUse(uint16_t aPort) const;
 
     /**
-     * This method returns whether a udp port belongs to the platform or the stack.
+     * Returns whether a udp port belongs to the platform or the stack.
      *
      * @param[in]   aPort       The udp port
      *
@@ -652,8 +685,7 @@ private:
     SocketHandle *mPrevBackboneSockets;
 #endif
 #if OPENTHREAD_CONFIG_UDP_FORWARD_ENABLE
-    void *         mUdpForwarderContext;
-    otUdpForwarder mUdpForwarder;
+    Callback<otUdpForwarder> mUdpForwarder;
 #endif
 };
 

@@ -136,10 +136,7 @@ void NetworkNameTlv::SetNetworkName(const NameData &aNameData)
     SetLength(len);
 }
 
-bool NetworkNameTlv::IsValid(void) const
-{
-    return IsValidUtf8String(mNetworkName, GetLength());
-}
+bool NetworkNameTlv::IsValid(void) const { return IsValidUtf8String(mNetworkName, GetLength()); }
 
 void SteeringDataTlv::CopyTo(SteeringData &aSteeringData) const
 {
@@ -261,10 +258,7 @@ exit:
     return entry;
 }
 
-ChannelMaskEntryBase *ChannelMaskBaseTlv::GetFirstEntry(void)
-{
-    return AsNonConst(AsConst(this)->GetFirstEntry());
-}
+ChannelMaskEntryBase *ChannelMaskBaseTlv::GetFirstEntry(void) { return AsNonConst(AsConst(this)->GetFirstEntry()); }
 
 void ChannelMaskTlv::SetChannelMask(uint32_t aChannelMask)
 {
@@ -365,8 +359,7 @@ uint32_t ChannelMaskTlv::GetChannelMask(const Message &aMessage)
     uint16_t offset;
     uint16_t end;
 
-    SuccessOrExit(FindTlvValueOffset(aMessage, kChannelMask, offset, end));
-    end += offset;
+    SuccessOrExit(FindTlvValueStartEndOffsets(aMessage, kChannelMask, offset, end));
 
     while (offset + sizeof(ChannelMaskEntryBase) <= end)
     {

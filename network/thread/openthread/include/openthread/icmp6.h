@@ -80,12 +80,13 @@ typedef enum otIcmp6Code
     OT_ICMP6_CODE_FRAGM_REAS_TIME_EX   = 1, ///< Fragment Reassembly Time Exceeded
 } otIcmp6Code;
 
-#define OT_ICMP6_HEADER_DATA_SIZE 4 ///< Size of an message specific data of ICMPv6 Header.
+#define OT_ICMP6_HEADER_DATA_SIZE 4        ///< Size of ICMPv6 Header.
+#define OT_ICMP6_ROUTER_ADVERT_MIN_SIZE 16 ///< Size of a Router Advertisement message without any options.
 
 /**
  * @struct otIcmp6Header
  *
- * This structure represents an ICMPv6 header.
+ * Represents an ICMPv6 header.
  *
  */
 OT_TOOL_PACKED_BEGIN
@@ -103,7 +104,7 @@ struct otIcmp6Header
 } OT_TOOL_PACKED_END;
 
 /**
- * This type represents an ICMPv6 header.
+ * Represents an ICMPv6 header.
  *
  */
 typedef struct otIcmp6Header otIcmp6Header;
@@ -117,19 +118,19 @@ typedef struct otIcmp6Header otIcmp6Header;
  * @param[in]  aIcmpHeader   A pointer to the received ICMPv6 header.
  *
  */
-typedef void (*otIcmp6ReceiveCallback)(void *               aContext,
-                                       otMessage *          aMessage,
+typedef void (*otIcmp6ReceiveCallback)(void                *aContext,
+                                       otMessage           *aMessage,
                                        const otMessageInfo *aMessageInfo,
                                        const otIcmp6Header *aIcmpHeader);
 
 /**
- * This structure implements ICMPv6 message handler.
+ * Implements ICMPv6 message handler.
  *
  */
 typedef struct otIcmp6Handler
 {
     otIcmp6ReceiveCallback mReceiveCallback; ///< The ICMPv6 received callback
-    void *                 mContext;         ///< A pointer to arbitrary context information.
+    void                  *mContext;         ///< A pointer to arbitrary context information.
     struct otIcmp6Handler *mNext;            ///< A pointer to the next handler in the list.
 } otIcmp6Handler;
 
@@ -146,7 +147,7 @@ typedef enum otIcmp6EchoMode
 } otIcmp6EchoMode;
 
 /**
- * This function indicates whether or not ICMPv6 Echo processing is enabled.
+ * Indicates whether or not ICMPv6 Echo processing is enabled.
  *
  * @param[in]  aInstance A pointer to an OpenThread instance.
  *
@@ -159,7 +160,7 @@ typedef enum otIcmp6EchoMode
 otIcmp6EchoMode otIcmp6GetEchoMode(otInstance *aInstance);
 
 /**
- * This function sets whether or not ICMPv6 Echo processing is enabled.
+ * Sets whether or not ICMPv6 Echo processing is enabled.
  *
  * @param[in]  aInstance A pointer to an OpenThread instance.
  * @param[in]  aMode     The ICMPv6 Echo processing mode.
@@ -168,7 +169,7 @@ otIcmp6EchoMode otIcmp6GetEchoMode(otInstance *aInstance);
 void otIcmp6SetEchoMode(otInstance *aInstance, otIcmp6EchoMode aMode);
 
 /**
- * This function registers a handler to provide received ICMPv6 messages.
+ * Registers a handler to provide received ICMPv6 messages.
  *
  * @note A handler structure @p aHandler has to be stored in persistent (static) memory.
  *       OpenThread does not make a copy of handler structure.
@@ -181,7 +182,7 @@ void otIcmp6SetEchoMode(otInstance *aInstance, otIcmp6EchoMode aMode);
 otError otIcmp6RegisterHandler(otInstance *aInstance, otIcmp6Handler *aHandler);
 
 /**
- * This function sends an ICMPv6 Echo Request via the Thread interface.
+ * Sends an ICMPv6 Echo Request via the Thread interface.
  *
  * @param[in]  aInstance     A pointer to an OpenThread instance.
  * @param[in]  aMessage      A pointer to the message buffer containing the ICMPv6 payload.
@@ -190,8 +191,8 @@ otError otIcmp6RegisterHandler(otInstance *aInstance, otIcmp6Handler *aHandler);
  *                           May be zero.
  *
  */
-otError otIcmp6SendEchoRequest(otInstance *         aInstance,
-                               otMessage *          aMessage,
+otError otIcmp6SendEchoRequest(otInstance          *aInstance,
+                               otMessage           *aMessage,
                                const otMessageInfo *aMessageInfo,
                                uint16_t             aIdentifier);
 

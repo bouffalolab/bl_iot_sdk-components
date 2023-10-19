@@ -123,6 +123,10 @@ static const char *getTrelRadioUrl(otPlatformConfig *aPlatformConfig)
 
 void platformInit(otPlatformConfig *aPlatformConfig)
 {
+#if OPENTHREAD_POSIX_CONFIG_BACKTRACE_ENABLE
+    platformBacktraceInit();
+#endif
+
     platformAlarmInit(aPlatformConfig->mSpeedUpFactor, aPlatformConfig->mRealTimeSignal);
     platformRadioInit(get802154RadioUrl(aPlatformConfig));
 
@@ -138,20 +142,11 @@ void platformInit(otPlatformConfig *aPlatformConfig)
     platformBackboneInit(aPlatformConfig->mBackboneInterfaceName);
 #endif
 
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
+#if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
     ot::Posix::InfraNetif::Get().Init(aPlatformConfig->mBackboneInterfaceName);
 #endif
 
     gNetifName[0] = '\0';
-
-#if OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE
-    if ((sscanf(OPENTHREAD_POSIX_CONFIG_NAT64_CIDR, "%" SCNu8 ".%" SCNu8 ".%" SCNu8 ".%" SCNu8 "/%" SCNu8,
-                &gNat64Cidr.mAddress.mFields.m8[0], &gNat64Cidr.mAddress.mFields.m8[1],
-                &gNat64Cidr.mAddress.mFields.m8[2], &gNat64Cidr.mAddress.mFields.m8[3], &gNat64Cidr.mLength)) != 5)
-    {
-        gNat64Cidr.mLength = 0;
-    }
-#endif
 
 #if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
     platformNetifInit(aPlatformConfig);
@@ -177,7 +172,7 @@ void platformSetUp(void)
     platformBackboneSetUp();
 #endif
 
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
+#if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
     ot::Posix::InfraNetif::Get().SetUp();
 #endif
 
@@ -232,7 +227,7 @@ void platformTearDown(void)
     platformNetifTearDown();
 #endif
 
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
+#if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
     ot::Posix::InfraNetif::Get().TearDown();
 #endif
 
@@ -264,7 +259,7 @@ void platformDeinit(void)
     platformTrelDeinit();
 #endif
 
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
+#if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
     ot::Posix::InfraNetif::Get().Deinit();
 #endif
 
@@ -288,31 +283,28 @@ void otSysDeinit(void)
 
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
 /**
- * This function try selecting the given file descriptors in nonblocking mode.
+ * Try selecting the given file descriptors in nonblocking mode.
  *
- * @param[in,out]   aReadFdSet   A pointer to the read file descriptors.
- * @param[in,out]   aWriteFdSet  A pointer to the write file descriptors.
- * @param[in,out]   aErrorFdSet  A pointer to the error file descriptors.
- * @param[in]       aMaxFd       The max file descriptor.
+ * @param[in,out]  aContext  A reference to the mainloop context.
  *
  * @returns The value returned from select().
  *
  */
-static int trySelect(fd_set *aReadFdSet, fd_set *aWriteFdSet, fd_set *aErrorFdSet, int aMaxFd)
+static int trySelect(otSysMainloopContext &aContext)
 {
     struct timeval timeout          = {0, 0};
-    fd_set         originReadFdSet  = *aReadFdSet;
-    fd_set         originWriteFdSet = *aWriteFdSet;
-    fd_set         originErrorFdSet = *aErrorFdSet;
+    fd_set         originReadFdSet  = aContext.mReadFdSet;
+    fd_set         originWriteFdSet = aContext.mWriteFdSet;
+    fd_set         originErrorFdSet = aContext.mErrorFdSet;
     int            rval;
 
-    rval = select(aMaxFd + 1, aReadFdSet, aWriteFdSet, aErrorFdSet, &timeout);
+    rval = select(aContext.mMaxFd + 1, &aContext.mReadFdSet, &aContext.mWriteFdSet, &aContext.mErrorFdSet, &timeout);
 
     if (rval == 0)
     {
-        *aReadFdSet  = originReadFdSet;
-        *aWriteFdSet = originWriteFdSet;
-        *aErrorFdSet = originErrorFdSet;
+        aContext.mReadFdSet  = originReadFdSet;
+        aContext.mWriteFdSet = originWriteFdSet;
+        aContext.mErrorFdSet = originErrorFdSet;
     }
 
     return rval;
@@ -325,17 +317,15 @@ void otSysMainloopUpdate(otInstance *aInstance, otSysMainloopContext *aMainloop)
 
     platformAlarmUpdateTimeout(&aMainloop->mTimeout);
 #if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
-    platformNetifUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet,
-                             &aMainloop->mMaxFd);
+    platformNetifUpdateFdSet(aMainloop);
 #endif
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
-    virtualTimeUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet, &aMainloop->mMaxFd,
-                           &aMainloop->mTimeout);
+    virtualTimeUpdateFdSet(aMainloop);
 #else
-    platformRadioUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mMaxFd, &aMainloop->mTimeout);
+    platformRadioUpdateFdSet(aMainloop);
 #endif
 #if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
-    platformTrelUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mMaxFd, &aMainloop->mTimeout);
+    platformTrelUpdateFdSet(aMainloop);
 #endif
 
     if (otTaskletsArePending(aInstance))
@@ -353,7 +343,7 @@ int otSysMainloopPoll(otSysMainloopContext *aMainloop)
     if (timerisset(&aMainloop->mTimeout))
     {
         // Make sure there are no data ready in UART
-        rval = trySelect(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet, aMainloop->mMaxFd);
+        rval = trySelect(*aMainloop);
 
         if (rval == 0)
         {
@@ -393,20 +383,17 @@ void otSysMainloopProcess(otInstance *aInstance, const otSysMainloopContext *aMa
     ot::Posix::Mainloop::Manager::Get().Process(*aMainloop);
 
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
-    virtualTimeProcess(aInstance, &aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet);
+    virtualTimeProcess(aInstance, aMainloop);
 #else
-    platformRadioProcess(aInstance, &aMainloop->mReadFdSet, &aMainloop->mWriteFdSet);
+    platformRadioProcess(aInstance, aMainloop);
 #endif
 #if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
-    platformTrelProcess(aInstance, &aMainloop->mReadFdSet, &aMainloop->mWriteFdSet);
+    platformTrelProcess(aInstance, aMainloop);
 #endif
     platformAlarmProcess(aInstance);
 #if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
-    platformNetifProcess(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet);
+    platformNetifProcess(aMainloop);
 #endif
 }
 
-bool IsSystemDryRun(void)
-{
-    return gDryRun;
-}
+bool IsSystemDryRun(void) { return gDryRun; }

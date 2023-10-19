@@ -63,18 +63,18 @@ extern "C" {
 typedef bool (*otUdpHandler)(void *aContext, const otMessage *aMessage, const otMessageInfo *aMessageInfo);
 
 /**
- * This structure represents a UDP receiver.
+ * Represents a UDP receiver.
  *
  */
 typedef struct otUdpReceiver
 {
     struct otUdpReceiver *mNext;    ///< A pointer to the next UDP receiver (internal use only).
     otUdpHandler          mHandler; ///< A function pointer to the receiver callback.
-    void *                mContext; ///< A pointer to application-specific context.
+    void                 *mContext; ///< A pointer to application-specific context.
 } otUdpReceiver;
 
 /**
- * This function adds a UDP receiver.
+ * Adds a UDP receiver.
  *
  * @param[in]   aInstance       A pointer to an OpenThread instance.
  * @param[in]   aUdpReceiver    A pointer to the UDP receiver.
@@ -86,7 +86,7 @@ typedef struct otUdpReceiver
 otError otUdpAddReceiver(otInstance *aInstance, otUdpReceiver *aUdpReceiver);
 
 /**
- * This function removes a UDP receiver.
+ * Removes a UDP receiver.
  *
  * @param[in]   aInstance       A pointer to an OpenThread instance.
  * @param[in]   aUdpReceiver    A pointer to the UDP receiver.
@@ -98,7 +98,7 @@ otError otUdpAddReceiver(otInstance *aInstance, otUdpReceiver *aUdpReceiver);
 otError otUdpRemoveReceiver(otInstance *aInstance, otUdpReceiver *aUdpReceiver);
 
 /**
- * This function sends a UDP message without socket.
+ * Sends a UDP message without socket.
  *
  * @param[in]  aInstance     A pointer to an OpenThread instance.
  * @param[in]  aMessage      A pointer to a message without UDP header.
@@ -117,7 +117,7 @@ otError otUdpSendDatagram(otInstance *aInstance, otMessage *aMessage, otMessageI
 typedef void (*otUdpReceive)(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
 
 /**
- * This structure represents a UDP socket.
+ * Represents a UDP socket.
  *
  */
 typedef struct otUdpSocket
@@ -125,13 +125,13 @@ typedef struct otUdpSocket
     otSockAddr          mSockName; ///< The local IPv6 socket address.
     otSockAddr          mPeerName; ///< The peer IPv6 socket address.
     otUdpReceive        mHandler;  ///< A function pointer to the application callback.
-    void *              mContext;  ///< A pointer to application-specific context.
-    void *              mHandle;   ///< A handle to platform's UDP.
+    void               *mContext;  ///< A pointer to application-specific context.
+    void               *mHandle;   ///< A handle to platform's UDP.
     struct otUdpSocket *mNext;     ///< A pointer to the next UDP socket (internal use only).
 } otUdpSocket;
 
 /**
- * This enumeration defines the OpenThread network interface identifiers.
+ * Defines the OpenThread network interface identifiers.
  *
  */
 typedef enum otNetifIdentifier
@@ -241,7 +241,7 @@ otError otUdpConnect(otInstance *aInstance, otUdpSocket *aSocket, const otSockAd
 otError otUdpSend(otInstance *aInstance, otUdpSocket *aSocket, otMessage *aMessage, const otMessageInfo *aMessageInfo);
 
 /**
- * This function gets the head of linked list of UDP Sockets.
+ * Gets the head of linked list of UDP Sockets.
  *
  * @param[in]  aInstance  A pointer to an OpenThread instance.
  *
@@ -269,7 +269,7 @@ otUdpSocket *otUdpGetSockets(otInstance *aInstance);
  */
 
 /**
- * This function pointer delivers the UDP packet to host and host should send the packet through its own network stack.
+ * Pointer delivers the UDP packet to host and host should send the packet through its own network stack.
  *
  * @param[in]  aMessage   A pointer to the UDP Message.
  * @param[in]  aPeerPort  The destination UDP port.
@@ -278,11 +278,11 @@ otUdpSocket *otUdpGetSockets(otInstance *aInstance);
  * @param[in]  aContext   A pointer to application-specific context.
  *
  */
-typedef void (*otUdpForwarder)(otMessage *   aMessage,
+typedef void (*otUdpForwarder)(otMessage    *aMessage,
                                uint16_t      aPeerPort,
                                otIp6Address *aPeerAddr,
                                uint16_t      aSockPort,
-                               void *        aContext);
+                               void         *aContext);
 
 /**
  * Set UDP forward callback to deliver UDP packets to host.
@@ -306,8 +306,8 @@ void otUdpForwardSetForwarder(otInstance *aInstance, otUdpForwarder aForwarder, 
  * @warning No matter the call success or fail, the message is freed.
  *
  */
-void otUdpForwardReceive(otInstance *        aInstance,
-                         otMessage *         aMessage,
+void otUdpForwardReceive(otInstance         *aInstance,
+                         otMessage          *aMessage,
                          uint16_t            aPeerPort,
                          const otIp6Address *aPeerAddr,
                          uint16_t            aSockPort);

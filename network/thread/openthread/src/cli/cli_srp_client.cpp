@@ -129,7 +129,7 @@ template <> otError SrpClient::Process<Cmd("host")>(Arg aArgs[])
         {
             uint16_t len;
             uint16_t size;
-            char *   hostName;
+            char    *hostName;
 
             VerifyOrExit(aArgs[2].IsEmpty(), error = OT_ERROR_INVALID_ARGS);
             hostName = otSrpClientBuffersGetHostNameString(GetInstancePtr(), &size);
@@ -331,17 +331,8 @@ template <> otError SrpClient::Process<Cmd("service")>(Arg aArgs[])
     {
         // `key [enable/disable]`
 
-        bool enable;
-
-        if (aArgs[1].IsEmpty())
-        {
-            OutputEnabledDisabledStatus(otSrpClientIsServiceKeyRecordEnabled(GetInstancePtr()));
-            ExitNow();
-        }
-
-        SuccessOrExit(error = Interpreter::ParseEnableOrDisable(aArgs[1], enable));
-        VerifyOrExit(aArgs[2].IsEmpty(), error = OT_ERROR_INVALID_ARGS);
-        otSrpClientSetServiceKeyRecordEnabled(GetInstancePtr(), enable);
+        error = Interpreter::GetInterpreter().ProcessEnableDisable(aArgs + 1, otSrpClientIsServiceKeyRecordEnabled,
+                                                                   otSrpClientSetServiceKeyRecordEnabled);
     }
 #endif // OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
     else
@@ -359,9 +350,9 @@ otError SrpClient::ProcessServiceAdd(Arg aArgs[])
 
     otSrpClientBuffersServiceEntry *entry = nullptr;
     uint16_t                        size;
-    char *                          string;
+    char                           *string;
     otError                         error;
-    char *                          label;
+    char                           *label;
 
     entry = otSrpClientBuffersAllocateService(GetInstancePtr());
 
@@ -562,17 +553,17 @@ template <> otError SrpClient::Process<Cmd("ttl")>(Arg aArgs[])
 
 void SrpClient::HandleCallback(otError                    aError,
                                const otSrpClientHostInfo *aHostInfo,
-                               const otSrpClientService * aServices,
-                               const otSrpClientService * aRemovedServices,
-                               void *                     aContext)
+                               const otSrpClientService  *aServices,
+                               const otSrpClientService  *aRemovedServices,
+                               void                      *aContext)
 {
     static_cast<SrpClient *>(aContext)->HandleCallback(aError, aHostInfo, aServices, aRemovedServices);
 }
 
 void SrpClient::HandleCallback(otError                    aError,
                                const otSrpClientHostInfo *aHostInfo,
-                               const otSrpClientService * aServices,
-                               const otSrpClientService * aRemovedServices)
+                               const otSrpClientService  *aServices,
+                               const otSrpClientService  *aRemovedServices)
 {
     otSrpClientService *next;
 

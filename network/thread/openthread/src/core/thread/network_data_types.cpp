@@ -131,8 +131,8 @@ uint16_t OnMeshPrefixConfig::ConvertToTlvFlags(void) const
 
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE
 
-void OnMeshPrefixConfig::SetFrom(const PrefixTlv &        aPrefixTlv,
-                                 const BorderRouterTlv &  aBorderRouterTlv,
+void OnMeshPrefixConfig::SetFrom(const PrefixTlv         &aPrefixTlv,
+                                 const BorderRouterTlv   &aBorderRouterTlv,
                                  const BorderRouterEntry &aBorderRouterEntry)
 {
     Clear();
@@ -184,6 +184,11 @@ uint8_t ExternalRouteConfig::ConvertToTlvFlags(void) const
         flags |= HasRouteEntry::kNat64Flag;
     }
 
+    if (mAdvPio)
+    {
+        flags |= HasRouteEntry::kAdvPioFlag;
+    }
+
     flags |= (RoutePreferenceToValue(mPreference) << HasRouteEntry::kPreferenceOffset);
 
     return flags;
@@ -191,9 +196,9 @@ uint8_t ExternalRouteConfig::ConvertToTlvFlags(void) const
 
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE
 
-void ExternalRouteConfig::SetFrom(Instance &           aInstance,
-                                  const PrefixTlv &    aPrefixTlv,
-                                  const HasRouteTlv &  aHasRouteTlv,
+void ExternalRouteConfig::SetFrom(Instance            &aInstance,
+                                  const PrefixTlv     &aPrefixTlv,
+                                  const HasRouteTlv   &aHasRouteTlv,
                                   const HasRouteEntry &aHasRouteEntry)
 {
     Clear();
@@ -208,6 +213,7 @@ void ExternalRouteConfig::SetFrom(Instance &           aInstance,
 void ExternalRouteConfig::SetFromTlvFlags(uint8_t aFlags)
 {
     mNat64      = ((aFlags & HasRouteEntry::kNat64Flag) != 0);
+    mAdvPio     = ((aFlags & HasRouteEntry::kAdvPioFlag) != 0);
     mPreference = RoutePreferenceFromValue(aFlags >> HasRouteEntry::kPreferenceOffset);
 }
 
@@ -247,6 +253,14 @@ void ServiceConfig::SetFrom(const ServiceTlv &aServiceTlv, const ServerTlv &aSer
     mServiceDataLength = serviceData.GetLength();
     serviceData.CopyBytesTo(mServiceData);
     GetServerConfig().SetFrom(aServerTlv);
+}
+
+void LowpanContextInfo::SetFrom(const PrefixTlv &aPrefixTlv, const ContextTlv &aContextTlv)
+{
+    mContextId    = aContextTlv.GetContextId();
+    mCompressFlag = aContextTlv.IsCompress();
+    aPrefixTlv.CopyPrefixTo(GetPrefix());
+    GetPrefix().SetLength(aContextTlv.GetContextLength());
 }
 
 } // namespace NetworkData

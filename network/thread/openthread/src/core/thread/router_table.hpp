@@ -33,12 +33,16 @@
 
 #if OPENTHREAD_FTD
 
+#include "common/array.hpp"
 #include "common/const_cast.hpp"
 #include "common/encoding.hpp"
 #include "common/iterator_utils.hpp"
 #include "common/locator.hpp"
 #include "common/non_copyable.hpp"
+#include "common/serial_number.hpp"
+#include "common/tasklet.hpp"
 #include "mac/mac_types.hpp"
+#include "thread/mle_tlvs.hpp"
 #include "thread/mle_types.hpp"
 #include "thread/thread_tlvs.hpp"
 #include "thread/topology.hpp"
@@ -48,41 +52,8 @@ namespace ot {
 class RouterTable : public InstanceLocator, private NonCopyable
 {
     friend class NeighborTable;
-    class IteratorBuilder;
 
 public:
-    /**
-     * This class represents an iterator for iterating through entries in the router table.
-     *
-     */
-    class Iterator : public InstanceLocator, public ItemPtrIterator<Router, Iterator>
-    {
-        friend class ItemPtrIterator<Router, Iterator>;
-        friend class IteratorBuilder;
-
-    public:
-        /**
-         * This constructor initializes an `Iterator` instance to start from beginning of the router table.
-         *
-         * @param[in] aInstance  A reference to the OpenThread instance.
-         *
-         */
-        explicit Iterator(Instance &aInstance);
-
-    private:
-        enum IteratorType : uint8_t
-        {
-            kEndIterator,
-        };
-
-        Iterator(Instance &aInstance, IteratorType)
-            : InstanceLocator(aInstance)
-        {
-        }
-
-        void Advance(void);
-    };
-
     /**
      * Constructor.
      *
@@ -92,47 +63,49 @@ public:
     explicit RouterTable(Instance &aInstance);
 
     /**
-     * This method clears the router table.
+     * Clears the router table.
      *
      */
     void Clear(void);
 
     /**
-     * This method removes all neighbor links to routers.
+     * Removes all neighbor links to routers.
      *
      */
     void ClearNeighbors(void);
 
     /**
-     * This method allocates a router with a random router id.
+     * Allocates a router with a random Router ID.
      *
-     * @returns A pointer to the allocated router or `nullptr` if a router ID is not available.
+     * @returns A pointer to the allocated router or `nullptr` if a Router ID is not available.
      *
      */
     Router *Allocate(void);
 
     /**
-     * This method allocates a router with a specified router id.
+     * Allocates a router with a specified Router ID.
      *
-     * @returns A pointer to the allocated router or `nullptr` if the router id could not be allocated.
+     * @param[in] aRouterId   The Router ID to try to allocate.
+     *
+     * @returns A pointer to the allocated router or `nullptr` if the ID @p aRouterId could not be allocated.
      *
      */
     Router *Allocate(uint8_t aRouterId);
 
     /**
-     * This method releases a router id.
+     * Releases a Router ID.
      *
-     * @param[in]  aRouterId  The router id.
+     * @param[in]  aRouterId  The Router ID.
      *
-     * @retval kErrorNone          Successfully released the router id.
+     * @retval kErrorNone          Successfully released the Router ID @p aRouterId.
      * @retval kErrorInvalidState  The device is not currently operating as a leader.
-     * @retval kErrorNotFound      The router id is not currently allocated.
+     * @retval kErrorNotFound      The Router ID @p aRouterId is not currently allocated.
      *
      */
     Error Release(uint8_t aRouterId);
 
     /**
-     * This method removes a router link.
+     * Removes a router link.
      *
      * @param[in]  aRouter  A reference to the router.
      *
@@ -140,125 +113,182 @@ public:
     void RemoveRouterLink(Router &aRouter);
 
     /**
-     * This method returns the number of active routers in the Thread network.
+     * Returns the number of active routers in the Thread network.
      *
      * @returns The number of active routers in the Thread network.
      *
      */
-    uint8_t GetActiveRouterCount(void) const { return mActiveRouterCount; }
+    uint8_t GetActiveRouterCount(void) const { return mRouters.GetLength(); }
 
     /**
-     * This method returns the number of active links with neighboring routers.
-     *
-     * @returns The number of active links with neighboring routers.
-     *
-     */
-    uint8_t GetActiveLinkCount(void) const;
-
-    /**
-     * This method returns the leader in the Thread network.
+     * Returns the leader in the Thread network.
      *
      * @returns A pointer to the Leader in the Thread network.
      *
      */
-    Router *GetLeader(void);
+    Router *GetLeader(void) { return AsNonConst(AsConst(this)->GetLeader()); }
 
     /**
-     * This method returns the time in seconds since the last Router ID Sequence update.
+     * Returns the leader in the Thread network.
      *
-     * @returns The time in seconds since the last Router ID Sequence update.
+     * @returns A pointer to the Leader in the Thread network.
+     *
+     */
+    const Router *GetLeader(void) const;
+
+    /**
+     * Returns the leader's age in seconds, i.e., seconds since the last Router ID Sequence update.
+     *
+     * @returns The leader's age.
      *
      */
     uint32_t GetLeaderAge(void) const;
 
     /**
-     * This method returns the link cost for a neighboring router.
+     * Returns the link cost for a neighboring router.
      *
-     * @param[in]  aRouter  A reference to the router.
+     * @param[in]  aRouter   A router.
      *
-     * @returns The link cost.
+     * @returns The link cost to @p aRouter.
      *
      */
-    uint8_t GetLinkCost(Router &aRouter);
+    uint8_t GetLinkCost(const Router &aRouter) const;
 
     /**
-     * This method returns the neighbor for a given RLOC16.
+     * Returns the link cost to the given Router.
      *
-     * @param[in]  aRloc16  The RLOC16 value.
+     * @param[in]  aRouterId  The Router ID.
+     *
+     * @returns The link cost to the Router.
+     *
+     */
+    uint8_t GetLinkCost(uint8_t aRouterId) const;
+
+    /**
+     * Returns the minimum mesh path cost to the given RLOC16
+     *
+     * @param[in]  aDestRloc16  The RLOC16 of destination
+     *
+     * @returns The minimum mesh path cost to @p aDestRloc16 (via direct link or forwarding).
+     *
+     */
+    uint8_t GetPathCost(uint16_t aDestRloc16) const;
+
+    /**
+     * Returns the mesh path cost to leader.
+     *
+     * @returns The path cost to leader.
+     *
+     */
+    uint8_t GetPathCostToLeader(void) const;
+
+    /**
+     * Determines the next hop towards an RLOC16 destination.
+     *
+     * @param[in]  aDestRloc16  The RLOC16 of the destination.
+     *
+     * @returns A RLOC16 of the next hop if a route is known, `Mle::kInvalidRloc16` otherwise.
+     *
+     */
+    uint16_t GetNextHop(uint16_t aDestRloc16) const;
+
+    /**
+     * Determines the next hop and the path cost towards an RLOC16 destination.
+     *
+     * @param[in]  aDestRloc16      The RLOC16 of the destination.
+     * @param[out] aNextHopRloc16   A reference to return the RLOC16 of next hop if known, or `Mle::kInvalidRloc16`.
+     * @param[out] aPathCost        A reference to return the path cost.
+     *
+     */
+    void GetNextHopAndPathCost(uint16_t aDestRloc16, uint16_t &aNextHopRloc16, uint8_t &aPathCost) const;
+
+    /**
+     * Finds the router for a given Router ID.
+     *
+     * @param[in]  aRouterId  The Router ID to search for.
      *
      * @returns A pointer to the router or `nullptr` if the router could not be found.
      *
      */
-    Router *GetNeighbor(uint16_t aRloc16);
+    Router *FindRouterById(uint8_t aRouterId) { return AsNonConst(AsConst(this)->FindRouterById(aRouterId)); }
 
     /**
-     * This method returns the neighbor for a given IEEE Extended Address.
+     * Finds the router for a given Router ID.
      *
-     * @param[in]  aExtAddress  A reference to the IEEE Extended Address.
+     * @param[in]  aRouterId  The Router ID to search for.
      *
      * @returns A pointer to the router or `nullptr` if the router could not be found.
      *
      */
-    Router *GetNeighbor(const Mac::ExtAddress &aExtAddress);
+    const Router *FindRouterById(uint8_t aRouterId) const;
 
     /**
-     * This method returns the neighbor for a given MAC address.
+     * Finds the router for a given RLOC16.
      *
-     * @param[in]  aMacAddress  A MAC address
+     * @param[in]  aRloc16  The RLOC16 to search for.
      *
      * @returns A pointer to the router or `nullptr` if the router could not be found.
      *
      */
-    Router *GetNeighbor(const Mac::Address &aMacAddress);
+    Router *FindRouterByRloc16(uint16_t aRloc16) { return AsNonConst(AsConst(this)->FindRouterByRloc16(aRloc16)); }
 
     /**
-     * This method returns the router for a given router id.
+     * Finds the router for a given RLOC16.
      *
-     * @param[in]  aRouterId  The router id.
+     * @param[in]  aRloc16  The RLOC16 to search for.
      *
      * @returns A pointer to the router or `nullptr` if the router could not be found.
      *
      */
-    Router *GetRouter(uint8_t aRouterId) { return AsNonConst(AsConst(this)->GetRouter(aRouterId)); }
+    const Router *FindRouterByRloc16(uint16_t aRloc16) const;
 
     /**
-     * This method returns the router for a given router id.
+     * Finds the router that is the next hop of a given router.
      *
-     * @param[in]  aRouterId  The router id.
+     * @param[in]  aRouter  The router to find next hop of.
      *
      * @returns A pointer to the router or `nullptr` if the router could not be found.
      *
      */
-    const Router *GetRouter(uint8_t aRouterId) const;
+    Router *FindNextHopOf(const Router &aRouter) { return AsNonConst(AsConst(this)->FindNextHopOf(aRouter)); }
 
     /**
-     * This method returns the router for a given IEEE Extended Address.
+     * Finds the router that is the next hop of a given router.
      *
-     * @param[in]  aExtAddress  A reference to the IEEE Extended Address.
+     * @param[in]  aRouter  The router to find next hop of.
      *
      * @returns A pointer to the router or `nullptr` if the router could not be found.
      *
      */
-    Router *GetRouter(const Mac::ExtAddress &aExtAddress);
+    const Router *FindNextHopOf(const Router &aRouter) const;
 
     /**
-     * This method returns if the router table contains a given `Neighbor` instance.
+     * Find the router for a given MAC Extended Address.
+     *
+     * @param[in]  aExtAddress  A reference to the MAC Extended Address.
+     *
+     * @returns A pointer to the router or `nullptr` if the router could not be found.
+     *
+     */
+    Router *FindRouter(const Mac::ExtAddress &aExtAddress);
+
+    /**
+     * Indicates whether the router table contains a given `Neighbor` instance.
      *
      * @param[in]  aNeighbor  A reference to a `Neighbor`.
      *
      * @retval TRUE  if @p aNeighbor is a `Router` in the router table.
      * @retval FALSE if @p aNeighbor is not a `Router` in the router table
-     *               (i.e. mParent, mParentCandidate, a `Child` of the child table).
+     *               (i.e. it can be the parent or parent candidate, or a `Child` of the child table).
      *
      */
     bool Contains(const Neighbor &aNeighbor) const
     {
-        return mRouters <= &static_cast<const Router &>(aNeighbor) &&
-               &static_cast<const Router &>(aNeighbor) < mRouters + Mle::kMaxRouters;
+        return mRouters.IsInArrayBuffer(&static_cast<const Router &>(aNeighbor));
     }
 
     /**
-     * This method retains diagnostic information for a given router.
+     * Retains diagnostic information for a given router.
      *
      * @param[in]   aRouterId    The router ID or RLOC16 for a given router.
      * @param[out]  aRouterInfo  The router information.
@@ -271,7 +301,7 @@ public:
     Error GetRouterInfo(uint16_t aRouterId, Router::Info &aRouterInfo);
 
     /**
-     * This method returns the Router ID Sequence.
+     * Returns the Router ID Sequence.
      *
      * @returns The Router ID Sequence.
      *
@@ -279,7 +309,7 @@ public:
     uint8_t GetRouterIdSequence(void) const { return mRouterIdSequence; }
 
     /**
-     * This method returns the local time when the Router ID Sequence was last updated.
+     * Returns the local time when the Router ID Sequence was last updated.
      *
      * @returns The local time when the Router ID Sequence was last updated.
      *
@@ -287,104 +317,193 @@ public:
     TimeMilli GetRouterIdSequenceLastUpdated(void) const { return mRouterIdSequenceLastUpdated; }
 
     /**
-     * This method returns the number of neighbor links.
+     * Determines whether the Router ID Sequence in a received Route TLV is more recent than the current
+     * Router ID Sequence being used by `RouterTable`.
      *
-     * @returns The number of neighbor links.
+     * @param[in] aRouteTlv   The Route TLV to compare.
+     *
+     * @retval TRUE    The Router ID Sequence in @p aRouteTlv is more recent.
+     * @retval FALSE   The Router ID Sequence in @p aRouteTlv is not more recent.
      *
      */
-    uint8_t GetNeighborCount(void) const;
+    bool IsRouteTlvIdSequenceMoreRecent(const Mle::RouteTlv &aRouteTlv) const;
 
     /**
-     * This method indicates whether or not @p aRouterId is allocated.
+     * Gets the number of router neighbors with `GetLinkQualityIn()` better than or equal to a given threshold.
      *
-     * @retval TRUE if @p aRouterId is allocated.
+     * @param[in] aLinkQuality  Link quality threshold.
+     *
+     * @returns Number of router neighbors with link quality of @o aLinkQuality or better.
+     *
+     */
+    uint8_t GetNeighborCount(LinkQuality aLinkQuality) const;
+
+    /**
+     * Indicates whether or not a Router ID is allocated.
+     *
+     * @param[in] aRouterId  The Router ID.
+     *
+     * @retval TRUE  if @p aRouterId is allocated.
      * @retval FALSE if @p aRouterId is not allocated.
      *
      */
-    bool IsAllocated(uint8_t aRouterId) const;
+    bool IsAllocated(uint8_t aRouterId) const { return mRouterIdMap.IsAllocated(aRouterId); }
 
     /**
-     * This method updates the Router ID allocation.
+     * Updates the Router ID allocation set.
      *
-     * @param[in]  aRouterIdSequence  The Router Id Sequence.
-     * @param[in]  aRouterIdSet       A reference to the Router Id Set.
+     * @param[in]  aRouterIdSequence  The Router ID Sequence.
+     * @param[in]  aRouterIdSet       The Router ID Set.
      *
      */
     void UpdateRouterIdSet(uint8_t aRouterIdSequence, const Mle::RouterIdSet &aRouterIdSet);
 
     /**
-     * This method gets the allocated Router ID set.
+     * Updates the routes based on a received `RouteTlv` from a neighboring router.
+     *
+     * @param[in]  aRouteTlv    The received `RouteTlv`
+     * @param[in]  aNeighborId  The router ID of neighboring router from which @p aRouteTlv is received.
+     *
+     */
+    void UpdateRoutes(const Mle::RouteTlv &aRouteTlv, uint8_t aNeighborId);
+
+    /**
+     * Updates the routes on an FED based on a received `RouteTlv` from the parent.
+     *
+     * MUST be called when device is an FED child and @p aRouteTlv is received from its current parent.
+     *
+     * @param[in]  aRouteTlv    The received `RouteTlv` from parent.
+     * @param[in]  aParentId    The Router ID of parent.
+     *
+     */
+    void UpdateRoutesOnFed(const Mle::RouteTlv &aRouteTlv, uint8_t aParentId);
+
+    /**
+     * Gets the allocated Router ID set.
      *
      * @returns The allocated Router ID set.
      *
      */
-    const Mle::RouterIdSet &GetRouterIdSet(void) const { return mAllocatedRouterIds; }
+    void GetRouterIdSet(Mle::RouterIdSet &aRouterIdSet) const { return mRouterIdMap.GetAsRouterIdSet(aRouterIdSet); }
 
     /**
-     * This method updates the router table and must be called with a one second period.
+     * Fills a Route TLV.
+     *
+     * When @p aNeighbor is not `nullptr`, we limit the number of router entries to `kMaxRoutersInRouteTlvForLinkAccept`
+     * when populating `aRouteTlv`, so that the TLV can be appended in a Link Accept message. In this case, we ensure
+     * to include router entries associated with @p aNeighbor, leader, and this device itself.
+     *
+     * @param[out] aRouteTlv    A Route TLV to be filled.
+     * @param[in]  aNeighbor    A pointer to the receiver (in case TLV is for a Link Accept message).
+     *
+     */
+    void FillRouteTlv(Mle::RouteTlv &aRouteTlv, const Neighbor *aNeighbor = nullptr) const;
+
+    /**
+     * Updates the router table and must be called with a one second period.
      *
      */
     void HandleTimeTick(void);
 
+#if OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
     /**
-     * This method enables range-based `for` loop iteration over all Router entries in the Router table.
+     * Gets the range of Router IDs.
      *
-     * This method should be used as follows:
+     * All the Router IDs in the range `[aMinRouterId, aMaxRouterId]` are allowed. This is intended for testing only.
      *
-     *     for (Router &router : Get<RouterTable>().Iterate()) { ... }
-     *
-     * @returns An `IteratorBuilder` instance.
+     * @param[out]  aMinRouterId   Reference to return the minimum Router ID.
+     * @param[out]  aMaxRouterId   Reference to return the maximum Router ID.
      *
      */
-    IteratorBuilder Iterate(void) { return IteratorBuilder(GetInstance()); }
-
-#if OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
     void GetRouterIdRange(uint8_t &aMinRouterId, uint8_t &aMaxRouterId) const;
 
+    /**
+     * Sets the range of Router IDs.
+     *
+     * All the Router IDs in the range `[aMinRouterId, aMaxRouterId]` are allowed. This is intended for testing only.
+     *
+     * @param[in]  aMinRouterId   The minimum Router ID.
+     * @param[in]  aMaxRouterId   The maximum Router ID.
+     *
+     * @retval kErrorNone          Successfully set the Router ID range.
+     * @retval kErrorInvalidArgs   The given range is not valid.
+     *
+     */
     Error SetRouterIdRange(uint8_t aMinRouterId, uint8_t aMaxRouterId);
 #endif
 
-#if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_INFO)
-    /**
-     * This method logs the route table.
-     *
-     */
-    void LogRouteTable(void);
-#else
-    void LogRouteTable(void) {}
-#endif
+    // The following methods are intended to support range-based `for`
+    // loop iteration over the router and should not be used
+    // directly.
+
+    Router       *begin(void) { return mRouters.begin(); }
+    Router       *end(void) { return mRouters.end(); }
+    const Router *begin(void) const { return mRouters.begin(); }
+    const Router *end(void) const { return mRouters.end(); }
 
 private:
-    class IteratorBuilder : public InstanceLocator
-    {
-    public:
-        explicit IteratorBuilder(Instance &aInstance)
-            : InstanceLocator(aInstance)
-        {
-        }
+    static constexpr uint32_t kRouterIdSequencePeriod     = 10; // in sec
+    static constexpr uint8_t  kLinkAcceptSequenceRollback = 64;
+#if OPENTHREAD_CONFIG_TIME_SYNC_ENABLE
+    static constexpr uint8_t kMaxRoutersInRouteTlvForLinkAccept = 3;
+#else
+    static constexpr uint8_t kMaxRoutersInRouteTlvForLinkAccept = 20;
+#endif
 
-        Iterator begin(void) { return Iterator(GetInstance()); }
-        Iterator end(void) { return Iterator(GetInstance(), Iterator::kEndIterator); }
-    };
-
-    void          UpdateAllocation(void);
-    const Router *GetFirstEntry(void) const;
-    const Router *GetNextEntry(const Router *aRouter) const;
-    Router *      GetFirstEntry(void) { return AsNonConst(AsConst(this)->GetFirstEntry()); }
-    Router *      GetNextEntry(Router *aRouter) { return AsNonConst(AsConst(this)->GetNextEntry(aRouter)); }
-
+    Router       *AddRouter(uint8_t aRouterId);
+    void          RemoveRouter(Router &aRouter);
+    Router       *FindNeighbor(uint16_t aRloc16);
+    Router       *FindNeighbor(const Mac::ExtAddress &aExtAddress);
+    Router       *FindNeighbor(const Mac::Address &aMacAddress);
     const Router *FindRouter(const Router::AddressMatcher &aMatcher) const;
-    Router *      FindRouter(const Router::AddressMatcher &aMatcher)
+    Router       *FindRouter(const Router::AddressMatcher &aMatcher)
     {
         return AsNonConst(AsConst(this)->FindRouter(aMatcher));
     }
 
-    Router           mRouters[Mle::kMaxRouters];
-    Mle::RouterIdSet mAllocatedRouterIds;
-    uint8_t          mRouterIdReuseDelay[Mle::kMaxRouterId + 1];
-    TimeMilli        mRouterIdSequenceLastUpdated;
-    uint8_t          mRouterIdSequence;
-    uint8_t          mActiveRouterCount;
+    void SignalTableChanged(void);
+    void HandleTableChanged(void);
+    void LogRouteTable(void) const;
+
+    class RouterIdMap
+    {
+    public:
+        // The `RouterIdMap` tracks which Router IDs are allocated.
+        // For allocated IDs, tracks the index of the `Router` entry
+        // in `mRouters` array. For unallocated IDs, tracks the
+        // remaining reuse delay time (in seconds).
+
+        RouterIdMap(void) { Clear(); }
+        void    Clear(void) { memset(mIndexes, 0, sizeof(mIndexes)); }
+        bool    IsAllocated(uint8_t aRouterId) const { return (mIndexes[aRouterId] & kAllocatedFlag); }
+        uint8_t GetIndex(uint8_t aRouterId) const { return (mIndexes[aRouterId] & kIndexMask); }
+        void    SetIndex(uint8_t aRouterId, uint8_t aIndex) { mIndexes[aRouterId] = kAllocatedFlag | aIndex; }
+        bool    CanAllocate(uint8_t aRouterId) const { return (mIndexes[aRouterId] == 0); }
+        void    Release(uint8_t aRouterId) { mIndexes[aRouterId] = kReuseDelay; }
+        void    GetAsRouterIdSet(Mle::RouterIdSet &aRouterIdSet) const;
+        void    HandleTimeTick(void);
+
+    private:
+        // The high bit in `mIndexes[aRouterId]` indicates whether or
+        // not the router ID is allocated. The lower 7 bits give either
+        // the index in `mRouter` array or remaining reuse delay time.
+
+        static constexpr uint8_t kReuseDelay    = 100; // in sec
+        static constexpr uint8_t kAllocatedFlag = 1 << 7;
+        static constexpr uint8_t kIndexMask     = 0x7f;
+
+        static_assert(kReuseDelay <= kIndexMask, "kReuseDelay does not fit in 7 bits");
+
+        uint8_t mIndexes[Mle::kMaxRouterId + 1];
+    };
+
+    using ChangedTask = TaskletIn<RouterTable, &RouterTable::HandleTableChanged>;
+
+    Array<Router, Mle::kMaxRouters> mRouters;
+    ChangedTask                     mChangedTask;
+    RouterIdMap                     mRouterIdMap;
+    TimeMilli                       mRouterIdSequenceLastUpdated;
+    uint8_t                         mRouterIdSequence;
 #if OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
     uint8_t mMinRouterId;
     uint8_t mMaxRouterId;

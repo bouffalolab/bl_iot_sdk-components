@@ -91,14 +91,15 @@ if(OT_POSIX_NAT64_CIDR)
     )
 endif()
 
-if(NOT OT_CONFIG)
-    set(OT_CONFIG "openthread-core-posix-config.h" PARENT_SCOPE)
+if(NOT OT_PLATFORM_CONFIG)
+    set(OT_PLATFORM_CONFIG "openthread-core-posix-config.h" PARENT_SCOPE)
 endif()
 
-set(OT_POSIX_CONFIG_RCP_VENDOR_INTERFACE "vendor_interface_example.cpp"
-       CACHE STRING "vendor interface implementation")
-
 set(CMAKE_EXE_LINKER_FLAGS "-rdynamic ${CMAKE_EXE_LINKER_FLAGS}" PARENT_SCOPE)
+
+if(OT_ANDROID_NDK)
+    target_compile_options(ot-posix-config INTERFACE -Wno-sign-compare)
+endif()
 
 add_library(openthread-posix
     alarm.cpp
@@ -128,8 +129,9 @@ add_library(openthread-posix
     udp.cpp
     utils.cpp
     virtual_time.cpp
-    ${OT_POSIX_CONFIG_RCP_VENDOR_INTERFACE}
 )
+
+include(vendor.cmake)
 
 target_link_libraries(openthread-posix
     PUBLIC
@@ -143,7 +145,7 @@ target_link_libraries(openthread-posix
         ot-config-ftd
         ot-config
         ot-posix-config
-        util
+        $<$<NOT:$<BOOL:${OT_ANDROID_NDK}>>:util>
         $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Linux>:rt>
 )
 

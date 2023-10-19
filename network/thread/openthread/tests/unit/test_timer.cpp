@@ -32,6 +32,7 @@
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
 #include "common/instance.hpp"
+#include "common/num_utils.hpp"
 #include "common/timer.hpp"
 
 enum
@@ -65,10 +66,7 @@ void otPlatAlarmMilliStartAt(otInstance *, uint32_t aT0, uint32_t aDt)
     sPlatDt = aDt;
 }
 
-uint32_t otPlatAlarmMilliGetNow(void)
-{
-    return sNow;
-}
+uint32_t otPlatAlarmMilliGetNow(void) { return sNow; }
 
 #if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
 void otPlatAlarmMicroStop(otInstance *)
@@ -85,18 +83,12 @@ void otPlatAlarmMicroStartAt(otInstance *, uint32_t aT0, uint32_t aDt)
     sPlatDt = aDt;
 }
 
-uint32_t otPlatAlarmMicroGetNow(void)
-{
-    return sNow;
-}
+uint32_t otPlatAlarmMicroGetNow(void) { return sNow; }
 #endif
 
 } // extern "C"
 
-void InitCounters(void)
-{
-    memset(sCallCount, 0, sizeof(sCallCount));
-}
+void InitCounters(void) { memset(sCallCount, 0, sizeof(sCallCount)); }
 
 /**
  * `TestTimer` sub-classes `ot::TimerMilli` and provides a handler and a counter to keep track of number of times timer
@@ -131,16 +123,10 @@ private:
 
 template <typename TimerType> void AlarmFired(otInstance *aInstance);
 
-template <> void AlarmFired<ot::TimerMilli>(otInstance *aInstance)
-{
-    otPlatAlarmMilliFired(aInstance);
-}
+template <> void AlarmFired<ot::TimerMilli>(otInstance *aInstance) { otPlatAlarmMilliFired(aInstance); }
 
 #if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
-template <> void AlarmFired<ot::TimerMicro>(otInstance *aInstance)
-{
-    otPlatAlarmMicroFired(aInstance);
-}
+template <> void AlarmFired<ot::TimerMicro>(otInstance *aInstance) { otPlatAlarmMicroFired(aInstance); }
 #endif
 
 /**
@@ -150,7 +136,7 @@ template <typename TimerType> int TestOneTimer(void)
 {
     const uint32_t       kTimeT0        = 1000;
     const uint32_t       kTimerInterval = 10;
-    ot::Instance *       instance       = testInitInstance();
+    ot::Instance        *instance       = testInitInstance();
     TestTimer<TimerType> timer(*instance);
 
     // Test one Timer basic operation.
@@ -276,7 +262,7 @@ template <typename TimerType> int TestTwoTimers(void)
 {
     const uint32_t       kTimeT0        = 1000;
     const uint32_t       kTimerInterval = 10;
-    ot::Instance *       instance       = testInitInstance();
+    ot::Instance        *instance       = testInitInstance();
     TestTimer<TimerType> timer1(*instance);
     TestTimer<TimerType> timer2(*instance);
 
@@ -522,7 +508,7 @@ template <typename TimerType> static void TenTimers(uint32_t aTimeShift)
     }
 
     // given the order in which timers are started, the TimerScheduler should call otPlatAlarmMilliStartAt 2 times.
-    // one for timer[0] and one for timer[5] which will supercede timer[0].
+    // one for timer[0] and one for timer[5] which will supersede timer[0].
     VerifyOrQuit(sCallCount[kCallCountIndexAlarmStart] == 2, "TestTenTimer: Start CallCount Failed.");
     VerifyOrQuit(sCallCount[kCallCountIndexAlarmStop] == 0, "TestTenTimer: Stop CallCount Failed.");
     VerifyOrQuit(sCallCount[kCallCountIndexTimerHandler] == 0, "TestTenTimer: Handler CallCount Failed.");
@@ -665,14 +651,20 @@ int TestTimerTime(void)
             VerifyOrQuit(t1 - t2 == duration, "Time difference failed");
 
             t2 = t1.GetDistantFuture();
-            VerifyOrQuit((t1 < t2), "GetDistanceFuture() failed");
+            VerifyOrQuit((t1 < t2) && !(t1 > t2), "GetDistanceFuture() failed");
             t2 += 1;
-            VerifyOrQuit(!(t1 < t2), "GetDistanceFuture() failed");
+            VerifyOrQuit(!(t1 < t2) || (t1 > t2), "GetDistanceFuture() failed");
 
             t2 = t1.GetDistantPast();
-            VerifyOrQuit((t1 > t2), "GetDistantPast() failed");
+            VerifyOrQuit((t1 > t2) && !(t1 < t2), "GetDistantPast() failed");
             t2 -= 1;
-            VerifyOrQuit(!(t1 > t2), "GetDistantPast() failed");
+            VerifyOrQuit(!(t1 > t2) || (t1 < t2), "GetDistantPast() failed");
+
+            VerifyOrQuit(Min(t1, t1.GetDistantFuture()) == t1);
+            VerifyOrQuit(Min(t1.GetDistantFuture(), t1) == t1);
+
+            VerifyOrQuit(Max(t1, t1.GetDistantPast()) == t1);
+            VerifyOrQuit(Max(t1.GetDistantPast(), t1) == t1);
 
             printf("--> PASSED\n");
         }

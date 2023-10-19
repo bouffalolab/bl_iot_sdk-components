@@ -107,7 +107,7 @@ static int swapOpen(otInstance *aInstance)
 }
 
 /**
- * This function reads @p aLength bytes from the data file and appends to the swap file.
+ * Reads @p aLength bytes from the data file and appends to the swap file.
  *
  * @param[in]   aFd     The file descriptor of the current swap file.
  * @param[in]   aLength Number of bytes to copy.
@@ -525,10 +525,7 @@ void PlatformSettingsGetSensitiveKeys(otInstance *aInstance, const uint16_t **aK
 
 #if SELF_TEST
 
-void otLogCritPlat(const char *aFormat, ...)
-{
-    OT_UNUSED_VARIABLE(aFormat);
-}
+void otLogCritPlat(const char *aFormat, ...) { OT_UNUSED_VARIABLE(aFormat); }
 
 const char *otExitCodeToString(uint8_t aExitCode)
 {
@@ -544,10 +541,7 @@ void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64)
 }
 
 // Stub implementation for testing
-bool IsSystemDryRun(void)
-{
-    return false;
-}
+bool IsSystemDryRun(void) { return false; }
 
 int main()
 {
