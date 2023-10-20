@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 #include <stdio.h>
 #include <stdint.h>
 #include <utils_list.h>
@@ -58,19 +29,19 @@ static lramsync_spi_config_t _spi_cfg = {
 };
 
 struct _ramsync_low_priv {
-	DMA_LLI_Ctrl_Type *tx_lli;
-	DMA_LLI_Ctrl_Type *rx_lli;
-	gpio_ctx_t         gpio;
+    DMA_LLI_Ctrl_Type *tx_lli;
+    DMA_LLI_Ctrl_Type *rx_lli;
+    gpio_ctx_t         gpio;
 };
 
 static ATTR_TCM_SECTION void _spi_dma_rx_irq(void *p_arg, uint32_t flag)
 {
-	lramsync_ctx_t *ctx = (lramsync_ctx_t *)p_arg;
+    lramsync_ctx_t *ctx = (lramsync_ctx_t *)p_arg;
 
-	if (HOSAL_DMA_INT_TRANS_COMPLETE != flag) {
-		blog_info("spi_dma_rx error\r\n");
-		return;
-	}
+    if (HOSAL_DMA_INT_TRANS_COMPLETE != flag) {
+        blog_info("spi_dma_rx error\r\n");
+        return;
+    }
 
     if (ctx->rx_cb) {
         ctx->rx_cb(ctx->rx_arg);
@@ -79,12 +50,12 @@ static ATTR_TCM_SECTION void _spi_dma_rx_irq(void *p_arg, uint32_t flag)
 
 static ATTR_TCM_SECTION void _spi_dma_tx_irq(void *p_arg, uint32_t flag)
 {
-	lramsync_ctx_t *ctx = (lramsync_ctx_t *)p_arg;
+    lramsync_ctx_t *ctx = (lramsync_ctx_t *)p_arg;
 
-	if (HOSAL_DMA_INT_TRANS_COMPLETE != flag) {
-		blog_info("spi_dma_tx error\r\n");
-		return;
-	}
+    if (HOSAL_DMA_INT_TRANS_COMPLETE != flag) {
+        blog_info("spi_dma_tx error\r\n");
+        return;
+    }
 
     if (ctx->tx_cb) {
         ctx->tx_cb(ctx->tx_arg);
@@ -93,7 +64,7 @@ static ATTR_TCM_SECTION void _spi_dma_tx_irq(void *p_arg, uint32_t flag)
 
 static void _gpio_irq(void *arg)
 {
-	gpio_ctx_t *pstnode = (gpio_ctx_t *)arg;
+    gpio_ctx_t *pstnode = (gpio_ctx_t *)arg;
     lramsync_ctx_t *ctx = (lramsync_ctx_t *)pstnode->arg;
     bl_gpio_intmask(pstnode->gpioPin, 0);
     lramsync_reset(ctx);
@@ -106,7 +77,7 @@ static void _gpio_irq(void *arg)
 
 static void _spi_gpio_init(const lramsync_spi_config_t *config)
 {
-	GLB_GPIO_Type gpiopins[4];
+    GLB_GPIO_Type gpiopins[4];
 
     gpiopins[0] = config->cs;  //pin cs
     gpiopins[1] = config->clk;
@@ -213,9 +184,9 @@ static int _spi_lli_list_init(lramsync_ctx_t *ctx)
         priv->tx_lli[i].dmaCtrl     = dmactrl;
 
         if (i != ctx->items_tx - 1) {
-        	priv->tx_lli[i].nextLLI = (uint32_t)&priv->tx_lli[i + 1];
+            priv->tx_lli[i].nextLLI = (uint32_t)&priv->tx_lli[i + 1];
         } else {
-        	priv->tx_lli[i].nextLLI = (uint32_t)&priv->tx_lli[0];
+            priv->tx_lli[i].nextLLI = (uint32_t)&priv->tx_lli[0];
         }
     }
  
@@ -237,9 +208,9 @@ static int _spi_lli_list_init(lramsync_ctx_t *ctx)
         priv->rx_lli[i].dmaCtrl     = dmactrl;
 
         if (i != ctx->items_rx - 1) {
-        	priv->rx_lli[i].nextLLI = (uint32_t)&priv->rx_lli[i + 1];
+            priv->rx_lli[i].nextLLI = (uint32_t)&priv->rx_lli[i + 1];
         } else {
-        	priv->rx_lli[i].nextLLI = (uint32_t)&priv->rx_lli[0];
+            priv->rx_lli[i].nextLLI = (uint32_t)&priv->rx_lli[0];
         }
     }
     return 0;
@@ -253,16 +224,16 @@ static int _spi_dma_init(lramsync_ctx_t *ctx)
     struct _ramsync_low_priv *priv;
 
     if (ctx->dma_rx_chan == -1) {
-		ctx->dma_rx_chan = hosal_dma_chan_request(0);
-		if (ctx->dma_rx_chan < 0) {
-			return -1;
-		}
+        ctx->dma_rx_chan = hosal_dma_chan_request(0);
+        if (ctx->dma_rx_chan < 0) {
+            return -1;
+        }
     }
     if (ctx->dma_tx_chan == -1) {
-		ctx->dma_tx_chan = hosal_dma_chan_request(0);
-		if (ctx->dma_tx_chan < 0) {
-			return -1;
-		}
+        ctx->dma_tx_chan = hosal_dma_chan_request(0);
+        if (ctx->dma_tx_chan < 0) {
+            return -1;
+        }
     }
 
     txllicfg.dir = DMA_TRNS_M2P;
@@ -278,13 +249,13 @@ static int _spi_dma_init(lramsync_ctx_t *ctx)
     }
   
     priv = (struct _ramsync_low_priv *)ctx->priv;
-	DMA_LLI_Init(ctx->dma_rx_chan, &rxllicfg);
-	DMA_LLI_Update(ctx->dma_rx_chan,(uint32_t)&priv->rx_lli[0]);
-	hosal_dma_irq_callback_set(ctx->dma_rx_chan, _spi_dma_rx_irq, (void *)ctx);
+    DMA_LLI_Init(ctx->dma_rx_chan, &rxllicfg);
+    DMA_LLI_Update(ctx->dma_rx_chan,(uint32_t)&priv->rx_lli[0]);
+    hosal_dma_irq_callback_set(ctx->dma_rx_chan, _spi_dma_rx_irq, (void *)ctx);
 
-	DMA_LLI_Init(ctx->dma_tx_chan, &txllicfg);
-	DMA_LLI_Update(ctx->dma_tx_chan, (uint32_t)&priv->tx_lli[0]);
-	hosal_dma_irq_callback_set(ctx->dma_tx_chan, _spi_dma_tx_irq, (void *)ctx);
+    DMA_LLI_Init(ctx->dma_tx_chan, &txllicfg);
+    DMA_LLI_Update(ctx->dma_tx_chan, (uint32_t)&priv->tx_lli[0]);
+    hosal_dma_irq_callback_set(ctx->dma_tx_chan, _spi_dma_tx_irq, (void *)ctx);
 
     SPI_Enable(ctx->cfg->port, SPI_WORK_MODE_SLAVE);
 
@@ -305,18 +276,18 @@ void lramsync_callback_register(
 
 void lramsync_start(lramsync_ctx_t *ctx)
 {
-	hosal_dma_chan_start(ctx->dma_rx_chan);
-	hosal_dma_chan_start(ctx->dma_tx_chan);
+    hosal_dma_chan_start(ctx->dma_rx_chan);
+    hosal_dma_chan_start(ctx->dma_tx_chan);
 }
 
 void lramsync_reset(lramsync_ctx_t *ctx)
 {
     printf("lramsync_reset\r\n");
-	GLB_AHB_Slave1_Reset(BL_AHB_SLAVE1_SPI);
-	SPI_Disable(ctx->cfg->port, SPI_WORK_MODE_SLAVE);
+    GLB_AHB_Slave1_Reset(BL_AHB_SLAVE1_SPI);
+    SPI_Disable(ctx->cfg->port, SPI_WORK_MODE_SLAVE);
 
-	hosal_dma_chan_stop(ctx->dma_tx_chan);
-	hosal_dma_chan_stop(ctx->dma_rx_chan);
+    hosal_dma_chan_stop(ctx->dma_tx_chan);
+    hosal_dma_chan_stop(ctx->dma_rx_chan);
 
     _spi_gpio_init(ctx->cfg);
     bl_gpio_enable_input(ctx->cfg->cs, 0, 1);
@@ -361,7 +332,7 @@ void lramsync_init(
         lramsync_cb_func_t rx_cb, void *rx_arg,
         lramsync_cb_func_t reset_signal_cb, void *reset_signal_arg)
 {
-	struct _ramsync_low_priv *priv;
+    struct _ramsync_low_priv *priv;
 
     if (ctx == NULL) {
         return;
@@ -426,4 +397,3 @@ void lramsync_init(
 
     tpdbg_log("lramsync_init slave\r\n");
 }
-

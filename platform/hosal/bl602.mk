@@ -67,6 +67,8 @@ COMPONENT_SRCS += bl602_hal/bl_uart.c \
                   sec_common/bl_sec_psk.c \
                   sec_common/bl_sec_pka.c \
                   sec_common/bl_sec_aes.c \
+                  sec_common/bl_sec_trng.c \
+                  sec_common/bl_sec_ghash.c \
 
 COMPONENT_SRCDIRS += bl602_hal platform_hal sec_common
 

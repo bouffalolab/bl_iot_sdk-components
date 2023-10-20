@@ -280,6 +280,15 @@ recv_udp(void *arg, struct udp_pcb *pcb, struct pbuf *p,
     API_EVENT(conn, NETCONN_EVT_RCVPLUS, len);
   }
 }
+
+/**
+ * Check if the udp pcb is owned by a netconn object,
+ * it returns 1 on yes, 0 otherwise.
+ */
+int udp_owner_is_netconn(struct udp_pcb *pcb)
+{
+  return pcb ? pcb->recv == recv_udp : 0;
+}
 #endif /* LWIP_UDP */
 
 #if LWIP_TCP
@@ -340,6 +349,19 @@ recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
   }
 
   return ERR_OK;
+}
+
+/**
+ * Check if the tcp pcb is owned by a netconn object,
+ * it returns 1 on yes, 0 otherwise.
+ */
+int tcp_owner_is_netconn(struct tcp_pcb *pcb)
+{
+#if LWIP_CALLBACK_API
+  return pcb ? pcb->recv == recv_tcp : 0;
+#else
+  return 0;
+#endif
 }
 
 /**

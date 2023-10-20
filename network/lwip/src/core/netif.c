@@ -648,6 +648,28 @@ netif_set_gw(struct netif *netif, const ip4_addr_t *gw)
   }
 }
 
+void
+netif_get_addr_ext(struct netif *netif, struct addr_ext *ext)
+{
+  LOCK_TCPIP_CORE();
+  if(netif) {
+    ext->arp_for_us_disable = netif->addr_ext.arp_for_us_disable;
+    ext->dhcp_qc_callback = netif->addr_ext.dhcp_qc_callback;
+  }
+  UNLOCK_TCPIP_CORE();
+}
+
+void
+netif_set_addr_ext(struct netif *netif, struct addr_ext *ext)
+{
+  LOCK_TCPIP_CORE();
+  if(netif) {
+    netif->addr_ext.arp_for_us_disable = ext->arp_for_us_disable;
+    netif->addr_ext.dhcp_qc_callback = ext->dhcp_qc_callback;
+  }
+  UNLOCK_TCPIP_CORE();
+}
+
 /**
  * @ingroup netif_ip4
  * Change IP address configuration for a network interface (including netmask

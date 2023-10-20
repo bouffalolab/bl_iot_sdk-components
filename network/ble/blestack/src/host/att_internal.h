@@ -15,7 +15,10 @@
 #endif
 
 #if defined(CONFIG_AUTO_PTS)
+#ifdef BT_ATT_MTU
+#undef BT_ATT_MTU
 #define BT_ATT_MTU 23
+#endif
 #endif
 
 struct bt_att_hdr {

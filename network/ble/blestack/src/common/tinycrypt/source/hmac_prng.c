@@ -45,19 +45,19 @@ static const unsigned int MIN_SLEN = 32;
  * max bytes in the seed string;
  * SP800-90A specifies a maximum of 2^35 bits (i.e., 2^32 bytes).
  */
-static const unsigned int MAX_SLEN = UINT32_MAX;
+//static const unsigned int MAX_SLEN = UINT32_MAX;
 
 /*
  * max bytes in the personalization string;
  * SP800-90A specifies a maximum of 2^35 bits (i.e., 2^32 bytes).
  */
-static const unsigned int MAX_PLEN = UINT32_MAX;
+//static const unsigned int MAX_PLEN = UINT32_MAX;
 
 /*
  * max bytes in the additional_info string;
  * SP800-90A specifies a maximum of 2^35 bits (i.e., 2^32 bytes).
  */
-static const unsigned int MAX_ALEN = UINT32_MAX;
+//static const unsigned int MAX_ALEN = UINT32_MAX;
 
 /*
  * max number of generates between re-seeds;

@@ -91,6 +91,30 @@ static BL_Err_Type ATTR_TCM_SECTION flash_set_l1c_wrap(SPI_Flash_Cfg_Type *p_fla
 }
 
 /**
+ * @brief get flash size from flash jedec id
+ *
+ * @return BL_Err_Type
+ */
+static uint32_t ATTR_TCM_SECTION flash_get_size_from_jedecid(uint32_t jedec_id)
+{
+    uint8_t flash_size_level = 0;
+    uint32_t flash_size = 0;
+    uint32_t jid = 0;
+
+    jid = ((jedec_id&0xff)<<16) + (jedec_id&0xff00) + ((jedec_id&0xff0000)>>16);
+
+    if (jid == 0) {
+        return 0;
+    }
+
+    flash_size_level = (jid & 0x1f);
+    flash_size_level -= 0x13;
+    flash_size = (1 << flash_size_level) * 512 * 1024;
+
+    return flash_size;
+}
+
+/**
  * @brief flash sf2 gpio init for dual bank mode
  *
  * @return BL_Err_Type
@@ -183,6 +207,16 @@ BL_Err_Type ATTR_TCM_SECTION flash_init(void)
     g_flash_cfg.clkInvert = clkInvert;
 
     return ret;
+}
+
+/**
+ * @brief get flash size
+ *
+ * @return BL_Err_Type
+ */
+uint32_t flash_get_size(void)
+{
+    return flash_get_size_from_jedecid(g_jedec_id);
 }
 
 /**

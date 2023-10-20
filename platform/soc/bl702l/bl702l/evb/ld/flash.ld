@@ -4,17 +4,18 @@ ENTRY( bl702_start )
 
 __EM_SIZE = DEFINED(btble_controller_init) ? 16K : 0K;
 __CACHE_SIZE = DEFINED(__CACHE_SIZE) ? __CACHE_SIZE : 16K;
+__stack_size = DEFINED(__stack_size) ? __stack_size : 2K;
 
 MEMORY
 {
   flash  (rxai!w) : ORIGIN = 0x23000000, LENGTH = (2M)
-  tcm_ocram (wxa) : ORIGIN = 0x4201C000 + __CACHE_SIZE, LENGTH = (16K - __CACHE_SIZE + 80K - __EM_SIZE)
+  tcm_ocram (wxa) : ORIGIN = 0x4201C000 + __CACHE_SIZE, LENGTH = (16K - __CACHE_SIZE + 80K - __EM_SIZE - __stack_size)
+  sys_stack (wxa) : ORIGIN = 0x42034000 - __EM_SIZE - __stack_size, LENGTH = __stack_size
   hbnram    (wxa) : ORIGIN = 0x40010000, LENGTH = (4K)
 }
 
 SECTIONS
 {
-  __stack_size = DEFINED(__stack_size) ? __stack_size : 2K;
   BOOT2_PT_ADDR = 0x4202e094;
 
   .init :
@@ -187,20 +188,20 @@ SECTIONS
     *(.sha_ocram*)
   } >tcm_ocram
 
-  .stack (NOLOAD) : ALIGN(8)
-  {
-    PROVIDE ( _sp_base = . );
-    . = . + __stack_size;
-    PROVIDE( _sp_main = . );
-    __freertos_irq_stack_top = .;
-  } >tcm_ocram
-
   . = ALIGN(8);
   PROVIDE( _heap_start = . );
   PROVIDE( _heap_size = ORIGIN(tcm_ocram) + LENGTH(tcm_ocram) - _heap_start );
 
   PROVIDE( _heap2_start = 0 );
   PROVIDE( _heap2_size = 0 );
+
+  .stack (NOLOAD) : ALIGN(8)
+  {
+    PROVIDE ( _sp_base = . );
+    . = . + __stack_size;
+    PROVIDE( _sp_main = . );
+    __freertos_irq_stack_top = .;
+  } >sys_stack
 
 
   /* cli */

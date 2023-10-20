@@ -258,6 +258,10 @@ typedef void (*dhcp_quick_connect_callback_fn)(struct netif *netif);
 /** Generic data structure used for all lwIP network interfaces.
  *  The following fields should be filled in by the initialization
  *  function for the device driver: hwaddr_len, hwaddr[], mtu, flags */
+struct addr_ext {
+  u8_t arp_for_us_disable;
+  dhcp_quick_connect_callback_fn dhcp_qc_callback;
+};
 struct netif {
 #if !LWIP_SINGLE_NETIF
   /** pointer to next in linked list */
@@ -396,7 +400,7 @@ struct netif {
 #if LWIP_IPV4 && IP_NAPT
   u8_t napt;
 #endif
-  dhcp_quick_connect_callback_fn qc_callback;
+  struct addr_ext addr_ext;
 };
 void dhcp_set_dhcp_quick_connect_callback(struct netif *netif, dhcp_quick_connect_callback_fn qc_callback);
 void dhcp_unset_dhcp_quick_connect_callback(struct netif *netif);
@@ -430,6 +434,8 @@ struct netif *netif_add(struct netif *netif,
                             void *state, netif_init_fn init, netif_input_fn input);
 void netif_set_addr(struct netif *netif, const ip4_addr_t *ipaddr, const ip4_addr_t *netmask,
                     const ip4_addr_t *gw);
+void netif_get_addr_ext(struct netif *netif, struct addr_ext *ext);
+void netif_set_addr_ext(struct netif *netif, struct addr_ext *ext);
 #else /* LWIP_IPV4 */
 struct netif *netif_add(struct netif *netif, void *state, netif_init_fn init, netif_input_fn input);
 #endif /* LWIP_IPV4 */

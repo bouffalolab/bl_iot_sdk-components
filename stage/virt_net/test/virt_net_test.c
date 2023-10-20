@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 #include <string.h>
 #include <aos/kernel.h>
 #include <cli.h>
@@ -110,9 +81,9 @@ static int virt_net_spi_event_cb(virt_net_t obj, enum virt_net_event_code code,
     return 0;
 }
 
+static int inited = 0;
 static void __virt_net_init(void)
 {
-    static int inited = 0;
     if (inited) {
        return; 
     }
@@ -145,6 +116,22 @@ static void __virt_net_init(void)
 
     /* set to default netif */
     netifapi_netif_set_default((struct netif *)&g_vnet_net->netif);
+}
+
+static void __virt_net_deinit(void)
+{
+    if (!inited) {
+       return; 
+    }
+    inited = 0;
+    
+    virt_net_setup_callback(g_vnet_net, NULL, NULL);
+
+    if (g_vnet_net->deinit(g_vnet_net)) {
+        printf("Deinit spi virtnet failed!!!!\r\n");
+        return;
+    }
+    virt_net_delete(g_vnet_net);
 }
 
 static void cmd_virt_net_connect(char *buf, int len, int argc, char **argv)
@@ -184,6 +171,12 @@ static void cmd_virt_net_enter_hbn(char *buf, int len, int argc, char **argv)
     __virt_net_init();
     virt_net_enter_hbn(g_vnet_net);
 }
+
+static void cmd_virt_net_destory(char *buf, int len, int argc, char **argv)
+{
+    __virt_net_deinit();
+}
+
 // STATIC_CLI_CMD_ATTRIBUTE makes this(these) command(s) static
 const static struct cli_command cmds_user[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"wifi_connect", "wifi_connect <ssid> <psk>", cmd_virt_net_connect},
@@ -191,6 +184,7 @@ const static struct cli_command cmds_user[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"wifi_status", "wifi_status", cmd_virt_net_get_status},
     {"wifi_scan", "wifi_scan", cmd_virt_net_scan},
     {"wifi_enter_hbn", "wifi_enter_hbn", cmd_virt_net_enter_hbn},
+    {"virt_net_destory", "virt_net destory", cmd_virt_net_destory},
 };
 
 int virt_net_test_cli_init(void)

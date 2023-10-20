@@ -62,7 +62,9 @@ struct bt_conn_le {
 #if defined(CONFIG_BT_STACK_PTS)
 	u8_t 			own_adder_type;
 #endif
-
+#if defined(BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)
+    bool disable_pref_conn_param_update;
+#endif
 };
 
 #if defined(CONFIG_BT_BREDR)

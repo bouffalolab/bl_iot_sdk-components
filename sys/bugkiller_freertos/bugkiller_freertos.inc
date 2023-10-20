@@ -6,6 +6,10 @@
 #include "bugkiller_heap_dump.inc"
 #endif
 
+#ifdef FREERTOS_HEAP_PSRAM_DUMP
+#include "bugkiller_heap_psram_dump.inc"
+#endif
+
 #ifdef FREERTOS_SEM_DUMP
 #include "bugkiller_sem_dump.inc"
 #endif

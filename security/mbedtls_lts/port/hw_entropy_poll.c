@@ -1,5 +1,7 @@
 #include "common.h"
 
+#include "mbedtls/entropy.h"
+
 #include <bl_sec.h>
 
 #if defined(MBEDTLS_ENTROPY_C)
@@ -8,7 +10,8 @@
 int mbedtls_hardware_poll( void *data,
                            unsigned char *output, size_t len, size_t *olen )
 {
-    bl_rand_stream( output, len );
+    if( bl_rand_stream( output, len ) )
+        return( MBEDTLS_ERR_ENTROPY_SOURCE_FAILED );
     *olen = len;
 
     return( 0 );

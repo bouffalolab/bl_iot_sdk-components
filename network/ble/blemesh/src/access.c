@@ -634,7 +634,7 @@ void bt_mesh_model_recv(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 		}
 
 		if (buf->len < op->min_len) {
-			BT_ERR("Too short message for OpCode 0x%08x", opcode);
+			BT_ERR("Too short message for OpCode 0x%08lx", opcode);
 			continue;
 		}
 

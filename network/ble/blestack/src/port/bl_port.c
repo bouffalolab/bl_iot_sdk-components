@@ -395,18 +395,10 @@ void k_get_random_byte_array(uint8_t *buf, size_t len)
 
 void *k_malloc(size_t size)
 {
-#if defined(CFG_USE_PSRAM)
-    return pvPortMallocPsram(size);
-#else
-    return pvPortMalloc(size);
-#endif /* CFG_USE_PSRAM */
+    return malloc(size);
 }
 
 void k_free(void *buf)
 {
-#if defined(CFG_USE_PSRAM)
-    return vPortFreePsram(buf);
-#else
-    return vPortFree(buf);
-#endif
+    return free(buf);
 }

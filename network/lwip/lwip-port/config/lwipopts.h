@@ -77,7 +77,9 @@ a lot of data that needs to be copied, this should be set high. */
 #define MEMP_NUM_PBUF           26
 /* MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
    per active UDP "connection". */
-#ifndef MEMP_NUM_UDP_PCB
+#ifdef OPENTHREAD_BORDER_ROUTER
+#define MEMP_NUM_UDP_PCB        20
+#else
 #define MEMP_NUM_UDP_PCB        6
 #endif
 
@@ -377,6 +379,12 @@ a lot of data that needs to be copied, this should be set high. */
 #define PBUF_LINK_ENCAPSULATION_HLEN    48u
 
 #define LWIP_RAW                        1
+
+#ifdef MATTER_SUPPORT
+#include "lwip/arch.h"
+#include <lwip/mem.h>
+#define LWIP_PBUF_CUSTOM_DATA           mem_size_t pool;
+#endif
 
 /*
    ---------------------------------

@@ -222,6 +222,7 @@ static const u8_t gen_method_sc[5 /* remote */][5 /* local */] = {
 	  PASSKEY_CONFIRM },
 };
 
+#if defined(CONFIG_BT_ECC)
 static const u8_t sc_debug_public_key[64] = {
 	0xe6, 0x9d, 0x35, 0x0e, 0x48, 0x01, 0x03, 0xcc, 0xdb, 0xfd, 0xf4, 0xac,
 	0x11, 0x91, 0xf4, 0xef, 0xb9, 0xa5, 0xf9, 0xe9, 0xa7, 0x83, 0x2c, 0x5e,
@@ -230,6 +231,7 @@ static const u8_t sc_debug_public_key[64] = {
 	0x5c, 0x15, 0x52, 0x5a, 0xbf, 0x9a, 0x32, 0x63, 0x6d, 0xeb, 0x2a, 0x65,
 	0x49, 0x9c, 0x80, 0xdc
 };
+#endif
 
 #if defined(CONFIG_BT_BREDR)
 /* SMP over BR/EDR channel specific context */
@@ -1950,15 +1952,7 @@ static void smp_timeout(struct k_work *work)
 	}
 
 	atomic_set_bit(smp->flags, SMP_FLAG_TIMEOUT);
-    //case SM/MAS/PROT/BV-01-C
-    //If smp timeout does not respond to it or close the connection.
-    /*If the Security Manager Timer reaches 30 seconds, the procedure shall be
-		considered to have failed, and the local higher layer shall be notified. No further
-		SMP commands shall be sent over the L2CAP Security Manager Channel. A
-		new Pairing process shall only be performed when a new physical link has
-		been established*/
-
-    //smp_pairing_complete(smp, BT_SMP_ERR_UNSPECIFIED);
+	smp_pairing_complete(smp, BT_SMP_ERR_UNSPECIFIED);
 }
 
 static void smp_send(struct bt_smp *smp, struct net_buf *buf,
@@ -2369,8 +2363,13 @@ static u8_t legacy_request_tk(struct bt_smp *smp)
 
 		break;
 	case PASSKEY_INPUT:
-		atomic_set_bit(smp->flags, SMP_FLAG_USER);
-		bt_auth->passkey_entry(conn);
+		if (bt_auth && bt_auth->passkey_entry) {
+			atomic_set_bit(smp->flags, SMP_FLAG_USER);
+			bt_auth->passkey_entry(conn);
+		}else{
+			BT_ERR("passkey_entry cb is NULL");
+			return BT_SMP_ERR_UNSPECIFIED;
+		}
 		break;
 	case JUST_WORKS:
 		break;
@@ -3678,10 +3677,14 @@ static u8_t smp_pairing_random(struct bt_smp *smp, struct net_buf *buf)
 				   smp->rrnd, &passkey)) {
 				return BT_SMP_ERR_UNSPECIFIED;
 			}
-
-			atomic_set_bit(smp->flags, SMP_FLAG_USER);
-			atomic_set_bit(smp->flags, SMP_FLAG_DHKEY_SEND);
-			bt_auth->passkey_confirm(smp->chan.chan.conn, passkey);
+			if (bt_auth && bt_auth->passkey_confirm) {
+				atomic_set_bit(smp->flags, SMP_FLAG_USER);
+				atomic_set_bit(smp->flags, SMP_FLAG_DHKEY_SEND);
+				bt_auth->passkey_confirm(smp->chan.chan.conn, passkey);
+			}else{
+				BT_ERR("passkey_confirm cb is NULL");
+				return  BT_SMP_ERR_UNSPECIFIED;
+			}
 			return 0;
 		case JUST_WORKS:
 			break;
@@ -3722,9 +3725,13 @@ static u8_t smp_pairing_random(struct bt_smp *smp, struct net_buf *buf)
 			   &passkey)) {
 			return BT_SMP_ERR_UNSPECIFIED;
 		}
-
-		atomic_set_bit(smp->flags, SMP_FLAG_USER);
-		bt_auth->passkey_confirm(smp->chan.chan.conn, passkey);
+		if (bt_auth && bt_auth->passkey_confirm) {
+			atomic_set_bit(smp->flags, SMP_FLAG_USER);
+			bt_auth->passkey_confirm(smp->chan.chan.conn, passkey);
+		}else{
+			BT_ERR("passkey_confirm cb is NULL");
+			return BT_SMP_ERR_UNSPECIFIED;
+		}
 		break;
 	case JUST_WORKS:
 		break;
@@ -4135,9 +4142,14 @@ static u8_t smp_public_key_slave(struct bt_smp *smp)
 		atomic_set_bit(&smp->allowed_cmds, BT_SMP_CMD_PAIRING_CONFIRM);
 		break;
 	case PASSKEY_INPUT:
-		atomic_set_bit(&smp->allowed_cmds, BT_SMP_CMD_PAIRING_CONFIRM);
-		atomic_set_bit(smp->flags, SMP_FLAG_USER);
-		bt_auth->passkey_entry(smp->chan.chan.conn);
+		if (bt_auth && bt_auth->passkey_entry) {
+			atomic_set_bit(&smp->allowed_cmds, BT_SMP_CMD_PAIRING_CONFIRM);
+			atomic_set_bit(smp->flags, SMP_FLAG_USER);
+			bt_auth->passkey_entry(smp->chan.chan.conn);
+		}else{
+			BT_ERR("passkey_entry cb is Null");   
+			return BT_SMP_ERR_UNSPECIFIED;
+		}
 		break;
 	case LE_SC_OOB:
 		atomic_set_bit(&smp->allowed_cmds, BT_SMP_CMD_PAIRING_RANDOM);
@@ -4201,8 +4213,13 @@ static u8_t smp_public_key(struct bt_smp *smp, struct net_buf *buf)
 			}
 			break;
 		case PASSKEY_INPUT:
-			atomic_set_bit(smp->flags, SMP_FLAG_USER);
-			bt_auth->passkey_entry(smp->chan.chan.conn);
+			if (bt_auth && bt_auth->passkey_entry) {
+				atomic_set_bit(smp->flags, SMP_FLAG_USER);
+				bt_auth->passkey_entry(smp->chan.chan.conn);
+			}else{
+				BT_ERR("passkey_entry cb is NULL");
+				return BT_SMP_ERR_UNSPECIFIED;
+			}
 			break;
 		case LE_SC_OOB:
 			/* Step 6: Select random N */

@@ -36,6 +36,7 @@
 
 #include "bl702l_spi.h"
 #include "bl702l_glb.h"
+#include "bl702l_clock.h"
 
 /** @addtogroup  BL702L_Peripheral_Driver
  *  @{
@@ -342,19 +343,23 @@ BL_Err_Type SPI_SetClock(SPI_ID_Type spiNo, uint32_t clk)
     uint32_t glb_div = 0, spi_div = 0;
     uint32_t tmpVal;
     uint32_t SPIx = spiAddr[spiNo];
+    uint32_t src_clk;
+    uint32_t clk_min;
 
-    if (clk > 80000000) {
-        clk = 80000000;
-    } else if (clk < 9766) {
-        clk = 9766;
+    src_clk = Clock_System_Clock_Get(BL_SYSTEM_CLOCK_BCLK);
+    clk_min = ((src_clk + 31) / 32 + 255) / 256;
+    if (clk > src_clk) {
+        clk = src_clk;
+    } else if (clk < clk_min) {
+        clk = clk_min;
     }
 
-    if (clk >= 312500) {
+    if (clk >= src_clk / 256) {
         glb_div = 0;
-        spi_div = 80000000 / clk - 1;
+        spi_div = src_clk / 2 / clk - 1;
     } else {
         glb_div = 31;
-        spi_div = 2500000 / clk - 1;
+        spi_div = src_clk / 64 / clk - 1;
     }
 
     if (spiNo == SPI0_ID) {

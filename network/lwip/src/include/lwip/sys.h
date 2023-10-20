@@ -108,6 +108,20 @@ typedef void (*lwip_thread_fn)(void *arg);
 #define LWIP_COMPAT_MUTEX 0
 #endif
 
+/**
+ * @ingroup sys
+ * Check the sys is inside interrupt through 'sys_is_inside_interrupt()'.
+ * @param void
+ */
+int sys_is_inside_interrupt(void);
+
+/**
+ * @ingroup sys
+ * Check the sys current task is tcpip through 'sys_current_is_tcpip()'.
+ * @param void
+ */
+int sys_current_is_tcpip(void);
+
 #if LWIP_COMPAT_MUTEX
 /* for old ports that don't have mutexes: define them to binary semaphores */
 #define sys_mutex_t                   sys_sem_t
@@ -147,6 +161,12 @@ void sys_mutex_lock(sys_mutex_t *mutex);
  * @param mutex the mutex to unlock
  */
 void sys_mutex_unlock(sys_mutex_t *mutex);
+/**
+ * @ingroup sys_mutex
+ * Check the mutex is locked through 'sys_mutex_is_locked()'.
+ * @param mutex the mutex to unlock
+ */
+int sys_mutex_is_locked(sys_mutex_t *mutex);
 /**
  * @ingroup sys_mutex
  * Deallocates a mutex.

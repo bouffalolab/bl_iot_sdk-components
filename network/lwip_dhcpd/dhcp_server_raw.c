@@ -23,6 +23,8 @@
 #include <lwip/init.h>
 #include <lwip/prot/dhcp.h>
 #include <dhcp_server.h>
+#include <lwip/netifapi.h>
+#include <lwip/tcpip.h>
 
 #define DHCPD_MAX_DNS_SERVER_NUM    2
 
@@ -92,6 +94,12 @@ struct dhcp_server
     ip4_addr_t end;
     ip4_addr_t current;
     ip4_addr_t dnsserver[DHCPD_MAX_DNS_SERVER_NUM];
+};
+
+struct dhcp_server_arg {
+    struct netif *netif;
+    ip4_addr_t start;
+    ip4_addr_t end;
 };
 
 static u8_t *dhcp_server_option_find(u8_t *buf, u16_t len, u8_t option);
@@ -410,7 +418,7 @@ dhcp_server_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t
             *dns_len = 0;
             for (u8_t i = 0; i < DHCPD_MAX_DNS_SERVER_NUM; i++)
             {
-                if (!ip_addr_isany(&dhcp_server->dnsserver[i]))
+                if (!ip4_addr_isany(&dhcp_server->dnsserver[i]))
                 {
                     SMEMCPY(opt_buf, &(dhcp_server->dnsserver[i].addr), 4);
                     opt_buf += 4;
@@ -509,7 +517,7 @@ dhcp_server_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t
                         *dns_len = 0;
                         for (u8_t i = 0; i < DHCPD_MAX_DNS_SERVER_NUM; i++)
                         {
-                            if (!ip_addr_isany(&dhcp_server->dnsserver[i]))
+                            if (!ip4_addr_isany(&dhcp_server->dnsserver[i]))
                             {
                                 SMEMCPY(opt_buf, &(dhcp_server->dnsserver[i].addr), 4);
                                 opt_buf += 4;
@@ -637,18 +645,22 @@ free_pbuf_and_return:
 * - ERR_MEM - Out of memory
 */
 err_t
-dhcp_server_start(struct netif *netif, ip4_addr_t *start, ip4_addr_t *end)
+dhcp_server_start(void *ctx)
 {
     struct dhcp_server *dhcp_server;
+    struct dhcp_server_arg *arg = (struct dhcp_server_arg *)ctx;
+    ip4_addr_t start = arg->start, end = arg->end;
+    struct netif *netif = arg->netif;
+    free(ctx);
 
     /* If this netif alreday use the dhcp server. */
     for (dhcp_server = lw_dhcp_server; dhcp_server != NULL; dhcp_server = dhcp_server->next)
     {
         if (dhcp_server->netif == netif)
         {
-            dhcp_server->start = *start;
-            dhcp_server->end = *end;
-            dhcp_server->current = *start;
+            dhcp_server->start = start;
+            dhcp_server->end = end;
+            dhcp_server->current = start;
             return ERR_OK;
         }
     }
@@ -670,9 +682,9 @@ dhcp_server_start(struct netif *netif, ip4_addr_t *start, ip4_addr_t *end)
     lw_dhcp_server = dhcp_server;
     dhcp_server->netif = netif;
     dhcp_server->node_list = NULL;
-    dhcp_server->start = *start;
-    dhcp_server->end = *end;
-    dhcp_server->current = *start;
+    dhcp_server->start = start;
+    dhcp_server->end = end;
+    dhcp_server->current = start;
 
     /* allocate UDP PCB */
     dhcp_server->pcb = udp_new();
@@ -722,29 +734,6 @@ err_t dhcp_server_stop(struct netif *netif)
     return ERR_OK;
 }
 
-static void set_if(struct netif *netif, char* ip_addr, char* gw_addr, char* nm_addr)
-{
-    ip4_addr_t *ip;
-    ip4_addr_t addr;
-
-    ip = (ip4_addr_t *)&addr;
-
-    /* set ip address */
-    if ((ip_addr != NULL) && ip4addr_aton(ip_addr, &addr)) {
-        netif_set_ipaddr(netif, ip);
-    }
-
-    /* set gateway address */
-    if ((gw_addr != NULL) && ip4addr_aton(gw_addr, &addr)) {
-        netif_set_gw(netif, ip);
-    }
-
-    /* set netmask address */
-    if ((nm_addr != NULL) && ip4addr_aton(nm_addr, &addr)) {
-        netif_set_netmask(netif, ip);
-    }
-}
-
 static err_t dhcp_server_op_dns_server(void* netif, const ip_addr_t *dnsserver, int reset)
 {
     struct dhcp_server *dhcp_server;
@@ -764,21 +753,21 @@ static err_t dhcp_server_op_dns_server(void* netif, const ip_addr_t *dnsserver, 
     }
 
     for (int i = 0; i < DHCPD_MAX_DNS_SERVER_NUM; i++) {
-        if (ip_addr_cmp(dnsserver, &dhcp_server->dnsserver[i])) {
+        if (ip4_addr_cmp(ip_2_ip4(dnsserver), &dhcp_server->dnsserver[i])) {
             found = i;
         }
-        if (!free && ip_addr_isany(&dhcp_server->dnsserver[i])) {
+        if (!free && ip4_addr_isany(&dhcp_server->dnsserver[i])) {
             free = i;
         }
     }
 
     /* Set */
     if (!reset && free) {
-        ip_addr_set(&dhcp_server->dnsserver[free], dnsserver);
+        ip4_addr_set(&dhcp_server->dnsserver[free], ip_2_ip4(dnsserver));
     }
     /* Reset */
     else if (reset && found) {
-        ip_addr_set_zero(&dhcp_server->dnsserver[found]);
+        ip4_addr_set_zero(&dhcp_server->dnsserver[found]);
     }
 
     return ERR_OK;
@@ -790,7 +779,7 @@ static void dhcp_server_clear_dns_server(void)
 
     for (dhcp_server = lw_dhcp_server; dhcp_server != NULL; dhcp_server = dhcp_server->next) {
         for (int i = 0; i < DHCPD_MAX_DNS_SERVER_NUM; i++) {
-            ip_addr_set_zero(&dhcp_server->dnsserver[i]);
+            ip4_addr_set_zero(&dhcp_server->dnsserver[i]);
         }
     }
 }
@@ -802,7 +791,7 @@ void dhcpd_clear_dns_server(void* netif)
     for (dhcp_server = lw_dhcp_server; dhcp_server != NULL; dhcp_server = dhcp_server->next) {
         if (dhcp_server->netif == netif) {
             for (int i = 0; i < DHCPD_MAX_DNS_SERVER_NUM; i++) {
-                ip_addr_set_zero(&dhcp_server->dnsserver[i]);
+                ip4_addr_set_zero(&dhcp_server->dnsserver[i]);
             }
         }
     }
@@ -819,24 +808,44 @@ err_t dhcpd_remove_dns_server(void* netif, const ip_addr_t *dnsserver)
 }
 
 //TODO better dhcpd_stop flow?
-void dhcpd_start(struct netif *netif)
+void dhcpd_start(struct netif *netif, int start, int limit)
 {
     err_t res;
+    char str_tmp[IP4ADDR_STRLEN_MAX] = DHCPD_SERVER_IP;
+    char *p = str_tmp;
+    int start_num = DHCPD_CLIENT_IP_MIN, end_num = DHCPD_CLIENT_IP_MAX;
+    ip4_addr_t ip_start, ip_end;
+    struct dhcp_server_arg *arg;
+    ip4_addr_t default_addr, default_mask, default_gw;
 
     if (1)
     {
-        dhcp_stop(netif);
+        netifapi_dhcp_stop(netif);
 
-        set_if(netif, DHCPD_SERVER_IP, "0.0.0.0", "255.255.255.0");
+        if(start == -1 || limit == -1 || ip4_addr_isany_val(*netif_ip4_addr(netif)))
+        {
+            ip4addr_aton(DHCPD_SERVER_IP, &default_addr);
+            ip4addr_aton("255.255.255.0", &default_mask);
+            ip4addr_aton("0.0.0.0", &default_gw);
+            netifapi_netif_set_addr(netif, &default_addr, &default_mask, &default_gw);
+        }
+        else
+        {
+            memset(str_tmp, 0, IP4ADDR_STRLEN_MAX);
+            ip4addr_ntoa_r(netif_ip4_addr(netif), str_tmp, IP4ADDR_STRLEN_MAX);
+            start_num = start;
+            end_num = start + limit - 1;
+        }
 
-        netif_set_up(netif);
+        if(start_num > 254 || start_num < 2 || end_num > 254 || end_num < 2 || start_num >= end_num) {
+            DEBUG_PRINTF("dhcp start arg error, range %d - %d \r\n", start_num, end_num);
+            return;
+        }
+
+        netifapi_netif_set_up(netif);
     }
 
     {
-        char str_tmp[4 * 4 + 4] = DHCPD_SERVER_IP;
-        char *p = str_tmp;
-        ip4_addr_t ip_start, ip_end;
-
         p = strchr(str_tmp, '.');
         if (p)
         {
@@ -853,16 +862,21 @@ void dhcpd_start(struct netif *netif)
         }
         p = p + 1; /* move to xxx.xxx.xxx.^ */
 
-        sprintf(p, "%d", DHCPD_CLIENT_IP_MIN);
+        sprintf(p, "%d", start_num);
         ip4addr_aton(str_tmp, &ip_start);
         DEBUG_PRINTF("ip_start: [%s]\r\n", str_tmp);
-        sprintf(p, "%d", DHCPD_CLIENT_IP_MAX);
+        sprintf(p, "%d", end_num);
         ip4addr_aton(str_tmp, &ip_end);
-        DEBUG_PRINTF("ip_start: [%s]\r\n", str_tmp);
+        DEBUG_PRINTF("ip_end: [%s]\r\n", str_tmp);
 
-        res = dhcp_server_start(netif, &ip_start, &ip_end);
-        if (res != 0)
+        arg = (struct dhcp_server_arg *)malloc(sizeof(struct dhcp_server_arg));
+        arg->netif = netif;
+        arg->start = ip_start;
+        arg->end = ip_end;
+        res = tcpip_callback((tcpip_callback_fn)dhcp_server_start, arg);
+        if (res != ERR_OK)
         {
+            free(arg);
             DEBUG_PRINTF("dhcp_server_start res: %d.\r\n", res);
         }
     }

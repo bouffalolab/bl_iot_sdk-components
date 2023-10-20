@@ -743,9 +743,11 @@ static void blemeshcli_init(char *pcWriteBuffer, int xWriteBufferLen, int argc, 
 	bt_mesh_lpn_set_cb(lpn_cb);
 #endif
 }
+
+#if defined(CONFIG_BT_MESH_PROVISIONER)
 static const u16_t net_idx = BT_MESH_NET_PRIMARY;
 static const u16_t app_idx = BT_MESH_APP_PRIMARY;
-
+#endif
 #if defined(CONFIG_BT_MESH_PROVISIONER)
 static u16_t self_addr = 1;
 static void setup_cdb(void)
@@ -754,7 +756,7 @@ static void setup_cdb(void)
 
 	key = bt_mesh_cdb_app_key_alloc(net_idx, app_idx);
 	if (key == NULL) {
-		vOutputString("Failed to allocate app-key 0x%04x\n");
+		vOutputString("Failed to allocate app-key\n");
 		return;
 	}
 
@@ -782,7 +784,7 @@ static void blemeshcli_pvnr_init(char *pcWriteBuffer, int xWriteBufferLen, int a
 
 	err = bt_mesh_init(&prov, &comp);
 	if (err) {
-		vOutputString("Initializing mesh failed (err %d)\n");
+		vOutputString("Initializing mesh failed (err %d)\n", err);
 		return;
 	}
 	blemesh_inited = true;
@@ -1051,7 +1053,7 @@ static u8_t capabilities(prov_caps_t* prv_caps, prov_start_t* prv_start)
 #endif /*CONFIG_BT_MESH_PROVISIONER*/
 static int output_number(bt_mesh_output_action_t action, u32_t number)
 {
-	vOutputString("OOB Number: %u\r\n", number);
+	vOutputString("OOB Number: %lu\r\n", number);
 	return 0;
 }
 
@@ -1205,7 +1207,7 @@ void ble_mesh_generic_onoff_client_model_cb(bfl_ble_mesh_generic_client_cb_event
             break;
         case BFL_BLE_MESH_MODEL_OP_GEN_ONOFF_SET_UNACK:
             if (param->error_code == BFL_OK) {
-                vOutputString("GenOnOffClient:SetUNACK,OK, opcode[%x] raddr[%x]\n", 
+                vOutputString("GenOnOffClient:SetUNACK,OK, opcode[%lx] raddr[%x]\n", 
                                 opcode, param->params->ctx.addr);
             } else {
                 vOutputString("GenOnOffClient:SetUNACK,Fail[%x]\n", param->error_code);
@@ -1343,7 +1345,7 @@ void ble_mesh_light_client_model_cb(bfl_ble_mesh_light_client_cb_event_t event,
 {
 	uint32_t opcode = param->params->opcode;
 
-    vOutputString("enter %s: event is %d, error code is %d, opcode is 0x%x\n",
+    vOutputString("enter %s: event is %d, error code is %d, opcode is 0x%lx\n",
              __func__, event, param->error_code, opcode);
 
     switch (event) {
@@ -1493,7 +1495,7 @@ void ble_mesh_light_client_model_cb(bfl_ble_mesh_light_client_cb_event_t event,
         break;
     }
     case BFL_BLE_MESH_LIGHT_CLIENT_EVT_MAX:{
-        vOutputString("InvalidEvt, Opcode[%x] [%x]\n", opcode, param->error_code);
+        vOutputString("InvalidEvt, Opcode[%lx] [%x]\n", opcode, param->error_code);
         break;
     }
     default:
@@ -1774,7 +1776,7 @@ static int input(bt_mesh_input_action_t act, u8_t size)
 		vOutputString("Enter a number (max %u digits) with: input-num <num>:", size);
 		read_str(str, sizeof(str)-1);
 		u32_t num = strtoul(str, NULL, 10);
-		vOutputString("Recved num[%d]\n", num);
+		vOutputString("Recved num[%lu]\n", num);
 		int err = bt_mesh_input_number(num);
 		if (err) {
 			vOutputString("Numeric input failed (err %d)\r\n", err);
@@ -1783,7 +1785,7 @@ static int input(bt_mesh_input_action_t act, u8_t size)
 	case BT_MESH_ENTER_STRING:{
 		vOutputString("Enter a string (max %u chars) with: input-str <str>\r\n", size);
 		read_str(str, sizeof(str)-1);
-		vOutputString("Recved string[%d]\n", str);
+		vOutputString("Recved string[%s]\n", str);
 		int err = bt_mesh_input_string(str);
 		if (err) {
 			vOutputString("String input failed (err %d)\r\n", err);
@@ -2444,7 +2446,7 @@ static void print_unprovisioned_beacon(u8_t uuid[16],
 	vOutputString("uuid:[%s]\n", bt_hex(uuid, 16));
 	vOutputString("oob_info:[%x]\n", (u16_t)oob_info);
 	if(uri_hash)
-		vOutputString("uri_hash:[%x]\n", *uri_hash);
+		vOutputString("uri_hash:[%lx]\n", *uri_hash);
 	else
 		vOutputString("uri_hash:[NULL]\n");
 }
@@ -3392,8 +3394,7 @@ static void blemeshcli_mod_sub_del(char *pcWriteBuffer, int xWriteBufferLen, int
 	}
 
 	if (err) {
-		vOutputString("Unable to send Model Subscription Delete "
-			    "(err %d)\n");
+		vOutputString("Unable to send Model Subscription Delete (err %d)\n", err);
 		return;
 	}
 
@@ -3433,7 +3434,7 @@ static void blemeshcli_mod_sub_del_all(char *pcWriteBuffer, int xWriteBufferLen,
 
 	if (err) {
 		vOutputString("Unable to send Model Subscription Delete "
-			    "(err %d)\n");
+			    "(err %d)\n", err);
 		return;
 	}
 
@@ -4465,7 +4466,7 @@ static void blemeshcli_lpn_timeout_get(char *pcWriteBuffer, int xWriteBufferLen,
 		return;
 	}
 
-	vOutputString("lpn_addr is %x, poll_timeout %x",
+	vOutputString("lpn_addr is %x, poll_timeout %lx",
 					lpn_addr, poll_timeout);
 }
 

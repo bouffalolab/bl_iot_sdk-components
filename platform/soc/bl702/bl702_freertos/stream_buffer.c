@@ -1261,3 +1261,7 @@ static void prvInitialiseNewStreamBuffer( StreamBuffer_t * const pxStreamBuffer,
 
 #endif /* configUSE_TRACE_FACILITY */
 /*-----------------------------------------------------------*/
+#ifdef CFG_COMPONENT_BUGKILLER_ENABLE
+#define FREERTOS_STREAMBUFFER_DUMP
+#include <bugkiller_freertos.inc>
+#endif

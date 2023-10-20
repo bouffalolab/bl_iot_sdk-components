@@ -1,5 +1,24 @@
 # Changes
 
+## 2023-09-14
+1. Fix the issue that connection update work is not released when upper layer does disconnection in BT_CONN_CONNECT_SCAN state.
+
+## 2023-08-15
+1. Fix the issue that att_timeout still happens while this att_req has been cancelled by upper layer.
+
+## 2023-08-08
+1. Remove compilation flags in ble_common.mk, including -Wno-unused-const-variable,-Wno-unused-but-set-variable and -Wno-format. Fix related compilation errors and warnings.
+
+## 2023-07-26
+1. Fix the problem that repeated calls to bt_conn_create_le causes subsequent connection failure.
+
+## 2023-07-14
+1. Add ble direct test mode feature.
+
+## 2023-06-21
+1. Fix an illegal memory access issue in bt_gatt_indicate().
+2. Solve the problem that the next bt_gatt_discover cannot be initiated in the callback function when the first bt_gatt_discover is completed.
+   
 ## 2023-06-16
 1. Optimize error log.
 

@@ -93,11 +93,11 @@ int adc_open(struct device *dev, uint16_t oflag)
     CPU_Interrupt_Disable(GPADC_DMA_IRQn);
     ADC_IntMask(ADC_INT_ALL, MASK);
 
-    adc_cfg.clkDiv = adc_device->clk_div;
+    adc_cfg.clkDiv = (ADC_CLK_Type)adc_device->clk_div;
 
-    adc_cfg.vref = adc_device->vref;
-    adc_cfg.resWidth = adc_device->data_width;
-    adc_cfg.inputMode = adc_device->differential_mode;
+    adc_cfg.vref = (ADC_VREF_Type)adc_device->vref;
+    adc_cfg.resWidth = (ADC_Data_Width_Type)adc_device->data_width;
+    adc_cfg.inputMode = (ADC_SIG_INPUT_Type)adc_device->differential_mode;
 
     adc_cfg.v18Sel = ADC_V18_SELECT;
     adc_cfg.v11Sel = ADC_V11_SELECT;
@@ -110,7 +110,7 @@ int adc_open(struct device *dev, uint16_t oflag)
     adc_cfg.offsetCalibVal = ADC_OFFSER_CALIB_VAL;
 
     adc_fifo_cfg.dmaEn = DISABLE;
-    adc_fifo_cfg.fifoThreshold = adc_device->fifo_threshold;
+    adc_fifo_cfg.fifoThreshold = (ADC_FIFO_Threshold_Type)adc_device->fifo_threshold;
 
     if (oflag & DEVICE_OFLAG_STREAM_TX) {
     }

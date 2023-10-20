@@ -1,5 +1,20 @@
 # Changes
 
+## 2023-10-11
+1.[BL702L]Add btblecontroller_702l_m4s1p.
+
+## 2023-10-08
+1.[BL702L]Add btblecontroller_702l_m0s2p.
+
+## 2023-09-27
+1.[BL702L][BL616]Optimize ble active scan.
+
+## 2023-09-21
+1.[BL702L][BL616]Fix the issue that ble may not be able to sleep in a corner case.
+
+## 2023-07-20
+1.[BL702L]Add btblecontroller_702l_m8s1p, and remove btblecontroller_702l_m8s1.
+
 ## 2023-06-14
 1.[BL702L][BL616]Add API to set stack size of btblecontroller task.
 

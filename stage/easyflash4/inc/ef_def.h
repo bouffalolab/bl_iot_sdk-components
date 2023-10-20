@@ -105,6 +105,8 @@ enum env_status {
     ENV_ERR_HDR,
     ENV_STATUS_NUM,
 };
+/** If the value of ENV_STATUS_NUM is changed, 
+ * please evaluate size of status_table in del_env. */
 typedef enum env_status env_status_t;
 
 struct env_node_obj {

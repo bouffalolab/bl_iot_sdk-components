@@ -581,7 +581,7 @@ dhcp_timeout(struct netif *netif)
 
   LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_timeout()\n"));
   /* only quick connect check renew fail, side effect for normal renew */
-  if(netif->qc_callback && dhcp->state == DHCP_STATE_RENEWING) {
+  if(netif->addr_ext.dhcp_qc_callback && dhcp->state == DHCP_STATE_RENEWING) {
       LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_timeout(): quick connect renew timeout\n"));
       dhcp_start(netif);
   }
@@ -760,6 +760,20 @@ dhcp_handle_ack(struct netif *netif, struct dhcp_msg *msg_in)
     dns_setserver(n, &dns_addr);
   }
 #endif /* LWIP_DHCP_PROVIDE_DNS_SERVERS */
+            printf( " IP:%u.%u.%u.%u\r\n MASK: %u.%u.%u.%u\r\n Gateway: %u.%u.%u.%u\r\n",
+                    (unsigned int)((dhcp->offered_ip_addr.addr & 0x000000FF) >> 0),
+                    (unsigned int)((dhcp->offered_ip_addr.addr & 0x0000FF00) >> 8),
+                    (unsigned int)((dhcp->offered_ip_addr.addr & 0x00FF0000) >> 16),
+                    (unsigned int)((dhcp->offered_ip_addr.addr & 0xFF000000) >> 24),
+                    (unsigned int)((dhcp->offered_sn_mask.addr & 0x000000FF) >> 0),
+                    (unsigned int)((dhcp->offered_sn_mask.addr & 0x0000FF00) >> 8),
+                    (unsigned int)((dhcp->offered_sn_mask.addr & 0x00FF0000) >> 16),
+                    (unsigned int)((dhcp->offered_sn_mask.addr & 0xFF000000) >> 24),
+                    (unsigned int)((dhcp->offered_gw_addr.addr & 0x000000FF) >> 0),
+                    (unsigned int)((dhcp->offered_gw_addr.addr & 0x0000FF00) >> 8),
+                    (unsigned int)((dhcp->offered_gw_addr.addr & 0x00FF0000) >> 16),
+                    (unsigned int)((dhcp->offered_gw_addr.addr & 0xFF000000) >> 24)
+                  );
 }
 
 /**
@@ -1127,18 +1141,6 @@ dhcp_discover(struct netif *netif)
   return result;
 }
 
-void dhcp_set_dhcp_quick_connect_callback(struct netif *netif, dhcp_quick_connect_callback_fn qc_callback)
-{
-    if(netif)
-        netif->qc_callback = qc_callback;
-}
-
-void dhcp_unset_dhcp_quick_connect_callback(struct netif *netif)
-{
-    if(netif)
-        netif->qc_callback = NULL;
-}
-
 /**
  * Bind the interface to the offered IP address.
  *
@@ -1249,9 +1251,10 @@ dhcp_bind(struct netif *netif)
        to ensure the callback can use dhcp_supplied_address() */
     dhcp_set_state(dhcp, DHCP_STATE_BOUND);
 
-    if(netif->qc_callback && !ip4_addr_cmp(netif_ip4_addr(netif), &dhcp->offered_ip_addr)) {
+    netif->addr_ext.arp_for_us_disable = 0;
+    if(netif->addr_ext.dhcp_qc_callback && !ip4_addr_cmp(netif_ip4_addr(netif), &dhcp->offered_ip_addr)) {
         netif_set_addr(netif, &dhcp->offered_ip_addr, &sn_mask, &gw_addr);
-        netif->qc_callback(netif);
+        netif->addr_ext.dhcp_qc_callback(netif);
     } else {
         netif_set_addr(netif, &dhcp->offered_ip_addr, &sn_mask, &gw_addr);
     }

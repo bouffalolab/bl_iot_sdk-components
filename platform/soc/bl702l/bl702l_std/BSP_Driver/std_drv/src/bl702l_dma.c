@@ -542,6 +542,27 @@ uint32_t DMA_LLI_Get_Counter(DMA_ID_Type dmaId, uint8_t ch)
 }
 
 /****************************************************************************/ /**
+ * @brief  DMA channel get dst address
+ *
+ * @param  dmaId: DMA ID type
+ * @param  ch: DMA channel number
+ *
+ * @return LLI counter
+ *
+*******************************************************************************/
+uint32_t DMA_LLI_Get_Dstaddr(DMA_ID_Type dmaId, uint8_t ch)
+{
+    /* Get channel register */
+    uint32_t DMAChs = DMA_Get_Channel(dmaAddr[dmaId], ch);
+
+    /* Check the parameters */
+    CHECK_PARAM(IS_DMA_ID_TYPE(dmaId));
+    CHECK_PARAM(IS_DMA_CHAN_TYPE(ch));
+
+    return BL_RD_REG(DMAChs, DMA_DSTADDR);
+}
+
+/****************************************************************************/ /**
  * @brief  DMA LLI PingPong Structure Start
  *
  * @param  dmaPpStruct: dma pp struct pointer

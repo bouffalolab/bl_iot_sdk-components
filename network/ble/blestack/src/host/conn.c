@@ -168,6 +168,18 @@ int bt_conn_get_peripheral_pref_params(struct bt_le_conn_param *param)
 
     return 0;
 }
+
+#if defined (BFLB_BLE_ENABLE_OR_DISABLE_SLAVE_PREF_CONN_PARAM_UDPATE)
+int bt_conn_enable_peripheral_pref_param_update(struct bt_conn *conn, bool enable)
+{
+    if(conn == NULL)
+        return -EINVAL;
+
+    conn->le.disable_pref_conn_param_update = !enable;
+    return 0;
+}
+#endif
+
 #endif//BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS
 
 static void notify_connected(struct bt_conn *conn)
@@ -427,26 +439,31 @@ static void conn_update_timeout(struct k_work *work)
 
 		send_conn_le_param_update(conn, param);
 	} else {
-        #if defined (BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)
-		param = BT_LE_CONN_PARAM(peripheral_pref_con_params.interval_min,
-					 peripheral_pref_con_params.interval_max,
-					 peripheral_pref_con_params.latency,
-					 peripheral_pref_con_params.timeout);
-        #else
-		param = BT_LE_CONN_PARAM(CONFIG_BT_PERIPHERAL_PREF_MIN_INT,
-					 CONFIG_BT_PERIPHERAL_PREF_MAX_INT,
-					 CONFIG_BT_PERIPHERAL_PREF_SLAVE_LATENCY,
-					 CONFIG_BT_PERIPHERAL_PREF_TIMEOUT);
-        #endif//BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS
-		send_conn_le_param_update(conn, param);
+        #if defined (BFLB_BLE_ENABLE_OR_DISABLE_SLAVE_PREF_CONN_PARAM_UDPATE)
+        if(!conn->le.disable_pref_conn_param_update)
+        #endif
+        {
+			#if defined (BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)
+			param = BT_LE_CONN_PARAM(peripheral_pref_con_params.interval_min,
+						 peripheral_pref_con_params.interval_max,
+						 peripheral_pref_con_params.latency,
+						 peripheral_pref_con_params.timeout);
+        	#else
+			param = BT_LE_CONN_PARAM(CONFIG_BT_PERIPHERAL_PREF_MIN_INT,
+						 CONFIG_BT_PERIPHERAL_PREF_MAX_INT,
+						 CONFIG_BT_PERIPHERAL_PREF_SLAVE_LATENCY,
+						 CONFIG_BT_PERIPHERAL_PREF_TIMEOUT);
+        	#endif//BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS
+			send_conn_le_param_update(conn, param);
+		}
 	}
 #else
 	/* update only if application set own params */
 	if (atomic_test_and_clear_bit(conn->flags, BT_CONN_SLAVE_PARAM_SET)) {
 		param = BT_LE_CONN_PARAM(conn->le.interval_min,
 					 conn->le.interval_max,
-					 conn->le.latency,
-					 conn->le.timeout);
+					 conn->le.pending_latency,
+					 conn->le.pending_timeout);
 
 		send_conn_le_param_update(conn, param);
 	}
@@ -986,16 +1003,31 @@ void bt_conn_ssp_auth(struct bt_conn *conn, u32_t passkey)
 
 	switch (conn->br.pairing_method) {
 	case PASSKEY_CONFIRM:
-		atomic_set_bit(conn->flags, BT_CONN_USER);
-		bt_auth->passkey_confirm(conn, passkey);
+		if (bt_auth && bt_auth->passkey_confirm){
+			atomic_set_bit(conn->flags, BT_CONN_USER);
+			bt_auth->passkey_confirm(conn, passkey);
+		}else{
+			BT_ERR("passkey_confirm cb is NULL");
+			return;
+		}
 		break;
 	case PASSKEY_DISPLAY:
-		atomic_set_bit(conn->flags, BT_CONN_USER);
-		bt_auth->passkey_display(conn, passkey);
+		if (bt_auth && bt_auth->passkey_display){
+			atomic_set_bit(conn->flags, BT_CONN_USER);
+			bt_auth->passkey_display(conn, passkey);
+		}else{
+			BT_ERR("passkey_display cb is NULL");
+			return;
+		}
 		break;
 	case PASSKEY_INPUT:
-		atomic_set_bit(conn->flags, BT_CONN_USER);
-		bt_auth->passkey_entry(conn);
+		if (bt_auth && bt_auth->passkey_entry){
+			atomic_set_bit(conn->flags, BT_CONN_USER);
+			bt_auth->passkey_entry(conn);
+		}else{
+			BT_ERR("passkey_entry cb is NULL");
+			return;
+		}
 		break;
 	case JUST_WORKS:
 		/*
@@ -1292,6 +1324,14 @@ bt_security_t bt_conn_get_security(struct bt_conn *conn)
 
 void bt_conn_cb_register(struct bt_conn_cb *cb)
 {
+	struct bt_conn_cb *ucb;
+
+	for (ucb = callback_list;ucb;ucb = ucb->_next) {
+		if (ucb==cb)
+		{
+			return;
+		}
+	}
 	cb->_next = callback_list;
 	callback_list = cb;
 }
@@ -2247,6 +2287,9 @@ int bt_conn_disconnect(struct bt_conn *conn, u8_t reason)
 		bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
 		if (IS_ENABLED(CONFIG_BT_CENTRAL)) {
 			bt_le_scan_update(false);
+			#if defined(BFLB_BLE_FREE_CONN_UPDATE_WORK_WHEN_DISCONNECT_IN_CONN_SCAN_STATE)
+			k_delayed_work_free(&conn->update_work);
+			#endif
 		}
 		return 0;
 	case BT_CONN_CONNECT_DIR_ADV:
@@ -2396,9 +2439,15 @@ struct bt_conn *bt_conn_create_le(const bt_addr_le_t *peer,
 		switch (conn->state) {
 		case BT_CONN_CONNECT_SCAN:
 			bt_conn_set_param_le(conn, param);
+			//fix by bouffalo:not ref if conn of this peer has existed.
+			bt_conn_unref(conn);
+			//fix end
 			return conn;
 		case BT_CONN_CONNECT:
 		case BT_CONN_CONNECTED:
+			//fix by bouffalo:not ref if conn of this peer has existed.
+			bt_conn_unref(conn);
+			//fix end
 			return conn;
 		case BT_CONN_DISCONNECTED:
 			BT_WARN("Found valid but disconnected conn object");
@@ -2516,7 +2565,7 @@ struct bt_conn *bt_conn_create_slave_le(const bt_addr_le_t *peer,
 		case BT_CONN_CONNECTED:
 			return conn;
 		case BT_CONN_DISCONNECTED:
-			BT_WARN("Found valid but disconnected conn object");
+			//BT_WARN("Found valid but disconnected conn object");
 			goto start_adv;
 		default:
 			bt_conn_unref(conn);
@@ -2531,7 +2580,6 @@ struct bt_conn *bt_conn_create_slave_le(const bt_addr_le_t *peer,
 
 start_adv:
 	bt_conn_set_state(conn, BT_CONN_CONNECT_DIR_ADV);
-
 	err = bt_le_adv_start_internal(&param_int, NULL, 0, NULL, 0, peer);
 	if (err) {
 		BT_WARN("Directed advertising could not be started: %d", err);
@@ -2600,7 +2648,7 @@ struct net_buf *bt_conn_create_pdu_timeout(struct net_buf_pool *pool,
 	}
 
 	if (!buf) {
-		BT_WARN("Unable to allocate buffer: timeout %d", timeout);
+		BT_WARN("Unable to allocate buffer: timeout %ld", timeout);
 		return NULL;
 	}
 

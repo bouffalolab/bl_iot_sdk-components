@@ -21,6 +21,7 @@
 #include <openthread/config.h>
 #include <openthread/thread.h>
 #include <platforms/utils/link_metrics.h>
+#include <openthread-core-config.h>
 #include <openthread_port.h>
 
 #include <FreeRTOS.h>
@@ -30,7 +31,6 @@
 #include <ot_internel.h>
 #include <ot_utils_ext.h>
 
-#include OPENTHREAD_PROJECT_CORE_CONFIG_FILE
 
 __attribute__((section(".bss"))) static otRadio_t                otRadioVar;
 __attribute__((section(".bss"))) static uint8_t                  otRadio_buffPool[TOTAL_RX_FRAME_SIZE * (OTRADIO_RX_FRAME_BUFFER_NUM + 1) + (ALIGNED_RX_FRAME_SIZE + MAX_ACK_FRAME_SIZE) * 2];
@@ -219,16 +219,8 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
 
     if (otRadioVar_ptr->pTxFrame == NULL) {
 
-#ifndef NO_RX_CHANNEL_AFTER_TX_DONE
-        uint8_t *pRxChannelAfterTxDone = &(aFrame->mInfo.mTxInfo.mRxChannelAfterTxDone);
-        uint8_t mRxChannelAfterTxDone = pRxChannelAfterTxDone[0];
-        pRxChannelAfterTxDone[0] = pRxChannelAfterTxDone[1];
-#endif
         iret = ot_radioSend(aFrame);
-#ifndef NO_RX_CHANNEL_AFTER_TX_DONE
-        pRxChannelAfterTxDone[1] = pRxChannelAfterTxDone[0];
-        pRxChannelAfterTxDone[0] = mRxChannelAfterTxDone;
-#endif
+
         if (iret) {
             otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_ERROR);
         }
@@ -429,7 +421,7 @@ otError otPlatRadioSleep(otInstance *aInstance)
 {
     lmac154_disableRx();
 
-#if !defined(CONFIG_NCP) || CONFIG_NCP == 0
+#if !defined(CONFIG_NCP) || CONFIG_NCP == 1
     lmac154_setRxStateWhenIdle(otThreadGetLinkMode(aInstance).mRxOnWhenIdle);
 #endif
 
@@ -439,11 +431,16 @@ otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel)
 {
     uint8_t ch = aChannel - OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN;
 
-    lmac154_enableRx();
+#ifdef BL702L
+    extern bool bz_phy_optimize_tx_channel(uint32_t channel);
+    bz_phy_optimize_tx_channel(2405 + 5 * ch);
+#endif
+
     lmac154_setChannel((lmac154_channel_t)ch);
-#if !defined(CONFIG_NCP) || CONFIG_NCP == 0
+#if !defined(CONFIG_NCP) || CONFIG_NCP == 1
     lmac154_setRxStateWhenIdle(otThreadGetLinkMode(aInstance).mRxOnWhenIdle);
 #endif
+    lmac154_enableRx();
 
     return OT_ERROR_NONE;
 }

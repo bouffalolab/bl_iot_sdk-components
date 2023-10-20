@@ -340,7 +340,7 @@ static void system_early_init(void)
 
 void bl702_main()
 {
-    static StackType_t aos_loop_proc_stack[1024];
+    static StackType_t aos_loop_proc_stack[CFG_AOS_LOOP_STACK_DEPTH];
     static StaticTask_t aos_loop_proc_task;
 
     bl_sys_early_init();

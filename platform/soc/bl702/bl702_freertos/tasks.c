@@ -5278,4 +5278,7 @@ when performing module tests). */
 
 #endif
 
-
+#ifdef CFG_COMPONENT_BUGKILLER_ENABLE
+#define FREERTOS_TASK_DUMP
+#include <bugkiller_freertos.inc>
+#endif

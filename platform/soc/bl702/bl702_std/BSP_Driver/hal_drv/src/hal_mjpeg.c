@@ -31,7 +31,7 @@ void mjpeg_init(mjpeg_device_t *mjpeg_cfg)
     MJPEG_CFG_Type mjpegCfg = {
         .burst = MJPEG_BURST_INCR16,
         .quality = mjpeg_cfg->quality,
-        .yuv = mjpeg_cfg->yuv_format,
+        .yuv = (MJPEG_YUV_Mode_Type)mjpeg_cfg->yuv_format,
         .waitCount = 0x400,
         .bufferMjpeg = mjpeg_cfg->write_buffer_addr,
         .sizeMjpeg = mjpeg_cfg->write_buffer_size,

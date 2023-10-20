@@ -30,6 +30,10 @@
 
 #if (BFLB_STATIC_ALLOC_MEM)
 #include "l2cap.h"
+#include <gatt.h>
+#include <conn.h>
+#include "conn_internal.h"
+#include "att_internal.h"
 #endif
 
 #if defined(CONFIG_NET_BUF_LOG)
@@ -109,6 +113,12 @@ extern struct net_buf_pool dummy_pool;
 #if defined(CONFIG_AUTO_PTS)
 extern struct net_buf_pool server_pool;
 extern struct net_buf_pool data_pool;
+#define SERVER_BUF_SIZE			2048
+#define DATA_MTU 264
+#if (BFLB_STATIC_ALLOC_MEM)
+__attribute__((section(".tcm_data"))) u8_t server_data_pool[1 * SERVER_BUF_SIZE];
+__attribute__((section(".tcm_data"))) u8_t data_data_pool[1 * DATA_MTU];
+#endif
 #endif
 
 struct net_buf_pool *_net_buf_pool_list[] = {&hci_cmd_pool, &hci_rx_pool,
@@ -201,7 +211,15 @@ void net_buf_init(struct net_buf_pool *buf_pool, u16_t buf_count, size_t data_si
         #if defined(CONFIG_BT_DISCARDABLE_BUF_COUNT)
         case DISCARDABLE:
             buf_fixed->data_pool = discardable_data_pool;
-            break;                           
+            break;
+        #endif
+        #if defined(CONFIG_AUTO_PTS)
+        case SERVER:
+            buf_fixed->data_pool = server_data_pool;
+            break;
+        case DATA:
+            buf_fixed->data_pool = data_data_pool;
+            break;
         #endif
         default:
             break;      
@@ -225,8 +243,8 @@ void net_buf_deinit(struct net_buf_pool *buf_pool)
     extern void bt_delete_queue(struct k_fifo *queue_to_del);
     bt_delete_queue((struct k_fifo *)(&(buf_pool->free)));
 
-    struct net_buf_pool_fixed *buf_fixed = (struct net_buf_pool_fixed *)buf_pool->alloc->alloc_data;
     #if !(BFLB_STATIC_ALLOC_MEM)
+    struct net_buf_pool_fixed *buf_fixed = (struct net_buf_pool_fixed *)buf_pool->alloc->alloc_data;
     k_free(buf_fixed->data_pool);
     #endif
     k_free(buf_pool->__bufs);

@@ -204,6 +204,9 @@ void ADC_Init(ADC_CFG_Type *cfg)
     regCfg1 = BL_SET_REG_BITS_VAL(regCfg1, GLB_GPADC_SCAN_LENGTH, 0);
     regCfg1 = BL_SET_REG_BITS_VAL(regCfg1, GLB_GPADC_CLK_DIV_RATIO, cfg->clkDiv);
     regCfg1 = BL_CLR_REG_BIT(regCfg1, GLB_GPADC_CLK_ANA_INV);
+    regCfg1 = BL_SET_REG_BIT(regCfg1, GLB_GPADC_LOWV_DET_EN);
+    regCfg1 = BL_SET_REG_BIT(regCfg1, GLB_GPADC_VCM_HYST_SEL);
+    regCfg1 = BL_SET_REG_BIT(regCfg1, GLB_GPADC_VCM_SEL_EN);
     // regCfg1 = BL_SET_REG_BITS_VAL(regCfg1, GLB_GPADC_CAL_OS_EN, cfg->offsetCalibEn);
     regCfg1 = BL_SET_REG_BITS_VAL(regCfg1, GLB_GPADC_RES_SEL, cfg->resWidth);
     BL_WR_REG(GLB_BASE, GLB_GPADC_REG_CONFIG1, regCfg1);

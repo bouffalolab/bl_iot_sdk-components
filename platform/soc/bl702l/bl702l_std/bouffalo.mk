@@ -88,6 +88,11 @@ COMPONENT_SRCS += $(addprefix BSP_Driver/hal_drv/src/, $(HAL_DRV_SRCS))
 CPPFLAGS += -Dbl706_iot
 endif
 
+ifeq ($(CONFIG_BL702_USE_LHAL),1)
+COMPONENT_SRCS += port/bl702l_clock.c
+COMPONENT_SRCS += port/bl702l_ef_cfg.c
+endif
+
 
 COMPONENT_OBJS := $(patsubst %.c,%.o, $(COMPONENT_SRCS))
 COMPONENT_OBJS := $(patsubst %.S,%.o, $(COMPONENT_OBJS))
@@ -112,9 +117,14 @@ COMPONENT_SRCDIRS += BSP_Board
 COMPONENT_SRCDIRS += BSP_Driver/hal_drv/src
 endif
 
+ifeq ($(CONFIG_BL702_USE_LHAL),1)
+COMPONENT_SRCDIRS += port
+endif
+
 
 ##
 CPPFLAGS += -DARCH_RISCV -DBFLB_CRYPT_HARDWARE -DBFLB_PKA_HARDWARE
 ifndef CONFIG_USE_STD_DRIVER
 CPPFLAGS += -DBFLB_USE_HAL_DRIVER
 endif
+CPPFLAGS += -DBL702L

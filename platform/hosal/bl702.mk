@@ -11,6 +11,7 @@ COMPONENT_SRCS := bl702_hal/bl_adc.c \
                   bl702_hal/bl_boot2.c \
                   bl702_hal/bl_chip.c \
                   bl702_hal/bl_dma.c \
+                  bl702_hal/bl_dma_uart.c \
                   bl702_hal/bl_efuse.c \
                   bl702_hal/bl_emac.c \
                   bl702_hal/bl_flash.c \
@@ -111,9 +112,9 @@ endif
 
 ifeq ($(CONFIG_USE_PSRAM),1)
 CPPFLAGS += -DCFG_USE_PSRAM
-ifeq ($(CONFIG_PSRAM_DUAL_BANK),1)
-CPPFLAGS += -DCFG_PSRAM_DUAL_BANK
-endif
+#ifeq ($(CONFIG_PSRAM_DUAL_BANK),1)
+#CPPFLAGS += -DCFG_PSRAM_DUAL_BANK
+#endif
 endif
 
 ifeq ($(CONFIG_USE_XTAL32K),1)

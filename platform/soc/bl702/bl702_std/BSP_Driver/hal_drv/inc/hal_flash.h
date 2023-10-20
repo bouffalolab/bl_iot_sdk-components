@@ -35,6 +35,7 @@ extern "C"{
 #define BL_FLASH_XIP_BASE BL702_FLASH_XIP_BASE
 
 uint32_t flash_get_jedecid(void);
+uint32_t flash_get_size(void);
 BL_Err_Type flash_init(void);
 BL_Err_Type flash_read_jedec_id(uint8_t *data);
 BL_Err_Type flash_read_via_xip(uint32_t addr, uint8_t *data, uint32_t len);

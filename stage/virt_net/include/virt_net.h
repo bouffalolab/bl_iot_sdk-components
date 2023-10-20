@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 #ifndef _VIRT_NET_H_
 #define _VIRT_NET_H_
 
@@ -75,7 +46,7 @@ enum virt_net_event_code {
 typedef int (*virt_net_init)(virt_net_t obj);
 
 typedef int (*virt_net_control)(virt_net_t obj, int cmd, ...);
-typedef int (*virt_net_deinit)(virt_net_t *obj);
+typedef int (*virt_net_deinit)(virt_net_t obj);
 
 /* event callback */
 /* NOTE: SHOULD NOT block in event callback */
@@ -144,6 +115,7 @@ enum virt_net_cmd{
 typedef int (*virt_net_cmd_callback_t)(virt_net_t obj, enum virt_net_cmd cmd, void *param);
 
 virt_net_t virt_net_create(void *ctx);
+int virt_net_delete(void *ctx);
 void virt_net_setup_callback(virt_net_t obj, virt_net_event_callback cb, void *opaque);
 int virt_net_send_nop(virt_net_t obj);
 int virt_net_connect_ap(virt_net_t obj, const char *ssid, const char *passphr);

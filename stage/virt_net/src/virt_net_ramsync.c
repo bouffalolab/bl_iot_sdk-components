@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -59,6 +30,10 @@
 #include "pkg_protocol.h"
 #include <ramsync_upper.h>
 #include "blog.h"
+
+#ifndef CFG_VIRT_NET_STACK_DEPTH
+#define CFG_VIRT_NET_STACK_DEPTH 1024
+#endif /* CFG_VIRT_NET_STACK_DEPTH */
 
 struct virt_net_ramsync;
 struct virt_net_custom_pbuf {
@@ -112,7 +87,7 @@ struct virt_net_ramsync {
 };
 
 static int __virt_net_ramsync_init(virt_net_t obj);
-static int __virt_net_ramsync_deinit(virt_net_t *obj);
+static int __virt_net_ramsync_deinit(virt_net_t obj);
 static void __virt_net_task(void *pvParameters);
 
 static inline int acquire_semaphore_slot(SemaphoreHandle_t sem) {
@@ -246,7 +221,7 @@ static err_t __link_output(struct netif *netif, struct pbuf *p)
   pkg_header->length = p->tot_len + 2 + sizeof(struct pkg_protocol);
 
   uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-		  pkg_header->length + 4, URAMSYNC_FOREVER);
+                          pkg_header->length + 4, URAMSYNC_FOREVER);
   blog_info("__link_output pkg_header->len:%d type:0x%x\r\n", pkg_header->length, pkg_header->type);
 
   return ERR_OK;
@@ -628,7 +603,7 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
       blog_info("get mac..\r\n");
 
       uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-    		  pkg_header->length + 4, URAMSYNC_FOREVER);
+                              pkg_header->length + 4, URAMSYNC_FOREVER);
       blog_info("GET_MAC pkg_header->len:%d type:0x%x\r\n\r\n", pkg_header->length, pkg_header->type);
       
         /* waiting response */
@@ -737,7 +712,7 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
   }
 
   uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-		  pkg_header->length + 4, URAMSYNC_FOREVER);
+                          pkg_header->length + 4, URAMSYNC_FOREVER);
   blog_info("CTRL pkg_header->len:%d type:0x%x\r\n\r\n", pkg_header->length, pkg_header->type);
 
   return 0;
@@ -770,14 +745,14 @@ static int __virt_net_ramsync_init(virt_net_t obj)
   return 0;
 }
 
-static int __virt_net_ramsync_deinit(virt_net_t *obj) 
+static int __virt_net_ramsync_deinit(virt_net_t obj) 
 {
-  if(tx_buffer){
-    free(tx_buffer);
-    tx_buffer = NULL;
-  }
-  /* TODO */
-  return -1;
+  struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)obj;
+
+  netif_set_status_callback(&sobj->vnet.netif, NULL);
+  netifapi_netif_remove(&sobj->vnet.netif);
+
+  return 0;
 }
 
 virt_net_t virt_net_create(void *ctx) 
@@ -789,7 +764,7 @@ virt_net_t virt_net_create(void *ctx)
     memset(sem_slot, 0, sizeof(sem_slot));
   }
 
-  struct virt_net_ramsync *sobj = pvPortMalloc(sizeof(struct virt_net_ramsync));
+  struct virt_net_ramsync *sobj = malloc(sizeof(struct virt_net_ramsync));
   if (sobj == NULL) {
     return NULL;
   }
@@ -829,7 +804,7 @@ virt_net_t virt_net_create(void *ctx)
   sobj->running = 1;
 
   /* create spi receivce thread */
-  if (xTaskCreate(__virt_net_task, "virt_net", 1024 + 256, (void *)sobj, VIRT_NET_TASK_PRI, &sobj->task_virt_net) != pdPASS) {
+  if (xTaskCreate(__virt_net_task, "virt_net", CFG_VIRT_NET_STACK_DEPTH, (void *)sobj, VIRT_NET_TASK_PRI, &sobj->task_virt_net) != pdPASS) {
     printf("create virt_netreceive task failed\r\n");
     goto _errout_4;
   }
@@ -863,8 +838,40 @@ _errout_3:
 _errout_2:
   vSemaphoreDelete(sobj->rx_buf_ind_mutex);
 _errout_1:
-  vPortFree(sobj);
+  free(sobj);
 
   return NULL;
+}
+
+int virt_net_delete(void *ctx) 
+{
+  if (!inited) {
+    return 0;
+  }
+  inited = 0;
+
+  struct virt_net_ramsync *sobj = ctx;
+
+  vTaskDelete(sobj->task_virt_net);
+
+  uramsync_deinit(&sobj->ramsync_ctx);
+
+  if(sobj){
+    free(sobj);
+  }
+
+  if (sobj->rx_buf_ind_mutex){
+    vSemaphoreDelete(sobj->rx_buf_ind_mutex);
+  }
+
+  if (sobj->rx_buff){
+    free(sobj->rx_buff);
+  }
+
+  if(tx_buffer){
+    free(tx_buffer);
+  }
+
+  return 0;
 }
 

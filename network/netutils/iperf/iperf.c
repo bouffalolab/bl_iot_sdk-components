@@ -1,33 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 /**
 * iperf-liked network performance tool
 *
@@ -40,6 +10,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 #include <semphr.h>
+#include <lwip/tcpip.h>
 #include <lwip/sockets.h>
 #include <lwip/udp.h>
 #include <aos/kernel.h>
@@ -67,6 +38,10 @@
 #define DEBUG_HEADER        "[NET] [IPC] "
 #define DEFAULT_HOST_IP     "192.168.11.1"
 #define IPERF_IP_LOCAL      "0.0.0.0"
+
+// Must be larger than sizeof(UDP_datagram) + sizeof(server_hdr) to be accepted
+// by peer. For iperf 2.0.9, 12 + 100 = 112
+#define UDP_FIN_PKT_PAYLOAD_LEN 256
 
 volatile int exit_flag = 0;
 
@@ -404,6 +379,9 @@ struct iperf_server_udp_ctx {
     uint32_t receive_start, period_start, current;
     uint64_t recv_total_len, recv_now;
     float f_min, f_max;
+    iperf_param_t *iperf_param;
+    struct udp_pcb *server;
+    err_t ret;
 };
 
 // 网络字节序转本地字节序，直接从内存读取
@@ -442,14 +420,23 @@ static void iperf_server_udp_recv_fn(void *arg, struct udp_pcb *pcb, struct pbuf
     ctx->period_start = ctx->period_start ? : ctx->current;
 
     // 记录当前接收的总字节数：payload+Ethernet Link+IP header + UDP header
-    ctx->recv_now += p->tot_len + PBUF_LINK_HLEN + PBUF_IP_HLEN + PBUF_TRANSPORT_HLEN;
+    ctx->recv_now += p->tot_len + PBUF_LINK_HLEN + PBUF_IP_HLEN + UDP_HLEN;
 
     ctx->datagram_cnt ++;
 
+    if (!(p->len >= sizeof(udp_header))) {
+        goto free;
+    }
     // 获得packet id
     udp_header.id = NTOHL_PTR(p->payload);
     if ((signed)udp_header.id < 0) {    // 发送完成，client端等待应答
-        server_hdr *hdr = (server_hdr *)((UDP_datagram *)p->payload + 1);   // server hdr 跟在UDP_datagram后面
+        struct pbuf *q = pbuf_alloc(PBUF_TRANSPORT, UDP_FIN_PKT_PAYLOAD_LEN, PBUF_RAM);
+        if (!q) {
+            goto free;
+        }
+        memset(q->payload, 0, UDP_FIN_PKT_PAYLOAD_LEN);
+        pbuf_take(q, p->payload, sizeof(UDP_datagram));
+        server_hdr *hdr = (server_hdr *)((UDP_datagram *)q->payload + 1);   // server hdr 跟在UDP_datagram后面
         HTONL_PTR(&hdr->flags, 0x80000000u);
         HTONL_PTR(&hdr->total_len1, 0);
         HTONL_PTR(&hdr->total_len2, ctx->recv_total_len);   // 低32位
@@ -461,7 +448,8 @@ static void iperf_server_udp_recv_fn(void *arg, struct udp_pcb *pcb, struct pbuf
 
         printf("iperf finish...\r\nreceive:%" PRId32 ",out of order:%" PRId32 "\r\n",
             ctx->datagram_cnt, ctx->out_of_order_cnt);
-        udp_sendto(pcb, p, addr, port);
+        udp_sendto(pcb, q, addr, port);
+        pbuf_free(q);
 
         //xSemaphoreGive(ctx->comp_sig_handle);
         ctx->exit_flag = 1;
@@ -512,50 +500,78 @@ static void iperf_server_udp_recv_fn(void *arg, struct udp_pcb *pcb, struct pbuf
       ctx->packet_id = (int32_t)udp_header.id;
     }
 
+free:
 	pbuf_free(p);
+}
+
+static void iperf_udp_server_init(void *ctx)
+{
+    struct iperf_server_udp_ctx *ctx_ = ctx;
+    err_t ret = ERR_OK;
+    ip_addr_t source_ip;
+    struct udp_pcb *server = NULL;
+
+    ctx_->server = NULL;
+    server = udp_new();
+    if (!server) {
+        printf("Create UDP Control block failed!\r\n");
+        ret = ERR_MEM;
+        goto err;
+    }
+
+    ipaddr_aton(IPERF_IP_LOCAL, &source_ip);
+    ret = udp_bind(server, &source_ip, ctx_->iperf_param->port);
+    if (ret != ERR_OK) {
+        printf("Bind failed!\r\n");
+        ret = ERR_VAL; // not accurate, don't care
+        goto err;
+    }
+
+    printf("bind UDP socket successfully!\r\n");
+
+    udp_recv(server, iperf_server_udp_recv_fn, ctx_);
+    ctx_->server = server;
+    ctx_->ret = ERR_OK;
+    return;
+err:
+    if (server)
+        udp_remove(server);
+    ctx_->ret = ret;
+}
+
+static void free_udp(void *pcb)
+{
+    udp_remove(pcb);
 }
 
 static void iperf_server_udp(void *arg)
 {
     iperf_param_t *iperf_param = (iperf_param_t *)arg;
-    struct udp_pcb *server = NULL;
-    err_t ret;
-    ip_addr_t source_ip;
     struct iperf_server_udp_ctx context;
 
     configASSERT(arg != NULL);
 
-    // FIXME bug here: lwip thread context 创建pcb控制块
-    server = udp_new();
-    if (!server) {
-        printf("Create UDP Control block failed!\r\n");
-        goto _exit;
-    }
-
-    ipaddr_aton(IPERF_IP_LOCAL, &source_ip);
-    ret = udp_bind(server, &source_ip, iperf_param->port);
-    if (ret != ERR_OK) {
-        printf("Bind failed!\r\n");
-        goto _exit;
-    }
-
-    printf("bind UDP socket successfully!\r\n");
-
     memset(&context, 0, sizeof context);
     context.f_min = 8000.0;
     context.packet_id = -1;
-    udp_recv(server, iperf_server_udp_recv_fn, (void *)&context);
+
+    context.iperf_param = iperf_param;
+    if (tcpip_callback(iperf_udp_server_init, &context) != ERR_OK ||
+            context.ret != ERR_OK) {
+        printf("UDP server init failed\r\n");
+        goto err;
+    }
 
     // 等待接收退出信号
     while (!context.exit_flag) {
         vTaskDelay(1000);
     }
 
-_exit:
-    if (server) udp_remove(server);
+    tcpip_callback(free_udp, context.server);
     if (iperf_param->host) vPortFree(iperf_param->host);
-    if (iperf_param) vPortFree(iperf_param);  
+    if (iperf_param) vPortFree(iperf_param);
 
+err:
     printf("ipus exit..\r\n");
 }
 

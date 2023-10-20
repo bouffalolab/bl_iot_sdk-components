@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 #include <stdint.h>
 #include <stdio.h>
 
@@ -94,8 +65,8 @@ static lramsync_spi_config_t _spi_cfg = {
 #define RAMSYNC_LOW_DUMY_CNT 1
 
 struct _ramsync_low_priv {
-	DMA_LLI_Ctrl_Type *tx_lli;
-	DMA_LLI_Ctrl_Type *rx_lli;
+    DMA_LLI_Ctrl_Type *tx_lli;
+    DMA_LLI_Ctrl_Type *rx_lli;
 };
 
 static int _lli_init(lramsync_ctx_t *ctx)
@@ -128,9 +99,9 @@ static int _lli_init(lramsync_ctx_t *ctx)
         priv->tx_lli[i].dmaCtrl = dmactrl;
 
         if (i != ctx->items_tx - 1) {
-        	priv->tx_lli[i].nextLLI = (uint32_t)&priv->tx_lli[i + 1];
+            priv->tx_lli[i].nextLLI = (uint32_t)&priv->tx_lli[i + 1];
         } else {
-        	priv->tx_lli[i].nextLLI = (uint32_t)&priv->tx_lli[0];
+            priv->tx_lli[i].nextLLI = (uint32_t)&priv->tx_lli[0];
         }
     }
 
@@ -154,9 +125,9 @@ static int _lli_init(lramsync_ctx_t *ctx)
         priv->rx_lli[i].dmaCtrl     = dmactrl;
 
         if (i != ctx->items_rx - 1) {
-        	priv->rx_lli[i].nextLLI = (uint32_t)&priv->rx_lli[i + 1];
+            priv->rx_lli[i].nextLLI = (uint32_t)&priv->rx_lli[i + 1];
         } else {
-        	priv->rx_lli[i].nextLLI = (uint32_t)&priv->rx_lli[0];
+            priv->rx_lli[i].nextLLI = (uint32_t)&priv->rx_lli[0];
         }
     }
     return 0;
@@ -167,10 +138,10 @@ static ATTR_TCM_SECTION void _spi_int_handler_tx(
 {
     lramsync_ctx_t *ctx = (lramsync_ctx_t *)arg;
 
-	if (HOSAL_DMA_INT_TRANS_COMPLETE != flag) {
-		blog_info("spi_dma_tx error\r\n");
-		return;
-	}
+    if (HOSAL_DMA_INT_TRANS_COMPLETE != flag) {
+        blog_info("spi_dma_tx error\r\n");
+        return;
+    }
 
     if (ctx->tx_cb) {
         ctx->tx_cb(ctx->tx_arg);
@@ -182,10 +153,10 @@ static ATTR_TCM_SECTION void _spi_int_handler_rx(
 {
     lramsync_ctx_t *ctx = (lramsync_ctx_t *)arg;
 
-	if (HOSAL_DMA_INT_TRANS_COMPLETE != flag) {
-		blog_info("spi_dma_rx error\r\n");
-		return;
-	}
+    if (HOSAL_DMA_INT_TRANS_COMPLETE != flag) {
+        blog_info("spi_dma_rx error\r\n");
+        return;
+    }
 
     if (ctx->rx_cb) {
         ctx->rx_cb(ctx->rx_arg);
@@ -347,7 +318,7 @@ void lramsync_start(lramsync_ctx_t *ctx)
 {
     hosal_dma_chan_start(ctx->dma_rx_chan);
     hosal_dma_chan_start(ctx->dma_tx_chan);
-	
+    
     SPI_Enable(ctx->cfg->port, SPI_WORK_MODE_MASTER);
 }
 

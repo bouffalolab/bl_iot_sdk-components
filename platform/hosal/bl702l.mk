@@ -12,6 +12,7 @@ COMPONENT_SRCS := bl702l_hal/bl_adc.c \
                   bl702l_hal/bl_boot2.c \
                   bl702l_hal/bl_chip.c \
                   bl702l_hal/bl_dma.c \
+                  bl702l_hal/bl_dma_uart.c \
                   bl702l_hal/bl_efuse.c \
                   bl702l_hal/bl_flash.c \
                   bl702l_hal/bl_gpio.c \
@@ -35,6 +36,7 @@ COMPONENT_SRCS := bl702l_hal/bl_adc.c \
                   bl702l_hal/hal_gpio.c \
                   bl702l_hal/hal_hbn.c \
                   bl702l_hal/hal_hwtimer.c \
+                  bl702l_hal/hal_ota.c \
                   bl702l_hal/hal_sys.c \
                   bl702l_hal/hal_tcal.c \
                   bl702l_hal/hosal_adc.c \

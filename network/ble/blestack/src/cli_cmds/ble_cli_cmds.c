@@ -138,6 +138,10 @@ static void blecli_gatts_get_desp(char *pcWriteBuffer, int xWriteBufferLen, int 
 #endif
 #endif
 
+static void blecli_le_enh_tx_test(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+static void blecli_le_enh_rx_test(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+static void blecli_le_test_end(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+
 const struct cli_command btStackCmdSet[] STATIC_CLI_CMD_ATTRIBUTE = {
 #if 1
     /*1.The cmd string to type, 2.Cmd description, 3.The function to run, 4.Number of parameters*/
@@ -293,6 +297,9 @@ const struct cli_command btStackCmdSet[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"ble_get_svc_desp","",blecli_gatts_get_desp},
 #endif
 #endif
+    {"ble_tx_test","LE tx test\r\nparameter [tx channel, 1 octet, test data length, 1 octet, packet payload, 1 octet, phy, 1 octet]",blecli_le_enh_tx_test},
+    {"ble_rx_test","LE tx test\r\nparameter [rx channel, 1 octet, phy, 1 octet, modulation index, 1 octet]",blecli_le_enh_rx_test},
+    {"ble_test_end","",blecli_le_test_end},
 #else
     {"ble_init", "", blecli_init},
 #if defined(CONFIG_BLE_TP_SERVER)
@@ -519,17 +526,10 @@ static void blecli_enable(char *pcWriteBuffer, int xWriteBufferLen, int argc, ch
 
 static void blecli_init(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
-    if(ble_inited){
-        vOutputString("Has initialized \r\n");
-        return;
-    }
-
     #if defined(CONFIG_BT_CONN)
     default_conn = NULL;
     bt_conn_cb_register(&conn_callbacks);
     #endif
-    ble_inited = true;
-    vOutputString("Init successfully \r\n");
 }
 
 #if defined(BL702)
@@ -600,6 +600,77 @@ static void blecli_set_default_phy(char *pcWriteBuffer, int xWriteBufferLen, int
 }
 #endif
 #endif
+
+static void blecli_le_enh_tx_test(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+    int err;
+    u8_t tx_ch;
+    u8_t test_data_len;
+    u8_t pkt_payload;
+    u8_t phy;
+
+    if(argc != 5){
+       vOutputString("Number of Parameters is not correct\r\n");
+       return;
+    }
+    get_uint8_from_string(&argv[1], &tx_ch); 
+    get_uint8_from_string(&argv[2], &test_data_len); 
+    get_uint8_from_string(&argv[3], &pkt_payload); 
+    get_uint8_from_string(&argv[4], &phy); 
+    
+    err = bt_le_enh_tx_test(tx_ch, test_data_len, pkt_payload, phy);
+    if(err)
+    {
+        vOutputString("le tx test failed (err %d)\r\n", err); 
+    }
+    else
+    {
+        vOutputString("le tx test success\r\n");
+    }
+
+}
+
+static void blecli_le_enh_rx_test(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+    int err;
+    u8_t rx_ch;
+    u8_t phy;
+    u8_t mod_index;
+
+    if(argc != 4){
+       vOutputString("Number of Parameters is not correct\r\n");
+       return;
+    }
+    get_uint8_from_string(&argv[1], &rx_ch); 
+    get_uint8_from_string(&argv[2], &phy); 
+    get_uint8_from_string(&argv[3], &mod_index); 
+    
+    err = bt_le_enh_rx_test(rx_ch, phy, mod_index);
+    if(err)
+    {
+        vOutputString("le rx test failed (err %d)\r\n", err); 
+    }
+    else
+    {
+        vOutputString("le rx test success\r\n");
+    }
+}
+
+static void blecli_le_test_end(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+    int err;
+    err = bt_le_test_end();
+    if(err)
+    {
+        vOutputString("set le test end failed (err %d)\r\n", err); 
+    }
+    else
+    {
+        vOutputString("set le test end success\r\n");
+    }  
+}
+
+
 
 static void blecli_get_device_name(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
@@ -823,7 +894,7 @@ static void blecli_start_advertise(char *pcWriteBuffer, int xWriteBufferLen, int
     uint8_t non_disc = BT_LE_AD_NO_BREDR;
     uint8_t gen_disc = BT_LE_AD_NO_BREDR | BT_LE_AD_GENERAL;
     uint8_t lim_disc = BT_LE_AD_NO_BREDR | BT_LE_AD_LIMITED;
-    char *adv_name = bt_get_name();
+    char *adv_name = (char*)bt_get_name();
     struct bt_data ad_discov[2] = {
         BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_NO_BREDR | BT_LE_AD_GENERAL),
         BT_DATA(BT_DATA_NAME_COMPLETE, adv_name, strlen(adv_name)),
@@ -1000,7 +1071,7 @@ static void blecli_connect(char *pcWriteBuffer, int xWriteBufferLen, int argc, c
 
 	(void)memset(addr_val,0,6);
 
-    if(argc != 3){
+    if(argc != 3 && argc != 6){
         vOutputString("Number of Parameters is not correct\r\n");
         return;
     }
@@ -1016,13 +1087,22 @@ static void blecli_connect(char *pcWriteBuffer, int xWriteBufferLen, int argc, c
     }
 	
     reverse_bytearray(addr_val, addr.a.val, 6);
-   
+    if(argc == 6)
+    {
+        get_uint16_from_string(&argv[3], &param.interval_min);
+        get_uint16_from_string(&argv[4], &param.interval_max);
+        get_uint16_from_string(&argv[5], &param.timeout);
+    }
+
     conn = bt_conn_create_le(&addr, /*BT_LE_CONN_PARAM_DEFAULT*/&param);
 
     if(!conn){
         vOutputString("Connection failed\r\n");
     }else{
-        vOutputString("Connection pending\r\n");
+        if(conn->state == BT_CONN_CONNECTED)
+            vOutputString("Le link with this peer device has existed\r\n");
+        else
+            vOutputString("Connection pending\r\n");
     }
 }
 
@@ -1265,8 +1345,7 @@ static void blecli_l2cap_send_test_data(char *p_write_buffer, int write_buffer_l
     uint8_t test_data[10] = {0x01, 0x02, 0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a};
     uint8_t large_test_data[30];
     uint16_t cid;
-    bool isLarge;
-    struct bt_l2cap_chan *chan;
+    uint8_t isLarge;
 
     if(argc != 3){
         vOutputString("Number of Parameters is not correct\r\n");
@@ -1383,13 +1462,13 @@ static void blecli_read_rssi(char *pcWriteBuffer, int xWriteBufferLen, int argc,
 static void blecli_ble_throughput_calc(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {  
     int err;
-    bool enable;
+    u8_t enable;
     u8_t interval;
     if(argc != 3){
        vOutputString("Number of Parameters is not correct\r\n");
        return;
     }
-    get_uint8_from_string(&argv[1], &enable); 
+    get_uint8_from_string(&argv[1], (uint8_t *)&enable); 
     get_uint8_from_string(&argv[2], &interval); 
     extern int bt_le_throughput_calc(bool enable, u8_t interval);
     err = bt_le_throughput_calc(enable,interval);

@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 #include <bl702l_romdriver.h>
 #include <bl702l_sf_cfg.h>
 #include <bl702l_xip_sflash.h>
@@ -74,14 +45,6 @@ __attribute__((always_inline)) __STATIC_INLINE uint32_t __get_SP(void)
 
 int bl_flash_erase(uint32_t addr, int len)
 {
-    /*We assume mid zero is illegal*/
-    if (0 == boot2_flashCfg.flashCfg.mid) {
-        return -1;
-    }
-
-    // if (IS_PSARAM((uint32_t)&_data)) {
-    //     BL702_MemSet4(__spn, 0xa5a5a5a5, PSRAM_TEMP_STACK_SIZE);
-    // }
     unsigned long mstatus_tmp;
     mstatus_tmp = read_csr(mstatus);
     clear_csr(mstatus, MSTATUS_MIE);
@@ -94,21 +57,18 @@ int bl_flash_erase(uint32_t addr, int len)
 int bl_flash_write(uint32_t addr, uint8_t *src, int len)
 {
     uint8_t* _data = src;
-    /*We assume mid zero is illegal*/
-    if (0 == boot2_flashCfg.flashCfg.mid) {
-        return -1;
-    }
+
 #ifdef CFG_USE_PSRAM
     if(IS_PSARAM((uint32_t)src)){
+        if (0 == len) {
+            return 0;
+        }
         _data = (uint8_t*)pvPortMalloc(len);
         if (NULL == _data) {
             return -1;
         }
         memcpy(_data, src, len);
     }
-    // if (IS_PSARAM((uint32_t)&_data)) {
-    //     BL702_MemSet4(__spn, 0xa5a5a5a5, PSRAM_TEMP_STACK_SIZE);
-    // }
 #endif
 
     unsigned long mstatus_tmp;
@@ -129,21 +89,17 @@ int bl_flash_write(uint32_t addr, uint8_t *src, int len)
 int bl_flash_read(uint32_t addr, uint8_t *dst, int len)
 {
     uint8_t* _data = dst;
-    /*We assume mid zero is illegal*/
-    if (0 == boot2_flashCfg.flashCfg.mid) {
-        return -1;
-    }
 
 #ifdef CFG_USE_PSRAM
     if(IS_PSARAM((uint32_t)dst)){
+        if (0 == len) {
+            return 0;
+        }
         _data = (uint8_t*)pvPortMalloc(len);
         if (NULL == _data) {
             return -1;
         }
     }
-    // if (IS_PSARAM((uint32_t)&_data)) {
-    //     BL702_MemSet4(__spn, 0xa5a5a5a5, PSRAM_TEMP_STACK_SIZE);
-    // }
 #endif
 
     unsigned long mstatus_tmp;
@@ -165,11 +121,6 @@ int bl_flash_read(uint32_t addr, uint8_t *dst, int len)
 
 static inline int bl_flash_erase_need_lock_internal(uint32_t addr, int len)
 {
-    /*We assume mid zero is illegal*/
-    if (0 == boot2_flashCfg.flashCfg.mid) {
-        return -1;
-    }
-
     RomDriver_XIP_SFlash_Erase_Need_Lock(
             &boot2_flashCfg.flashCfg,
             addr,
@@ -181,11 +132,6 @@ static inline int bl_flash_erase_need_lock_internal(uint32_t addr, int len)
 
 static inline int bl_flash_write_need_lock_internal(uint32_t addr, uint8_t *src, int len)
 {
-    /*We assume mid zero is illegal*/
-    if (0 == boot2_flashCfg.flashCfg.mid) {
-        return -1;
-    }
-
     RomDriver_XIP_SFlash_Write_Need_Lock(
             &boot2_flashCfg.flashCfg,
             addr,
@@ -198,11 +144,6 @@ static inline int bl_flash_write_need_lock_internal(uint32_t addr, uint8_t *src,
 
 static inline int bl_flash_read_need_lock_internal(uint32_t addr, uint8_t *dst, int len)
 {
-    /*We assume mid zero is illegal*/
-    if (0 == boot2_flashCfg.flashCfg.mid) {
-        return -1;
-    }
-
     RomDriver_XIP_SFlash_Read_Need_Lock(
             &boot2_flashCfg.flashCfg,
             addr,
@@ -317,6 +258,42 @@ void* bl_flash_get_flashCfg(void)
     return &boot2_flashCfg.flashCfg;
 }
 
+void bl_flash_get_encryptInfo(encrypt_info_t *info)
+{
+    uint32_t boot_cfg;
+    uint32_t sig_len;
+    
+    info->flash_offset = SF_Ctrl_Get_Flash_Image_Offset();
+    
+    //printf("flash_offset: 0x%08lX\r\n", info->flash_offset);
+    
+    bl_flash_read(info->flash_offset - 0x1000 + 0x78, (uint8_t *)&info->img_len, 4);
+    
+    //printf("img_len: 0x%08lX\r\n", info->img_len);
+    
+    bl_flash_read(info->flash_offset - 0x1000 + 0x74, (uint8_t *)&boot_cfg, 4);
+    
+    //printf("boot_cfg: 0x%08lX\r\n", boot_cfg);
+    
+    info->encrypt_type = (boot_cfg >> 2) & 0x03;
+    info->aes_region_lock = (boot_cfg >> 11) & 0x01;
+    
+    //printf("encrypt_type: %d, aes_region_lock: %d\r\n", info->encrypt_type, info->aes_region_lock);
+    
+    if(boot_cfg & 0x03){
+        bl_flash_read(info->flash_offset - 0x1000 + 0xF0 + 68, (uint8_t *)&sig_len, 4);
+        bl_flash_read(info->flash_offset - 0x1000 + 0xF0 + 68 + (4 + sig_len + 4), info->aes_iv, 16);
+    }else{
+        bl_flash_read(info->flash_offset - 0x1000 + 0xF0, info->aes_iv, 16);
+    }
+    
+    //printf("aes_iv:");
+    //for(int i=0; i<16; i++){
+    //    printf(" %02X", info->aes_iv[i]);
+    //}
+    //printf("\r\n");
+}
+
 static inline int bl_flash_read_byxip_internal(uint32_t addr, uint8_t *dst, int len)
 {
     uint32_t offset;
@@ -360,6 +337,9 @@ int bl_flash_read_byxip(uint32_t addr, uint8_t *dst, int len)
     int iret;
 
     if(IS_PSARAM((uint32_t)dst)){
+        if (0 == len) {
+            return 0;
+        }
         _data = (uint8_t*)pvPortMalloc(len);
         if (NULL == _data) {
             return -1;
@@ -397,45 +377,42 @@ int ATTR_TCM_SECTION bl_flash_init(void)
     int ret = 0;
 
     // get flash config from bootheader
-    L1C_Cache_Flush();
-    XIP_SFlash_Read_Via_Cache_Need_Lock(8 + BL702L_FLASH_XIP_BASE, (uint8_t *)&boot2_flashCfg, 4 + sizeof(SPI_Flash_Cfg_Type));
-    L1C_Cache_Flush();
+    //L1C_Cache_Flush();
+    //XIP_SFlash_Read_Via_Cache_Need_Lock(8 + BL702L_FLASH_XIP_BASE, (uint8_t *)&boot2_flashCfg, 4 + sizeof(SPI_Flash_Cfg_Type));
+    //L1C_Cache_Flush();
 
-    // update flash config
-    if (pFlashCfg->mid == 0xff) {
-        XIP_SFlash_Opt_Enter(&aesEnable);
-        XIP_SFlash_State_Save(pFlashCfg, &offset);
+    XIP_SFlash_Opt_Enter(&aesEnable);
+    XIP_SFlash_State_Save(pFlashCfg, &offset);
 
-        // store clock delay and clock invert, which have already been used for flash boot
-        clkDelay = pFlashCfg->clkDelay;
-        clkInvert = pFlashCfg->clkInvert;
+    // store clock delay and clock invert, which have already been used for flash boot
+    clkDelay = pFlashCfg->clkDelay;
+    clkInvert = pFlashCfg->clkInvert;
 
-        SFlash_GetJedecId(pFlashCfg, (uint8_t *)&jid);
-        ret = SF_Cfg_Get_Flash_Cfg_Need_Lock(jid, pFlashCfg);
-        if (ret == 0) {
-            if ((pFlashCfg->ioMode & 0x0f) == SF_CTRL_QO_MODE || (pFlashCfg->ioMode & 0x0f) == SF_CTRL_QIO_MODE) {
-                SFlash_Qspi_Enable(pFlashCfg);
-            }
-
-            if (((pFlashCfg->ioMode >> 4) & 0x01) == 1) {
-                L1C_Set_Wrap(DISABLE);
-            } else {
-                L1C_Set_Wrap(ENABLE);
-                if ((pFlashCfg->ioMode & 0x0f) == SF_CTRL_QO_MODE || (pFlashCfg->ioMode & 0x0f) == SF_CTRL_QIO_MODE) {
-                    SFlash_SetBurstWrap(pFlashCfg);
-                }
-            }
+    SFlash_GetJedecId(pFlashCfg, (uint8_t *)&jid);
+    ret = SF_Cfg_Get_Flash_Cfg_Need_Lock(jid, pFlashCfg);
+    if (ret == 0) {
+        if ((pFlashCfg->ioMode & 0x0f) == SF_CTRL_QO_MODE || (pFlashCfg->ioMode & 0x0f) == SF_CTRL_QIO_MODE) {
+            SFlash_Qspi_Enable(pFlashCfg);
         }
 
-        // replace clock delay and clock invert
-        pFlashCfg->clkDelay = clkDelay;
-        pFlashCfg->clkInvert = clkInvert;
-
-        XIP_SFlash_State_Restore(pFlashCfg, offset);
-        XIP_SFlash_Opt_Exit(aesEnable);
-
-        L1C_Cache_Flush();
+        if (((pFlashCfg->ioMode >> 4) & 0x01) == 1) {
+            L1C_Set_Wrap(DISABLE);
+        } else {
+            L1C_Set_Wrap(ENABLE);
+            if ((pFlashCfg->ioMode & 0x0f) == SF_CTRL_QO_MODE || (pFlashCfg->ioMode & 0x0f) == SF_CTRL_QIO_MODE) {
+                SFlash_SetBurstWrap(pFlashCfg);
+            }
+        }
     }
+
+    // replace clock delay and clock invert
+    pFlashCfg->clkDelay = clkDelay;
+    pFlashCfg->clkInvert = clkInvert;
+
+    XIP_SFlash_State_Restore(pFlashCfg, offset);
+    XIP_SFlash_Opt_Exit(aesEnable);
+
+    L1C_Cache_Flush();
 
     return ret;
 }

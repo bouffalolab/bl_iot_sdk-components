@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -72,13 +43,13 @@ int bl_sec_sha_init()
 
 int bl_sha_mutex_take()
 {
-    taskENTER_CRITICAL();
+    bl_sec_enter_critical();
     return 0;
 }
 
 int bl_sha_mutex_give()
 {
-    taskEXIT_CRITICAL();
+    bl_sec_exit_critical(0);
     return 0;
 }
 
@@ -103,8 +74,7 @@ static bool is_psram_cache(void * addr)
 #define BL704L_PSRAM_ADDRESS_MASK 0xff000000UL
 #define BL704L_PSRAM_RAW_REGION 0x26000000UL
 
-    if (BL704L_PSRAM_CACHE_REGION == (BL704L_PSRAM_ADDRESS_MASK & (uint32_t) addr))
-    {
+    if (BL704L_PSRAM_CACHE_REGION == (BL704L_PSRAM_ADDRESS_MASK & (uint32_t)addr)) {
         return true;
     }
 
@@ -161,8 +131,7 @@ int bl_sha_init(bl_sha_ctx_t *ctx, const bl_sha_type_t type)
         link_cfg = &working_link_cfg;
     }
 #elif defined(BL702L)
-    if (is_psram_cache(ctx))
-    {
+    if (is_psram_cache(ctx)) {
         link_cfg = &working_link_cfg;
     }
 #endif
@@ -191,14 +160,12 @@ int bl_sha_clone(bl_sha_ctx_t *dst, const bl_sha_ctx_t *src)
     dst->ctx.shaPadding = dst->pad;
     dst->ctx.linkAddr   = (uint32_t) &dst->link_cfg;
 #if defined(BL602) || defined(BL702)
-    if (is_tcm_addr(dst))
-    {
-        dst->ctx.linkAddr = (uint32_t) &working_link_cfg;
+    if (is_tcm_addr(dst)) {
+        dst->ctx.linkAddr = (uint32_t)&working_link_cfg;
     }
 #elif defined(BL702L)
-    if (is_psram_cache(dst))
-    {
-        dst->ctx.linkAddr = (uint32_t) &working_link_cfg;
+    if (is_psram_cache(dst)) {
+        dst->ctx.linkAddr = (uint32_t)&working_link_cfg;
     }
 #endif
     return 0;
@@ -207,16 +174,15 @@ int bl_sha_clone(bl_sha_ctx_t *dst, const bl_sha_ctx_t *src)
 int bl_sha_update(bl_sha_ctx_t *ctx, const uint8_t *input, uint32_t len)
 {
 #if defined(BL602) || defined(BL702)
-    if (is_tcm_addr(ctx))
-    {
+    if (is_tcm_addr(ctx)) {
         ARCH_MemCpy_Fast(&working_link_cfg, &ctx->link_cfg, sizeof(working_link_cfg));
     }
 #elif defined(BL702L)
-    if (is_psram_cache(ctx))
-    {
+    if (is_psram_cache(ctx)) {
         ARCH_MemCpy_Fast(&working_link_cfg, &ctx->link_cfg, sizeof(working_link_cfg));
     }
-#elif defined BL616
+#elif defined(BL616)
+    bl_sec_enter_critical();
     if (bl_sec_is_cache_addr(ctx)) {
         L1C_DCache_Clean_Invalid_By_Addr((uintptr_t)ctx, sizeof(*ctx));
         ctx = bl_sec_get_no_cache_addr(ctx);
@@ -227,15 +193,15 @@ int bl_sha_update(bl_sha_ctx_t *ctx, const uint8_t *input, uint32_t len)
 #endif
     Sec_Eng_SHA256_Link_Update((SEC_Eng_SHA256_Link_Ctx *) &ctx->ctx, BL_SHA_ID, input, len);
 #if defined(BL602) || defined(BL702)
-    if (is_tcm_addr(ctx))
-    {
+    if (is_tcm_addr(ctx)) {
         ARCH_MemCpy_Fast(&ctx->link_cfg, &working_link_cfg, sizeof(working_link_cfg));
     }
 #elif defined(BL702L)
-    if (is_psram_cache(ctx))
-    {
+    if (is_psram_cache(ctx)) {
         ARCH_MemCpy_Fast(&ctx->link_cfg, &working_link_cfg, sizeof(working_link_cfg));
     }
+#elif defined(BL616)
+    bl_sec_exit_critical(0);
 #endif
     return 0;
 }
@@ -243,13 +209,11 @@ int bl_sha_update(bl_sha_ctx_t *ctx, const uint8_t *input, uint32_t len)
 int bl_sha_finish(bl_sha_ctx_t *ctx, uint8_t *hash)
 {
 #if defined(BL602) || defined(BL702)
-    if (is_tcm_addr(ctx))
-    {
+    if (is_tcm_addr(ctx)) {
         ARCH_MemCpy_Fast(&working_link_cfg, &ctx->link_cfg, sizeof(working_link_cfg));
     }
 #elif defined(BL702L)
-    if (is_psram_cache(ctx))
-    {
+    if (is_psram_cache(ctx)) {
         ARCH_MemCpy_Fast(&working_link_cfg, &ctx->link_cfg, sizeof(working_link_cfg));
     }
 #elif defined BL616
@@ -317,6 +281,7 @@ int bl_sha512_clone(bl_sha512_ctx_t *dst, const bl_sha512_ctx_t *src)
 int bl_sha512_update(bl_sha512_ctx_t *ctx, const uint8_t *input, uint32_t len)
 {
 #ifdef BL616
+    bl_sec_enter_critical();
     if (bl_sec_is_cache_addr(ctx)) {
         L1C_DCache_Clean_Invalid_By_Addr((uintptr_t)ctx, sizeof(*ctx));
         ctx = bl_sec_get_no_cache_addr(ctx);
@@ -326,6 +291,9 @@ int bl_sha512_update(bl_sha512_ctx_t *ctx, const uint8_t *input, uint32_t len)
     }
 #endif
     Sec_Eng_SHA512_Link_Update((SEC_Eng_SHA512_Link_Ctx *)&ctx->ctx, BL_SHA_ID, input, len);
+#ifdef BL616
+    bl_sec_exit_critical(0);
+#endif
     return 0;
 }
 
@@ -347,6 +315,8 @@ int bl_sha512_finish(bl_sha512_ctx_t *ctx, uint8_t *hash)
  * Test cases
  */
 #include <stdlib.h>
+
+#define BL_SEC_INTENTIONALLY_LEAK(x) do{(void)x;}while(0)
 
 static const char tc_hash_input[] = "The quick brown fox jumps over the lazy dog";
 bool tc_sha1()
@@ -378,6 +348,8 @@ bool tc_sha1()
                 while (1) {
                 }
             }
+            BL_SEC_INTENTIONALLY_LEAK(in_buf);
+            BL_SEC_INTENTIONALLY_LEAK(ctx);
         }
         printf("Test addr %p\r\n", ctx);
         for (int j = 0; j < 1 * 1000; ++j) {
@@ -423,6 +395,8 @@ bool tc_sha1()
                 }
             }
         }
+        BL_SEC_INTENTIONALLY_LEAK(in_buf);
+        BL_SEC_INTENTIONALLY_LEAK(ctx);
     }
     return true;
 }
@@ -456,6 +430,8 @@ bool tc_sha512()
                 while (1) {
                 }
             }
+            BL_SEC_INTENTIONALLY_LEAK(in_buf);
+            BL_SEC_INTENTIONALLY_LEAK(ctx);
         }
         printf("Test addr %p\r\n", ctx);
         for (int j = 0; j < 1 * 1000; ++j) {
@@ -501,6 +477,8 @@ bool tc_sha512()
                 }
             }
         }
+        BL_SEC_INTENTIONALLY_LEAK(in_buf);
+        BL_SEC_INTENTIONALLY_LEAK(ctx);
     }
     return true;
 }

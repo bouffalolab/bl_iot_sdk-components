@@ -292,6 +292,10 @@ int bt_le_read_chan_map(struct bt_conn *conn, struct bt_hci_rp_le_read_chan_map 
 int bt_le_throughput_calc(bool enable, u8_t interval);
 #endif
 
+int bt_le_enh_tx_test(u8_t tx_ch, u8_t test_data_len, u8_t pkt_payload, u8_t phy);
+int bt_le_enh_rx_test(u8_t rx_ch, u8_t phy, u8_t mod_index);
+int bt_le_test_end(void);
+
 #if defined(BFLB_HOST_ASSISTANT)
 struct blhast_cb{
     void (*le_scan_cb)(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb);

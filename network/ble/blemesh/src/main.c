@@ -49,7 +49,7 @@ int bt_mesh_provision(const u8_t net_key[16], u16_t net_idx,
 	/* Added debug infomation by bouffalo */
 	printf("mesh provision, network key : %s\n", bt_hex(net_key, 16));
 	printf("mesh provision, device key : %s\n", bt_hex(dev_key, 16));
-	printf("mesh provison, network key index :0x%04x flags :0x%02x iv index :0x%04x\n", 
+	printf("mesh provison, network key index :0x%04x flags :0x%02x iv index :0x%04lx\n", 
 				net_idx, flags, iv_index);
 
 	BT_INFO("Primary Element: 0x%04x", addr);
@@ -130,7 +130,7 @@ int bt_mesh_provision(const u8_t net_key[16], u16_t net_idx,
 
 	/* Modified by bouffalo, don't refresh seq */
 	//bt_mesh.seq = 0U;
-	BT_WARN("mesh seq %d", bt_mesh.seq);
+	BT_WARN("mesh seq %lu", bt_mesh.seq);
 
 	bt_mesh_comp_provision(addr);
 

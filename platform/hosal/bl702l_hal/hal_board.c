@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 #include <stdint.h>
 #include <stdio.h>
 #include <bl_efuse.h>
@@ -81,7 +52,7 @@ static int update_mac_config_get_mac_from_efuse(uint8_t mac_addr[8])
     result_or = mac_addr[0] | mac_addr[1] | mac_addr[2] | mac_addr[3] | mac_addr[4] | mac_addr[5] | mac_addr[6] | mac_addr[7];
     result_and = mac_addr[0] & mac_addr[1] & mac_addr[2] & mac_addr[3] & mac_addr[4] & mac_addr[5] & mac_addr[6] & mac_addr[7];
 
-    if (0 == result_or || 1 == result_and) {
+    if (0 == result_or || 0xFF == result_and) {
         /*all zero or one found in efuse*/
         return -1;
     }
@@ -97,7 +68,7 @@ static int update_mac_config_get_mac_from_factory(uint8_t mac_addr[8])
     }
     result_or = mac_addr[0] | mac_addr[1] | mac_addr[2] | mac_addr[3] | mac_addr[4] | mac_addr[5] | mac_addr[6] | mac_addr[7];
     result_and = mac_addr[0] & mac_addr[1] & mac_addr[2] & mac_addr[3] & mac_addr[4] & mac_addr[5] & mac_addr[6] & mac_addr[7];
-    if (0 == result_or || 1 == result_and) {
+    if (0 == result_or || 0xFF == result_and) {
         /*all zero or one found in efuse*/
         return -1;
     }
@@ -189,11 +160,11 @@ static void update_mac_config(const void *fdt, int offset1)
     countindex = fdt_stringlist_count(fdt, offset1, "mode");
     if (1 == countindex) {
         result = fdt_stringlist_get(fdt, offset1, "mode", 0, &lentmp);
-        blog_print("MAC address mode length %d\r\n", lentmp);
+        blog_info("MAC address mode length %d\r\n", lentmp);
         if (lentmp <= MAC_ORDER_ADDR_LEN_MAX) {
             memcpy(mac_mode, result, lentmp);
             mac_mode[3] = '\0';
-            blog_print("MAC address mode is %s\r\n", mac_mode);
+            blog_info("MAC address mode is %s\r\n", mac_mode);
             update_mac_config_with_order(fdt, offset1, mac_mode);
         }
     }

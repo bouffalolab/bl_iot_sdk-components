@@ -22,6 +22,11 @@ ifeq ($(CONFIG_CHIP_CODE),WB03)
 CFLAGS   += -DWB03
 endif
 
+ifeq ($(CONFIG_USE_PSRAM), 1)
+CFLAGS   += -DCFG_USE_PSRAM
+CPPFLAGS += -DCFG_USE_PSRAM
+endif
+
 # Component Makefile
 #
 ## These include paths would be exported to project level

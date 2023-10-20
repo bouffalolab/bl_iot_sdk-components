@@ -1,31 +1,5 @@
 /*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (C) 2015-2017 Alibaba Group Holding Limited
  */
 
 #include <stdlib.h>
@@ -690,6 +664,7 @@ static void echo_cmd(char *buf, int len, int argc, char **argv);
 static void exit_cmd(char *buf, int len, int argc, char **argv);
 static void devname_cmd(char *buf, int len, int argc, char **argv);
 static void pmem_cmd(char *buf, int len, int argc, char **argv);
+static void gdbmem_cmd(char *buf, int len, int argc, char **argv);
 static void mmem_cmd(char *buf, int len, int argc, char **argv);
 
 #endif
@@ -710,6 +685,7 @@ const struct cli_command built_ins[] STATIC_CLI_CMD_ATTRIBUTE = {
 #if (AOS_CLI_MINI_SIZE <= 0)
 
     { "p", "print memory", pmem_cmd },
+    { "gdbm", "print memory for gdb", gdbmem_cmd },
     { "m", "modify memory", mmem_cmd },
     { "echo", "echo for command", echo_cmd },
     { "exit", "close CLI", exit_cmd },
@@ -789,6 +765,9 @@ static void version_cmd(char *buf, int len, int argc, char **argv)
         }
     }
     aos_cli_printf("Heap left: %d Bytes\r\n", xPortGetFreeHeapSize());
+#if defined(CFG_USE_PSRAM)
+    aos_cli_printf("Psram Heap left: %d Bytes\r\n", xPortGetFreeHeapSizePsram());
+#endif /* CFG_USE_PSRAM */
 }
 
 
@@ -832,14 +811,14 @@ static void pmem_cmd(char *buf, int len, int argc, char **argv)
 
     switch (argc) {
         case 4:
-            width = strtol(argv[3], NULL, 0);
+            width = strtoul(argv[3], NULL, 0);
             __attribute__ ((fallthrough));
         case 3:
-            nunits = strtol(argv[2], NULL, 0);
+            nunits = strtoul(argv[2], NULL, 0);
             nunits = nunits > 0x400 ? 0x400 : nunits;
             __attribute__ ((fallthrough));
         case 2:
-            addr = (char *)strtol(argv[1], &pos, 0);
+            addr = (char *)strtoul(argv[1], &pos, 0);
             break;
         default:
             break;
@@ -893,6 +872,62 @@ static void pmem_cmd(char *buf, int len, int argc, char **argv)
     }
 }
 
+static void gdbmem_cmd(char *buf, int len, int argc, char **argv)
+{
+    int   i;
+    char *pos    = NULL;
+    char *addr   = NULL;
+    int   nunits = 16;
+    uint8_t xor_code = 0;
+
+    switch (argc) {
+        case 3:
+            nunits = strtoul(argv[2], NULL, 0);
+            __attribute__ ((fallthrough));
+        case 2:
+            addr = (char *)strtoul(argv[1], &pos, 0);
+            break;
+        default:
+            addr = NULL;
+            break;
+    }
+
+    if (pos == NULL || pos == argv[1]) {
+        aos_cli_printf("gdm <addr> <nunits> \r\n"
+                       "addr  : address to display\r\n"
+                       "nunits: number of units to display (default is 16)\r\n"
+                       );
+        return;
+    }
+
+    aos_cli_printf("0x%08x:", (unsigned int)addr);
+    if (0 == (nunits & 0x3) && 0 == (((uintptr_t)addr) & 0x3)) {
+        nunits = (nunits >> 2);
+        for (i = 0; i < nunits; i++) {
+            uint32_t val = *(uint32_t*)(addr + (i << 2));
+            xor_code ^= ((val >> 0) & 0xFF);
+            xor_code ^= ((val >> 8) & 0xFF);
+            xor_code ^= ((val >> 16) & 0xFF);
+            xor_code ^= ((val >> 24) & 0xFF);
+            aos_cli_printf(" %02x %02x %02x %02x",
+                (val >> 0) & 0xFF,
+                (val >> 8) & 0xFF,
+                (val >> 16) & 0xFF,
+                (val >> 24) & 0xFF
+            );
+        }
+    } else {
+        for (i = 0; i < nunits; i++) {
+            uint8_t val;
+            val = *(unsigned char *)addr;
+            xor_code ^= val;
+            aos_cli_printf(" %02x", val);
+            addr += 1;
+        }
+    }
+    aos_cli_printf(" XOR:%02x\r\n", xor_code);
+}
+
 static void mmem_cmd(char *buf, int len, int argc, char **argv)
 {
     void        *addr  = NULL;
@@ -903,13 +938,13 @@ static void mmem_cmd(char *buf, int len, int argc, char **argv)
 
     switch (argc) {
         case 4:
-            width = strtol(argv[3], NULL, 0);
+            width = strtoul(argv[3], NULL, 0);
             __attribute__ ((fallthrough));
         case 3:
-            value = strtol(argv[2], NULL, 0);
+            value = strtoul(argv[2], NULL, 0);
             __attribute__ ((fallthrough));
         case 2:
-            addr = (void *)strtol(argv[1], NULL, 0);
+            addr = (void *)strtoul(argv[1], NULL, 0);
             break;
         default:
             addr = NULL;

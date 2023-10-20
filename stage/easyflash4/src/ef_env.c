@@ -153,6 +153,8 @@ enum sector_dirty_status {
     SECTOR_DIRTY_GC,
     SECTOR_DIRTY_STATUS_NUM,
 };
+/** If the value of SECTOR_DIRTY_STATUS_NUM is changed, 
+ * please evaluate size of status_table in del_env. */
 typedef enum sector_dirty_status sector_dirty_status_t;
 
 struct sector_hdr_data {
@@ -1090,8 +1092,19 @@ static EfErrCode del_env(const char *key, env_node_obj_t old_env, bool complete_
     uint32_t dirty_status_addr;
     static bool last_is_complete_del = false;
 
-    uint8_t env_status_table[ENV_STATUS_TABLE_SIZE];
-    uint8_t dirty_status_table[DIRTY_STATUS_TABLE_SIZE];
+//#if (ENV_STATUS_TABLE_SIZE >= DIRTY_STATUS_TABLE_SIZE)
+/**
+ * enum value is invalid to determine during preprocess phase.
+ * Previous implementation makes determination to be always true and makes build error if -Wundef and -Werror are enabled.
+ * Now hard-code it to #if 1.
+ * 
+ * Any change on ENV_STATUS_NUM or SECTOR_DIRTY_STATUS_NUM should re-evaluate the size of status_table.
+ * */
+#if 1
+    uint8_t status_table[ENV_STATUS_TABLE_SIZE];
+#else
+    uint8_t status_table[DIRTY_STATUS_TABLE_SIZE];
+#endif
 
     /* need find ENV */
     if (!old_env) {
@@ -1106,10 +1119,10 @@ static EfErrCode del_env(const char *key, env_node_obj_t old_env, bool complete_
     }
     /* change and save the new status */
     if (!complete_del) {
-        result = write_status(old_env->addr.start, env_status_table, ENV_STATUS_NUM, ENV_PRE_DELETE);
+        result = write_status(old_env->addr.start, status_table, ENV_STATUS_NUM, ENV_PRE_DELETE);
         last_is_complete_del = true;
     } else {
-        result = write_status(old_env->addr.start, env_status_table, ENV_STATUS_NUM, ENV_DELETED);
+        result = write_status(old_env->addr.start, status_table, ENV_STATUS_NUM, ENV_DELETED);
 
         if (!last_is_complete_del && result == EF_NO_ERR) {
 #ifdef EF_ENV_USING_CACHE
@@ -1130,8 +1143,8 @@ static EfErrCode del_env(const char *key, env_node_obj_t old_env, bool complete_
     dirty_status_addr = EF_ALIGN_DOWN(old_env->addr.start, SECTOR_SIZE) + SECTOR_DIRTY_OFFSET;
     /* read and change the sector dirty status */
     if (result == EF_NO_ERR
-            && read_status(dirty_status_addr, dirty_status_table, SECTOR_DIRTY_STATUS_NUM) == SECTOR_DIRTY_FALSE) {
-        result = write_status(dirty_status_addr, dirty_status_table, SECTOR_DIRTY_STATUS_NUM, SECTOR_DIRTY_TRUE);
+            && read_status(dirty_status_addr, status_table, SECTOR_DIRTY_STATUS_NUM) == SECTOR_DIRTY_FALSE) {
+        result = write_status(dirty_status_addr, status_table, SECTOR_DIRTY_STATUS_NUM, SECTOR_DIRTY_TRUE);
     }
 
     return result;
@@ -1306,7 +1319,7 @@ static bool write_hdr_gc(sector_meta_data_t sector, void *arg1, void *arg2){
  * 1. alloc an ENV when the flash not has enough space
  * 2. write an ENV then the flash not has enough space
  */
-static void gc_collect(void)
+static void gc_collect_internal(void *arg)
 {
     struct sector_meta_data sector;
     size_t empty_sec = 0;
@@ -1328,6 +1341,23 @@ static void gc_collect(void)
     }
 
     gc_request = false;
+}
+
+static void gc_collect(void)
+{
+#if defined(BL702) || defined(BL702L)
+    extern uint8_t _sp_main;
+    extern void bl_function_call_with_stack(void (*f)(void *data), void *data, void *stacktop);
+    extern int bl_irq_save(void);
+    extern void bl_irq_restore(int flags);
+
+    int mstatus_tmp;
+    mstatus_tmp = bl_irq_save();
+    bl_function_call_with_stack(gc_collect_internal, NULL, &_sp_main);
+    bl_irq_restore(mstatus_tmp);
+#else
+    gc_collect_internal(NULL);
+#endif
 }
 
 static EfErrCode align_write(uint32_t addr, const uint32_t *buf, size_t size)

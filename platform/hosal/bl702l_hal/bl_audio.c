@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 #include "bl_audio.h"
 #include "bl_irq.h"
 #include "hosal_dma.h"
@@ -69,8 +40,10 @@ static void audio_amic_gpio_init(bl_audio_amic_cfg_t *cfg)
     gpioCfg.gpioPin = audioPinList[cfg->amic_pos_ch];
     GLB_GPIO_Init(&gpioCfg);
     
-    gpioCfg.gpioPin = audioPinList[cfg->amic_neg_ch];
-    GLB_GPIO_Init(&gpioCfg);
+    if(!cfg->amic_single_ended){
+        gpioCfg.gpioPin = audioPinList[cfg->amic_neg_ch];
+        GLB_GPIO_Init(&gpioCfg);
+    }
 }
 
 static void audio_pdm_gpio_init(bl_audio_pdm_cfg_t *cfg)
@@ -120,7 +93,7 @@ static void audio_amic_adc_init(bl_audio_amic_cfg_t *cfg)
         .pga_negative_en = ENABLE,                                  /* DISABLE, look into each channel will see high impedance, ENABLE:one of eight channel will be choose */
         .pga_posi_ch = cfg->amic_pos_ch,                            /* Positive channel selection, connected to PGA positive terminal */
         .pga_nega_ch = cfg->amic_neg_ch,                            /* Negative channel selection, connected to PGA negative terminal */
-        .pga_coupled_mode = AUADC_ADC_PGA_MODE_AC_DIFF,             /* PGA mode configuration */
+        .pga_coupled_mode = cfg->amic_single_ended,                 /* PGA mode configuration */
         .pga_gain = AUADC_ADC_PGA_GAIN_30DB,                        /* audio mode enable, audio filter is on when set to high */
         .adc_mode = AUADC_ADC_FILT_MODE_AUDIO,                      /* adc work mode, audio-mode or measuring-mode */
         .audio_osr = AUADC_ADC_Audio_OSR_128,                       /* audio osr configuration */
@@ -202,16 +175,18 @@ int bl_audio_amic_init(bl_audio_amic_cfg_t *cfg)
         return -1;
     }
     
+    if(cfg->amic_single_ended > 1){
+        return -1;
+    }
+    
     if(cfg->amic_pos_ch > 7){
         return -1;
     }
     
-    if(cfg->amic_neg_ch > 7){
-        return -1;
-    }
-    
-    if(cfg->amic_pos_ch == cfg->amic_neg_ch){
-        return -1;
+    if(!cfg->amic_single_ended){
+        if(cfg->amic_neg_ch > 7){
+            return -1;
+        }
     }
     
     if(cfg->pcm_frame_size < 1 || cfg->pcm_frame_size > 4095){
@@ -413,3 +388,54 @@ float bl_audio_get_digital_gain(void)
     
     return (float)volume / 2;
 }
+
+
+#if 0
+#define FRAME_SIZE 4000
+#define FRAME_NUM  4
+int16_t audio_buf[FRAME_SIZE * FRAME_NUM];
+int16_t pcm_buf[2][FRAME_SIZE];
+
+void audio_callback(int buf_idx)
+{
+    static uint32_t len = 0;
+    
+    printf("audio_callback: %d\r\n", buf_idx);
+    memcpy(audio_buf + len, pcm_buf[buf_idx], sizeof(int16_t) * FRAME_SIZE);
+    len += FRAME_SIZE;
+    if(len == FRAME_SIZE * FRAME_NUM){
+        bl_audio_stop();
+        len = 0;
+        /* Now you can dump audio_buf and play the audio with Cool Edit. */
+    }
+}
+
+void bl_audio_amic_test(void)
+{
+    bl_audio_amic_cfg_t cfg;
+    cfg.amic_single_ended = 0;
+    cfg.amic_pos_ch = 1;  // GPIO3
+    cfg.amic_neg_ch = 3;  // GPIO8
+    cfg.pcm_frame_size = FRAME_SIZE;
+    cfg.pcm_frame_buf[0] = pcm_buf[0];
+    cfg.pcm_frame_buf[1] = pcm_buf[1];
+    cfg.pcm_frame_event = audio_callback;
+    
+    bl_audio_amic_init(&cfg);
+    bl_audio_start();
+}
+
+void bl_audio_pdm_test(void)
+{
+    bl_audio_pdm_cfg_t cfg;
+    cfg.pdm_clk_pin = 8;
+    cfg.pdm_in_pin = 3;
+    cfg.pcm_frame_size = FRAME_SIZE;
+    cfg.pcm_frame_buf[0] = pcm_buf[0];
+    cfg.pcm_frame_buf[1] = pcm_buf[1];
+    cfg.pcm_frame_event = audio_callback;
+    
+    bl_audio_pdm_init(&cfg);
+    bl_audio_start();
+}
+#endif

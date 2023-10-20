@@ -376,14 +376,19 @@ ip4_forward(struct pbuf *p, struct ip_hdr *iphdr, struct netif *inp)
   {
       struct pbuf *q = pbuf_clone(PBUF_LINK, PBUF_RAM, p);
       if (q != NULL) {
-          netif->output(netif, q, ip4_current_dest_addr());
+          if(ERR_OK != netif->output(netif, q, ip4_current_dest_addr())){
+              STATS_INC(ip_napt.output_err);
+          }
           pbuf_free(q);
       } else {
           MIB2_STATS_INC(mib2.ipinaddrerrors);
           MIB2_STATS_INC(mib2.ipindiscards);
+          STATS_INC(ip_napt.mem_alloc_err);
       }
   } else {
-    netif->output(netif, p, ip4_current_dest_addr());
+     if(ERR_OK != netif->output(netif, p, ip4_current_dest_addr())){
+          STATS_INC(ip_napt.output_err);
+     }
   }
 #else
   netif->output(netif, p, ip4_current_dest_addr());

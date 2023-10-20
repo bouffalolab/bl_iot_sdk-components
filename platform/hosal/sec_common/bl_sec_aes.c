@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 #include <bl_sec.h>
 #include "bl_sec_hw_common.h"
 #include <bl_sec_aes.h>
@@ -80,7 +51,10 @@ int bl_aes_set_key(bl_sec_aes_t *aes, bl_sec_aes_op_t op, const uint8_t *key, si
     (void)op;
 
 #ifdef BL616
-    aes = bl_sec_get_no_cache_addr(aes);
+    if (bl_sec_is_cache_addr(aes)) {
+        L1C_DCache_Clean_Invalid_By_Addr((uintptr_t)aes, sizeof(*aes));
+        aes = bl_sec_get_no_cache_addr(aes);
+    }
 #endif
 
     aes->link_cfg.aesDecKeySel = SEC_ENG_AES_USE_NEW;
@@ -98,23 +72,51 @@ int bl_aes_set_key(bl_sec_aes_t *aes, bl_sec_aes_op_t op, const uint8_t *key, si
     return 0;
 }
 
-int bl_aes_transform(bl_sec_aes_t *aes, bl_sec_aes_op_t op, const uint8_t *input, uint8_t *output)
+int bl_aes_set_mode(bl_sec_aes_t *aes, bl_sec_aes_mode_t mode, const uint8_t iv[16])
 {
-    const uint16_t n_blk = 1;
+    if (!aes) {
+        return -1;
+    }
+#ifdef BL616
+    if (bl_sec_is_cache_addr(aes)) {
+        L1C_DCache_Clean_Invalid_By_Addr((uintptr_t)aes, sizeof(*aes));
+        aes = bl_sec_get_no_cache_addr(aes);
+    }
+#endif
+    aes->link_cfg.aesBlockMode = (uint8_t)mode;
+    if (iv) {
+        memcpy(&aes->link_cfg.aesIV0, iv, 16);
+        aes->link_cfg.aesIVSel = SEC_ENG_AES_USE_NEW;
+    }
+
+    return 0;
+}
+
+int bl_aes_transform_blocks(bl_sec_aes_t *aes, bl_sec_aes_op_t op, const uint8_t *input, uint16_t n_blk, uint8_t *output)
+{
+    int ret;
+    size_t bytes;
     if (!(aes && input && output)) {
         return -1;
     }
 
+    if (n_blk == 0) {
+        return 0;
+    }
+    bytes = n_blk << 4;
 #ifdef BL616
-    aes = bl_sec_get_no_cache_addr(aes);
+    bl_sec_enter_critical();
+    if (bl_sec_is_cache_addr(aes)) {
+        L1C_DCache_Clean_Invalid_By_Addr((uintptr_t)aes, sizeof(*aes));
+        aes = bl_sec_get_no_cache_addr(aes);
+    }
     if (bl_sec_is_cache_addr(input)) {
-        L1C_DCache_Clean_Invalid_By_Addr((uintptr_t)input, 16);
+        L1C_DCache_Clean_Invalid_By_Addr((uintptr_t)input, bytes);
     }
     if (bl_sec_is_cache_addr(output) && input != output) {
-        L1C_DCache_Clean_Invalid_By_Addr((uintptr_t)output, 16);
+        L1C_DCache_Clean_Invalid_By_Addr((uintptr_t)output, bytes);
     }
 #endif
-    aes->link_cfg.aesMsgLen = n_blk;
     if (op == BL_AES_ENCRYPT) {
         aes->link_cfg.aesDecEn = SEC_ENG_AES_ENCRYPTION;
     } else {
@@ -122,18 +124,27 @@ int bl_aes_transform(bl_sec_aes_t *aes, bl_sec_aes_op_t op, const uint8_t *input
     }
 
     Sec_Eng_AES_Enable_Link(AES_ID);
-    Sec_Eng_AES_Link_Work(AES_ID, (uint32_t)&aes->link_cfg, input, n_blk << 4, output);
+    ret = Sec_Eng_AES_Link_Work(AES_ID, (uint32_t)&aes->link_cfg, input, bytes, output);
     Sec_Eng_AES_Disable_Link(AES_ID);
 
-    return 0;
+#ifdef BL616
+    bl_sec_exit_critical(0);
+#endif
+    return !(ret == SUCCESS);
 }
 
+int bl_aes_transform(bl_sec_aes_t *aes, bl_sec_aes_op_t op, const uint8_t *input, uint8_t *output)
+{
+    return bl_aes_transform_blocks(aes, op, input, 1, output);
+}
 
 /*
  * Test cases
  */
 #include <stdbool.h>
 #include <stdlib.h>
+
+#define BL_SEC_INTENTIONALLY_LEAK(x) do{(void)x;}while(0)
 
 bool tc_aes_ecb()
 {
@@ -205,6 +216,8 @@ bool tc_aes_ecb()
                 }
             }
         }
+        BL_SEC_INTENTIONALLY_LEAK(aes);
+        BL_SEC_INTENTIONALLY_LEAK(buf);
     }
     return true;
 }

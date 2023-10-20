@@ -625,3 +625,7 @@ const HeapRegion_t *pxHeapRegion;
 	xBlockAllocatedBit = ( ( size_t ) 1 ) << ( ( sizeof( size_t ) * heapBITS_PER_BYTE ) - 1 );
 }
 
+#if defined (CFG_COMPONENT_BUGKILLER_ENABLE) && defined (CFG_USE_PSRAM)
+#define FREERTOS_HEAP_PSRAM_DUMP
+#include <bugkiller_freertos.inc>
+#endif

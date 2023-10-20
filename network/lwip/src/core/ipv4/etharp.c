@@ -726,7 +726,7 @@ etharp_input(struct pbuf *p, struct netif *netif)
   IPADDR_WORDALIGNED_COPY_TO_IP4_ADDR_T(&dipaddr, &hdr->dipaddr);
 
   /* this interface is not configured? */
-  if (ip4_addr_isany_val(*netif_ip4_addr(netif))) {
+  if (ip4_addr_isany_val(*netif_ip4_addr(netif)) || netif->addr_ext.arp_for_us_disable) {
     for_us = 0;
   } else {
     /* ARP packet directed to us? */

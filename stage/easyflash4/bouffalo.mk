@@ -20,3 +20,11 @@ CPPFLAGS += -DCONFIG_CLI_CMD_ENABLE
 endif
 
 CPPFLAGS += -D USE_UTILS_CRC
+CPPFLAGS += -D$(CONFIG_CHIP_NAME)
+
+ifeq ($(CONFIG_CHIP_NAME),BL702)
+# It is enough enable -Wundef and -Werror only on BL702 platform 
+# to ensure code quality of easyflash4
+CPPFLAGS += -Wundef
+CPPFLAGS += -Werror
+endif

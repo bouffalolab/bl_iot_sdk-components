@@ -938,7 +938,7 @@ int bt_mesh_friend_req(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 	poll_to = sys_get_be24(msg->poll_to);
 
 	if (poll_to <= 0x000009 || poll_to >= 0x34bc00) {
-		BT_WARN("Prohibited PollTimeout (0x%06x)", poll_to);
+		BT_WARN("Prohibited PollTimeout (0x%06lx)", poll_to);
 		return -EINVAL;
 	}
 
@@ -958,7 +958,7 @@ int bt_mesh_friend_req(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 	}
 
 	if (CONFIG_BT_MESH_FRIEND_QUEUE_SIZE < MIN_QUEUE_SIZE(msg->criteria)) {
-		BT_WARN("We have a too small Friend Queue size (%u < %u)",
+		BT_WARN("We have a too small Friend Queue size (%u < %lu)",
 			CONFIG_BT_MESH_FRIEND_QUEUE_SIZE,
 			MIN_QUEUE_SIZE(msg->criteria));
 		return 0;

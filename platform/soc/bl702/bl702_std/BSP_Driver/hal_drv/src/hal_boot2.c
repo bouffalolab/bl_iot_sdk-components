@@ -171,12 +171,12 @@ void ATTR_TCM_SECTION hal_boot2_sboot_finish(void)
  */
 void hal_boot2_uart_gpio_init(void)
 {
-    GLB_GPIO_Type gpios[] = { GPIO_PIN_14, GPIO_PIN_15 };
+    GLB_GPIO_Type gpios[] = { GLB_GPIO_PIN_14, GLB_GPIO_PIN_15 };
 
     GLB_GPIO_Func_Init(GPIO_FUN_UART, gpios, 2);
 
-    GLB_UART_Fun_Sel((GPIO_PIN_14 % 8), GLB_UART_SIG_FUN_UART0_TXD); //  GPIO_FUN_UART1_TX
-    GLB_UART_Fun_Sel((GPIO_PIN_15 % 8), GLB_UART_SIG_FUN_UART0_RXD);
+    GLB_UART_Fun_Sel((GLB_GPIO_PIN_14 % 8), GLB_UART_SIG_FUN_UART0_TXD); //  GPIO_FUN_UART1_TX
+    GLB_UART_Fun_Sel((GLB_GPIO_PIN_15 % 8), GLB_UART_SIG_FUN_UART0_RXD);
 }
 
 /**
@@ -186,11 +186,11 @@ void hal_boot2_uart_gpio_init(void)
  */
 void hal_boot2_debug_uart_gpio_init(void)
 {
-    GLB_GPIO_Type gpios[] = { GPIO_PIN_17 };
+    GLB_GPIO_Type gpios[] = { GLB_GPIO_PIN_17 };
 
     GLB_GPIO_Func_Init(GPIO_FUN_UART, gpios, 1);
 
-    GLB_UART_Fun_Sel((GPIO_PIN_17 % 8), GLB_UART_SIG_FUN_UART1_TXD);
+    GLB_UART_Fun_Sel((GLB_GPIO_PIN_17 % 8), GLB_UART_SIG_FUN_UART1_TXD);
 }
 
 /**

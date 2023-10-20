@@ -2635,7 +2635,7 @@ static bool setting_env_cb(env_node_obj_t env, void *arg1, void *arg2)
     if (env->crc_is_ok) {
         /* check ENV */
         if (env->status == ENV_WRITE) {
-			BT_WARN("Env[%.*s] Data len[%d]", env->name_len, env->name, env->value_len);
+			BT_WARN("Env[%.*s] Data len[%lu]", env->name_len, env->name, env->value_len);
 			#if 1
 			char *pname, name[EF_ENV_NAME_MAX+1];
 			const char* next;

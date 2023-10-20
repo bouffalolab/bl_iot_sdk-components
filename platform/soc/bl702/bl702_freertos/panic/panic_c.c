@@ -53,9 +53,6 @@ static void backtrace_stack(int (*print_func)(const char *fmt, ...),
 {
     uintptr_t *ra;
     uint32_t i = 0; 
-#ifdef CONF_ENABLE_FUNC_BACKTRACE_ELF
-    uintptr_t *input_fp = fp;
-#endif
 
     while (1) {
         ra = (uintptr_t *)*(unsigned long *)(fp - 1);
@@ -73,32 +70,6 @@ static void backtrace_stack(int (*print_func)(const char *fmt, ...),
 
         i ++;
     }
-
-
-#ifdef CONF_ENABLE_FUNC_BACKTRACE_ELF
-
-#define STR(R)    #R
-#define DEF2STR(R)  STR(R)
-
-    char proj_elf[] = DEF2STR(CONF_ENABLE_FUNC_BACKTRACE_ELF);
-    print_func("CMD: riscv64-unknown-elf-addr2line -e ");
-    print_func(proj_elf);
-    print_func(" -a -f ");
-
-    while (1) {
-        ra = (uintptr_t *)*(unsigned long *)(input_fp - 1);
-
-        if (ra == 0) {
-            break;
-        }
-
-        print_func("%p ", ra);
-
-        input_fp = (uintptr_t *)*(input_fp - 2);
-    }
-
-    print_func("\r\n");
-#endif
 }
 
 int backtrace_riscv(int (*print_func)(const char *fmt, ...), uintptr_t *regs)
@@ -145,7 +116,7 @@ static inline void backtrace_stack_app(int (*print_func)(const char *fmt, ...), 
       return;
     }
 
-    if ((unsigned long)pc > VALID_FP_START_XIP) {
+    if (pc > VALID_FP_START_XIP) {
       /* there is a function that does not saved ra,
       * skip!
       * this value is the next fp

@@ -446,7 +446,9 @@ static int bflb_ecdsa_verify_point_mul(uint8_t id,const uint32_t *m )
 #endif
                 }else if(pka_p1_eq_inf==0 && pka_p2_eq_inf == 1){
                     //sum = X1
+#ifdef ECDSA_DBG_DETAIL
                     MSG("sum = X1\r\n");
+#endif
                 }else if(pka_p1_eq_inf==0 && pka_p2_eq_inf == 0){
                     //sum = X1 + X2
                     bflb_ecdsa_point_add(id);
@@ -455,7 +457,9 @@ static int bflb_ecdsa_verify_point_mul(uint8_t id,const uint32_t *m )
                     bflb_ecdsa_dump_temp_result();
 #endif
                 }else{
+#ifdef ECDSA_DBG_DETAIL
                     MSG("Error! infinite point + infinite point\r\n");
+#endif
                     return -1;
                 }
 

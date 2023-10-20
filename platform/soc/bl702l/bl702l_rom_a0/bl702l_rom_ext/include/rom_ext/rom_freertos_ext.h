@@ -99,5 +99,8 @@ extern TCB_t * volatile pxCurrentTCB;
 // Public Functions
 void rom_freertos_init(uint32_t idle_task_stack_size, uint32_t timer_task_stack_size);
 
+// Hook Functions
+void rom_exception_hook(uint32_t mcause, uint32_t mepc, uint32_t mtval, uintptr_t *regs, uintptr_t *tasksp);
+
 
 #endif

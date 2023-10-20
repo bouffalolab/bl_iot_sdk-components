@@ -686,26 +686,6 @@ void *bl_os_zalloc(unsigned int size)
 }
 
 /****************************************************************************
- * Name: bl_os_update_time
- *
- * Description:
- *   Transform ticks to time and add this time to timespec value
- *
- * Input Parameters:
- *   timespec - Input timespec data pointer
- *   ticks    - System ticks
- *
- * Returned Value:
- *   None
- *
- ****************************************************************************/
-
-static void bl_os_update_time(uint32_t *ms, uint32_t ticks)
-{
-
-}
-
-/****************************************************************************
  * Name: bl_os_errno_trans
  *
  * Description:

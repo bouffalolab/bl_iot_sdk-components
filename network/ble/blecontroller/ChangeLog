@@ -1,5 +1,11 @@
 # Changes
 
+## 2023-07-25
+1.[BL702]Fix a ble/zb coex issue that causes ble link loss.
+
+## 2023-06-29
+1.[BL602]Add blecontroller_602_m8s1 library.
+
 ## 2023-04-19
 1. Fixed the crash problem when the code calls ble_stack_start after restarting by calling the hal_sys_reset function.
 

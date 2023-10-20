@@ -123,9 +123,13 @@ endif
 
 
 ifeq ($(CONFIG_BT_STACK_CLI),1)
-ble_stack_srcs   += src/cli_cmds/ble_cli_cmds.c \
-					src/cli_cmds/bredr_cli_cmds.c \
-					src/cli_cmds/pts_cli_cmds.c
+ble_stack_srcs   += src/cli_cmds/ble_cli_cmds.c
+ifeq ($(CONFIG_BT_BREDR),1)
+ble_stack_srcs   += src/cli_cmds/bredr_cli_cmds.c
+endif
+ifeq ($(CONFIG_BT_STACK_PTS),1)
+ble_stack_srcs   += src/cli_cmds/pts_cli_cmds.c
+endif
 endif
 
 ifeq ($(CONFIG_BT_BAS_SERVER),1)

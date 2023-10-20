@@ -994,6 +994,17 @@ int bt_conn_set_peripheral_pref_params(struct bt_le_conn_param *param);
  * @return 0 in case of success or negative value in case of error.
  */
 int bt_conn_get_peripheral_pref_params(struct bt_le_conn_param *param);
+
+#if defined (BFLB_BLE_ENABLE_OR_DISABLE_SLAVE_PREF_CONN_PARAM_UDPATE)
+/** @brief Enable or disable peripheral preferred connection parameters udpate
+ *
+ * @param conn Connection object.
+ * @param enable true:enable,false:disable
+ *
+ * @return 0 in case of success or negative value in case of error.
+ */
+int bt_conn_enable_peripheral_pref_param_update(struct bt_conn *conn, bool enable);
+#endif
 #endif
 
 #endif

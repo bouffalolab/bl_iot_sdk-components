@@ -52,7 +52,11 @@ void USB_DoNothing_IRQHandler(void)
 
 void system_bor_init(void)
 {
-    HBN_BOR_CFG_Type borCfg = { 0 /* pu_bor */, 0 /* irq_bor_en */, 1 /* bor_vth */, 0 /* bor_sel */ };
+    HBN_BOR_CFG_Type borCfg;
+    borCfg.enableBor = 1;
+    borCfg.enableBorInt = 0;
+    borCfg.borThreshold = 1;
+    borCfg.enablePorInBor = 1;
     HBN_Set_BOR_Cfg(&borCfg);
 }
 

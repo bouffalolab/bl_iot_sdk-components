@@ -47,6 +47,8 @@ else
 	endif
 endif
 
+$(info use $(LINKER_SCRIPTS))
+
 ##
 COMPONENT_ADD_LDFLAGS += -L $(COMPONENT_PATH)/evb/ld \
                          $(addprefix -T ,$(LINKER_SCRIPTS))

@@ -27,7 +27,136 @@
 #include "hal_flash.h"
 
 static uint32_t g_jedec_id = 0;
-static SPI_Flash_Cfg_Type g_flash_cfg;
+static SPI_Flash_Cfg_Type g_flash_cfg = {
+    .resetCreadCmd = 0xff,
+    .resetCreadCmdSize = 3,
+    .mid = 0xc8,
+
+    .deBurstWrapCmd = 0x77,
+    .deBurstWrapCmdDmyClk = 0x3,
+    .deBurstWrapDataMode = SF_CTRL_DATA_4_LINES,
+    .deBurstWrapData = 0xF0,
+
+    /* reg */
+    .writeEnableCmd = 0x06,
+    .wrEnableIndex = 0x00,
+    .wrEnableBit = 0x01,
+    .wrEnableReadRegLen = 0x01,
+
+    .qeIndex = 1,
+    .qeBit = 0x01,
+    .qeWriteRegLen = 0x02,
+    .qeReadRegLen = 0x1,
+
+    .busyIndex = 0,
+    .busyBit = 0x00,
+    .busyReadRegLen = 0x1,
+    .releasePowerDown = 0xab,
+
+    .readRegCmd[0] = 0x05,
+    .readRegCmd[1] = 0x35,
+    .writeRegCmd[0] = 0x01,
+    .writeRegCmd[1] = 0x01,
+
+    .fastReadQioCmd = 0xeb,
+    .frQioDmyClk = 16 / 8,
+    .cReadSupport = 0,
+    .cReadMode = 0xa0,
+
+    .burstWrapCmd = 0x77,
+    .burstWrapCmdDmyClk = 0x3,
+    .burstWrapDataMode = SF_CTRL_DATA_4_LINES,
+    .burstWrapData = 0x40,
+    /* erase */
+    .chipEraseCmd = 0xc7,
+    .sectorEraseCmd = 0x20,
+    .blk32EraseCmd = 0x52,
+    .blk64EraseCmd = 0xd8,
+    /* write */
+    .pageProgramCmd = 0x02,
+    .qpageProgramCmd = 0x32,
+    .qppAddrMode = SF_CTRL_ADDR_1_LINE,
+
+    .ioMode = 0x10,
+    .clkDelay = 0,
+    .clkInvert = 0x03,
+
+    .resetEnCmd = 0x66,
+    .resetCmd = 0x99,
+    .cRExit = 0xff,
+    .wrEnableWriteRegLen = 0x00,
+
+    /* id */
+    .jedecIdCmd = 0x9f,
+    .jedecIdCmdDmyClk = 0,
+    .qpiJedecIdCmd = 0x9f,
+    .qpiJedecIdCmdDmyClk = 0x00,
+    .sectorSize = 4,
+    .pageSize = 256,
+
+    /* read */
+    .fastReadCmd = 0x0b,
+    .frDmyClk = 8 / 8,
+    .qpiFastReadCmd = 0x0b,
+    .qpiFrDmyClk = 8 / 8,
+    .fastReadDoCmd = 0x3b,
+    .frDoDmyClk = 8 / 8,
+    .fastReadDioCmd = 0xbb,
+    .frDioDmyClk = 0,
+    .fastReadQoCmd = 0x6b,
+    .frQoDmyClk = 8 / 8,
+
+    .qpiFastReadQioCmd = 0xeb,
+    .qpiFrQioDmyClk = 16 / 8,
+    .qpiPageProgramCmd = 0x02,
+    .writeVregEnableCmd = 0x50,
+
+    /* qpi mode */
+    .enterQpi = 0x38,
+    .exitQpi = 0xff,
+
+    /* AC */
+    .timeEsector = 500,
+    .timeE32k = 2000,
+    .timeE64k = 2000,
+    .timePagePgm = 5,
+    .timeCe = 33 * 1000,
+    .pdDelay = 20,
+    .qeData = 0,
+};
+
+/**
+ * @brief flash_get_clock_delay
+ *
+ * @return int
+ */
+static BL_Err_Type ATTR_TCM_SECTION flash_get_clock_delay(SPI_Flash_Cfg_Type *cfg)
+{
+    uint32_t tmpVal = 0;
+
+    tmpVal = BL_RD_REG(SF_CTRL_BASE, SF_CTRL_0);
+    /* bit0-3 for clk delay */
+    if (BL_IS_REG_BIT_SET(tmpVal, SF_CTRL_SF_IF_READ_DLY_EN)) {
+        cfg->clkDelay = BL_GET_REG_BITS_VAL(tmpVal, SF_CTRL_SF_IF_READ_DLY_N) + 1;
+    } else {
+        cfg->clkDelay = 0;
+    }
+    cfg->clkInvert = 0;
+    /* bit0 for clk invert */
+    cfg->clkInvert |= ((BL_GET_REG_BITS_VAL(tmpVal, SF_CTRL_SF_CLK_OUT_INV_SEL) & 1) << 0);
+    /* bit1 for rx clk invert */
+    cfg->clkInvert |= ((BL_GET_REG_BITS_VAL(tmpVal, SF_CTRL_SF_CLK_SF_RX_INV_SEL) & 1) << 1);
+
+    tmpVal = BL_RD_REG(SF_CTRL_BASE, SF_CTRL_SF_IF_IO_DLY_1);
+    /* bit4-6 for do delay */
+    cfg->clkDelay |= ((BL_GET_REG_BITS_VAL(tmpVal, SF_CTRL_IO_0_DO_DLY_SEL) & 7) << 4);
+    /* bit2-4 for di delay */
+    cfg->clkInvert |= ((BL_GET_REG_BITS_VAL(tmpVal, SF_CTRL_IO_0_DI_DLY_SEL) & 7) << 2);
+    /* bit5-7 for oe delay */
+    cfg->clkInvert |= ((BL_GET_REG_BITS_VAL(tmpVal, SF_CTRL_IO_0_OE_DLY_SEL) & 7) << 5);
+
+    return SUCCESS;
+}
 
 /**
  * @brief flash_get_jedecid
@@ -89,6 +218,30 @@ static BL_Err_Type ATTR_TCM_SECTION flash_set_l1c_wrap(SPI_Flash_Cfg_Type *p_fla
 }
 
 /**
+ * @brief get flash size from flash jedec id
+ *
+ * @return BL_Err_Type
+ */
+static uint32_t ATTR_TCM_SECTION flash_get_size_from_jedecid(uint32_t jedec_id)
+{
+    uint8_t flash_size_level = 0;
+    uint32_t flash_size = 0;
+    uint32_t jid = 0;
+
+    jid = ((jedec_id&0xff)<<16) + (jedec_id&0xff00) + ((jedec_id&0xff0000)>>16);
+
+    if (jid == 0) {
+        return 0;
+    }
+
+    flash_size_level = (jid & 0x1f);
+    flash_size_level -= 0x13;
+    flash_size = (1 << flash_size_level) * 512 * 1024;
+
+    return flash_size;
+}
+
+/**
  * @brief flash sf2 gpio init for dual bank mode
  *
  * @return BL_Err_Type
@@ -133,7 +286,7 @@ static BL_Err_Type ATTR_TCM_SECTION flash_config_init(SPI_Flash_Cfg_Type *p_flas
     arch_memcpy(jedec_id, (uint8_t *)&jid, 3);
     jid &= 0xFFFFFF;
     g_jedec_id = jid;
-    ret = SF_Cfg_Get_Flash_Cfg_Need_Lock_Ext(jid, p_flash_cfg);
+    ret = SF_Cfg_Get_Flash_Cfg_Need_Lock(jid, p_flash_cfg);
     if (ret == SUCCESS) {
         p_flash_cfg->mid = (jid & 0xff);
     }
@@ -155,38 +308,35 @@ static BL_Err_Type ATTR_TCM_SECTION flash_config_init(SPI_Flash_Cfg_Type *p_flas
  */
 BL_Err_Type ATTR_TCM_SECTION flash_init(void)
 {
-    return SUCCESS;
-#if 0
-    BL_Err_Type ret = ERROR;
-    uint8_t clkDelay = 1;
-    uint8_t clkInvert = 1;
+    int ret = -1;
     uint32_t jedec_id = 0;
 
-    cpu_global_irq_disable();
-    L1C_Cache_Flush();
-    SF_Cfg_Get_Flash_Cfg_Need_Lock_Ext(0, &g_flash_cfg);
-    L1C_Cache_Flush();
-    cpu_global_irq_enable();
-    if (g_flash_cfg.mid != 0xff) {
-        return SUCCESS;
+    jedec_id = GLB_Get_Flash_Id_Value();
+    if (jedec_id != 0) {
+        ret = SF_Cfg_Get_Flash_Cfg_Need_Lock(jedec_id, &g_flash_cfg);
+        if (ret == 0) {
+            g_jedec_id = jedec_id;
+            flash_get_clock_delay(&g_flash_cfg);
+            return 0;
+        }
     }
-    clkDelay = g_flash_cfg.clkDelay;
-    clkInvert = g_flash_cfg.clkInvert;
-    g_flash_cfg.ioMode = g_flash_cfg.ioMode & 0x0f;
 
     ret = flash_config_init(&g_flash_cfg, (uint8_t *)&jedec_id);
-#if 0
-    MSG("flash ID = %08x\r\n", jedec_id);
-    bflb_platform_dump((uint8_t *)&g_flash_cfg, sizeof(g_flash_cfg));
-    if (ret != SUCCESS) {
-        MSG("flash config init fail!\r\n");
-    }
-#endif
-    g_flash_cfg.clkDelay = clkDelay;
-    g_flash_cfg.clkInvert = clkInvert;
+
+    flash_get_clock_delay(&g_flash_cfg);
+    GLB_Set_Flash_Id_Value(g_jedec_id);
 
     return ret;
-#endif
+}
+
+/**
+ * @brief get flash size
+ *
+ * @return BL_Err_Type
+ */
+uint32_t flash_get_size(void)
+{
+    return flash_get_size_from_jedecid(g_jedec_id);
 }
 
 /**

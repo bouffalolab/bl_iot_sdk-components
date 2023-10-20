@@ -345,6 +345,8 @@ void DMA_Channel_Enable(uint8_t ch);
 void DMA_Channel_Disable(uint8_t ch);
 void DMA_LLI_Init(uint8_t ch, DMA_LLI_Cfg_Type *lliCfg);
 void DMA_LLI_Update(uint8_t ch, uint32_t LLI);
+uint32_t DMA_LLI_Get_Counter(uint8_t ch);
+uint32_t DMA_LLI_Get_Dstaddr(uint8_t ch);
 void DMA_IntMask(uint8_t ch, DMA_INT_Type intType, BL_Mask_Type intMask);
 void DMA_LLI_PpBuf_Start_New_Transmit(DMA_LLI_PP_Buf *dmaPpBuf);
 DMA_LLI_Ctrl_Type *DMA_LLI_PpBuf_Remove_Completed_List(DMA_LLI_PP_Buf *dmaPpBuf);

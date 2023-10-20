@@ -10,7 +10,7 @@
 #include <FreeRTOS.h>
 #include <timers.h>
 #include <openthread/config.h>
-#include OPENTHREAD_PROJECT_CORE_CONFIG_FILE
+#include <openthread-core-config.h>
 #include <openthread/platform/alarm-milli.h>
 #include <openthread/platform/alarm-micro.h>
 #include <openthread/platform/time.h>

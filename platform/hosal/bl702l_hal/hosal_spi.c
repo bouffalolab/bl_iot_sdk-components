@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 #include <string.h>
 #include <stdio.h>
 #include <device/vfs_spi.h>
@@ -533,7 +504,7 @@ static void hosal_spi_gpio_init(hosal_spi_dev_t *arg)
     }
 
     GLB_GPIO_Type gpiopins[4];
-    gpiopins[0] = arg->config.pin_mosi + 1; //pin cs
+    gpiopins[0] = arg->config.pin_cs;
     gpiopins[1] = arg->config.pin_clk;
     gpiopins[2] = arg->config.pin_mosi;
     gpiopins[3] = arg->config.pin_miso;
@@ -606,9 +577,11 @@ int hosal_spi_finalize(hosal_spi_dev_t *spi)
         if (spi_priv->rx_dma_ch >= 0) {
             hosal_dma_chan_release(spi_priv->rx_dma_ch);
         }
+        vEventGroupDelete(spi_priv->spi_event_group);
         vPortFree(spi_priv);
     } else {
         spi_priv_t *spi_priv = (spi_priv_t *)spi->priv;
+        vEventGroupDelete(spi_priv->spi_event_group);
         vPortFree(spi_priv);
     }
     bl_irq_disable(SPI_IRQn);

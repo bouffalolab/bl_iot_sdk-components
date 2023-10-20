@@ -20,7 +20,5 @@ void zb_pds_init(zb_app_conf_t *app_conf);
 //enable=1:device will enter into low power mode when it is idle;
 //enable=0:device won't enter into low power mode when it
 void zb_pds_enable(uint8_t enable);
-void zbapp_action_before_sleep_callback(void);
-void zbapp_action_after_wakeup_callback(void);
 void zb_set_ota_status(bool otaOngoing);
 #endif

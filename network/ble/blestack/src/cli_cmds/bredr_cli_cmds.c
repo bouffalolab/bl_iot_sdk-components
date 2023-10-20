@@ -15,6 +15,7 @@
 #include <l2cap.h>
 #include <l2cap_internal.h>
 #if CONFIG_BT_A2DP
+#include <avdtp_internal.h>
 #include <a2dp.h>
 #endif
 #if CONFIG_BT_AVRCP
@@ -34,6 +35,7 @@
 #endif
 
 #include "log.h"
+struct bt_br_discovery_result result[10] = { 0 };
 
 static void bredr_connected(struct bt_conn *conn, u8_t err);
 static void bredr_disconnected(struct bt_conn *conn, u8_t reason);
@@ -86,6 +88,7 @@ static void bredr_l2cap_send_test_data(char *p_write_buffer, int write_buffer_le
 static void bredr_l2cap_disconnect(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 static void bredr_l2cap_echo_req(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 static void bredr_security(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+static void bredr_start_inquiry(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 
 #if BR_EDR_PTS_TEST
 static void bredr_sdp_client_connect(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
@@ -93,6 +96,9 @@ static void bredr_sdp_client_connect(char *p_write_buffer, int write_buffer_len,
 
 #if CONFIG_BT_A2DP
 static void a2dp_connect(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void a2dp_discovery(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void a2dp_suspend(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+static void a2dp_resume(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 #if BR_EDR_PTS_TEST
 static void a2dp_disconnect(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
 static void a2dp_start_discovery(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
@@ -153,12 +159,18 @@ const struct cli_command bredr_cmd_set[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"bredr_l2cap_disconnect_req", "", bredr_l2cap_disconnect},
     {"bredr_l2cap_echo_req", "", bredr_l2cap_echo_req},
     {"bredr_security", "", bredr_security},
+    {"bredr_start_inquiry", "", bredr_start_inquiry},
     #if BR_EDR_PTS_TEST
     {"bredr_sdp_client_connect", "", bredr_sdp_client_connect},
     #endif
         
     #if CONFIG_BT_A2DP
     {"a2dp_connect", "", a2dp_connect},
+	#if CONFIG_BT_A2DP_SOURCE
+    {"a2dp_start_disc", "", a2dp_discovery},
+    {"a2dp_source_suspend", "", a2dp_suspend},
+    {"a2dp_source_resume", "", a2dp_resume},
+	#endif
     #if BR_EDR_PTS_TEST
     {"a2dp_disconnect", "", a2dp_disconnect},
     {"a2dp_start_disc", "", a2dp_start_discovery},
@@ -529,6 +541,39 @@ static void bredr_security(char *pcWriteBuffer, int xWriteBufferLen, int argc, c
     }
 }
 
+void bt_br_discv_cb(struct bt_br_discovery_result *results,
+				  size_t count)
+{
+    char addr_str[18];
+    uint32_t dev_class;
+    int i;
+
+    if (!results || count== 0) {
+        return;
+    }
+
+    for (i=0;i<count;i++) {
+        dev_class = (results[i].cod[0] | (results[i].cod[1] << 8) | 
+                     (results[i].cod[1] << 16));
+        bt_addr_to_str(&results[i].addr, addr_str, sizeof(addr_str));
+        printf("addr %s,class 0x%lx,rssi %d\r\n",addr_str,
+                     dev_class,results[i].rssi);
+    }
+}
+
+static void bredr_start_inquiry(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    struct bt_br_discovery_param param;
+
+    //Valid range 0x01 - 0x30.
+    param.length = 0x05;
+    param.limited = 0;
+
+    int err = bt_br_discovery_start(&param,result,10,bt_br_discv_cb);
+    if (err) {
+        printf("BREDR discovery failed\n");
+    }
+}
 
 #if BR_EDR_PTS_TEST
 extern int bt_sdp_client_connect(struct bt_conn *conn);
@@ -563,20 +608,73 @@ static void a2dp_stream(uint8_t state)
 
 static void a2dp_connect(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
 {
-    int ret;
+    struct bt_a2dp *a2dp;
 
     if(!default_conn){
         printf("Not connected.\n");
         return;
     }
 
-    ret = bt_a2dp_connect(default_conn);
-    if(ret) {
+    a2dp = bt_a2dp_connect(default_conn);
+    if(a2dp) {
         printf("a2dp connect successfully.\n");
     } else {
         printf("a2dp connect fail. \n");
     }
 }
+
+#if CONFIG_BT_A2DP_SOURCE
+static void a2dp_discovery(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret;
+
+    if (!default_conn) {
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_start_discovery(default_conn);
+    if(ret) {
+        printf("A2dp start discovery successfully.\n");
+    } else {
+        printf("A2dp start discovery fail. ret(%d)\n",ret);
+    }
+}
+
+static void a2dp_suspend(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret = 0;
+
+    if (!default_conn) {
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_stream_suspend(default_conn);
+    if (!ret) {
+        printf("A2dp suspend stream successfully.\n");
+    } else {
+        printf("A2dp suspend stream fail. ret(%d)\n",ret);
+    }
+}
+
+static void a2dp_resume(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+{
+    int ret = 0;
+
+    if (!default_conn) {
+        printf("Not connected.\n");
+        return;
+    }
+
+    ret = bt_stream_resume(default_conn);
+    if (!ret) {
+        printf("A2dp resume stream successfully.\n");
+    } else {
+        printf("A2dp resume stream fail. ret(%d)\n",ret);
+    }
+}
+#endif
 
 #if BR_EDR_PTS_TEST
 static void a2dp_disconnect(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
@@ -764,7 +862,7 @@ static void avrcp_absvol(uint8_t vol)
 
 static void avrcp_play_status(uint32_t song_len, uint32_t song_pos, uint8_t status)
 {
-    printf("%s, song length: %d, song position: %d, play status: %d \n", __func__, song_len, song_pos, status);
+    printf("%s, song length: %lu, song position: %lu, play status: %u \n", __func__, song_len, song_pos, status);
 }
 
 static void avrcp_connect(char *p_write_buffer, int write_buffer_len, int argc, char **argv)

@@ -36,6 +36,7 @@
 
 #include "bl702l_i2c.h"
 #include "bl702l_glb.h"
+#include "bl702l_clock.h"
 
 /** @addtogroup  BL616_Peripheral_Driver
  *  @{
@@ -311,12 +312,7 @@ void I2C_Init(I2C_ID_Type i2cNo, I2C_Direction_Type direct, I2C_Transfer_Cfg *cf
     /* Check the parameters */
     CHECK_PARAM(IS_I2C_ID_TYPE(i2cNo));
 
-    /* set i2c clk,default is 400000,max support clk is 400000 */
-    if (cfg->clk == 0 || cfg->clk > 400000) {
-        I2C_ClockSet(i2cNo, 400000);
-    } else {
-        I2C_ClockSet(i2cNo, cfg->clk);
-    }
+    I2C_ClockSet(i2cNo, cfg->clk);
 
     /* Disable clock gate when use I2C0 */
     GLB_PER_Clock_UnGate(GLB_AHB_CLOCK_I2C);
@@ -343,9 +339,6 @@ void I2C_Init(I2C_ID_Type i2cNo, I2C_Direction_Type direct, I2C_Transfer_Cfg *cf
     } else {
         tmpVal = BL_CLR_REG_BIT(tmpVal, I2C_CR_I2C_SUB_ADDR_EN);
     }
-
-    /* align clock when 1 master*/
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_SCL_SYNC_EN, DISABLE);
 
     tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PKT_LEN, cfg->dataSize - 1);
     BL_WR_REG(I2Cx, I2C_CONFIG, tmpVal);
@@ -380,13 +373,15 @@ BL_Err_Type I2C_SetDeglitchCount(I2C_ID_Type i2cNo, uint8_t cnt)
     if (cnt > 0) {
         /* enable de-glitch function */
         tmpVal = BL_SET_REG_BIT(tmpVal, I2C_CR_I2C_DEG_EN);
+        /* Set count value */
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_DEG_CNT, cnt - 1);
     } else {
         /* disable de-glitch function */
         tmpVal = BL_CLR_REG_BIT(tmpVal, I2C_CR_I2C_DEG_EN);
+        /* Set count value as 0 */
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_DEG_CNT, 0);
     }
 
-    /* Set count value */
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_DEG_CNT, cnt);
     BL_WR_REG(I2Cx, I2C_CONFIG, tmpVal);
 
     return SUCCESS;
@@ -441,25 +436,60 @@ void I2C_SetPrd(I2C_ID_Type i2cNo, uint8_t phase)
 *******************************************************************************/
 void I2C_ClockSet(I2C_ID_Type i2cNo, uint32_t clk)
 {
-    uint32_t bclk = 0;
+    uint32_t tmpVal;
+    uint32_t I2Cx = I2C_BASE;
+    uint32_t phase, phase0, phase1, phase2, phase3;
+    uint32_t bias;
 
     /* Check the parameters */
     CHECK_PARAM(IS_I2C_ID_TYPE(i2cNo));
 
-    bclk = GLB_Get_BCLK_Div();
-    if (clk >= 100000) {
-        GLB_Set_I2C_CLK(1, GLB_I2C_CLK_SRC_BCLK, 0);
-        I2C_SetPrd(i2cNo, bclk / (clk * 4) - 1);
-    } else if (clk >= 8000) {
-        GLB_Set_I2C_CLK(1, GLB_I2C_CLK_SRC_BCLK, 9);
-        I2C_SetPrd(i2cNo, bclk / 10 / (clk * 4) - 1);
-    } else if (clk >= 800) {
-        GLB_Set_I2C_CLK(1, GLB_I2C_CLK_SRC_BCLK, 99);
-        I2C_SetPrd(i2cNo, bclk / 100 / (clk * 4) - 1);
+    if (i2cNo == I2C0_ID) {
+        phase = Clock_Peripheral_Clock_Get(BL_PERIPHERAL_CLOCK_I2C0);
     } else {
-        GLB_Set_I2C_CLK(1, GLB_I2C_CLK_SRC_BCLK, 255);
-        I2C_SetPrd(i2cNo, bclk / 256 / (clk * 4) - 1);
+        return;
     }
+    phase = (phase + clk / 2) / clk - 4;
+    phase0 = (phase + 4) / 8;
+    phase2 = (phase * 3 + 4) / 8;
+    phase3 = (phase + 4) / 8;
+    phase1 = phase - (phase0 + phase2 + phase3);
+    tmpVal = BL_RD_REG(I2Cx, I2C_CONFIG);
+
+    if (BL_IS_REG_BIT_SET(tmpVal, I2C_CR_I2C_DEG_EN) && (BL_IS_REG_BIT_SET(tmpVal, I2C_CR_I2C_SCL_SYNC_EN))) {
+        bias = BL_GET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_DEG_CNT);
+        bias += 1;
+    } else {
+        bias = 0;
+    }
+    if (BL_IS_REG_BIT_SET(tmpVal, I2C_CR_I2C_SCL_SYNC_EN)) {
+        bias += 3;
+    }
+
+    if (phase1 < (bias + 1)) {
+        phase1 = 1;
+    } else {
+        phase1 -= bias;
+    }
+
+    tmpVal = BL_RD_REG(I2Cx, I2C_PRD_START);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_S_PH_0, phase0);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_S_PH_1, phase1);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_S_PH_2, phase2);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_S_PH_3, phase3);
+    BL_WR_REG(I2Cx, I2C_PRD_START, tmpVal);
+    tmpVal = BL_RD_REG(I2Cx, I2C_PRD_STOP);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_P_PH_0, phase0);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_P_PH_1, phase1);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_P_PH_2, phase2);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_P_PH_3, phase3);
+    BL_WR_REG(I2Cx, I2C_PRD_STOP, tmpVal);
+    tmpVal = BL_RD_REG(I2Cx, I2C_PRD_DATA);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_D_PH_0, phase0);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_D_PH_1, phase1);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_D_PH_2, phase2);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, I2C_CR_I2C_PRD_D_PH_3, phase3);
+    BL_WR_REG(I2Cx, I2C_PRD_DATA, tmpVal);
 }
 
 /****************************************************************************/ /**

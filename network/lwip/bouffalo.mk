@@ -43,6 +43,7 @@ endif
 
 ifeq ($(CONFIG_IPV6), 1)
 COMPONENT_SRCDIRS += src/core/ipv6
+CPPFLAGS += -D CFG_IPV6
 endif
 
 ifeq ($(CONFIG_OTBR),1)
@@ -59,4 +60,8 @@ endif
 
 ifeq ($(CONFIG_LWIP_PE_OPT),1)
 CFLAGS += -msave-restore
+endif
+
+ifeq ($(CONFIG_MATTER_SUPPORT),1)
+CPPFLAGS += -DMATTER_SUPPORT
 endif

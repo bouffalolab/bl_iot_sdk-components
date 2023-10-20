@@ -62,9 +62,9 @@ int uart_open(struct device *dev, uint16_t oflag)
 
     uint32_t uart_clk = Clock_Peripheral_Clock_Get(BL_PERIPHERAL_CLOCK_UART0 + uart_device->id);
     uart_cfg.baudRate = uart_device->baudrate;
-    uart_cfg.dataBits = uart_device->databits;
-    uart_cfg.stopBits = uart_device->stopbits;
-    uart_cfg.parity = uart_device->parity;
+    uart_cfg.dataBits = (UART_DataBits_Type)uart_device->databits;
+    uart_cfg.stopBits = (UART_StopBits_Type)uart_device->stopbits;
+    uart_cfg.parity = (UART_Parity_Type)uart_device->parity;
     uart_cfg.uartClk = uart_clk;
     uart_cfg.ctsFlowControl = UART_CTS_FLOWCONTROL_ENABLE;
     uart_cfg.rtsSoftwareControl = UART_RTS_FLOWCONTROL_ENABLE;
@@ -195,9 +195,9 @@ int uart_control(struct device *dev, int cmd, void *args)
 
             uart_cfg.uartClk = uart_clk;
             uart_cfg.baudRate = cfg->baudrate;
-            uart_cfg.stopBits = cfg->stopbits;
-            uart_cfg.parity = cfg->parity;
-            uart_cfg.dataBits = cfg->databits;
+            uart_cfg.dataBits = (UART_DataBits_Type)cfg->databits;
+            uart_cfg.stopBits = (UART_StopBits_Type)cfg->stopbits;
+            uart_cfg.parity = (UART_Parity_Type)cfg->parity;
             uart_cfg.ctsFlowControl = UART_CTS_FLOWCONTROL_ENABLE;
             uart_cfg.rtsSoftwareControl = UART_RTS_FLOWCONTROL_ENABLE;
             uart_cfg.byteBitInverse = UART_MSB_FIRST_ENABLE;

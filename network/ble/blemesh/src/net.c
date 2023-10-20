@@ -670,7 +670,7 @@ bool bt_mesh_net_iv_update(u32_t iv_index, bool iv_update)
 		/* We're currently in IV Update mode */
 
 		if (iv_index != bt_mesh.iv_index) {
-			BT_WARN("IV Index mismatch: 0x%08x != 0x%08x",
+			BT_WARN("IV Index mismatch: 0x%08lx != 0x%08lx",
 				iv_index, bt_mesh.iv_index);
 			return false;
 		}
@@ -690,7 +690,7 @@ bool bt_mesh_net_iv_update(u32_t iv_index, bool iv_update)
 
 		if (iv_index < bt_mesh.iv_index ||
 		    iv_index > bt_mesh.iv_index + 42) {
-			BT_ERR("IV Index out of sync: 0x%08x != 0x%08x",
+			BT_ERR("IV Index out of sync: 0x%08lx != 0x%08lx",
 			       iv_index, bt_mesh.iv_index);
 			return false;
 		}

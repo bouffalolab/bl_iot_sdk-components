@@ -290,7 +290,7 @@ int timer_write(struct device *dev, uint32_t pos, const void *buffer, uint32_t s
         if (compare_count < 1) {
             return -1;
         }
-        TIMER_SetCompValue(timer_device->id, timeout_cfg->timeout_id, compare_count - 2);
+        TIMER_SetCompValue(timer_device->id, (TIMER_Comp_ID_Type)timeout_cfg->timeout_id, compare_count - 2);
     }
     TIMER_Enable(timer_device->id);
     return 0;

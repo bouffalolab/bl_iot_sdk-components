@@ -190,9 +190,17 @@
 */
 #ifndef CONFIG_BT_L2CAP_TX_MTU
 #ifdef CONFIG_BT_SMP
-#define CONFIG_BT_L2CAP_TX_MTU 247 //96 //65
+#if defined(CONFIG_BT_A2DP_SOURCE)
+#define CONFIG_BT_L2CAP_TX_MTU 680
 #else
-#define CONFIG_BT_L2CAP_TX_MTU 247 //23
+#define CONFIG_BT_L2CAP_TX_MTU 247 //96 //65
+#endif
+#else
+#if defined(CONFIG_BT_A2DP_SOURCE)
+#define CONFIG_BT_L2CAP_TX_MTU 680
+#else
+#define CONFIG_BT_L2CAP_TX_MTU 247 //96 //65
+#endif
 #endif
 #endif
 
@@ -246,6 +254,16 @@
 #define CONFIG_BT_SMP_SC_ONLY 1
 #endif
 
+#ifdef CONFIG_BT_FIXED_PASSKEY
+#undef CONFIG_BT_FIXED_PASSKEY
+#define CONFIG_BT_FIXED_PASSKEY 1
+#endif
+
+#ifdef CONFIG_BT_SMP_ENFORCE_MITM
+#undef CONFIG_BT_SMP_ENFORCE_MITM
+#define CONFIG_BT_SMP_ENFORCE_MITM 1
+#endif
+
 /**
 *  CONFIG_BT_USE_DEBUG_KEYS:This option places Security Manager in
 *  a Debug Mode. In this mode predefined
@@ -263,6 +281,8 @@
 #define CONFIG_BT_USE_DEBUG_KEYS 1
 #endif
 
+#endif //#ifdef CONFIG_BT_SMP
+
 /**
 *  CONFIG_BT_L2CAP_DYNAMIC_CHANNEL:enables support for LE Connection
 *  oriented Channels,allowing the creation of dynamic L2CAP Channels
@@ -270,8 +290,6 @@
 #ifdef CONFIG_BT_L2CAP_DYNAMIC_CHANNEL
 #undef CONFIG_BT_L2CAP_DYNAMIC_CHANNEL
 #define CONFIG_BT_L2CAP_DYNAMIC_CHANNEL 1
-#endif
-
 #endif
 
 /**
@@ -545,12 +563,10 @@
 // 37-6-2=31 bytes, where UUID of Local Name takes up 2 bytes
 #define CONFIG_BT_DEVICE_NAME_MAX 29
 
-#if defined(CONFIG_BT_GAP_PERIPHERAL_PREF_PARAMS)
 #define CONFIG_BT_PERIPHERAL_PREF_MIN_INT 0x0024
 #define CONFIG_BT_PERIPHERAL_PREF_MAX_INT 0x0028
 #define CONFIG_BT_PERIPHERAL_PREF_SLAVE_LATENCY 0
 #define CONFIG_BT_PERIPHERAL_PREF_TIMEOUT 500
-#endif
 
 #ifndef CONFIG_BT_PHY_UPDATE
 #define CONFIG_BT_PHY_UPDATE 1
@@ -598,15 +614,26 @@
 
 
 #if defined(CONFIG_AUTO_PTS)
+#ifdef BFLB_FIXED_IRK
+#undef BFLB_FIXED_IRK
 #define BFLB_FIXED_IRK 1
+#endif
 #define CONFIG_BT_L2CAP_DYNAMIC_CHANNEL
+#ifdef CONFIG_BT_DEVICE_NAME_GATT_WRITABLE
+#undef CONFIG_BT_DEVICE_NAME_GATT_WRITABLE
 #define CONFIG_BT_DEVICE_NAME_GATT_WRITABLE 1
+#endif 
 #define CONFIG_BT_GATT_SERVICE_CHANGED 1
 //#define CONFIG_BT_GATT_CACHING 1
 #define CONFIG_BT_SCAN_WITH_IDENTITY 1
 //#define CONFIG_BT_ADV_WITH_PUBLIC_ADDR 1
+#ifdef CONFIG_BT_ATT_PREPARE_COUNT
+#undef CONFIG_BT_ATT_PREPARE_COUNT
 #define CONFIG_BT_ATT_PREPARE_COUNT 64
+#endif
 #define CONFIG_BT_TESTING 1
+#define CONFIG_BT_GATT_READ_MULTIPLE 1
+#define CONFIG_BT_GAP_PERIPHERAL_PREF_PARAMS 1
 #endif
 #endif //BFLB_BLE
 
@@ -620,6 +647,8 @@ happens, which cause memory leak issue.*/
 #define BFLB_BLE_PATCH_FREE_ALLOCATED_BUFFER_IN_OS
 /*To avoid duplicated pubkey callback.*/
 #define BFLB_BLE_PATCH_AVOID_DUPLI_PUBKEY_CB
+/*Cancle att->timeout work if att_req is cancelled to avoid att timeout.*/
+#define BFLB_BLE_PATCH_CANCEL_ATT_TIMEOUT_TIMER_WHEN_ATT_REQ_CANCELLED
 /* Fix call bt_conn_disconnect->bt_hci_disconnect->bt_hci_cmd_send_sync, the current task yeild.
  * When disconnect done and conn->state change to BT_CONN_DISCONNECTED, current task retore.
  * Then bt_conn_set_state called with parameter BT_CONN_DISCONNECT. the conn->ref shall be error.
@@ -678,5 +707,9 @@ BT_SMP_DIST_ENC_KEY bit is not cleared while remote ENC_KEY is received.*/
 #define BFLB_BLE_PATCH_FORCE_UPDATE_GAP_DEVICE_NAME
 #define BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK
 #define BFLB_BLE_AUTO_CLEAN_KEY_WHEN_KEY_MISSING
-
+#define BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC
+#define BFLB_BLE_FREE_CONN_UPDATE_WORK_WHEN_DISCONNECT_IN_CONN_SCAN_STATE
+#if defined (CONFIG_BT_GAP_PERIPHERAL_PREF_PARAMS)
+#define BFLB_BLE_ENABLE_OR_DISABLE_SLAVE_PREF_CONN_PARAM_UDPATE
+#endif
 #endif /* BLE_CONFIG_H */

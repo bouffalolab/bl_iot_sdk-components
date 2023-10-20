@@ -435,6 +435,46 @@ void DMA_LLI_Update(uint8_t ch, uint32_t LLI)
 }
 
 /****************************************************************************/ /**
+ * @brief  DMA channel get LLI counter
+ *
+ * @param  dmaId: DMA ID type
+ * @param  ch: DMA channel number
+ *
+ * @return LLI counter
+ *
+*******************************************************************************/
+uint32_t DMA_LLI_Get_Counter(uint8_t ch)
+{
+    /* Get channel register */
+    uint32_t DMAChs = DMA_Get_Channel(ch);
+
+    /* Check the parameters */
+    CHECK_PARAM(IS_DMA_CHAN_TYPE(ch));
+
+    return BL_GET_REG_BITS_VAL(BL_RD_REG(DMAChs, DMA_CONFIG), DMA_LLICOUNTER);
+}
+
+/****************************************************************************/ /**
+ * @brief  DMA channel get dst address
+ *
+ * @param  dmaId: DMA ID type
+ * @param  ch: DMA channel number
+ *
+ * @return LLI counter
+ *
+*******************************************************************************/
+uint32_t DMA_LLI_Get_Dstaddr(uint8_t ch)
+{
+    /* Get channel register */
+    uint32_t DMAChs = DMA_Get_Channel(ch);
+
+    /* Check the parameters */
+    CHECK_PARAM(IS_DMA_CHAN_TYPE(ch));
+
+    return BL_RD_REG(DMAChs, DMA_DSTADDR);
+}
+
+/****************************************************************************/ /**
  * @brief  DMA LLI PingPong Structure Start
  *
  * @param  dmaPpStruct: dma pp struct pointer

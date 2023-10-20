@@ -1,31 +1,10 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
+/**
+ ****************************************************************************************
  *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
+ * @file bl_tx.c
+ * Copyright (C) Bouffalo Lab 2016-2018
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ ****************************************************************************************
  */
 
 #include <string.h>
@@ -486,6 +465,7 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
                 if (!txdesc_host)
                 {
                     bl_os_log_warn("[TX] no more txdesc, wait!\n\r");
+                    tx_cntrl_sta_trigger_pending |= BIT_STA(i);
                     break;
                 }
 
@@ -493,6 +473,7 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
                 txhdr = (struct bl_txhdr *)utils_list_pop_front(&sta->pending_list);
                 if (!txhdr)
                 {
+                    tx_cntrl_sta_trigger_pending |= BIT_STA(i);
                     break;
                 }
 
@@ -510,6 +491,7 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
                 if (!txdesc_host)
                 {
                     bl_os_log_warn("[TX] no more txdesc, wait!\n\r");
+                    tx_cntrl_sta_trigger_pending |= BIT_STA(i);
                     break;
                 }
 
@@ -519,6 +501,7 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
                 if (!txbuf)
                 {
                     bl_os_log_warn("[TX] no more txbuf, wait!\n\r");
+                    tx_cntrl_sta_trigger_pending |= BIT_STA(i);
                     break;
                 }
 #endif

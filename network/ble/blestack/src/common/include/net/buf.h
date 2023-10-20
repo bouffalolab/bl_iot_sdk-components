@@ -77,6 +77,10 @@ enum
     ACL_TX,
     FRAG,
     PREP,
+#if defined(CONFIG_AUTO_PTS)
+	SERVER,
+	DATA,
+#endif /* CONFIG_AUTO_PTS */
     
 };
 #endif

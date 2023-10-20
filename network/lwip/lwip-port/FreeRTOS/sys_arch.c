@@ -376,7 +376,19 @@ void sys_mutex_unlock(sys_mutex_t *mutex)
 {
 	xSemaphoreGive(*mutex);
 }
+
+/* Mutex is locked */
+int sys_mutex_is_locked(sys_mutex_t *mutex)
+{
+        return uxSemaphoreGetCount(*mutex) == 0;
+}
 #endif /*LWIP_COMPAT_MUTEX*/
+
+int sys_is_inside_interrupt()
+{
+        return xPortIsInsideInterrupt();
+}
+
 /*-----------------------------------------------------------------------------------*/
 // TODO
 /*-----------------------------------------------------------------------------------*/
@@ -386,6 +398,11 @@ void sys_mutex_unlock(sys_mutex_t *mutex)
   thread() function. The id of the new thread is returned. Both the id and
   the priority are system dependent.
 */
+xTaskHandle TcpipTask;
+int sys_current_is_tcpip()
+{
+        return TcpipTask == xTaskGetCurrentTaskHandle();
+}
 sys_thread_t sys_thread_new(const char *name, lwip_thread_fn thread , void *arg, int stacksize, int prio)
 {
 xTaskHandle CreatedTask;
@@ -401,6 +418,7 @@ int result;
 
 	   if(result == pdPASS)
 	   {
+		   TcpipTask = CreatedTask;
 		   return CreatedTask;
 	   }
 	   else

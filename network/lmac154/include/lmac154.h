@@ -1062,6 +1062,16 @@ void lmac154_setBE(uint8_t max_be, uint8_t min_be);
 void lmac154_setMaxCsmaBackoff(uint8_t maxBackoff);
 
 /****************************************************************************//**
+ * @brief  Set tx-rx transition time
+ *
+ * @param  time: us
+ *
+ * @return None
+ *
+*******************************************************************************/
+void lmac154_setTxRxTransTime(uint8_t timeInUs);
+
+/****************************************************************************//**
  * @brief  Get event timestamps
  *
  * @param  type: event timestamp type

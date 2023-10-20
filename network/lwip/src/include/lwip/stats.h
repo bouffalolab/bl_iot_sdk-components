@@ -237,6 +237,10 @@ struct stats_ip_napt {
   STAT_COUNTER nr_active_udp;
   STAT_COUNTER nr_active_icmp;
   STAT_COUNTER nr_forced_evictions;
+#if BL_IP_FORWARD
+  STAT_COUNTER mem_alloc_err;
+  STAT_COUNTER output_err;
+#endif
 };
 #endif /* IP_NAPT */
 

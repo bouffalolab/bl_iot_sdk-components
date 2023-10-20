@@ -114,6 +114,7 @@ static ssize_t write_name(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 {
 	char value[CONFIG_BT_DEVICE_NAME_MAX + 1] = {};
 
+	#if (CONFIG_BT_ATT_PREPARE_COUNT == 0)
 	if (offset) {
 		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
 	}
@@ -123,6 +124,17 @@ static ssize_t write_name(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 	}
 
 	memcpy(value, buf, len);
+	#else
+	if (offset >= CONFIG_BT_DEVICE_NAME_MAX) {
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+	}
+
+	if (len + offset > CONFIG_BT_DEVICE_NAME_MAX) {
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+	}
+
+	memcpy(value + offset, buf, len);
+	#endif /* CONFIG_BT_ATT_PREPARE_COUNT == 0 */
 
 	bt_set_name(value);
 
@@ -222,7 +234,7 @@ BT_GATT_SERVICE_DEFINE(_2_gap_svc,
 	BT_GATT_CHARACTERISTIC(BT_UUID_GAP_DEVICE_NAME,
 			       BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
 #if defined(CONFIG_AUTO_PTS)
-			       BT_GATT_PERM_WRITE_ENCRYPT |
+			       //BT_GATT_PERM_WRITE_ENCRYPT |
 #endif /* CONFIG_AUTO_PTS */
 			       BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
 			       read_name, write_name, bt_dev.name),
@@ -2552,10 +2564,10 @@ discover:
 	}
 
 done:
-	params->func(conn, NULL, params);
 #if defined(BFLB_BLE_DISCOVER_ONGOING)
 	discover_ongoing = BT_GATT_ITER_STOP;
 #endif
+	params->func(conn, NULL, params);
 }
 
 static void gatt_find_type_rsp(struct bt_conn *conn, u8_t err,
@@ -2572,9 +2584,7 @@ static void gatt_find_type_rsp(struct bt_conn *conn, u8_t err,
 	BT_DBG("err 0x%02x", err);
 
 	#if defined(BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK)
-	if(params){
-		params->err = err;
-	}
+	params->err = err;
 	#endif /* BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK */
 
 	if (err) {
@@ -2622,10 +2632,10 @@ static void gatt_find_type_rsp(struct bt_conn *conn, u8_t err,
 
 	return;
 done:
-	params->func(conn, NULL, params);
 #if defined(BFLB_BLE_DISCOVER_ONGOING)
 	discover_ongoing = BT_GATT_ITER_STOP;
 #endif
+	params->func(conn, NULL, params);
 }
 
 static int gatt_find_type(struct bt_conn *conn,
@@ -2925,9 +2935,7 @@ static void gatt_read_type_rsp(struct bt_conn *conn, u8_t err,
 	u16_t handle;
 
 	#if defined(BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK)
-	if(params){
-		params->err = err;
-	}
+	params->err = err;
 	#endif /* BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK */
 
 	BT_DBG("err 0x%02x", err);
@@ -3075,9 +3083,7 @@ static void gatt_read_group_rsp(struct bt_conn *conn, u8_t err,
 	u16_t handle;
 
 	#if defined(BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK)
-	if(params){
-		params->err = err;
-	}
+	params->err = err;
 	#endif /* BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK */
 
 	BT_DBG("err 0x%02x", err);
@@ -3152,9 +3158,7 @@ static void gatt_find_info_rsp(struct bt_conn *conn, u8_t err,
 	BT_DBG("err 0x%02x", err);
 
 	#if defined(BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK)
-	if(params){
-		params->err = err;
-	}
+	params->err = err;
 	#endif /* BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK */
 
 	if (err) {
@@ -3248,10 +3252,10 @@ static void gatt_find_info_rsp(struct bt_conn *conn, u8_t err,
 	return;
 
 done:
-	params->func(conn, NULL, params);
 #if defined(BFLB_BLE_DISCOVER_ONGOING)
 	discover_ongoing = BT_GATT_ITER_STOP;
 #endif
+	params->func(conn, NULL, params);
 }
 
 static int gatt_find_info(struct bt_conn *conn,
@@ -3646,6 +3650,27 @@ static int gatt_exec_write(struct bt_conn *conn,
 	return gatt_send(conn, buf, gatt_write_rsp, params, NULL);
 }
 
+#ifdef BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC
+static int gatt_cancel_all_writes(struct bt_conn *conn,
+			   struct bt_gatt_write_params *params)
+{
+	struct net_buf *buf;
+	struct bt_att_exec_write_req *req;
+
+	buf = bt_att_create_pdu(conn, BT_ATT_OP_EXEC_WRITE_REQ, sizeof(*req));
+	if (!buf) {
+		return -ENOMEM;
+	}
+
+	req = net_buf_add(buf, sizeof(*req));
+	req->flags = BT_ATT_FLAG_CANCEL;
+
+	BT_DBG("");
+
+	return gatt_send(conn, buf, gatt_write_rsp, params, NULL);
+}
+#endif /* BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC */
+
 static void gatt_prepare_write_rsp(struct bt_conn *conn, u8_t err,
 				   const void *pdu, u16_t length,
 				   void *user_data)
@@ -3660,6 +3685,35 @@ static void gatt_prepare_write_rsp(struct bt_conn *conn, u8_t err,
 		params->func(conn, err, params);
 		return;
 	}
+
+#if defined(BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC)
+	const struct bt_att_prepare_write_rsp *rsp = pdu;
+
+	size_t len = length - sizeof(*rsp);
+	if (len > params->length) {
+		BT_ERR("Incorrect length, canceling write");
+		if (gatt_cancel_all_writes(conn, params)) {
+			goto fail;
+		}
+
+		return;
+	}
+
+	bool data_valid = memcmp(params->data, rsp->value, len) == 0;
+	if (params->offset != rsp->offset || !data_valid) {
+		BT_ERR("Incorrect offset or data in response, canceling write");
+		if (gatt_cancel_all_writes(conn, params)) {
+			goto fail;
+		}
+
+		return;
+	}
+
+	/* Update params */
+	params->offset += len;
+	params->data = (const uint8_t *)params->data + len;
+	params->length -= len;
+#endif /* BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC */
 	/* If there is no more data execute */
 	if (!params->length) {
 		gatt_exec_write(conn, params);
@@ -3667,8 +3721,16 @@ static void gatt_prepare_write_rsp(struct bt_conn *conn, u8_t err,
 	}
 
 	/* Write next chunk */
-	bt_gatt_write(conn, params);
-		
+	if (!bt_gatt_write(conn, params)) {
+		/* Success */
+		return;
+	}
+
+#if defined(BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC)
+fail:
+	/* Notify application that the write operation has failed */
+	params->func(conn, BT_ATT_ERR_UNLIKELY, params);
+#endif /* BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC */
 }
 
 static int gatt_prepare_write(struct bt_conn *conn,
@@ -3692,11 +3754,12 @@ static int gatt_prepare_write(struct bt_conn *conn,
 	req->offset = sys_cpu_to_le16(params->offset);
 	memcpy(req->value, params->data, len);
 	net_buf_add(buf, len);
-
+#if !defined(BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC)
 	/* Update params */
 	params->offset += len;
 	params->data = (const u8_t *)params->data + len;
 	params->length -= len;
+#endif /* BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC */
 
 	BT_DBG("handle 0x%04x offset %u len %u", params->handle, params->offset,
 	       params->length);

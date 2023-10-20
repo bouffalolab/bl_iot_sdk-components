@@ -1,31 +1,14 @@
 /*
- * Copyright (c) 2016-2023 Bouffalolab.
+ *  Description: Highly optimised PSK calculation
  *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
+ *  Copyright (C) Bouffalo Lab 2016-2022
+ *  SPDX-License-Identifier: Apache-2.0
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
+ *  Author:      Chien Wong(qwang@bouffalolab.com)
+ *  Start Date:  Oct 28, 2022
+ *  Last Update: Oct 31, 2022
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *  This is not a generic implementation of PBKDF2-SHA1, but only for PSK.
  */
 
 #include <bl_sec.h>
@@ -140,10 +123,12 @@ static inline int sha1_(void *sha_buf, void *output)
     return 0;
 }
 
+#define SHA_INPUT_BUF_USED_LEN (256 + SHA1_LEN)
+
 static void F_(const char *password, const void *ssid, size_t ssid_len, size_t block_idx, void *output)
 {
     size_t password_len = strlen(password);
-    uint32_t sha_input_buf[(256 + SHA1_LEN) / 4];
+    uint32_t sha_input_buf[(SHA_INPUT_BUF_USED_LEN + 28 * 2) / 4];
     const size_t iterations = 4096;
     void *sha_buf = sha_input_buf;
     void *p;
@@ -153,13 +138,13 @@ static void F_(const char *password, const void *ssid, size_t ssid_len, size_t b
 #ifdef BL616
     if (bl_sec_is_cache_addr(sha_input_buf)) {
         L1C_DCache_Clean_Invalid_By_Addr((uintptr_t)sha_input_buf, sizeof(sha_input_buf));
-        sha_buf = bl_sec_get_no_cache_addr(sha_input_buf);
+        sha_buf = (uint8_t *)bl_sec_get_no_cache_addr(sha_input_buf) + 28;
     }
 #endif
     void *sha_buf2 = sha_buf + 128;
     void *sha_out = sha_buf + 256;
 
-    memset(sha_buf, 0, sizeof(sha_input_buf));
+    memset(sha_buf, 0, SHA_INPUT_BUF_USED_LEN);
     memcpy(sha_buf, password, password_len);
     memcpy(sha_buf2, password, password_len);
     pw = (uint32_t *)sha_buf;
@@ -203,7 +188,7 @@ static void F_(const char *password, const void *ssid, size_t ssid_len, size_t b
     }
 
     sha_hw_deinit();
-    memset(sha_buf, 0, sizeof(sha_input_buf));
+    memset(sha_buf, 0, SHA_INPUT_BUF_USED_LEN);
 }
 
 int bl_sec_psk(const char *password, const void *ssid, size_t ssid_len, void *output)

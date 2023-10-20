@@ -171,6 +171,7 @@ void ADC_Init(ADC_CFG_Type *cfg)
     uint32_t regCfg1;
     uint32_t regCfg2;
     uint32_t regCalib;
+    uint32_t regCmd;
 
     CHECK_PARAM(IS_ADC_V18_SEL_TYPE(cfg->v18Sel));
     CHECK_PARAM(IS_ADC_V11_SEL_TYPE(cfg->v11Sel));
@@ -221,6 +222,15 @@ void ADC_Init(ADC_CFG_Type *cfg)
     regCfg2 = BL_SET_REG_BITS_VAL(regCfg2, AON_GPADC_DIFF_MODE, cfg->inputMode);
 
     BL_WR_REG(AON_BASE, AON_GPADC_REG_CONFIG2, regCfg2);
+
+    regCmd = BL_RD_REG(AON_BASE, AON_GPADC_REG_CMD);
+    regCmd = BL_SET_REG_BIT(regCmd, AON_GPADC_MIC2_DIFF);
+    if (cfg->inputMode == ADC_INPUT_SINGLE_END) {
+        regCmd = BL_SET_REG_BIT(regCmd, AON_GPADC_NEG_GND);
+    } else {
+        regCmd = BL_CLR_REG_BIT(regCmd, AON_GPADC_NEG_GND);
+    }
+    BL_WR_REG(AON_BASE, AON_GPADC_REG_CMD, regCmd);
 
     /* calibration offset */
     regCalib = BL_RD_REG(AON_BASE, AON_GPADC_REG_DEFINE);
@@ -1146,8 +1156,10 @@ void ADC_Tsen_Init(ADC_TSEN_MOD_Type tsenMod)
     tmpVal = BL_SET_REG_BIT(tmpVal, AON_GPADC_TS_EN);
     /*select tsen ext or inner*/
     tmpVal = BL_SET_REG_BITS_VAL(tmpVal, AON_GPADC_TSEXT_SEL, tsenMod);
+    /*chopper mode = 1*/
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, AON_GPADC_CHOP_MODE, 1);
 
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, AON_GPADC_PGA_VCM, 2);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, AON_GPADC_PGA_VCM, 1);
     /*pga vcmi enable*/
     tmpVal = BL_CLR_REG_BIT(tmpVal, AON_GPADC_PGA_VCMI_EN);
     /*0:512uS;1:16mS;2:32mS;3:64mS*/

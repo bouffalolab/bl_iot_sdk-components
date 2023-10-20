@@ -1,31 +1,10 @@
-/*
- * Copyright (c) 2016-2023 Bouffalolab.
+/**
+ ****************************************************************************************
  *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
+ * @file wifi_mgmr.c
+ * Copyright (C) Bouffalo Lab 2016-2018
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ ****************************************************************************************
  */
 
 #include <stdint.h>
@@ -42,6 +21,7 @@
 #include <aos/yloop.h>
 #include <bl60x_fw_api.h>
 #include <dns_server.h>
+#include <dhcp_server.h>
 #include "bl_main.h"
 #include "wifi_mgmr.h"
 #include "wifi_mgmr_profile.h"
@@ -590,8 +570,7 @@ static bool stateGlobalGuard_AP(void *ev, struct event *event )
     ap = (wifi_mgmr_ap_msg_t*)msg->data;
 
     if (ap->use_dhcp_server) {
-        void dhcpd_start(struct netif *netif);
-        netifapi_netif_common(&(wifiMgmr.wlan_ap.netif), dhcpd_start, NULL);
+        dhcpd_start(&(wifiMgmr.wlan_ap.netif), -1, -1);
     }
 
     if (ap->max_sta_supported >= 0) {
@@ -635,8 +614,8 @@ static bool stateGlobalGuard_stop(void *ev, struct event *event )
     // netifapi_netif_set_addr(&(wifiMgmr.wlan_ap.netif), NULL, NULL, NULL);
 err_t dhcp_server_stop(struct netif *netif);
     netifapi_netif_common(&(wifiMgmr.wlan_ap.netif), NULL, dhcp_server_stop);
-    bl_os_printf(DEBUG_HEADER "Removing ETH interface ...\r\n");
-    netifapi_netif_remove(&(wifiMgmr.wlan_ap.netif));
+    // bl_os_printf(DEBUG_HEADER "Removing ETH interface ...\r\n");
+    // netifapi_netif_remove(&(wifiMgmr.wlan_ap.netif));
     wifiMgmr.inf_ap_enabled = 0;
     aos_post_event(EV_WIFI, CODE_WIFI_ON_AP_STOPPED, 0);
 
@@ -788,6 +767,12 @@ static void stateGlobalAction_connect( void *oldStateData, struct event *event,
 
 static void stateExit( void *stateData, struct event *event )
 {
+    if (_pending_task_is_set(WIFI_MGMR_PENDING_TASK_SCAN_BIT)) {
+        bl_os_printf(DEBUG_HEADER "Pending Scan Sent\r\n");
+        bl_main_scan(&wifiMgmr.wlan_sta.netif, NULL, 0, (struct mac_addr *)&mac_addr_bcst, NULL, 0, 0);
+        _pending_task_clr_safely(WIFI_MGMR_PENDING_TASK_SCAN_BIT);
+    }
+
    bl_os_printf(DEBUG_HEADER "Exiting %s state\r\n", (char *)stateData);
 }
 
@@ -1116,7 +1101,7 @@ static void stateConnectedIPNoEnter(void *stateData, struct event *event )
     bl_os_printf("Entering %s state, up time is %.1fs, cost time is %.1fs\r\n", (char *)stateData, now/1000.0, (now - wifiMgmr.connect_time)/1000.0);
 #endif
 
-#ifndef CFG_NETBUS_WIFI_ENABLE
+#if (!CFG_NETBUS_WIFI_ENABLE)
     /* timeout 15 seconds for ip obtaining */
     if (use_dhcp) {
         stateConnectedIPNo_data->timer = bl_os_timer_create(ip_obtaining_timeout, stateConnectedIPNo_data);
@@ -1439,6 +1424,7 @@ static void stateDisconnect_enter(void *stateData, struct event *event)
         stateDisconnect_data->timer_started = 1;
     } else {
         bl_os_printf(DEBUG_HEADER "Will NOT retry connect\r\n");
+        wifi_mgmr_api_common_msg(WIFI_MGMR_EVENT_APP_IDLE, (void*)0x1, (void*)0x2);
     }
     aos_post_event(EV_WIFI, CODE_WIFI_ON_DISCONNECT, wifiMgmr.wifi_mgmr_stat_info.status_code);
 
@@ -1773,7 +1759,11 @@ void wifi_mgmr_set_connect_stat_info(struct wifi_event_sm_connect_ind *ind, uint
 
 int wifi_mgmr_set_country_code_internal(char *country_code)
 {
-    bl_main_set_country_code(country_code);
+    int ret;
+    ret = bl_main_set_country_code(country_code);
+    if (ret != 0) {
+        return ret;
+    }
     strncpy(wifiMgmr.country_code, country_code, sizeof(wifiMgmr.country_code));
     wifiMgmr.country_code[2] = '\0';
     wifiMgmr.channel_nums = bl_main_get_channel_nums();
@@ -1784,8 +1774,7 @@ int wifi_mgmr_set_country_code_internal(char *country_code)
 
 int wifi_mgmr_ap_sta_cnt_get_internal(uint8_t *sta_cnt)
 {
-    bl_main_apm_sta_cnt_get(sta_cnt);
-    return 0;
+    return bl_main_apm_sta_cnt_get(sta_cnt);
 }
 
 int wifi_mgmr_ap_sta_info_get_internal(wifi_mgmr_sta_basic_info_t *sta_info_internal, uint8_t idx)
@@ -1805,14 +1794,12 @@ int wifi_mgmr_ap_sta_info_get_internal(wifi_mgmr_sta_basic_info_t *sta_info_inte
 
 int wifi_mgmr_ap_sta_delete_internal(uint8_t sta_idx)
 {
-    bl_main_apm_sta_delete(sta_idx);
-    return 0;
+    return bl_main_apm_sta_delete(sta_idx);
 }
 
 int wifi_mgmr_scan_complete_notify()
 {
-    wifi_mgmr_scan_complete_callback();
-    return 0;
+    return wifi_mgmr_scan_complete_callback();
 }
 
 int wifi_mgmr_api_fw_powersaving_get(void)

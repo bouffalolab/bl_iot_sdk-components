@@ -58,6 +58,9 @@ void btble_controller_reset(void);
 char *btble_controller_get_lib_ver(void);
 
 void btble_controller_remaining_mem(uint8_t** addr, int* size);
+
+void btble_controller_set_cs2(uint8_t enable);    // cs2 is enabled by default
+
 #if defined(BL702L)
 void btble_controller_sleep_init(void);
 typedef int (*btble_before_sleep_cb_t)(void);
