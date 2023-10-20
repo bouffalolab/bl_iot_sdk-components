@@ -116,7 +116,7 @@ static inline void backtrace_stack_app(int (*print_func)(const char *fmt, ...), 
       return;
     }
 
-    if (pc > VALID_FP_START_XIP) {
+    if (pc > (uintptr_t *)VALID_FP_START_XIP) {
       /* there is a function that does not saved ra,
       * skip!
       * this value is the next fp
