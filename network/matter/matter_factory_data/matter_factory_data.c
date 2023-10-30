@@ -171,7 +171,7 @@ static bool mfd_parseData(void)
  *  */
 
     uint32_t cipher_size = 0, plaintext_size = 0;
-    uint32_t crc_value;
+    uint32_t crc_value, mfd_crc;
 #ifdef BL616
     uint32_t xipaddr_base = bflb_sf_ctrl_get_flash_image_offset(0, SF_CTRL_FLASH_BANK0);
 #else
@@ -198,7 +198,8 @@ static bool mfd_parseData(void)
         return false;;
     }
     crc_value = BFLB_Soft_CRC32((uint8_t *)((xipaddr_base + 4 + cipher_size + 4) + 4), plaintext_size);
-    if (crc_value != *(uint32_t *)((xipaddr_base + 4 + cipher_size + 4) + 4 + plaintext_size)) {
+    memcpy(&mfd_crc, (uint8_t *) (xipaddr_base + 4 + cipher_size + 4 + 4 + plaintext_size), sizeof(uint32_t));
+    if (crc_value != mfd_crc) {
         return false;;
     }
 
