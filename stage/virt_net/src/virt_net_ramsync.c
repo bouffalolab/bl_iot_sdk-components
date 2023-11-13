@@ -407,6 +407,18 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
     } while (0);
     break;
     }
+  case VIRT_NET_CTRL_GET_DEV_VERSION_IND:
+    {
+      uint8_t *version = (uint8_t *)sem_context[pkg_cmd->msg_id];
+      assert(version != NULL);
+
+      sem = release_semaphore_slot(pkg_cmd->msg_id);
+      if (sem) {
+        memcpy(version, pkg_cmd->payload, 4);
+        xSemaphoreGive(sem);
+      }
+    }
+    break;
   default:
     printf("unknow response: %d\r\n", pkg_cmd->cmd);
     break;
@@ -704,6 +716,52 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
 
       pkg_cmd->cmd = VIRT_NET_CTRL_HBN;
       pkg_cmd->msg_id = -1;
+    }
+    break;
+  case VIRT_NET_CTRL_GET_DEV_VERSION:
+    {
+      uint8_t *tmp;
+      SemaphoreHandle_t sem;
+      StaticSemaphore_t sem_buff;
+      int msg_id;
+
+      sem = xSemaphoreCreateBinaryStatic(&sem_buff);
+      assert(sem != NULL);
+
+      msg_id = acquire_semaphore_slot(sem);
+      if (msg_id < 0) {
+        printf("Bug? too many pending commands, try to enlarge sem_slot\r\n");
+        return -1;
+      }
+      pkg_header->type = PKG_CMD_FRAME;
+      pkg_header->length = sizeof(struct pkg_protocol_cmd);
+
+      pkg_cmd->cmd = VIRT_NET_CTRL_GET_DEV_VERSION;
+      pkg_cmd->msg_id = msg_id;
+
+      va_start(args, cmd);
+
+      tmp = va_arg(args, uint8_t *);
+
+      sem_context[msg_id] = (void *)tmp;
+
+      va_end(args);
+
+      blog_info("get slave version..\r\n");
+
+      uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
+                              pkg_header->length + 4, URAMSYNC_FOREVER);
+      blog_info("GET_DEV_VERSION pkg_header->len:%d type:0x%x\r\n\r\n", pkg_header->length, pkg_header->type);
+
+        /* waiting response */
+      if (xSemaphoreTake(sem, 3000) != pdTRUE) {
+        release_semaphore_slot(msg_id);
+        printf("get slave version failed!!!!\r\n");
+        return -1;
+      }
+
+      release_semaphore_slot(msg_id);
+      return 0;
     }
     break;
   default:

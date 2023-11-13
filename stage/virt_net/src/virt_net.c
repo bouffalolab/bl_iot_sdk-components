@@ -63,3 +63,11 @@ int virt_net_enter_hbn(virt_net_t obj) {
 
   return obj->ctrl(obj, VIRT_NET_CTRL_HBN);
 }
+
+int virt_net_slave_version(virt_net_t obj, uint32_t * version)
+{
+    assert(obj != NULL);
+    assert(version != NULL);
+
+    return obj->ctrl(obj, VIRT_NET_CTRL_GET_DEV_VERSION, (uint8_t*)version);
+}
