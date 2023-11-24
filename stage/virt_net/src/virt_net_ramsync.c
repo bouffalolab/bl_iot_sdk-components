@@ -559,11 +559,13 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
       /* Copy ssid */
       tmp = va_arg(args, uint8_t *);
       memset(connect_ap_cmd->ssid, 0, sizeof(connect_ap_cmd->ssid));
+      memset(connect_ap_cmd->ssid_tail, 0, sizeof(connect_ap_cmd->ssid_tail));
       strncpy((char *)connect_ap_cmd->ssid, (const char *)tmp, connect_ap_cmd->ssid_len);
 
       /* Copy passphr */
       tmp = va_arg(args, uint8_t *);
       memset(connect_ap_cmd->passphr, 0, sizeof(connect_ap_cmd->passphr));
+      memset(connect_ap_cmd->psk_tail, 0, sizeof(connect_ap_cmd->psk_tail));
       strncpy((char *)connect_ap_cmd->passphr, (const char *)tmp, passphr_len);
 
       va_end(args);
