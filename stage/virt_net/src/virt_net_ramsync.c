@@ -44,10 +44,14 @@ struct virt_net_custom_pbuf {
 #define VIRT_NET_RXBUFF_OFFSET (sizeof(struct virt_net_custom_pbuf))
 
 /* 头部的假数据，绕过DMA/SPI FIFO缓存 */
+#ifndef CFG_VIRT_NET_RXBUFF_CNT
 #if defined(CFG_USE_PSRAM)
 #define VIRT_NET_RXBUFF_CNT (16)
 #else
 #define VIRT_NET_RXBUFF_CNT (4)
+#endif
+#else
+#define VIRT_NET_RXBUFF_CNT CFG_VIRT_NET_RXBUFF_CNT
 #endif
 #define VIRT_NET_BUFF_SIZE (TP_PAYLOAD_LEN + VIRT_NET_RXBUFF_OFFSET) /* + sizeof(pbuf header) */
 #define VIRT_NET_MAX_PENDING_CMD (32)
@@ -842,7 +846,7 @@ virt_net_t virt_net_create(void *ctx)
 
   /* Init rx ind */
   assert(VIRT_NET_RXBUFF_CNT <= _BITSET_BITS);
-  sobj->rx_buf_ind.__bits[0] = (1 << VIRT_NET_RXBUFF_CNT) - 1;
+  sobj->rx_buf_ind.__bits[0] = ((uint64_t)1 << VIRT_NET_RXBUFF_CNT) - 1;
 
   sobj->rx_buf_ind_mutex = xSemaphoreCreateMutex();
   if (sobj->rx_buf_ind_mutex == NULL) {
