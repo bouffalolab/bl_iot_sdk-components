@@ -261,6 +261,9 @@ static void __timer_callback(TimerHandle_t handle)
     struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)pvTimerGetTimerID(handle);
 
     printf("Dhcp timeout, Ip Got Failed.\r\n");
+
+    event_propagate(sobj, VIRT_NET_EV_ON_DHCP_TIMEOUT, NULL);
+
     if (sobj->vnet.ctrl) {
         sobj->vnet.ctrl(&sobj->vnet, VIRT_NET_CTRL_DISCONNECT_AP);
     }

@@ -40,6 +40,8 @@ enum virt_net_event_code {
   VIRT_NET_EV_ON_AP_STA_DEL,
   VIRT_NET_EV_ON_EMERGENCY_MAC,
   VIRT_NET_EV_ON_LINK_STATUS_DONE,
+
+  VIRT_NET_EV_ON_DHCP_TIMEOUT = 0x80,
 };
 
 /* Init virt net */
