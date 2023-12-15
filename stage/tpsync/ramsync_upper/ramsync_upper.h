@@ -13,9 +13,9 @@
 /* ramsync_upper config macro */
 #define TP_ST_MAGIC              (0x11223344)
 #define TP_TXPAYLOAD_NUM         (2)
-#define TP_TXDESC_NUM            (2)
+#define TP_TXDESC_NUM            (16)
 #define TP_RXPAYLOAD_NUM         (2)
-#define TP_RXDESC_NUM            (2)
+#define TP_RXDESC_NUM            (16)
 #define TP_PAYLOAD_LEN           (1024 + 512)// 512
 
 #define RAMSYNC_TX_STACK_SIZE    (1024)// Bytes

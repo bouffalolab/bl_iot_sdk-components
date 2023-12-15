@@ -71,6 +71,7 @@ int desc_push_tofront(desc_msg_t *q, void *buf, uint32_t len, uint32_t timeout_m
     res = xQueueSendToFront(q->hdl, &msg, (DESC_FOREVER == timeout_ms) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms));// fixme return
     if (pdTRUE != res) {
         //tpdbg_log("xQueueSendToFront res = %d\r\n", res);
+        free(msg.buf);
         return -3;
     }
 
@@ -98,6 +99,7 @@ int desc_push_toback(desc_msg_t *q, void *buf, uint32_t len, uint32_t timeout_ms
     res = xQueueSendToBack(q->hdl, &msg, (DESC_FOREVER == timeout_ms) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms));// fixme return
     if (pdTRUE != res) {
         //tpdbg_log("xQueueSendToBack res = %d\r\n", res);
+        free(msg.buf);
         return -3;
     }
 
