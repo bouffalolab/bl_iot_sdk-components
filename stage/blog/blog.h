@@ -39,6 +39,7 @@ const static uint32_t BLOG_HARD_DECLARE_DISABLE __attribute__((used)) = 0;
 DECLARE_C_LEVEL(__COMPONENT_NAME_DEQUOTED__);
 DECLARE_C_INFO(__COMPONENT_NAME_DEQUOTED__);
 
+#ifndef CFG_BLOG_IGNORE_FILE_NAME
 /* file level */
 #define _REFF_LEVEL(name)            _fsymf_level_##name
 #define REFF_LEVEL(name)             _REFF_LEVEL(name)
@@ -50,8 +51,12 @@ DECLARE_C_INFO(__COMPONENT_NAME_DEQUOTED__);
 #define _DEFF_INFO(name, named)      const blog_info_t REFF_INFO(name) ATTR_BLOG_CODE2(name) = {\
                                         (blog_level_t *)(&REFF_LEVEL(name)), (char *)(#named)}
 #define DECLARE_F_INFO(name, named) _DEFF_INFO(name, named)
+
 DECLARE_F_LEVEL(__COMPONENT_FILE_NAME_DEQUOTED__);
 DECLARE_F_INFO(__COMPONENT_FILE_NAME_DEQUOTED__, __COMPONENT_FILE_NAMED__);
+#else
+#define REFF_LEVEL(name)            _REFC_LEVEL(name)
+#endif
 
 /* pri level */
 #define _REFP_LEVEL(name)            _fsymp_level_##name
@@ -236,4 +241,3 @@ void blog_hexdump_out(const char *name, uint8_t width, uint8_t *buf, uint16_t si
 #endif
 
 #endif
-
