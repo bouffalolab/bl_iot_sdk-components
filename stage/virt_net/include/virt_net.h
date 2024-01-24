@@ -42,6 +42,7 @@ enum virt_net_event_code {
   VIRT_NET_EV_ON_LINK_STATUS_DONE,
 
   VIRT_NET_EV_ON_DHCP_TIMEOUT = 0x80,
+  VIRT_NET_EV_ON_RAMSYNC_TIMEOUT = 0x81,
 };
 
 /* Init virt net */
@@ -127,6 +128,7 @@ int virt_net_scan(virt_net_t obj);
 int virt_net_get_link_status(virt_net_t obj);
 int virt_net_enter_hbn(virt_net_t obj);
 int virt_net_slave_version(virt_net_t obj, uint32_t * version);
+int virt_net_reset_slave();
 
 #ifdef __cplusplus
 }

@@ -38,6 +38,10 @@
 #define URAMSYNC_MASTER_DEV_TYPE (1)
 #define URAMSYNC_SLAVE_DEV_TYPE  (2)
 
+enum {
+    URAMSYNC_EVENT_RESET_TIMEOUT,
+};
+
 /* Structure for tp_uramsync_t */
 typedef struct __tp_payload {
     uint32_t magic;
@@ -185,5 +189,8 @@ int uramsync_tx_push_toback(tp_uramsync_t *uramsync, void *buf, uint32_t len, ui
  *
  */
 int uramsync_tx_push_tofront(tp_uramsync_t *uramsync, void *buf, uint32_t len, uint32_t timeout_ms);
+
+typedef void (*uramsync_event_callback_t)(uint8_t eventId, uint8_t* args);
+int uramsync_register_event_callback(uramsync_event_callback_t cb);
 
 #endif
