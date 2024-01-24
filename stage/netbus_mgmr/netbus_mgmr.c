@@ -124,7 +124,13 @@ static void netbuswifi_cmd_mgmr_task(void *pvParameters)
     }
 }
 
-#define MAX_TX_PBUF_CNT (10 + 2)
+#ifndef NETBUS_TX_PBUF_CNT
+#define NETBUS_TX_PBUF_CNT 16
+#endif
+
+#ifndef NETBUS_TX_PBUF_SIZE
+#define NETBUS_TX_PBUF_SIZE 1514
+#endif
 
 static void init_tx_desc(netbus_wifi_mgmr_ctx_t *env)
 {
@@ -135,17 +141,18 @@ static void init_tx_desc(netbus_wifi_mgmr_ctx_t *env)
 
     memset(desc, 0, sizeof(*desc));
     for (i = 0; i < TX_PBUF_DESC_PBUF_MAX_NUM; ++i) {
-        p = pbuf_alloc(PBUF_RAW_TX, 1514, PBUF_RAM);
+        p = pbuf_alloc(PBUF_RAW_TX, NETBUS_TX_PBUF_SIZE, PBUF_RAM);
         if (p) {
             blog_info("preallocated pbuf %p, p->next %p\r\n", p, p->next);
             desc->pbufs[i] = p;
             // backup
             memcpy(&desc->pbufs_back[i], p, sizeof(*p));
             alloced_num++;
-            if (alloced_num >= MAX_TX_PBUF_CNT) {
+            if (alloced_num >= NETBUS_TX_PBUF_CNT) {
                 break;
             }
         } else {
+            blog_info("pbuf alloc failed\r\n");
             break;
         }
     }
