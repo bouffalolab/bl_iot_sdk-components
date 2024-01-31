@@ -426,6 +426,16 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
       }
     }
     break;
+  case VIRT_NET_CTRL_SLAVE_READY_IND:
+    {
+        event_propagate(sobj, VIRT_NET_EV_ON_SLAVE_READY, NULL);
+    }
+    break;
+  case VIRT_NET_CTRL_SLAVE_HEARTBEAT:
+    {
+        event_propagate(sobj, VIRT_NET_EV_ON_SLAVE_HEARTBEAT, NULL);
+    }
+    break;
   default:
     printf("unknow response: %d\r\n", pkg_cmd->cmd);
     break;
