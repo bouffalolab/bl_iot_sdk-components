@@ -142,11 +142,6 @@ static void __uramsync_reset_logic(tp_uramsync_t *uramsync)
     memset(uramsync->p_rx_cache, 0, sizeof(tp_payload_t));
 }
 
-#define URAMSYNC_RESET_TIMEOUT_IN_MS 1000
-#define URAMSYNC_RESET_THRESHOLD 5
-static volatile uint8_t ramsyncResetCnt = 0;
-static uramsync_event_callback_t ramsyncEventCb = NULL;
-
 static void ramsynck_reset_entry(void *arg)
 {
     tp_uramsync_t *uramsync = (tp_uramsync_t *)arg;
@@ -166,23 +161,13 @@ static void ramsynck_reset_entry(void *arg)
 
         if (URAMSYNC_MASTER_DEV_TYPE == uramsync->devtype) {
             tpdbg_log("[%s][tp_reset_task] 3. reset hw\r\n", uramsync->name);
-            ramsyncResetCnt = 0;
+
             while (1) {
                 lramsync_reset(&uramsync->hw);
-                vTaskDelay(pdMS_TO_TICKS(URAMSYNC_RESET_TIMEOUT_IN_MS));// wait for one slot sync complete
+                vTaskDelay(pdMS_TO_TICKS(1000));// wait for one slot sync complete
                 #if (TP_TXPAYLOAD_NUM > 1)
                 if (TP_ST_MAGIC == uramsync->p_rx->payload[0].magic) {
-                    ramsyncResetCnt = 0;
                     break;
-                }
-                if (++ramsyncResetCnt >= URAMSYNC_RESET_THRESHOLD)
-                {
-                    //notify upper layer to reset remote peer (slave)
-                    ramsyncResetCnt = 0;
-                    if (ramsyncEventCb)
-                    {
-                        ramsyncEventCb(URAMSYNC_EVENT_RESET_TIMEOUT, NULL);
-                    }
                 }
                 #endif /* (TP_TXPAYLOAD_NUM > 1) */
             }
@@ -887,8 +872,3 @@ void test_reset_signal_cb(void *arg)
     __reset_signal_cb(arg);
 }
 
-int uramsync_register_event_callback(uramsync_event_callback_t cb)
-{
-    ramsyncEventCb = cb;
-    return 0;
-}

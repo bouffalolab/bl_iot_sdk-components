@@ -822,17 +822,6 @@ static int __virt_net_ramsync_deinit(virt_net_t obj)
   return 0;
 }
 
-struct virt_net_ramsync * pVirtNetObj = NULL;
-
-void __virt_net_ramsync_event_callback(uint8_t eventId, uint8_t* args)
-{
-    if (URAMSYNC_EVENT_RESET_TIMEOUT == eventId)
-    {
-        printf("ramsync reset timeout\r\n");
-        event_propagate(pVirtNetObj, VIRT_NET_EV_ON_RAMSYNC_TIMEOUT, NULL);
-    }
-}
-
 virt_net_t virt_net_create(void *ctx) 
 {
 
@@ -847,7 +836,6 @@ virt_net_t virt_net_create(void *ctx)
     return NULL;
   }
 
-  pVirtNetObj = sobj;
   memset(sobj, 0, sizeof(struct virt_net_ramsync));
 
   sobj->vnet.init   = __virt_net_ramsync_init;
@@ -855,8 +843,6 @@ virt_net_t virt_net_create(void *ctx)
   sobj->vnet.ctrl   = __virt_net_ramsync_control;
 
   uramsync_init(&sobj->ramsync_ctx, URAMSYNC_MASTER_DEV_TYPE);
-
-  uramsync_register_event_callback(__virt_net_ramsync_event_callback);
 
   /* Init rx ind */
   assert(VIRT_NET_RXBUFF_CNT <= _BITSET_BITS);
