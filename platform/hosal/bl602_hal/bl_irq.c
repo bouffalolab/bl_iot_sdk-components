@@ -320,23 +320,23 @@ static void registerdump(unsigned int *regs)
 #define REG_T6              28
 #define REG_MSTATUS         29
 
-  blog_info("Current task sp data:\r\n");
+  printf("Current task sp data:\r\n");
 
-  blog_info("RA:%08x, mstatus:%08x\r\n",
+  printf("RA:%08x, mstatus:%08x\r\n",
           regs[REG_RA], regs[REG_MSTATUS]);
 
-  blog_info("A0:%08x A1:%08x A2:%08x A3:%08x A4:%08x A5:%08x "
+  printf("A0:%08x A1:%08x A2:%08x A3:%08x A4:%08x A5:%08x "
           "A6:%08x A7:%08x\r\n",
           regs[REG_A0], regs[REG_A1], regs[REG_A2], regs[REG_A3],
           regs[REG_A4], regs[REG_A5], regs[REG_A6], regs[REG_A7]);
-  blog_info("T0:%08x T1:%08x T2:%08x T3:%08x T4:%08x T5:%08x T6:%08x\r\n",
+  printf("T0:%08x T1:%08x T2:%08x T3:%08x T4:%08x T5:%08x T6:%08x\r\n",
           regs[REG_T0], regs[REG_T1], regs[REG_T2], regs[REG_T3],
           regs[REG_T4], regs[REG_T5], regs[REG_T6]);
-  blog_info("S0:%08x S1:%08x S2:%08x S3:%08x S4:%08x S5:%08x "
+  printf("S0:%08x S1:%08x S2:%08x S3:%08x S4:%08x S5:%08x "
           "S6:%08x S7:%08x\r\n",
           regs[REG_S0], regs[REG_S1], regs[REG_S2], regs[REG_S3],
           regs[REG_S4], regs[REG_S5], regs[REG_S6], regs[REG_S7]);
-  blog_info("S8:%08x S9:%08x S10:%08x S11:%08x\r\n",
+  printf("S8:%08x S9:%08x S10:%08x S11:%08x\r\n",
           regs[REG_S8], regs[REG_S9], regs[REG_S10], regs[REG_S11]);
 }
 
@@ -356,7 +356,7 @@ void exception_entry(uint32_t mcause, uint32_t mepc, uint32_t mtval, uintptr_t *
     } else {
         registerdump(tasksp);
         puts("Exception Entry--->>>\r\n");
-        blog_info("mcause %08lx, mepc %08lx, mtval %08lx\r\n",
+        printf("mcause %08lx, mepc %08lx, mtval %08lx\r\n",
             mcause,
             mepc,
             mtval
