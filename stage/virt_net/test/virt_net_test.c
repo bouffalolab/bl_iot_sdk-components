@@ -176,7 +176,7 @@ static void cmd_virt_net_version(char *buf, int len, int argc, char **argv)
 {
     uint32_t version;
     __virt_net_init();
-    if (0 == virt_net_get_slave_version(g_vnet_net, &version))
+    if (0 == virt_net_slave_version(g_vnet_net, &version))
     {
         printf("version=0x%08lx\r\n", version);
     }
