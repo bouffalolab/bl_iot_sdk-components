@@ -222,7 +222,7 @@ static err_t __link_output(struct netif *netif, struct pbuf *p)
   }
 
   pkg_header->type = PKG_DATA_FRAME;
-  pkg_header->length = p->tot_len + 2 + sizeof(struct pkg_protocol);
+  pkg_header->length = p->tot_len + 2;
 
   uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
                           pkg_header->length + 4, URAMSYNC_FOREVER);
@@ -704,7 +704,7 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
         return -1;
       }
       pkg_header->type = PKG_CMD_FRAME;
-      pkg_header->length = sizeof(struct pkg_protocol_cmd) + sizeof(struct pkg_protocol_cmd);
+      pkg_header->length = sizeof(struct pkg_protocol_cmd);
 
       pkg_cmd->cmd = VIRT_NET_CTRL_GET_LINK_STATUS;
       pkg_cmd->msg_id = msg_id;
