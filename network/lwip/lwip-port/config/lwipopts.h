@@ -65,8 +65,7 @@ a lot of data that needs to be copied, this should be set high. */
 #elif defined(CFG_SDIOWIFI)
 #define MEM_SIZE                (8*1024)
 #elif defined(CFG_NETBUS_WIFI_ENABLE)
-//TODO: system will crash if large than 28KB
-#define MEM_SIZE                (28*1024)
+#define MEM_SIZE                (42*1024)
 #else
 #define MEM_SIZE                (8*1024)
 #endif
