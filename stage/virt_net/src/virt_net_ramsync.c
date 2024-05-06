@@ -428,6 +428,19 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
     break;
   case VIRT_NET_CTRL_SLAVE_READY_IND:
     {
+        printf("slave ready ind.\r\n");
+        if (sobj->sta_linkup) {
+            netifapi_netif_set_link_down(&sobj->vnet.netif);
+            printf("stop dhcp...\r\n");
+            #if LWIP_IPV4
+            netifapi_dhcp_stop((struct netif *)&sobj->vnet.netif);
+            #endif
+            #if LWIP_IPV6
+            dhcp6_disable((struct netif *)&sobj->vnet.netif);
+            #endif
+            netifapi_netif_set_down((struct netif *)&sobj->vnet.netif);
+            sobj->sta_linkup = 0;
+        }
         event_propagate(sobj, VIRT_NET_EV_ON_SLAVE_READY, NULL);
     }
     break;
