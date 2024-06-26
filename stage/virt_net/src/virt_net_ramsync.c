@@ -442,6 +442,10 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
             sobj->sta_linkup = 0;
         }
         event_propagate(sobj, VIRT_NET_EV_ON_SLAVE_READY, NULL);
+
+        if (sobj->vnet.ctrl) {
+            sobj->vnet.ctrl(&sobj->vnet, VIRT_NET_CTRL_CMD_CFM, VIRT_NET_CTRL_SLAVE_READY_IND);
+        }
     }
     break;
   case VIRT_NET_CTRL_SLAVE_HEARTBEAT:
@@ -794,6 +798,25 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
 
       release_semaphore_slot(msg_id);
       return 0;
+    }
+    break;
+  case VIRT_NET_CTRL_CMD_CFM:
+    {
+      struct pkg_cmd_confirm *cfm = (struct pkg_cmd_confirm *)&pkg_cmd->payload;
+
+      printf("send cmd confirm!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\n");
+
+      pkg_header->type = PKG_CMD_FRAME;
+      pkg_header->length = sizeof(struct pkg_protocol_cmd) + sizeof(struct pkg_cmd_confirm);
+
+      pkg_cmd->cmd = VIRT_NET_CTRL_CMD_CFM;
+      pkg_cmd->msg_id = -1;
+
+      va_start(args, cmd);
+      cfm->cmdId = (uint16_t)va_arg(args, unsigned int);
+      va_end(args);
+
+      blog_info("send cfm for cmdId=%04x\r\n", cfm->cmdId);
     }
     break;
   default:

@@ -31,6 +31,10 @@ struct pkg_protocol_cmd {
   uint8_t payload[0];
 } __attribute__((packed));
 
+struct pkg_cmd_confirm {
+  uint16_t cmdId;
+} __attribute__((packed));
+
 struct bflbwifi_scan_record {
     uint8_t bssid[6];
     uint8_t ssid[32 + 1];

@@ -8,6 +8,14 @@
 #include <netbus_wifi_mgmr_cmd_handlers.h>
 #include <supplicant_api.h>
 
+void __attribute__((weak)) netbus_cmd_confirm_hook(netbus_cmd_confirm_msg_t *cfm)
+{
+    if (cfm)
+    {
+        blog_info("Get cmd confirm: cmdId=%04x\r\n", cfm->args.cmdId);
+    }
+}
+
 static void stop_ap(void)
 {
     wifi_mgmr_ap_stop(NULL);
@@ -669,6 +677,20 @@ static void handle_get_dev_version(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr
     bflbmsg_send(&env->trcver_ctx, BF1B_MSG_TYPE_CMD, &msg, sizeof(msg));
 }
 
+static void handle_get_confirm(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t *cmd)
+{
+    blog_info("handle get confirm\r\n");
+
+    if (!cmd->data_ptr || cmd->data_len != sizeof(netbus_cmd_confirm_msg_t)) {
+        log_error("msg format error\r\n");
+        goto ret;
+    }
+
+    netbus_cmd_confirm_hook((netbus_cmd_confirm_msg_t *)cmd->data_ptr);
+ret:
+    vPortFree(cmd->data_ptr);
+}
+
 static void handle_ping(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t *cmd)
 {
     netbus_min_cmd_msg_t msg;
@@ -813,6 +835,11 @@ void netbus_wifi_mgmr_cmd_entry(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_ms
         blog_info("BFLB_CMD_HBN start\r\n");
         handle_hbn(env, cmd);
         blog_info("BFLB_CMD_HBN end\r\n");
+        break;
+    case BFLB_CMD_CFM:
+        blog_info("BFLB_CMD_CFM start\r\n");
+        handle_get_confirm(env, cmd);
+        blog_info("BFLB_CMD_CFM end\r\n");
         break;
     default:
         blog_info("default start\r\n");

@@ -151,6 +151,7 @@ static void cmd_virt_net_connect(char *buf, int len, int argc, char **argv)
 
 static void cmd_virt_net_get_status(char *buf, int len, int argc, char **argv)
 {
+    __virt_net_init();
     virt_net_get_link_status(g_vnet_net);
 }
 
