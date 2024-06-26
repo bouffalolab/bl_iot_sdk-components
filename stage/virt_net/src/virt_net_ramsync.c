@@ -804,8 +804,6 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
     {
       struct pkg_cmd_confirm *cfm = (struct pkg_cmd_confirm *)&pkg_cmd->payload;
 
-      printf("send cmd confirm!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\n");
-
       pkg_header->type = PKG_CMD_FRAME;
       pkg_header->length = sizeof(struct pkg_protocol_cmd) + sizeof(struct pkg_cmd_confirm);
 
