@@ -4,8 +4,6 @@
 
 #include "bl_pds.h"
 #include "bl_rtc.h"
-#include <FreeRTOS.h>
-#include <task.h>
 
 
 void hal_pds_init(void);

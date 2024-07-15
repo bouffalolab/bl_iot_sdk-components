@@ -5,6 +5,12 @@
 #include <stdarg.h>
 #include <limits.h>
 
+#ifndef CONFIG_USE_UART_1_FOR_DEBUG
+#define DEFAULT_DEBUG_UART_ID 0
+#else
+#define DEFAULT_DEBUG_UART_ID 1
+#endif
+
 //#define CHAR_BIT	8
 //FIXME no ugly declare
 extern int usb_cdc_is_port_open(void);
@@ -823,7 +829,7 @@ void debug_print(uint8_t *data, uint32_t len)
         }
 #endif
 
-        UART_SendData(0, data, len);
+        UART_SendData(DEFAULT_DEBUG_UART_ID, data, len);
     }
 #endif
 }

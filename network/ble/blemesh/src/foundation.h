@@ -154,6 +154,10 @@ void bt_mesh_subnet_del(struct bt_mesh_subnet *sub, bool store);
 struct bt_mesh_app_key *bt_mesh_app_key_alloc(u16_t app_idx);
 void bt_mesh_app_key_del(struct bt_mesh_app_key *key, bool store);
 
+#if defined(BFLB_BLE)
+int bt_mesh_comp_get_page_0(struct net_buf_simple *buf);
+#endif
+
 #include <byteorder.h>
 
 static inline void key_idx_pack(struct net_buf_simple *buf,

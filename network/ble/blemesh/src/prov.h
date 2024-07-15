@@ -76,7 +76,7 @@ void bt_mesh_prov_mod_sub_add_cb(struct bt_mesh_model *model,
             u16_t elem_addr, u16_t group_addr);
 #endif /* CONFIG_BT_MESH_MOD_SUB_ADD_CB */
 
-#if defined(CONFIG_AUTO_PTS)
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 /* add by bouffalolab */
 void prov_set_method(uint8_t method, uint8_t action, uint8_t size);
 /* add by bouffalolab */

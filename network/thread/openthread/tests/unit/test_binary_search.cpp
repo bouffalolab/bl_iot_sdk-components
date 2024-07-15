@@ -26,6 +26,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
 #include <string.h>
 
 #include "test_platform.h"
@@ -76,7 +77,7 @@ void TestBinarySearch(void)
         const Entry *entry;
         char         name[kMaxNameSize];
 
-        strcpy(name, tableEntry.mName);
+        strlcpy(name, tableEntry.mName, kMaxNameSize);
 
         entry = BinarySearch::Find(name, kTable);
         VerifyOrQuit(entry == &tableEntry, "BinarySearch::Find() failed");

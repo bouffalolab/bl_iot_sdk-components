@@ -8,7 +8,7 @@
 
 #include <zephyr.h>
 #include <string.h>
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <stdbool.h>
 #include <common/include/atomic.h>
 #include <util.h>
@@ -22,7 +22,7 @@
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_NET)
 #define LOG_MODULE_NAME bt_mesh_net
-#include "log.h"
+#include "bt_log.h"
 
 #include "crypto.h"
 #include "adv.h"
@@ -441,7 +441,7 @@ int bt_mesh_net_beacon_update(struct bt_mesh_subnet *sub)
 		keys = &sub->keys[0];
 	}
 
-	BT_DBG("flags 0x%02x, IVI 0x%08x", flags, bt_mesh.iv_index);
+	BT_DBG("flags 0x%02x, IVI 0x%08lx", flags, bt_mesh.iv_index);
 
 	return bt_mesh_beacon_auth(keys->beacon, flags, keys->net_id,
 				   bt_mesh.iv_index, sub->auth);
@@ -453,7 +453,7 @@ int bt_mesh_net_create(u16_t idx, u8_t flags, const u8_t key[16],
 	struct bt_mesh_subnet *sub;
 	int err;
 
-	BT_DBG("idx %u flags 0x%02x iv_index %u", idx, flags, iv_index);
+	BT_DBG("idx %u flags 0x%02x iv_index %lu", idx, flags, iv_index);
 
 	BT_DBG("NetKey %s", bt_hex(key, 16));
 
@@ -493,12 +493,12 @@ int bt_mesh_net_create(u16_t idx, u8_t flags, const u8_t key[16],
 	 * doesn't apply straight after provisioning (since we can't know how
 	 * long has actually passed since the network changed its state).
 	 */
-#if defined(CONFIG_AUTO_PTS)
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	/* MESH/NODE/IVU/BI-01-C */
 	if(BT_MESH_IV_UPDATE(flags)){
 #endif
 		bt_mesh.ivu_duration = BT_MESH_IVU_MIN_HOURS;
-#if defined(CONFIG_AUTO_PTS)
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	}
 #endif
 
@@ -744,7 +744,7 @@ do_update:
 
 	if (iv_update) {
 		bt_mesh.iv_index = iv_index;
-		BT_DBG("IV Update state entered. New index 0x%08x",
+		BT_DBG("IV Update state entered. New index 0x%08lx",
 		       bt_mesh.iv_index);
 
 		bt_mesh_rpl_reset();
@@ -819,7 +819,7 @@ static void bt_mesh_net_local(struct k_work *work)
 			.friend_match = 0U,
 		};
 
-		BT_DBG("src: 0x%04x dst: 0x%04x seq 0x%06x sub %p", rx.ctx.addr,
+		BT_DBG("src: 0x%04x dst: 0x%04x seq 0x%06lx sub %p", rx.ctx.addr,
 		       rx.ctx.addr, rx.seq, sub);
 
 		(void) bt_mesh_trans_recv(&buf->b, &rx);
@@ -862,7 +862,7 @@ static int net_header_encode(struct bt_mesh_net_tx *tx, u8_t nid,
 		return -EINVAL;
 	}
 
-	BT_DBG("src 0x%04x dst 0x%04x ctl %u seq 0x%06x",
+	BT_DBG("src 0x%04x dst 0x%04x ctl %u seq 0x%06lx",
 	       tx->src, tx->ctx->addr, ctl, bt_mesh.seq);
 
 	net_buf_simple_push_be16(buf, tx->ctx->addr);
@@ -937,7 +937,7 @@ int bt_mesh_net_send(struct bt_mesh_net_tx *tx, struct net_buf *buf,
 	       tx->src, tx->ctx->addr, buf->len, net_buf_headroom(buf),
 	       net_buf_tailroom(buf));
 	BT_DBG("Payload len %u: %s", buf->len, bt_hex(buf->data, buf->len));
-	BT_DBG("Seq 0x%06x", bt_mesh.seq);
+	BT_DBG("Seq 0x%06lx", bt_mesh.seq);
 
 	if (tx->ctx->send_ttl == BT_MESH_TTL_DEFAULT) {
 		tx->ctx->send_ttl = bt_mesh_default_ttl_get();
@@ -1016,7 +1016,7 @@ void bt_mesh_net_loopback_clear(u16_t net_idx)
 		struct bt_mesh_subnet *sub = LOOPBACK_BUF_SUB(buf);
 
 		if (net_idx == BT_MESH_KEY_ANY || net_idx == sub->net_idx) {
-			BT_DBG("Dropped 0x%06x", SEQ(buf->data));
+			BT_DBG("Dropped 0x%06lx", SEQ(buf->data));
 			net_buf_unref(buf);
 		} else {
 			net_buf_slist_put(&new_list, buf);
@@ -1085,7 +1085,7 @@ static int net_decrypt(struct bt_mesh_subnet *sub, const u8_t *enc,
 		       struct net_buf_simple *buf)
 {
 	BT_DBG("NID 0x%02x net_idx 0x%04x", NID(data), sub->net_idx);
-	BT_DBG("IVI %u net->iv_index 0x%08x", IVI(data), bt_mesh.iv_index);
+	BT_DBG("IVI %u net->iv_index 0x%08lx", IVI(data), bt_mesh.iv_index);
 
 	rx->old_iv = (IVI(data) != (bt_mesh.iv_index & 0x01));
 
@@ -1314,7 +1314,7 @@ static void bt_mesh_net_relay(struct net_buf_simple *sbuf,
 	}
 	/* Fix by bouffalolab for MESH/NODE/FRND/FN/BV-23-C*/
 	if (relay_to_adv(rx->net_if) 
-	#if defined(CONFIG_AUTO_PTS)
+	#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		|| rx->friend_cred
 	#endif 
 		) {

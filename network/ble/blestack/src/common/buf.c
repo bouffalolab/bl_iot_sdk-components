@@ -12,11 +12,11 @@
 #define LOG_LEVEL CONFIG_NET_BUF_LOG_LEVEL
 #endif
 
-#include <log.h>
+#include <bt_log.h>
 //LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include <stdio.h>
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <stddef.h>
 #include <string.h>
 #include <misc/byteorder.h>
@@ -64,10 +64,6 @@
 #if defined(BFLB_DYNAMIC_ALLOC_MEM)
 extern struct net_buf_pool hci_cmd_pool;
 extern struct net_buf_pool hci_rx_pool;
-#if (BFLB_STATIC_ALLOC_MEM)
-__attribute__((section(".tcm_data"))) u8_t hci_cmd_data_pool[CONFIG_BT_HCI_CMD_COUNT * BT_BUF_RX_SIZE];
-__attribute__((section(".tcm_data"))) u8_t hci_rx_data_pool[CONFIG_BT_RX_BUF_COUNT * BT_BUF_RX_SIZE];
-#endif
 #if defined(CONFIG_BT_CONN)
 extern struct net_buf_pool acl_tx_pool;
 extern struct net_buf_pool num_complete_pool;
@@ -106,8 +102,13 @@ extern struct net_buf_pool friend_buf_pool;
 #if defined(CONFIG_BT_BREDR)
 extern struct net_buf_pool br_sig_pool;
 extern struct net_buf_pool sdp_pool;
-extern struct net_buf_pool hf_pool;
 extern struct net_buf_pool dummy_pool;
+#if defined(CONFIG_BT_HFP)
+extern struct net_buf_pool hf_pool;
+#endif
+#if defined(CONFIG_BT_SPP)
+extern struct net_buf_pool spp_pool;
+#endif
 #endif
 
 #if defined(CONFIG_AUTO_PTS)
@@ -149,8 +150,13 @@ struct net_buf_pool *_net_buf_pool_list[] = {&hci_cmd_pool, &hci_rx_pool,
 	#if defined(CONFIG_BT_BREDR)
 	&sdp_pool,
 	&br_sig_pool,
-	&hf_pool,
 	&dummy_pool,
+	#if defined(CONFIG_BT_HFP)
+	&hf_pool,
+	#endif
+	#if defined(CONFIG_BT_SPP)
+	&spp_pool,
+	#endif
 	#endif
 	#if defined(CONFIG_AUTO_PTS)
 	&server_pool,
@@ -180,14 +186,14 @@ void net_buf_init(struct net_buf_pool *buf_pool, u16_t buf_count, size_t data_si
     #if (BFLB_STATIC_ALLOC_MEM)
     switch (buf_type){
         case HCI_CMD:
-            buf_fixed->data_pool = hci_cmd_data_pool;
+            buf_fixed->data_pool = (u8_t *)k_malloc(buf_count * data_size);
             break;
         case HCI_RX:
-            buf_fixed->data_pool = hci_rx_data_pool;
+            buf_fixed->data_pool = (u8_t *)k_malloc(buf_count * data_size);
             break;
         #if defined(CONFIG_BT_CONN)
         case ACL_TX:
-            buf_fixed->data_pool = (u8_t *)k_malloc(buf_count * data_size); ;
+            buf_fixed->data_pool = (u8_t *)k_malloc(buf_count * data_size);
             break;
         case NUM_COMPLETE:
             buf_fixed->data_pool = num_complete_data_pool;
@@ -242,9 +248,17 @@ void net_buf_deinit(struct net_buf_pool *buf_pool)
 {
     extern void bt_delete_queue(struct k_fifo *queue_to_del);
     bt_delete_queue((struct k_fifo *)(&(buf_pool->free)));
-
-    #if !(BFLB_STATIC_ALLOC_MEM)
     struct net_buf_pool_fixed *buf_fixed = (struct net_buf_pool_fixed *)buf_pool->alloc->alloc_data;
+    #if (BFLB_STATIC_ALLOC_MEM)
+    if(buf_pool == &hci_cmd_pool || buf_pool == &acl_tx_pool || buf_pool == &hci_rx_pool
+       #if CONFIG_BT_L2CAP_TX_FRAG_COUNT > 0
+       || buf_pool == &frag_pool
+       #endif
+        )
+    {
+        k_free(buf_fixed->data_pool);
+    }
+    #else
     k_free(buf_fixed->data_pool);
     #endif
     k_free(buf_pool->__bufs);
@@ -1094,6 +1108,20 @@ void net_buf_simple_add_be32(struct net_buf_simple *buf, u32_t val)
 	sys_put_be32(val, net_buf_simple_add(buf, sizeof(val)));
 }
 
+void net_buf_simple_add_le64(struct net_buf_simple *buf, uint64_t val)
+{
+	NET_BUF_SIMPLE_DBG("buf %p val %" PRIu64, buf, val);
+
+	sys_put_le64(val, net_buf_simple_add(buf, sizeof(val)));
+}
+
+void net_buf_simple_add_be64(struct net_buf_simple *buf, uint64_t val)
+{
+	NET_BUF_SIMPLE_DBG("buf %p val %" PRIu64, buf, val);
+
+	sys_put_be64(val, net_buf_simple_add(buf, sizeof(val)));
+}
+
 void *net_buf_simple_push(struct net_buf_simple *buf, size_t len)
 {
 	NET_BUF_SIMPLE_DBG("buf %p len %zu", buf, len);
@@ -1212,6 +1240,26 @@ u32_t net_buf_simple_pull_be32(struct net_buf_simple *buf)
 	net_buf_simple_pull(buf, sizeof(val));
 
 	return sys_be32_to_cpu(val);
+}
+
+uint64_t net_buf_simple_pull_le64(struct net_buf_simple *buf)
+{
+	uint64_t val;
+
+	val = UNALIGNED_GET((uint64_t *)buf->data);
+	net_buf_simple_pull(buf, sizeof(val));
+
+	return sys_le64_to_cpu(val);
+}
+
+uint64_t net_buf_simple_pull_be64(struct net_buf_simple *buf)
+{
+	uint64_t val;
+
+	val = UNALIGNED_GET((uint64_t *)buf->data);
+	net_buf_simple_pull(buf, sizeof(val));
+
+	return sys_be64_to_cpu(val);
 }
 
 size_t net_buf_simple_headroom(struct net_buf_simple *buf)

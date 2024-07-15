@@ -5,13 +5,16 @@ ENTRY( bl702_start )
 __EM_SIZE = DEFINED(ble_controller_init) ? (DEFINED(em_16k_init) ? 16K : 8K) : 0K;
 __CACHE_SIZE = DEFINED(__CACHE_SIZE) ? __CACHE_SIZE : 16K;
 __stack_size = DEFINED(__stack_size) ? __stack_size : 2K;
+__sha_ocram_size = DEFINED(__sha_ocram_size) ? __sha_ocram_size : 128;
 
 MEMORY
 {
   flash     (wxa) : ORIGIN = 0x22030000, LENGTH = (2048K - 64K) /* we have 2MB ocram from 0x22020000 on fpga, use high ocram address as flash */
-  tcm_ocram (wxa) : ORIGIN = 0x42010000 + __CACHE_SIZE, LENGTH = (64K - __CACHE_SIZE + 64K - __EM_SIZE - __stack_size)
-  sys_stack (wxa) : ORIGIN = 0x42030000 - __EM_SIZE - __stack_size, LENGTH = __stack_size
+  tcm_ocram (wxa) : ORIGIN = 0x42010000 + __CACHE_SIZE, LENGTH = (64K - __CACHE_SIZE + 64K - __EM_SIZE - __stack_size - __sha_ocram_size)
+  sys_stack (wxa) : ORIGIN = 0x42030000 - __EM_SIZE - __stack_size - __sha_ocram_size, LENGTH = __stack_size
+  sha_ocram (wxa) : ORIGIN = 0x42030000 - __EM_SIZE - __sha_ocram_size, LENGTH = __sha_ocram_size
   hbnram    (wxa) : ORIGIN = 0x40010000, LENGTH = (4K)
+  bugkill   (rxai!w) : ORIGIN = 0xD0000000, LENGTH = 16M
 }
 
 SECTIONS
@@ -30,6 +33,19 @@ SECTIONS
     *(.text .text.*)
     *(.gnu.linkonce.t.*)
   } >flash
+
+  .bugkiller_command :
+  {
+    PROVIDE( __bugkiller_command_start = ADDR(.bugkiller_command) );
+    PROVIDE( __bugkiller_command_end = ADDR(.bugkiller_command) + SIZEOF(.bugkiller_command) );
+    KEEP (*(.static_bugkiller_command))
+  } > bugkill
+
+  .bugkiller  :
+  {
+    KEEP (*(.bugkiller_code))
+    KEEP (*bugkiller*.o(.rodata* .text* .data* .sdata* .sbss*))
+  } > bugkill
 
   .rodata :
   {
@@ -106,17 +122,16 @@ SECTIONS
 
     /* tcm code that should be retentive after hbn wakeup */
     *libbl702_std.a:bl702_romapi.o(.tcm_code.* .sclock_rlt_code.*)
-    *libbl702_std.a:bl702_glb.o(.tcm_code.* .sclock_rlt_code.*)
     *libbl702_std.a:bl702_aon.o(.tcm_code.* .sclock_rlt_code.*)
+    *libbl702_std.a:bl702_glb.o(.tcm_code.* .sclock_rlt_code.*)
+    *libbl702_std.a:bl702_hbn.o(.tcm_code.* .sclock_rlt_code.*)
     PROVIDE ( _hbn_restore_tcm_run_end = . );
 
     /* data that should be retentive after hbn wakeup */
     *liblmac154.a:*(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
     *libbl702_std.a:*(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
-    *libhosal.a:bl_adc.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
     *libhosal.a:bl_gpio.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
-    *libhosal.a:bl_sys.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
-    *libhosal.a:bl_timer.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
+    *libhosal.a:hosal_gpio.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
     *libhosal.a:bl_uart.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
     *libhosal.a:hosal_uart.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
     PROVIDE ( _hbn_restore_data_run_end = . );
@@ -130,11 +145,6 @@ SECTIONS
   {
     *(.hbn_noinit)
     *(.retention_noinit)
-
-    /* PDS backup address */
-    . = ALIGN(4);
-    PROVIDE ( __ld_pds_bak_addr = . );
-    . = . + 116;
   } >hbnram
 
   .rsvd (NOLOAD) :
@@ -217,11 +227,6 @@ SECTIONS
     *(COMMON)
   } >tcm_ocram
 
-  .sha_ocram (NOLOAD) :
-  {
-    *(.sha_ocram*)
-  } >tcm_ocram
-
   . = ALIGN(8);
   PROVIDE( _heap_start = . );
   PROVIDE( _heap_size = ORIGIN(tcm_ocram) + LENGTH(tcm_ocram) - _heap_start );
@@ -231,11 +236,16 @@ SECTIONS
 
   .stack (NOLOAD) : ALIGN(8)
   {
-    PROVIDE ( _sp_base = . );
+    PROVIDE( _sp_base = . );
     . = . + __stack_size;
     PROVIDE( _sp_main = . );
     __freertos_irq_stack_top = .;
   } >sys_stack
+
+  .sha_ocram (NOLOAD) :
+  {
+    *(.sha_ocram*)
+  } >sha_ocram
 
 
   /* camera driver */
@@ -263,10 +273,15 @@ SECTIONS
   PROVIDE( _ld_ram_addr2 = ORIGIN(hbnram) );
   PROVIDE( _ld_ram_size3 = SIZEOF(.stack) );
   PROVIDE( _ld_ram_addr3 = ADDR(.stack) );
+  PROVIDE( _ld_ram_sha_size = LENGTH(sha_ocram) );
+  PROVIDE( _ld_ram_sha_addr = ORIGIN(sha_ocram) );
 
   /* BOOT2 parameter */
-  PROVIDE ( __boot2_pt_addr_src = BOOT2_PT_ADDR );
+  PROVIDE( __boot2_pt_addr_src = BOOT2_PT_ADDR );
 
   /* EM size */
-  PROVIDE(__LD_CONFIG_EM_SEL = __EM_SIZE);
+  PROVIDE( __LD_CONFIG_EM_SEL = __EM_SIZE );
+
+  /* BLE_CORE_REG size */
+  PROVIDE( __LD_BLE_CORE_REG_SIZE = __EM_SIZE ? 0xA4 : 0 );
 }

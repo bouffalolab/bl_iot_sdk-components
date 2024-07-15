@@ -33,8 +33,7 @@ COMPONENT_SRCS := bl702_hal/bl_adc.c \
                   bl702_hal/hal_boot2.c \
                   bl702_hal/hal_button.c \
                   bl702_hal/hal_gpio.c \
-                  bl702_hal/hal_hbn.c \
-                  bl702_hal/hal_hwtimer.c \
+                  bl702_hal/hal_ota.c \
                   bl702_hal/hal_pds.c \
                   bl702_hal/hal_spi_flash.c \
                   bl702_hal/hal_sys.c \
@@ -72,51 +71,3 @@ COMPONENT_SRCDIRS += bl702_hal sec_common
 
 COMPONENT_OBJS := $(patsubst %.c,%.o, $(COMPONENT_SRCS))
 COMPONENT_OBJS := $(patsubst %.S,%.o, $(COMPONENT_OBJS))
-
-##
-CPPFLAGS += -DARCH_RISCV -DBFLB_CRYPT_HARDWARE
-ifndef CONFIG_USE_STD_DRIVER
-CPPFLAGS += -DBFLB_USE_HAL_DRIVER
-endif
-
-ifeq ($(CONFIG_BT),1)
-CPPFLAGS += -DCFG_BLE_ENABLE
-endif
-
-ifeq ($(CONFIG_BLE_MFG),1)
-CPPFLAGS += -DCONFIG_BLE_MFG
-endif
-
-ifeq ($(CONFIG_ZIGBEE),1)
-CPPFLAGS += -DCFG_ZIGBEE_ENABLE
-endif
-
-ifeq ($(CONFIG_PDS_ENABLE),1)
-CPPFLAGS += -DCFG_PDS_ENABLE
-CONFIG_PDS_LEVEL ?= 31
-CPPFLAGS += -DCFG_PDS_LEVEL=$(CONFIG_PDS_LEVEL)
-ifeq ($(CONFIG_PDS_LEVEL),31)
-CPPFLAGS += -DCFG_PDS_OPTIMIZE
-endif
-CPPFLAGS += -DCONFIG_HW_SEC_ENG_DISABLE
-endif
-
-ifeq ($(CONFIG_HBN_ENABLE),1)
-CPPFLAGS += -DCFG_HBN_ENABLE
-CPPFLAGS += -DCFG_HBN_OPTIMIZE
-endif
-
-ifeq ($(CONFIG_ENCRYPT_CPU),1)
-CPPFLAGS += -DCFG_ENCRYPT_CPU
-endif
-
-ifeq ($(CONFIG_USE_PSRAM),1)
-CPPFLAGS += -DCFG_USE_PSRAM
-#ifeq ($(CONFIG_PSRAM_DUAL_BANK),1)
-#CPPFLAGS += -DCFG_PSRAM_DUAL_BANK
-#endif
-endif
-
-ifeq ($(CONFIG_USE_XTAL32K),1)
-CPPFLAGS += -DCFG_USE_XTAL32K
-endif

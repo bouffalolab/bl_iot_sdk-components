@@ -27,6 +27,7 @@ typedef struct bl_adc_voice_cfg
 // pos_ch/neg_ch: 0 - 11, corresponding to gpio {14, 15, 17, 18, 19, 20, 21, 7, 8, 9, 11, 12}
 int bl_adc_init(uint8_t single_ended, uint8_t pos_ch, uint8_t neg_ch);
 float bl_adc_get_val(void);
+int bl_adc_disable(void);
 
 int bl_adc_vbat_init(void);
 float bl_adc_vbat_get_val(void);

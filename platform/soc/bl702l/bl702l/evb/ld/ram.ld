@@ -2,7 +2,7 @@ OUTPUT_ARCH( "riscv" )
 
 ENTRY( bl702_start )
 
-__EM_SIZE = DEFINED(btble_controller_init) ? 16K : 0K;
+__EM_SIZE = DEFINED(__EM_SIZE) ? __EM_SIZE : 0K;
 __CACHE_SIZE = DEFINED(__CACHE_SIZE) ? __CACHE_SIZE : 16K;
 __stack_size = DEFINED(__stack_size) ? __stack_size : 2K;
 
@@ -16,8 +16,6 @@ MEMORY
 
 SECTIONS
 {
-  BOOT2_PT_ADDR = 0x4202e094;
-
   .init :
   {
     KEEP (*(SORT_NONE(.init)))
@@ -197,7 +195,7 @@ SECTIONS
 
   .stack (NOLOAD) : ALIGN(8)
   {
-    PROVIDE ( _sp_base = . );
+    PROVIDE( _sp_base = . );
     . = . + __stack_size;
     PROVIDE( _sp_main = . );
     __freertos_irq_stack_top = .;
@@ -226,11 +224,11 @@ SECTIONS
   PROVIDE( _ld_ram_size3 = SIZEOF(.stack) );
   PROVIDE( _ld_ram_addr3 = ADDR(.stack) );
 
-  /* BOOT2 parameter */
-  PROVIDE ( __boot2_pt_addr_src = BOOT2_PT_ADDR );
-
   /* EM size */
-  PROVIDE(__LD_CONFIG_EM_SEL = __EM_SIZE);
+  PROVIDE( __LD_CONFIG_EM_SEL = __EM_SIZE );
+
+  /* BLE_CORE_REG size */
+  PROVIDE( __LD_BLE_CORE_REG_SIZE = __EM_SIZE ? 0x214 : 0 );
 
   /* rom driver */
   INCLUDE romdriver.ld

@@ -230,7 +230,7 @@ int hosal_dma_irq_callback_set(hosal_dma_chan_t chan, hosal_dma_irq_t pfn, void 
 int hosal_dma_finalize(void)
 {
     if (!gp_hosal_dma_dev) {
-        blog_error("please hosal_dma_init !\r\n");
+        //blog_error("please hosal_dma_init !\r\n");
         return -1;
     }
 

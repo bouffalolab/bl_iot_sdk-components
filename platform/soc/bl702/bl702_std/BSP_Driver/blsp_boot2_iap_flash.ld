@@ -27,6 +27,7 @@ MEMORY
     itcm_memory (rx)  : 	ORIGIN = 0x22014000, LENGTH = 16K
     dtcm_memory (rx)  : 	ORIGIN = 0x42018000, LENGTH = 4K
     ram_memory  (!rx) : 	ORIGIN = 0x42019000, LENGTH = 83K
+    hbn_memory  (!rx) : 	ORIGIN = 0x40010000, LENGTH = 4K
 }
 
 SECTIONS
@@ -50,20 +51,20 @@ SECTIONS
 
 	.ver 0 : AT(ORIGIN(xip_memory) + VerOffset)
     {
-    	
+
 		LONG(0x42464c42); /* BLFB */
 		LONG(0x46524556); /* VERF */
 		KEEP (*(.blverinf))
 		LONG(0x42464c42); /* BLFB */
 		LONG(0x46524556); /* VERF */
 		KEEP (*(.verinfo))
-    } 
-    
+    }
+
     .text :
     {
-        *(EXCLUDE_FILE 
-        	( *bl702_uart*.o* 
-        	  *hal_uart*.o* 
+        *(EXCLUDE_FILE
+        	( *bl702_uart*.o*
+        	  *hal_uart*.o*
         	  *bl702_sec_eng*.o*
         	  *bl702_glb*.o*
         	  *hal_sec_hash*.o*
@@ -136,45 +137,49 @@ SECTIONS
         . = ALIGN(4);
         __tcm_data_end__ = .;
     } > dtcm_memory
-    
+
     __StackTop = ORIGIN(dtcm_memory) + LENGTH(dtcm_memory);
     __StackLimit = __StackTop - StackSize;
-    
+
     /* Check if data + heap + stack exceeds dtcm limit */
     ASSERT(__StackLimit >= __tcm_data_end__, "region dtcm overflowed with stack")
-    
+
     __system_ram_load_addr = __dtcm_load_addr + SIZEOF(.dtcm_region);
 
     .system_ram_data_region :
     {
         . = ALIGN(4);
         __system_ram_data_start__ = .;
-        
+
         *(.system_ram)
-        
+
         . = ALIGN(4);
         __system_ram_data_end__ = .;
     } > ram_memory
-    
-    
+
+
     __ram_load_addr = __system_ram_load_addr + SIZEOF(.system_ram_data_region);
-    
+
     /* Data section */
     .ram_data_region : AT (__ram_load_addr)
     {
         . = ALIGN(4);
         __ram_data_start__ = .;
-        
+
         PROVIDE( __global_pointer$ = . + 0x800 );
-        
+
         *(.data)
         *(.data.*)
-        
+        *(.sdata)
+        *(.sdata.*)
+        *(.sdata2)
+        *(.sdata2.*)
+
         . = ALIGN(4);
         __ram_data_end__ = .;
     } > ram_memory
 
-    .nocache_ram_region (NOLOAD) : 
+    .nocache_ram_region (NOLOAD) :
     {
         . = ALIGN(4);
         *(.nocache_ram)
@@ -188,14 +193,15 @@ SECTIONS
         *(.system_ram_noinit)
         . = ALIGN(4);
     } > ram_memory
-    
+
     .bss (NOLOAD) :
     {
         . = ALIGN(4);
         __bss_start__ = .;
-        
+
         *(.bss*)
-  
+        *(.sbss*)
+
         . = ALIGN(4);
         __bss_end__ = .;
     } > ram_memory
@@ -206,6 +212,13 @@ SECTIONS
         *(.noinit_data*)
         . = ALIGN(4);
     } > ram_memory
-    
+
+    .noinit_hbn_ram_region (NOLOAD) :
+    {
+        . = ALIGN(4);
+        *(.noinit_hbn_ram_data*)
+        . = ALIGN(4);
+    } > hbn_memory
+
 }
 

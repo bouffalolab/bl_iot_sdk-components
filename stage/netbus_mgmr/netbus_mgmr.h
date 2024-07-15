@@ -11,7 +11,11 @@
 #include <netbus_transceiver.h>
 #include <utils_memp.h>
 
+#ifndef CFG_NETBUS_WIFI_VERSION
 #define NETBUS_WIFI_VERSION 0x0000FFFF
+#else
+#define NETBUS_WIFI_VERSION CFG_NETBUS_WIFI_VERSION
+#endif
 
 enum {
     BFLB_CMD_RESET = 0x1000,

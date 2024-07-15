@@ -124,6 +124,7 @@ int virt_net_get_mac(virt_net_t obj, uint8_t mac[6]);
 int virt_net_scan(virt_net_t obj);
 int virt_net_get_link_status(virt_net_t obj);
 int virt_net_enter_hbn(virt_net_t obj);
+int virt_net_slave_version(virt_net_t obj, uint32_t * version);
 
 #ifdef __cplusplus
 }

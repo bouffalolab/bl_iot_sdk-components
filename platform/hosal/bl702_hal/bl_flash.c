@@ -1,5 +1,7 @@
 #include <bl702_romdriver.h>
 #include <bl702_sf_cfg_ext.h>
+#include <bl702_xip_sflash.h>
+#include <bl702_l1c.h>
 
 #include "bl_flash.h"
 #include "bl_irq.h"
@@ -117,8 +119,8 @@ int bl_flash_read(uint32_t addr, uint8_t *dst, int len)
 }
 
 
-#if defined(CFG_ENCRYPT_CPU)
-int ATTR_TCM_SECTION bl_flash_erase_need_lock(uint32_t addr, int len)
+ATTR_TCM_SECTION
+static __attribute__((noinline)) int bl_flash_erase_need_lock_internal(uint32_t addr, int len)
 {
     XIP_SFlash_Opt_Enter();
     RomDriver_XIP_SFlash_Erase_Need_Lock(
@@ -128,10 +130,12 @@ int ATTR_TCM_SECTION bl_flash_erase_need_lock(uint32_t addr, int len)
             addr + len - 1
     );
     XIP_SFlash_Opt_Exit();
+
     return 0;
 }
 
-int ATTR_TCM_SECTION bl_flash_write_need_lock(uint32_t addr, uint8_t *src, int len)
+ATTR_TCM_SECTION
+static __attribute__((noinline)) int bl_flash_write_need_lock_internal(uint32_t addr, uint8_t *src, int len)
 {
     XIP_SFlash_Opt_Enter();
     RomDriver_XIP_SFlash_Write_Need_Lock(
@@ -142,10 +146,12 @@ int ATTR_TCM_SECTION bl_flash_write_need_lock(uint32_t addr, uint8_t *src, int l
             len
     );
     XIP_SFlash_Opt_Exit();
+
     return 0;
 }
 
-int ATTR_TCM_SECTION bl_flash_read_need_lock(uint32_t addr, uint8_t *dst, int len)
+ATTR_TCM_SECTION
+static __attribute__((noinline)) int bl_flash_read_need_lock_internal(uint32_t addr, uint8_t *dst, int len)
 {
     XIP_SFlash_Opt_Enter();
     RomDriver_XIP_SFlash_Read_Need_Lock(
@@ -156,44 +162,6 @@ int ATTR_TCM_SECTION bl_flash_read_need_lock(uint32_t addr, uint8_t *dst, int le
             len
     );
     XIP_SFlash_Opt_Exit();
-    return 0;
-}
-#else
-
-static inline int bl_flash_erase_need_lock_internal(uint32_t addr, int len)
-{
-    RomDriver_XIP_SFlash_Erase_Need_Lock(
-            &boot2_flashCfg.flashCfg,
-            boot2_flashCfg.flashCfg.ioMode&0xf,
-            addr,
-            addr + len - 1
-    );
-
-    return 0;
-}
-
-static inline int bl_flash_write_need_lock_internal(uint32_t addr, uint8_t *src, int len)
-{
-    RomDriver_XIP_SFlash_Write_Need_Lock(
-            &boot2_flashCfg.flashCfg,
-            boot2_flashCfg.flashCfg.ioMode&0xf,
-            addr,
-            src,
-            len
-    );
-
-    return 0;
-}
-
-static inline int bl_flash_read_need_lock_internal(uint32_t addr, uint8_t *dst, int len)
-{
-    RomDriver_XIP_SFlash_Read_Need_Lock(
-            &boot2_flashCfg.flashCfg,
-            boot2_flashCfg.flashCfg.ioMode&0xf,
-            addr,
-            dst,
-            len
-    );
 
     return 0;
 }
@@ -275,7 +243,6 @@ int bl_flash_read_need_lock(uint32_t addr, uint8_t *dst, int len)
     return bl_flash_read_need_lock_internal(addr, dst, len);
 }
 
-#endif
 
 static void _dump_flash_config()
 {
@@ -308,7 +275,7 @@ static inline int bl_flash_read_byxip_internal(uint32_t addr, uint8_t *dst, int 
     uint32_t offset;
     uint32_t xipaddr;
 
-    offset = RomDriver_SF_Ctrl_Get_Flash_Image_Offset();
+    offset = SF_Ctrl_Get_Flash_Image_Offset();
 
     if ((addr < offset) || (addr >= 0x1000000)) {
         // not support or arg err ?
@@ -384,6 +351,10 @@ int ATTR_TCM_SECTION bl_flash_init(void)
     uint32_t offset = 0;
     int ret = 0;
 
+    unsigned long mstatus_tmp;
+    mstatus_tmp = read_csr(mstatus);
+    clear_csr(mstatus, MSTATUS_MIE);
+
     // patch for SF2 swap
     *(volatile uint32_t *)0x40000130 |= (1U << 16);  // enable GPIO25 input
     *(volatile uint32_t *)0x40000134 |= (1U << 16);  // enable GPIO27 input
@@ -425,6 +396,8 @@ int ATTR_TCM_SECTION bl_flash_init(void)
     XIP_SFlash_Opt_Exit();
 
     L1C_Cache_Flush_Ext();
+
+    write_csr(mstatus, mstatus_tmp);
 
     return ret;
 }

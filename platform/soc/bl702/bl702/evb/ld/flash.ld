@@ -122,17 +122,16 @@ SECTIONS
 
     /* tcm code that should be retentive after hbn wakeup */
     *libbl702_std.a:bl702_romapi.o(.tcm_code.* .sclock_rlt_code.*)
-    *libbl702_std.a:bl702_glb.o(.tcm_code.* .sclock_rlt_code.*)
     *libbl702_std.a:bl702_aon.o(.tcm_code.* .sclock_rlt_code.*)
+    *libbl702_std.a:bl702_glb.o(.tcm_code.* .sclock_rlt_code.*)
+    *libbl702_std.a:bl702_hbn.o(.tcm_code.* .sclock_rlt_code.*)
     PROVIDE ( _hbn_restore_tcm_run_end = . );
 
     /* data that should be retentive after hbn wakeup */
     *liblmac154.a:*(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
     *libbl702_std.a:*(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
-    *libhosal.a:bl_adc.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
     *libhosal.a:bl_gpio.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
-    *libhosal.a:bl_sys.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
-    *libhosal.a:bl_timer.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
+    *libhosal.a:hosal_gpio.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
     *libhosal.a:bl_uart.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
     *libhosal.a:hosal_uart.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
     PROVIDE ( _hbn_restore_data_run_end = . );
@@ -146,11 +145,6 @@ SECTIONS
   {
     *(.hbn_noinit)
     *(.retention_noinit)
-
-    /* PDS backup address */
-    . = ALIGN(4);
-    PROVIDE ( __ld_pds_bak_addr = . );
-    . = . + 116;
   } >hbnram
 
   .rsvd (NOLOAD) :
@@ -242,7 +236,7 @@ SECTIONS
 
   .stack (NOLOAD) : ALIGN(8)
   {
-    PROVIDE ( _sp_base = . );
+    PROVIDE( _sp_base = . );
     . = . + __stack_size;
     PROVIDE( _sp_main = . );
     __freertos_irq_stack_top = .;
@@ -279,13 +273,15 @@ SECTIONS
   PROVIDE( _ld_ram_addr2 = ORIGIN(hbnram) );
   PROVIDE( _ld_ram_size3 = SIZEOF(.stack) );
   PROVIDE( _ld_ram_addr3 = ADDR(.stack) );
-
   PROVIDE( _ld_ram_sha_size = LENGTH(sha_ocram) );
   PROVIDE( _ld_ram_sha_addr = ORIGIN(sha_ocram) );
-  
+
   /* BOOT2 parameter */
-  PROVIDE ( __boot2_pt_addr_src = BOOT2_PT_ADDR );
+  PROVIDE( __boot2_pt_addr_src = BOOT2_PT_ADDR );
 
   /* EM size */
-  PROVIDE(__LD_CONFIG_EM_SEL = __EM_SIZE);
+  PROVIDE( __LD_CONFIG_EM_SEL = __EM_SIZE );
+
+  /* BLE_CORE_REG size */
+  PROVIDE( __LD_BLE_CORE_REG_SIZE = __EM_SIZE ? 0xA4 : 0 );
 }

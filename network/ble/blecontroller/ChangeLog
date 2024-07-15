@@ -1,5 +1,11 @@
 # Changes
 
+## 2024-05-21
+1.[BL602][BL702]Fix the issue that it fails to allocate tx buffer in the new connection, because the previous allocated buffers are not released in the case that previous ble link is disconnected while the data is not sent out.
+
+## 2024-04-28
+1.[BL702]Fix slave's assert issue caused by that slave's remote procedure state is updated unexpectly when its llcp_phy_req is rejected by master.
+
 ## 2023-07-25
 1.[BL702]Fix a ble/zb coex issue that causes ble link loss.
 
@@ -7,10 +13,10 @@
 1.[BL602]Add blecontroller_602_m8s1 library.
 
 ## 2023-04-19
-1. Fixed the crash problem when the code calls ble_stack_start after restarting by calling the hal_sys_reset function.
+1.[BL702]BL602]Fixed the crash problem when the code calls ble_stack_start after restarting by calling the hal_sys_reset function.
 
 ## 2023-04-19
-1. Add API to get ble tx power.
+1.[BL702][BL602]Add API to get ble tx power.
 
 ## 2023-04-18
-1. fix a potential issue that ble controller may hit assert when enable/disable ble scan periodically.
+1.[BL702][BL602]Fix a potential issue that ble controller may hit assert when enable/disable ble scan periodically.

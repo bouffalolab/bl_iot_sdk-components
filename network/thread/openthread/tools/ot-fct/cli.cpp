@@ -55,7 +55,7 @@ otError Cli::GetNextTargetPower(const Power::Domain &aDomain, int &aIterator, Po
     otError error = OT_ERROR_NOT_FOUND;
     char    value[kMaxValueSize];
     char   *domain;
-    char   *psave;
+    char   *psave = nullptr;
 
     while (mProductConfigFile.Get(kKeyTargetPower, aIterator, value, sizeof(value)) == OT_ERROR_NONE)
     {
@@ -76,10 +76,11 @@ otError Cli::GetNextDomain(int &aIterator, Power::Domain &aDomain)
     otError error = OT_ERROR_NOT_FOUND;
     char    value[kMaxValueSize];
     char   *str;
+    char   *psave = nullptr;
 
     while (mProductConfigFile.Get(kKeyRegionDomainMapping, aIterator, value, sizeof(value)) == OT_ERROR_NONE)
     {
-        if ((str = strtok(value, kCommaDelimiter)) == nullptr)
+        if ((str = strtok_r(value, kCommaDelimiter, &psave)) == nullptr)
         {
             continue;
         }
@@ -210,6 +211,7 @@ otError Cli::ProcessCalibrationTable(Utils::CmdLineParser::Arg aArgs[])
         char                  *subString;
         uint8_t                channel;
         Power::CalibratedPower calibratedPower;
+        char                  *psave = nullptr;
 
         for (Utils::CmdLineParser::Arg *arg = &aArgs[1]; !arg->IsEmpty(); arg++)
         {
@@ -218,12 +220,12 @@ otError Cli::ProcessCalibrationTable(Utils::CmdLineParser::Arg aArgs[])
                 arg++;
                 VerifyOrExit(!arg->IsEmpty(), error = OT_ERROR_INVALID_ARGS);
 
-                subString = strtok(arg->GetCString(), kCommaDelimiter);
+                subString = strtok_r(arg->GetCString(), kCommaDelimiter, &psave);
                 VerifyOrExit(subString != nullptr, error = OT_ERROR_PARSE);
                 SuccessOrExit(error = Utils::CmdLineParser::ParseAsUint8(subString, channel));
                 calibratedPower.SetChannelStart(channel);
 
-                subString = strtok(NULL, kCommaDelimiter);
+                subString = strtok_r(NULL, kCommaDelimiter, &psave);
                 VerifyOrExit(subString != nullptr, error = OT_ERROR_PARSE);
                 SuccessOrExit(error = Utils::CmdLineParser::ParseAsUint8(subString, channel));
                 calibratedPower.SetChannelEnd(channel);

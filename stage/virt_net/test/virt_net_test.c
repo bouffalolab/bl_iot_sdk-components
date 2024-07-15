@@ -172,6 +172,16 @@ static void cmd_virt_net_enter_hbn(char *buf, int len, int argc, char **argv)
     virt_net_enter_hbn(g_vnet_net);
 }
 
+static void cmd_virt_net_version(char *buf, int len, int argc, char **argv)
+{
+    uint32_t version;
+    __virt_net_init();
+    if (0 == virt_net_slave_version(g_vnet_net, &version))
+    {
+        printf("version=0x%08lx\r\n", version);
+    }
+}
+
 static void cmd_virt_net_destory(char *buf, int len, int argc, char **argv)
 {
     __virt_net_deinit();
@@ -185,6 +195,7 @@ const static struct cli_command cmds_user[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"wifi_scan", "wifi_scan", cmd_virt_net_scan},
     {"wifi_enter_hbn", "wifi_enter_hbn", cmd_virt_net_enter_hbn},
     {"virt_net_destory", "virt_net destory", cmd_virt_net_destory},
+    {"virt_net_slave_version", "virt_net version", cmd_virt_net_version},
 };
 
 int virt_net_test_cli_init(void)

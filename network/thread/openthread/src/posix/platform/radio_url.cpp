@@ -112,7 +112,7 @@ namespace Posix {
 RadioUrl::RadioUrl(const char *aUrl)
 {
     VerifyOrDie(strnlen(aUrl, sizeof(mUrl)) < sizeof(mUrl), OT_EXIT_INVALID_ARGUMENTS);
-    strncpy(mUrl, aUrl, sizeof(mUrl) - 1);
+    memcpy(mUrl, aUrl, sizeof(mUrl) - 1);
     SuccessOrDie(Url::Url::Init(mUrl));
 }
 

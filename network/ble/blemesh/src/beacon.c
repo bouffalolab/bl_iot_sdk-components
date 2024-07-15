@@ -7,7 +7,7 @@
  */
 
 #include <zephyr.h>
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <util.h>
 
 #include <net/buf.h>
@@ -17,7 +17,7 @@
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_BEACON)
 #define LOG_MODULE_NAME bt_mesh_beacon
-#include "log.h"
+#include "bt_log.h"
 
 #include "adv.h"
 #include "mesh.h"
@@ -100,7 +100,7 @@ void bt_mesh_beacon_create(struct bt_mesh_subnet *sub,
 
 	BT_DBG("net_idx 0x%04x flags 0x%02x NetID %s", sub->net_idx,
 	       flags, bt_hex(keys->net_id, 8));
-	BT_DBG("IV Index 0x%08x Auth %s", bt_mesh.iv_index,
+	BT_DBG("IV Index 0x%08lx Auth %s", bt_mesh.iv_index,
 	       bt_hex(sub->auth, 8));
 }
 
@@ -144,7 +144,7 @@ static int secure_beacon_send(void)
 
 #if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		static u32_t pts_cnt = 0;
-		BT_PTS("[PTS] Sending secure network beacon (Flags = 0x%02X, IV Index = 0x%08X) %u", bt_mesh_net_flags(sub), bt_mesh.iv_index, ++pts_cnt);
+		BT_PTS("[PTS] Sending secure network beacon (Flags = 0x%02X, IV Index = 0x%08lX) %lu", bt_mesh_net_flags(sub), bt_mesh.iv_index, ++pts_cnt);
 #endif
 
 		bt_mesh_adv_send(buf, &send_cb, sub);
@@ -189,7 +189,7 @@ static int unprovisioned_beacon_send(void)
 
 #if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	static u32_t pts_cnt = 0;
-	BT_PTS("[PTS] Sending unprovisioned device beacon %u", ++pts_cnt);
+	BT_PTS("[PTS] Sending unprovisioned device beacon %lu", ++pts_cnt);
 #endif
 
 	bt_mesh_adv_send(buf, NULL, NULL);
@@ -338,10 +338,10 @@ static void secure_beacon_recv(struct net_buf_simple *buf)
 #if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	BT_PTS("[PTS] Secure network beacon received");
 	BT_PTS("[PTS] - Flags: [0x%02X]", flags);
-	BT_PTS("[PTS] - IV Index: [0x%08X]", iv_index);
+	BT_PTS("[PTS] - IV Index: [0x%08lX]", iv_index);
 #endif
 
-	BT_DBG("flags 0x%02x id %s iv_index 0x%08x",
+	BT_DBG("flags 0x%02x id %s iv_index 0x%08lx",
 	       flags, bt_hex(net_id, 8), iv_index);
 
 	sub = bt_mesh_subnet_find(net_id, flags, iv_index, auth, &new_key);
@@ -377,7 +377,7 @@ static void secure_beacon_recv(struct net_buf_simple *buf)
 #endif
 	}
 
-	BT_DBG("net_idx 0x%04x iv_index 0x%08x, current iv_index 0x%08x",
+	BT_DBG("net_idx 0x%04x iv_index 0x%08lx, current iv_index 0x%08lx",
 	       sub->net_idx, iv_index, bt_mesh.iv_index);
 
 	if (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_INITIATOR) &&

@@ -7,7 +7,7 @@ DESCRIPTION
 
 ****************************************************************************/
 
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -15,7 +15,7 @@ DESCRIPTION
 #include "gatt.h"
 #include "uuid.h"
 #include "ias.h"
-#include "log.h"
+#include "bt_log.h"
 
 
 /*************************************************************************

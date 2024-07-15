@@ -45,11 +45,25 @@ typedef enum {
     HOSAL_IRQ_TRIG_POS_LEVEL,        /**< @brief  GPIO posedge level trigger interrupt (32k 3T)*/
     HOSAL_IRQ_TRIG_NEG_POS_PULSE,
 
+#if defined(BL702L)
+    HOSAL_IRQ_TRIG_SYNC_FALLING_EDGE = 0,        /*!< GPIO interrupt sync mode, GPIO falling edge trigger interrupt */
+    HOSAL_IRQ_TRIG_SYNC_RISING_EDGE = 1,         /*!< GPIO interrupt sync mode, GPIO rising edge trigger interrupt */
+    HOSAL_IRQ_TRIG_SYNC_LOW_LEVEL = 2,           /*!< GPIO interrupt sync mode, GPIO low level trigger interrupt (32k 3T) */
+    HOSAL_IRQ_TRIG_SYNC_HIGH_LEVEL = 3,          /*!< GPIO interrupt sync mode, GPIO high level trigger interrupt (32k 3T) */
+    HOSAL_IRQ_TRIG_SYNC_FALLING_RISING_EDGE = 4, /*!< GPIO interrupt sync mode, GPIO falling and rising edge trigger interrupt */
+    HOSAL_IRQ_TRIG_ASYNC_FALLING_EDGE = 8,       /*!< GPIO interrupt async mode, GPIO falling edge trigger interrupt */
+    HOSAL_IRQ_TRIG_ASYNC_RISING_EDGE = 9,        /*!< GPIO interrupt async mode, GPIO rising edge trigger interrupt */
+    HOSAL_IRQ_TRIG_ASYNC_LOW_LEVEL = 10,         /*!< GPIO interrupt async mode, GPIO low level trigger interrupt (32k 3T) */
+    HOSAL_IRQ_TRIG_ASYNC_HIGH_LEVEL = 11,        /*!< GPIO interrupt async mode, GPIO high level trigger interrupt (32k 3T) */
+#endif
+
+#if defined(BL616)
     HOSAL_IRQ_TRIG_SYNC_FALLING_EDGE = 10,        /*!< GPIO interrupt sync mode, GPIO falling edge trigger interrupt */
     HOSAL_IRQ_TRIG_SYNC_RISING_EDGE = 11,         /*!< GPIO interrupt sync mode, GPIO rising edge trigger interrupt */
     HOSAL_IRQ_TRIG_SYNC_LOW_LEVEL = 12,           /*!< GPIO interrupt sync mode, GPIO low level trigger interrupt (32k 3T) */
     HOSAL_IRQ_TRIG_SYNC_HIGH_LEVEL = 13,          /*!< GPIO interrupt sync mode, GPIO high level trigger interrupt (32k 3T) */
     HOSAL_IRQ_TRIG_SYNC_FALLING_RISING_EDGE = 14, /*!< GPIO interrupt sync mode, GPIO falling and rising edge trigger interrupt */
+#endif
 } hosal_gpio_irq_trigger_t;
 
 /**

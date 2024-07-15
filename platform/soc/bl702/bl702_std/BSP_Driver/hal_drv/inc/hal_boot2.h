@@ -46,6 +46,7 @@ extern "C" {
 #include "bl702_uart.h"
 #include "bl702_clock.h"
 #include "bl702_sec_eng.h"
+#include "bl702_timer.h"
 
 #define BL_TCM_BASE           BL702_TCM_BASE
 #define BL_SYS_CLK_PLL        GLB_SYS_CLK_DLL144M

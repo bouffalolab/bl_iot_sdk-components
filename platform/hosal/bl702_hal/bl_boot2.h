@@ -36,7 +36,7 @@
 #ifndef __BL_BOOT2_H__
 #define __BL_BOOT2_H__
 
-#include "stdint.h"
+#include <stdint.h>
 #include "bl702_sflash.h"
 #include "bl702_xip_sflash.h"
 

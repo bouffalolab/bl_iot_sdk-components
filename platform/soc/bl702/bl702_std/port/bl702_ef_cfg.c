@@ -33,10 +33,12 @@
   *
   ******************************************************************************
   */
-#include "bflb_efuse.h"
-#include "bflb_ef_ctrl.h"
+//#include "bflb_efuse.h"
+//#include "bflb_ef_ctrl.h"
 //#include "bl702_ef_cfg.h"
 #include "bl702_glb.h"
+#include "bflb_efuse.h"
+#include "bflb_ef_ctrl.h"
 #include "hardware/ef_data_reg.h"
 
 static const bflb_ef_ctrl_com_trim_cfg_t trim_list[] = {
@@ -103,7 +105,7 @@ void ATTR_TCM_SECTION bflb_efuse_switch_cpu_clock_restore(void)
 {
     /* all API should be place at tcm section */
     GLB_Set_System_CLK_Div(hdiv, bdiv);
-    HBN_Set_ROOT_CLK_Sel(rtClk);
+    HBN_Set_ROOT_CLK_Sel((HBN_ROOT_CLK_Type)rtClk);
 }
 
 /****************************************************************************/ /**

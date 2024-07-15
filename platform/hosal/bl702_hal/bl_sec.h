@@ -3,9 +3,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <FreeRTOS.h>
-#include <semphr.h>
-
 #include <bl_sec_common.h>
 #include <bl_sec_pka.h>
 #include <bl_sec_aes.h>
@@ -13,8 +10,6 @@
 #if defined(__cplusplus)
 extern "C" {
 #endif
-
-extern SemaphoreHandle_t g_bl_sec_sha_mutex;
 
 int bl_sec_init(void);
 int bl_sec_test(void);
@@ -40,7 +35,7 @@ int bl_sha_finish(bl_sha_ctx_t *ctx, uint8_t *hash);
 int bl_sec_ccm_encrypt_and_tag(const uint8_t *key, unsigned int key_bytelen, size_t length, const unsigned char *iv, size_t iv_len, const unsigned char *add, size_t add_len,
                          const unsigned char *input, unsigned char *output, unsigned char *tag, size_t tag_len);
 int bl_sec_ccm_auth_decrypt(const uint8_t *key, unsigned int key_bytelen, size_t length,const unsigned char *iv, size_t iv_len, const unsigned char *add,
-							 size_t add_len, const unsigned char *input, unsigned char *output, const unsigned char *tag, size_t tag_len);
+                             size_t add_len, const unsigned char *input, unsigned char *output, const unsigned char *tag, size_t tag_len);
 int bl_sec_aes_ecb_encrypt(const uint8_t *key, unsigned int key_bytelen, size_t length, const unsigned char *input, unsigned char *output);
 int bl_sec_aes_ecb_decrypt(const uint8_t *key, unsigned int key_bytelen, size_t length, const unsigned char *input, unsigned char *output);
 

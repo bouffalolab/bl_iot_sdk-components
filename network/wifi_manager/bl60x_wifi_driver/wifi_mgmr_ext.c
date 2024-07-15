@@ -306,6 +306,12 @@ int wifi_mgmr_sta_dns_get(uint32_t *dns1, uint32_t *dns2)
         return -1;
     }
 
+    if (!netif_is_link_up(&wifiMgmr.wlan_sta.netif)) {
+        ip_addr_set_any(0, (ip_addr_t*)dns1);
+        ip_addr_set_any(0, (ip_addr_t*)dns2);
+        return 0;
+    }
+
     /*Get DNS1*/
     dns = dns_getserver(0);
     *dns1 = ip_addr_get_ip4_u32(dns);
@@ -668,6 +674,11 @@ int wifi_mgmr_ap_ip_get(uint32_t *ip, uint32_t *gw, uint32_t *mask)
 int wifi_mgmr_ap_start(wifi_interface_t *interface, char *ssid, int hidden_ssid, char *passwd, int channel)
 {
     return wifi_mgmr_api_ap_start(ssid, passwd, channel, hidden_ssid, -1, 1);
+}
+
+int wifi_mgmr_ap_chan_switch(wifi_interface_t *interface, int channel, uint8_t cs_count)
+{
+    return wifi_mgmr_api_chan_switch(channel, cs_count);
 }
 
 int wifi_mgmr_ap_start_adv(wifi_interface_t *interface, char *ssid, int hidden_ssid, char *passwd, int channel, uint8_t use_dhcp)

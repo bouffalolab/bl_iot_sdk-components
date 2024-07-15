@@ -13,7 +13,7 @@
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <string.h>
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <zephyr.h>
 
 #include "settings.h"
@@ -28,7 +28,7 @@
 #if !defined(BFLB_BLE)
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_SERVICE)
 #define LOG_MODULE_NAME bt_dis
-#include "log.h"
+#include "bt_log.h"
 #endif
 
 #if CONFIG_BT_GATT_DIS_PNP
@@ -45,7 +45,7 @@ struct dis_pnp {
 #elif defined(BL602)
 #define CONFIG_BT_GATT_DIS_MODEL    "BL602_BLE_MODEL"
 #else
-#define CONFIG_BT_GATT_DIS_MODEL
+#define CONFIG_BT_GATT_DIS_MODEL    "BL_BLE_MODEL"
 #endif
 
 #define CONFIG_BT_GATT_DIS_MANUF    "Bouffalo Lab"
@@ -54,7 +54,7 @@ struct dis_pnp {
 #define CONFIG_BT_GATT_DIS_HW_REV_STR    "0001"
 #define CONFIG_BT_GATT_DIS_SW_REV_STR    "123"
 
-#define CONFIG_BT_GATT_DIS_PNP_VID       0x07AF
+#define CONFIG_BT_GATT_DIS_PNP_VID       0x0A38
 #define CONFIG_BT_GATT_DIS_PNP_PID       0x707
 #define CONFIG_BT_GATT_DIS_PNP_VER       0x0000
 #endif
@@ -131,6 +131,7 @@ static struct bt_gatt_attr attrs[]= {
 	BT_GATT_CHARACTERISTIC(BT_UUID_DIS_MODEL_NUMBER,
 			       BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
 			       read_str, NULL, BT_GATT_DIS_MODEL_REF),
+
 	BT_GATT_CHARACTERISTIC(BT_UUID_DIS_MANUFACTURER_NAME,
 			       BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
 			       read_str, NULL, BT_GATT_DIS_MANUF_REF),

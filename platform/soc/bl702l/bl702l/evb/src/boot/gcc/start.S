@@ -40,7 +40,7 @@ bl702_start:
 	call bl_sys_cache_config
 
 	/* Load boot2 partition address */
-	la a0, __boot2_pt_addr_src
+	jal hal_boot2_get_pt_addr
 	la a1, __boot2_pt_addr_start
 	la a2, __boot2_pt_addr_end
 	bgeu a1, a2, 2f

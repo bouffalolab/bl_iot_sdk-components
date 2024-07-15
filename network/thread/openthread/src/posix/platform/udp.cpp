@@ -36,6 +36,9 @@
 #define __APPLE_USE_RFC_3542
 #endif
 
+#define _GNU_SOURCE
+#include <string.h>
+
 #include "openthread-posix-config.h"
 #include "platform-posix.h"
 
@@ -571,7 +574,7 @@ void Udp::Init(const char *aIfName)
     {
         VerifyOrDie(strlen(aIfName) < sizeof(gNetifName) - 1, OT_EXIT_INVALID_ARGUMENTS);
         assert(gNetifIndex == 0);
-        strcpy(gNetifName, aIfName);
+        strlcpy(gNetifName, aIfName, sizeof(gNetifName));
         gNetifIndex = if_nametoindex(gNetifName);
         VerifyOrDie(gNetifIndex != 0, OT_EXIT_ERROR_ERRNO);
     }

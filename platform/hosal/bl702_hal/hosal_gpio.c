@@ -7,13 +7,55 @@
 #include <bl702.h>
 #include <bl_irq.h>
 
-#define GPIP_INT_STATE_OFFSET    (0x1a8)
 static hosal_gpio_ctx_t *gpio_head = NULL;
+
+static hosal_gpio_ctx_t *hosal_gpio_find_node(hosal_gpio_dev_t *gpio)
+{
+    hosal_gpio_ctx_t *ctx;
+
+    for (ctx = gpio_head; ctx != NULL; ctx = ctx->next) {
+        if (ctx->pin == gpio->port) {
+            break;
+        }
+    }
+
+    return ctx;
+}
+
+static void hosal_gpio_add_node(hosal_gpio_ctx_t *node)
+{
+    node->next = gpio_head;
+    gpio_head = node;
+}
+
+static void hosal_gpio_delete_node(hosal_gpio_ctx_t *node)
+{
+    hosal_gpio_ctx_t *ctx;
+
+    if (gpio_head == node) {
+        gpio_head = node->next;
+    } else {
+        for (ctx = gpio_head; ctx != NULL; ctx = ctx->next) {
+            if (ctx->next == node) {
+                ctx->next = node->next;
+                break;
+            }
+        }
+    }
+}
 
 int hosal_gpio_init(hosal_gpio_dev_t *gpio)
 {
     if (gpio == NULL) {
         return -1;
+    }
+
+    hosal_gpio_ctx_t *node = hosal_gpio_find_node(gpio);
+    if (node == NULL) {
+        node = malloc(sizeof(hosal_gpio_ctx_t));
+        node->pin = gpio->port;
+        node->handle = NULL;
+        hosal_gpio_add_node(node);
     }
 
     switch (gpio->config) {
@@ -46,52 +88,41 @@ int hosal_gpio_output_set(hosal_gpio_dev_t *gpio, uint8_t value)
     if (gpio == NULL) {
         return -1;
     }
-    GLB_GPIO_Write((GLB_GPIO_Type)gpio->port, value ? 1 : 0);
+
+    bl_gpio_output_set(gpio->port, value);
     return 0;
 }
 
-int hosal_gpio_input_get(hosal_gpio_dev_t *gpio, uint8_t  *value)
+int hosal_gpio_input_get(hosal_gpio_dev_t *gpio, uint8_t *value)
 {
     if (gpio == NULL) {
         return -1;
     }
 
-    *value = GLB_GPIO_Read((GLB_GPIO_Type)gpio->port);
+    bl_gpio_input_get(gpio->port, value);
     return 0;
 }
 
-static int check_gpio_is_interrupt(int gpioPin)
+static int check_gpio_is_interrupt(GLB_GPIO_Type gpioPin)
 {
-    int bitcount = 0;
-    int reg_val = 0;
-
-    bitcount = 1 << gpioPin;
-    reg_val = *(int32_t *)(GLB_BASE + GPIP_INT_STATE_OFFSET);
-
-    if ((bitcount & reg_val) == bitcount) {
-        return 0;
-    }
-    return -1;
+    return GLB_Get_GPIO_IntStatus(gpioPin) == SET ? 0 : -1;
 }
 
-static int exec_gpio_handler(hosal_gpio_ctx_t *node)
+static void exec_gpio_handler(hosal_gpio_ctx_t *node)
 {
     bl_gpio_intmask(node->pin, 1);
 
     if (node->handle) {
         node->handle(node->arg);
-        bl_gpio_intmask(node->pin, 0);
-        return 0;
     }
-    bl_gpio_intmask(node->pin, 0);
 
-    return -1;
+    bl_gpio_intmask(node->pin, 0);
 }
 
-static void gpio_interrupt_entry(hosal_gpio_ctx_t *pstnode)
+static void gpio_interrupt_entry(hosal_gpio_ctx_t **pstnode)
 {
     int ret;
-    hosal_gpio_ctx_t *node  = pstnode;
+    hosal_gpio_ctx_t *node = *pstnode;
 
     while (node) {
         ret = check_gpio_is_interrupt(node->pin);
@@ -101,53 +132,27 @@ static void gpio_interrupt_entry(hosal_gpio_ctx_t *pstnode)
 
         node = node->next;
     }
-    return;
 }
 
 int hosal_gpio_irq_set(hosal_gpio_dev_t *gpio, hosal_gpio_irq_trigger_t trigger_type, hosal_gpio_irq_handler_t handler, void *arg)
 {
-    if (NULL == gpio || gpio->port > GLB_GPIO_PIN_MAX || trigger_type > 3) {
-        printf("hosal irq register paraments is not correct! \r\n");
+    if (gpio == NULL || trigger_type > 3) {
+        blog_error("hosal irq register parameter is not correct!\r\n");
         return -1;
     }
-    hosal_gpio_ctx_t *node = NULL;
-    hosal_gpio_ctx_t *node_f = NULL;
-    node = (hosal_gpio_ctx_t *)pvPortMalloc(sizeof(hosal_gpio_ctx_t));
-    if (!node) {
-        printf("hosal irq ctx malloc failed \r\n");
+
+    hosal_gpio_ctx_t *node = hosal_gpio_find_node(gpio);
+    if (node == NULL) {
+        blog_error("please hosal_gpio_init for gpio%d!\r\n", gpio->port);
         return -1;
     }
-    node->handle     = handler;
-    node->arg        = arg;
-    node->pin        = gpio->port;
-    node->intCtrlMod = GLB_GPIO_INT_CONTROL_ASYNC;
-    node->intTrigMod = trigger_type;
-    if (!gpio_head) {
-        gpio_head = node;
-        node->next = NULL;
-    } else {
-        for (node_f = gpio_head; node_f != NULL; node_f = node_f->next) {
-            if (node_f->pin == node->pin) {
-#if 0
-                memcpy(node_f, node, sizeof(hosal_gpio_ctx_t));// will crash beacause next field is NULL
-#endif
-                node_f->handle = node->handle;
-                node_f->arg    = node->arg;
-                node_f->intCtrlMod = node->intCtrlMod;
-                node_f->intTrigMod = node->intTrigMod;
-                vPortFree(node);
-                break;
-            }
-        }
-        if (node_f == NULL) {
-            node->next = gpio_head;
-            gpio_head = node;
-        }
-    }
+
+    node->handle = handler;
+    node->arg = arg;
 
     bl_gpio_intmask(gpio->port, 1);
     bl_set_gpio_intmod(gpio->port, GLB_GPIO_INT_CONTROL_ASYNC, trigger_type);
-    bl_irq_register_with_ctx(GPIO_INT0_IRQn, gpio_interrupt_entry, gpio_head);
+    bl_irq_register_with_ctx(GPIO_INT0_IRQn, gpio_interrupt_entry, &gpio_head);
     bl_gpio_intmask(gpio->port, 0);
     bl_irq_enable(GPIO_INT0_IRQn);
     return 0;
@@ -158,8 +163,8 @@ int hosal_gpio_irq_mask(hosal_gpio_dev_t *gpio, uint8_t mask)
     if (gpio  == NULL) {
         return -1;
     }
-    bl_gpio_intmask(gpio->port, mask ? 1 : 0);
 
+    bl_gpio_intmask(gpio->port, mask ? 1 : 0);
     return 0;
 }
 
@@ -168,17 +173,13 @@ int hosal_gpio_finalize(hosal_gpio_dev_t *gpio)
     if (gpio == NULL) {
         return -1;
     }
-    hosal_gpio_ctx_t *node = NULL;
-    for (node = gpio_head; node != NULL; node = node->next) {
-        if (node->pin == gpio->port) {
-            vPortFree(node);
-        }
+
+    hosal_gpio_ctx_t *node = hosal_gpio_find_node(gpio);
+    if (node != NULL) {
+        hosal_gpio_delete_node(node);
+        free(node);
     }
-    
+
     bl_gpio_intmask(gpio->port, 1);
-    bl_gpio_int_clear(gpio->port, 0);
-    return 0;    
+    return 0;
 }
-
-
-

@@ -1,17 +1,12 @@
 #include <stdio.h>
 #include <stdint.h>
-#include <bl702.h>
-#include <bl702_gpio.h>
-#include <bl702_glb.h>
 #include <bl_pwm.h>
 #include <hosal_pwm.h>
 #include <blog.h>
-#define _HAL_PWM_DUTY_ACCURACY  100
-#define PWM_CHANNAL_MAX     5
+
 
 /**
- * Initialises a PWM pin
- *
+ * Initialises a PWM device
  *
  * @param[in]  pwm  the PWM device
  *
@@ -19,31 +14,29 @@
  */
 int hosal_pwm_init(hosal_pwm_dev_t *pwm)
 {
-    uint8_t ch;
-	GLB_GPIO_Cfg_Type cfg = {
-        .drive = 0,
-        .smtCtrl = 1,
-        .gpioMode = GPIO_MODE_OUTPUT,
-        .pullType = GPIO_PULL_DOWN,
-        .gpioPin = 0,
-        .gpioFun = 8,
-    };
-    
-    if (NULL == pwm || pwm->port >= PWM_CHANNAL_MAX) {
+    if (pwm == NULL) {
+        blog_error("arg null.\r\n");
+        return -1;
+    }
+
+    if (pwm->port > 4) {
         blog_error("arg error.\r\n");
         return -1;
     }
-    ch = pwm->config.pin % PWM_CHANNAL_MAX;
-    if (ch != pwm->port) {
-        blog_error("error:pwm pin and port do not correspond!  mapping rules: pwm_ch = pin %% 5\r\n");
+
+    if (pwm->config.pin > 31) {
+        blog_error("arg error.\r\n");
         return -1;
     }
-    cfg.gpioPin = pwm->config.pin; 
-    GLB_GPIO_Init(&cfg);
 
-    PWM_Channel_Disable(ch);
-    GLB_AHB_Slave1_Clock_Gate(DISABLE,BL_AHB_SLAVE1_PWM);
-    PWM_Smart_Configure(ch, pwm->config.freq, (uint8_t)(pwm->config.duty_cycle/100));
+    if (pwm->port != pwm->config.pin % 5) {
+        blog_error("pwm port and pin do not match!\r\n");
+        return -1;
+    }
+
+    bl_pwm_port_init(pwm->port, pwm->config.freq);
+    bl_pwm_gpio_init(pwm->port, pwm->config.pin);
+    bl_pwm_set_duty(pwm->port, pwm->config.duty_cycle / 100);
 
     return 0;
 }
@@ -57,94 +50,145 @@ int hosal_pwm_init(hosal_pwm_dev_t *pwm)
  */
 int hosal_pwm_start(hosal_pwm_dev_t *pwm)
 {
-    uint8_t ch;
+    if (pwm == NULL) {
+        blog_error("arg null.\r\n");
+        return -1;
+    }
 
-    if (NULL == pwm || pwm->port >= PWM_CHANNAL_MAX) {
+    if (pwm->port > 4) {
         blog_error("arg error.\r\n");
         return -1;
     }
 
-    ch = pwm->port;
-    bl_pwm_start(ch);
+    bl_pwm_start(pwm->port);
+
     return 0;
 }
 
 /**
- * Stops output on a PWM pin
+ * Changes parameters of the PWM device
  *
- * @param[in]  pwm  the PWM device, para  set duty and  freq
+ * @param[in]  pwm  the PWM device
+ * @param[in]  para  the new parameters (frequency and duty cycle)
  *
  * @return  0 : on success, EIO : if an error occurred with any step
  */
 int hosal_pwm_para_chg(hosal_pwm_dev_t *pwm, hosal_pwm_config_t para)
 {
-    uint8_t ch;
+    if (pwm == NULL) {
+        blog_error("arg null.\r\n");
+        return -1;
+    }
 
-    if (NULL == pwm || pwm->port >= PWM_CHANNAL_MAX) {
+    if (pwm->port > 4) {
         blog_error("arg error.\r\n");
         return -1;
     }
-    
-    ch = pwm->port;
+
     pwm->config.freq = para.freq;
+    bl_pwm_port_init(pwm->port, pwm->config.freq);
+
     pwm->config.duty_cycle = para.duty_cycle;
-    PWM_Smart_Configure(ch, para.freq, (uint8_t)(para.duty_cycle/100));
-    
+    bl_pwm_set_duty(pwm->port, pwm->config.duty_cycle / 100);
+
+    bl_pwm_start(pwm->port);
+
     return 0;
 }
 
 /**
- * set pwm freq
+ * Changes frequency of the PWM device
  *
- *@param[in] id pwm channel
- *@param[in] freq pwm freq
+ * @param[in]  pwm  the PWM device
+ * @param[in]  freq  the new frequency
  *
- *@return 0 : on success -1 : fail
+ * @return  0 : on success, EIO : if an error occurred with any step
  */
 int hosal_pwm_freq_set(hosal_pwm_dev_t *pwm, uint32_t freq)
 {
-    if (NULL == pwm || pwm->port > PWM_CHANNAL_MAX) {
+    if (pwm == NULL) {
+        blog_error("arg null.\r\n");
+        return -1;
+    }
+
+    if (pwm->port > 4) {
         blog_error("arg error.\r\n");
         return -1;
     }
-    if (freq <= (BL_PWM_CLK / (1UL << 16)) || freq > (BL_PWM_CLK / 100)) {
-        return -1;
-    }
+
     pwm->config.freq = freq;
-    PWM_Smart_Configure(pwm->port, freq, (uint8_t)(pwm->config.duty_cycle/100));
+    bl_pwm_port_init(pwm->port, pwm->config.freq);
+
+    bl_pwm_set_duty(pwm->port, pwm->config.duty_cycle / 100);
+
+    bl_pwm_start(pwm->port);
+
     return 0;
 }
 
 int hosal_pwm_freq_get(hosal_pwm_dev_t *pwm,  uint32_t *p_freq)
 {
-    if (NULL == pwm || pwm->port > PWM_CHANNAL_MAX || NULL == p_freq) {
+    if (pwm == NULL) {
+        blog_error("arg null.\r\n");
+        return -1;
+    }
+
+    if (pwm->port > 4) {
         blog_error("arg error.\r\n");
         return -1;
     }
+
     *p_freq = pwm->config.freq;
+
     return 0;
 }
 
+/**
+ * Changes duty cycle of the PWM device
+ *
+ * @param[in]  pwm  the PWM device
+ * @param[in]  duty  the new duty cycle
+ *
+ * @return  0 : on success, EIO : if an error occurred with any step
+ */
 int hosal_pwm_duty_set(hosal_pwm_dev_t *pwm, uint32_t duty)
 {
-	if (NULL == pwm || pwm->port >= PWM_CHANNAL_MAX || duty > 10000) {
+    if (pwm == NULL) {
+        blog_error("arg null.\r\n");
+        return -1;
+    }
+
+    if (pwm->port > 4) {
         blog_error("arg error.\r\n");
         return -1;
     }
+
     pwm->config.duty_cycle = duty;
-    PWM_Smart_Configure(pwm->port, pwm->config.freq, (uint8_t)(pwm->config.duty_cycle/100));
+    bl_pwm_set_duty(pwm->port, pwm->config.duty_cycle / 100);
+
     return 0;
 }
 
 int hosal_pwm_duty_get(hosal_pwm_dev_t *pwm, uint32_t *p_duty)
 {
-	if (NULL == pwm || pwm->port >= PWM_CHANNAL_MAX || NULL == p_duty) {
+    float duty;
+
+    if (pwm == NULL) {
+        blog_error("arg null.\r\n");
+        return -1;
+    }
+
+    if (pwm->port > 4) {
         blog_error("arg error.\r\n");
         return -1;
     }
-    *p_duty = pwm->config.duty_cycle;
+
+    bl_pwm_get_duty(pwm->port, &duty);
+    *p_duty = (uint32_t)(duty * 100);
+
     return 0;
 }
+
 /**
  * Stops output on a PWM pin
  *
@@ -154,37 +198,41 @@ int hosal_pwm_duty_get(hosal_pwm_dev_t *pwm, uint32_t *p_duty)
  */
 int hosal_pwm_stop(hosal_pwm_dev_t *pwm)
 {
-    uint8_t ch;
+    if (pwm == NULL) {
+        blog_error("arg null.\r\n");
+        return -1;
+    }
 
-    if (NULL == pwm || pwm->port >= PWM_CHANNAL_MAX) {
+    if (pwm->port > 4) {
         blog_error("arg error.\r\n");
         return -1;
     }
 
-    ch = pwm->port;
-    bl_pwm_stop(ch);
+    bl_pwm_stop(pwm->port);
+
     return 0;
 }
 
 /**
- * De-initialises an PWM interface, Turns off an PWM hardware interface
+ * De-initialises the PWM device
  *
- * @param[in]  pwm  the interface which should be de-initialised
+ * @param[in]  pwm  the PWM device
  *
  * @return  0 : on success, EIO : if an error occurred with any step
  */
 int hosal_pwm_finalize(hosal_pwm_dev_t *pwm)
 {
-    uint8_t ch;
+    if (pwm == NULL) {
+        blog_error("arg null.\r\n");
+        return -1;
+    }
 
-    if (NULL == pwm || pwm->port >= PWM_CHANNAL_MAX) {
+    if (pwm->port > 4) {
         blog_error("arg error.\r\n");
         return -1;
     }
 
-    ch = pwm->port;
-    bl_pwm_stop(ch);
+    bl_pwm_stop(pwm->port);
+
     return 0;
 }
-
-

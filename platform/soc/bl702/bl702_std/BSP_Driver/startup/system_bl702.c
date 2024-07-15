@@ -50,7 +50,7 @@ void USB_DoNothing_IRQHandler(void)
   System initialization function
  *----------------------------------------------------------------------------*/
 
-void system_bor_init(void)
+__attribute__((optimize("O0"))) void system_bor_init(void)
 {
     HBN_BOR_CFG_Type borCfg;
     borCfg.enableBor = 1;
@@ -60,7 +60,7 @@ void system_bor_init(void)
     HBN_Set_BOR_Cfg(&borCfg);
 }
 
-void SystemInit(void)
+__attribute__((optimize("O0"))) void SystemInit(void)
 {
     uint32_t *p;
     uint32_t i = 0;

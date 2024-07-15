@@ -18,8 +18,8 @@
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_PROXY)
 #define LOG_MODULE_NAME bt_mesh_proxy
-#include "log.h"
-#include "errno.h"
+#include "bt_log.h"
+#include "bt_errno.h"
 
 #include "mesh.h"
 #include "adv.h"
@@ -66,7 +66,7 @@
 #else
 #define ADV_OPT (BT_LE_ADV_OPT_CONNECTABLE | BT_LE_ADV_OPT_ONE_TIME)
 #endif
-
+#if defined(CONFIG_BT_MESH_GATT_PROXY) || defined(CONFIG_BT_MESH_PB_GATT)
 static const struct bt_le_adv_param slow_adv_param = {
 	.options = ADV_OPT,
 	.interval_min = BT_GAP_ADV_SLOW_INT_MIN,
@@ -78,6 +78,7 @@ static const struct bt_le_adv_param fast_adv_param = {
 	.interval_min = BT_GAP_ADV_FAST_INT_MIN_2,
 	.interval_max = BT_GAP_ADV_FAST_INT_MAX_2,
 };
+#endif /* CONFIG_BT_MESH_GATT_PROXY */
 #if !defined(CONFIG_BLE_MULTI_ADV)
 static bool proxy_adv_enabled;
 #else
@@ -1344,7 +1345,7 @@ static s32_t gatt_proxy_advertise(struct bt_mesh_subnet *sub)
 
 		if (active < NODE_ID_TIMEOUT) {
 			remaining = NODE_ID_TIMEOUT - active;
-			BT_DBG("Node ID active for %u ms, %d ms remaining",
+			BT_DBG("Node ID active for %lu ms, %ld ms remaining",
 			       active, remaining);
 			node_id_adv(sub);
 		} else {
@@ -1376,7 +1377,7 @@ static s32_t gatt_proxy_advertise(struct bt_mesh_subnet *sub)
 		}
 	}
 
-	BT_DBG("Advertising %d ms for net_idx 0x%04x", remaining, sub->net_idx);
+	BT_DBG("Advertising %ld ms for net_idx 0x%04x", remaining, sub->net_idx);
 	/* Modified by bouffalo */
 	return remaining;
 }

@@ -8,7 +8,7 @@
 
 #include <string.h>
 #include <stdbool.h>
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <toolchain.h>
 #include <types.h>
 #include <byteorder.h>
@@ -25,7 +25,7 @@
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_CRYPTO)
 #define LOG_MODULE_NAME bt_mesh_crypto
-#include "log.h"
+#include "bt_log.h"
 
 #include "mesh.h"
 #include "crypto.h"
@@ -603,7 +603,7 @@ int bt_mesh_net_obfuscate(u8_t *pdu, u32_t iv_index,
 	u8_t tmp[16];
 	int err, i;
 
-	BT_DBG("IVIndex %u, PrivacyKey %s", iv_index, bt_hex(privacy_key, 16));
+	BT_DBG("IVIndex %lu, PrivacyKey %s", iv_index, bt_hex(privacy_key, 16));
 
 	sys_put_be32(iv_index, &priv_rand[5]);
 	memcpy(&priv_rand[9], &pdu[7], 7);
@@ -629,7 +629,7 @@ int bt_mesh_net_encrypt(const u8_t key[16], struct net_buf_simple *buf,
 	u8_t nonce[13];
 	int err;
 
-	BT_DBG("IVIndex %u EncKey %s mic_len %u", iv_index, bt_hex(key, 16),
+	BT_DBG("IVIndex %lu EncKey %s mic_len %u", iv_index, bt_hex(key, 16),
 	       mic_len);
 	BT_DBG("PDU (len %u) %s", buf->len, bt_hex(buf->data, buf->len));
 
@@ -661,7 +661,7 @@ int bt_mesh_net_decrypt(const u8_t key[16], struct net_buf_simple *buf,
 	u8_t nonce[13];
 
 	BT_DBG("PDU (%u bytes) %s", buf->len, bt_hex(buf->data, buf->len));
-	BT_DBG("iv_index %u, key %s mic_len %u", iv_index, bt_hex(key, 16),
+	BT_DBG("iv_index %lu, key %s mic_len %u", iv_index, bt_hex(key, 16),
 	       mic_len);
 
 #if defined(CONFIG_BT_MESH_PROXY)
@@ -709,7 +709,7 @@ int bt_mesh_app_encrypt(const u8_t key[16], bool dev_key, u8_t aszmic,
 
 	BT_DBG("AppKey %s", bt_hex(key, 16));
 	BT_DBG("dev_key %u src 0x%04x dst 0x%04x", dev_key, src, dst);
-	BT_DBG("seq_num 0x%08x iv_index 0x%08x", seq_num, iv_index);
+	BT_DBG("seq_num 0x%08lx iv_index 0x%08lx", seq_num, iv_index);
 	BT_DBG("Clear: %s", bt_hex(buf->data, buf->len));
 
 	create_app_nonce(nonce, dev_key, aszmic, src, dst, seq_num, iv_index);
@@ -886,7 +886,7 @@ int bt_mesh_beacon_auth(const u8_t beacon_key[16], u8_t flags,
 
 	BT_DBG("BeaconKey %s", bt_hex(beacon_key, 16));
 	BT_DBG("NetId %s", bt_hex(net_id, 8));
-	BT_DBG("IV Index 0x%08x", iv_index);
+	BT_DBG("IV Index 0x%08lx", iv_index);
 
 	msg[0] = flags;
 	memcpy(&msg[1], net_id, 8);

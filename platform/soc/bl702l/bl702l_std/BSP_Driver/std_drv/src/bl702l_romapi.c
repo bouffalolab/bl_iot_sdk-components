@@ -951,10 +951,12 @@ BL_Err_Type HBN_Set_HRAM_Ret(void){
     return RomDriver_HBN_Set_HRAM_Ret();
 }
 
+#if 0
 __ALWAYS_INLINE ATTR_TCM_SECTION
 BL_Err_Type HBN_Power_On_Xtal_32K(void){
     return RomDriver_HBN_Power_On_Xtal_32K();
 }
+#endif
 
 __ALWAYS_INLINE ATTR_TCM_SECTION
 BL_Err_Type HBN_Power_Off_Xtal_32K(void){
@@ -1375,6 +1377,13 @@ __ALWAYS_INLINE ATTR_TCM_SECTION
 uint32_t SF_Cfg_Flash_Identify(uint8_t callFromFlash, uint32_t autoScan, uint32_t flashPinCfg, uint8_t restoreDefault, SPI_Flash_Cfg_Type *pFlashCfg){
     return RomDriver_SF_Cfg_Flash_Identify(callFromFlash,autoScan,flashPinCfg,restoreDefault,pFlashCfg);
 }
+
+#if 0
+__ALWAYS_INLINE ATTR_TCM_SECTION
+uint32_t SF_Cfg_Flash_Identify_Ext(uint8_t callFromFlash, uint32_t autoScan, uint32_t flashPinCfg, uint8_t restoreDefault, SPI_Flash_Cfg_Type *pFlashCfg){
+    return SF_Cfg_Flash_Identify(callFromFlash,autoScan,flashPinCfg,restoreDefault,pFlashCfg);
+}
+#endif
 
 __ALWAYS_INLINE ATTR_TCM_SECTION
 void SF_Ctrl_Enable(const SF_Ctrl_Cfg_Type *cfg){

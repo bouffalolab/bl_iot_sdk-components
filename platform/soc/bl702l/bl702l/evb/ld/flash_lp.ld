@@ -2,7 +2,7 @@ OUTPUT_ARCH( "riscv" )
 
 ENTRY( bl702_start )
 
-__EM_SIZE = DEFINED(btble_controller_init) ? (DEFINED(__EM_SIZE) ? __EM_SIZE : 16K) : 0K;
+__EM_SIZE = DEFINED(__EM_SIZE) ? __EM_SIZE : 0K;
 __CACHE_SIZE = DEFINED(__CACHE_SIZE) ? __CACHE_SIZE : 8K;
 __stack_size = DEFINED(__stack_size) ? __stack_size : 2K;
 
@@ -17,11 +17,17 @@ MEMORY
 
 SECTIONS
 {
-  BOOT2_PT_ADDR = 0x4202e094;
-
   .init :
   {
     KEEP (*(SORT_NONE(.init)))
+  } >flash
+
+  .ver :
+  {
+    . = ORIGIN(flash) + 0xC00;
+    LONG(0x42464c42); /* BLFB */
+    LONG(0x46524556); /* VERF */
+    KEEP(*(.blverinf))
   } >flash
 
   .text :
@@ -203,7 +209,7 @@ SECTIONS
 
   .stack (NOLOAD) : ALIGN(8)
   {
-    PROVIDE ( _sp_base = . );
+    PROVIDE( _sp_base = . );
     . = . + __stack_size;
     PROVIDE( _sp_main = . );
     __freertos_irq_stack_top = .;
@@ -225,18 +231,18 @@ SECTIONS
   /* ram information */
   PROVIDE( _ld_ram_size0 = LENGTH(flash) );
   PROVIDE( _ld_ram_addr0 = ORIGIN(flash) );
-  PROVIDE( _ld_ram_size1 = LENGTH(ocram) );
-  PROVIDE( _ld_ram_addr1 = ORIGIN(ocram) );
+  PROVIDE( _ld_ram_size1 = LENGTH(tcm) + LENGTH(ocram) );
+  PROVIDE( _ld_ram_addr1 = ORIGIN(tcm) );
   PROVIDE( _ld_ram_size2 = LENGTH(hbnram) );
   PROVIDE( _ld_ram_addr2 = ORIGIN(hbnram) );
   PROVIDE( _ld_ram_size3 = SIZEOF(.stack) );
   PROVIDE( _ld_ram_addr3 = ADDR(.stack) );
 
-  /* BOOT2 parameter */
-  PROVIDE ( __boot2_pt_addr_src = BOOT2_PT_ADDR );
-
   /* EM size */
-  PROVIDE(__LD_CONFIG_EM_SEL = __EM_SIZE);
+  PROVIDE( __LD_CONFIG_EM_SEL = __EM_SIZE );
+
+  /* BLE_CORE_REG size */
+  PROVIDE( __LD_BLE_CORE_REG_SIZE = __EM_SIZE ? 0x214 : 0 );
 
   /* rom driver */
   INCLUDE romdriver.ld

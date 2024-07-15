@@ -81,40 +81,26 @@ typedef enum {
 } I2C_INT_Type;
 
 /**
- *  @brief I2S start condition phase structure type definition
+ *  @brief I2C timing structure type definition
  */
 typedef struct
 {
-    uint8_t len0; /*!< Length of START condition phase 0 */
-    uint8_t len1; /*!< Length of START condition phase 1 */
-    uint8_t len2; /*!< Length of START condition phase 2 */
-    uint8_t len3; /*!< Length of START condition phase 3 */
-} I2C_Start_Condition_Phase_Type;
+    uint8_t start_phase0; /*!< Length of start signal phase 0 */
+    uint8_t start_phase1; /*!< Length of start signal phase 1 */
+    uint8_t start_phase2; /*!< Length of start signal phase 2 */
+    uint8_t start_phase3; /*!< Length of start signal phase 3 */
+    uint8_t stop_phase0;  /*!< Length of stop signal phase 0 */
+    uint8_t stop_phase1;  /*!< Length of stop signal phase 1 */
+    uint8_t stop_phase2;  /*!< Length of stop signal phase 2 */
+    uint8_t stop_phase3;  /*!< Length of stop signal phase 3 */
+    uint8_t data_phase0;  /*!< Length of data signal phase 0 */
+    uint8_t data_phase1;  /*!< Length of data signal phase 1，should not be 0 */
+    uint8_t data_phase2;  /*!< Length of data signal phase 2 */
+    uint8_t data_phase3;  /*!< Length of data signal phase 3 */
+} I2C_Timing_Phase_Type;
 
 /**
- *  @brief I2S stop condition phase structure type definition
- */
-typedef struct
-{
-    uint8_t len0; /*!< Length of STOP condition phase 0 */
-    uint8_t len1; /*!< Length of STOP condition phase 1 */
-    uint8_t len2; /*!< Length of STOP condition phase 2 */
-    uint8_t len3; /*!< Length of STOP condition phase 3 */
-} I2C_Stop_Condition_Phase_Type;
-
-/**
- *  @brief I2S data phase structure type definition
- */
-typedef struct
-{
-    uint8_t len0; /*!< Length of DATA phase 0 */
-    uint8_t len1; /*!< Length of DATA phase 1 */
-    uint8_t len2; /*!< Length of DATA phase 2 */
-    uint8_t len3; /*!< Length of DATA phase 3 */
-} I2C_Data_Phase_Type;
-
-/**
- *  @brief I2S transfer structure type definition
+ *  @brief I2C transfer structure type definition
  */
 typedef struct
 {
@@ -184,6 +170,8 @@ void I2C_Disable(I2C_ID_Type i2cNo);
 BL_Err_Type I2C_SetDeglitchCount(I2C_ID_Type i2cNo, uint8_t cnt);
 BL_Err_Type I2C_DeInit(I2C_ID_Type i2cNo);
 void I2C_SetPrd(I2C_ID_Type i2cNo, uint8_t phase);
+void I2C_SetTimingPhase(I2C_ID_Type i2cNo, I2C_Timing_Phase_Type *timing);
+void I2C_GetTimingPhase(I2C_ID_Type i2cNo, I2C_Timing_Phase_Type *timing);
 void I2C_ClockSet(I2C_ID_Type i2cNo, uint32_t clk);
 void I2C_SetSclSync(I2C_ID_Type i2cNo, uint8_t enable);
 void I2C_Init(I2C_ID_Type i2cNo, I2C_Direction_Type direct, I2C_Transfer_Cfg *cfg);

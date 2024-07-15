@@ -2,7 +2,7 @@
 #define BLE_CONFIG_H
 
 #include "FreeRTOSConfig.h"
-#include "bl_timer.h"
+
 /**
  * CONFIG_BLUETOOTH: Enable the bluetooh stack
  */
@@ -82,7 +82,11 @@
 #if !defined(CONFIG_BT_CONN)
 #define CONFIG_BT_HCI_TX_STACK_SIZE  1024
 #else
+#if defined(CFG_IOT_SDK) || defined(BL_MCU_SDK)
 #define CONFIG_BT_HCI_TX_STACK_SIZE 1536//1024//200
+#else
+#define CONFIG_BT_HCI_TX_STACK_SIZE 1536+512//1024//200
+#endif /*CFG_IOT_SDK || BL_MCU_SDK*/
 #endif
 #endif
 
@@ -117,6 +121,11 @@
 #endif //CONFIG_BT_MESH
 #endif
 
+#if defined(CONFIG_BT_MESH_PTS)
+//#define MESH_LCTL_BIND_WITH_GENLVL   //Lighting CTL Temperature state bind with Genneric Level
+//#define MESH_LHSLH_BIND_WITH_GENLVL  //Lighting HSL Hue state bind with Genneric Level
+//#define MESH_LHSLSA_BIND_WITH_GENLVL //Lighting HSL Saturation state bind with Genneric Level
+#endif
 /**
 * CONFIG_BT_RX_BUF_RSV_COUNT: number of buffer that HCI_LE_EVENT reserved
 * events,range 1 to CONFIG_BT_RX_BUF_COUNT
@@ -308,7 +317,7 @@
 * range 1 to 65535,seconds
 */
 #ifndef CONFIG_BT_RPA_TIMEOUT
-#if defined(CONFIG_AUTO_PTS)
+#if defined(CONFIG_AUTO_PTS) ||defined(CONFIG_BT_STACK_PTS)
 #define CONFIG_BT_RPA_TIMEOUT 60
 #else
 #define CONFIG_BT_RPA_TIMEOUT 900
@@ -321,6 +330,8 @@
 */
 #ifdef CONFIG_BT_GATT_DYNAMIC_DB
 #undef CONFIG_BT_GATT_DYNAMIC_DB
+#define CONFIG_BT_GATT_DYNAMIC_DB 1
+#else
 #define CONFIG_BT_GATT_DYNAMIC_DB 1
 #endif
 
@@ -405,7 +416,11 @@
 */
 #ifndef CONFIG_BT_WORK_QUEUE_STACK_SIZE
 #ifndef CONFIG_BT_MESH
+#if defined(CFG_IOT_SDK) || defined(BL_MCU_SDK)
 #define CONFIG_BT_WORK_QUEUE_STACK_SIZE 1536//1280//512
+#else
+#define CONFIG_BT_WORK_QUEUE_STACK_SIZE 1536+512//1280//512
+#endif /*CFG_IOT_SDK || BL_MCU_SDK*/
 #else
 #if !defined(CONFIG_BT_CONN)
 #define CONFIG_BT_WORK_QUEUE_STACK_SIZE 1024
@@ -584,6 +599,7 @@
 #endif
 
 #define PCM_PRINTF 0
+#define DISABLE_BREDR_INVALID_ENC_KEY_TEST 1
 #endif
 
 #if defined(CONFIG_BT_AUDIO)
@@ -595,12 +611,13 @@
 
 //#define BFLB_BLE_DISABLE_STATIC_ATTR
 //#define BFLB_BLE_DISABLE_STATIC_CHANNEL
+
 #define BFLB_DISABLE_BT
 #define BFLB_FIXED_IRK 0
 #define BFLB_DYNAMIC_ALLOC_MEM
 #define BFLB_BT_LINK_KEYS_STORE
 #if defined(BL702) || defined(BL702L)
-#if defined(CFG_BLE_PDS) && defined(BFLB_BLE) && defined(BFLB_DYNAMIC_ALLOC_MEM)
+#if defined(CFG_BLE_PDS) && defined(BFLB_BLE) && defined(BFLB_DYNAMIC_ALLOC_MEM)&& !defined(CONFIG_BT_MESH)
 #define BFLB_STATIC_ALLOC_MEM   1
 #else
 #define BFLB_STATIC_ALLOC_MEM   0
@@ -701,15 +718,65 @@ BT_SMP_DIST_ENC_KEY bit is not cleared while remote ENC_KEY is received.*/
 #define BFLB_BLE_SMP_SC_ONLY
 #endif
 
-#define BR_EDR_PTS_TEST 0
+/* Fix do att_send_req but att->tx_sem is busy, the request will push into att->tx_queue, when
+ * pop att->tx_queue and send request, att_send not ref req->buf, this will cause buf to be
+ * released early.
+ */
+#define BFLB_BLE_PATCH_ATT_SEND_REQ_WHEN_TX_SEM_BUSY_BUF_ERR
+
 #define BFLB_BLE_ENABLE_TEST_PSM 0
 #define BFLB_BREDR_SCO_TYPE_FIX
 #define BFLB_BLE_PATCH_FORCE_UPDATE_GAP_DEVICE_NAME
 #define BFLB_BLE_PATCH_ADD_ERRNO_IN_DISCOVER_CALLBACK
+#define BFLB_BLE_PATCH_NOT_DO_TX_IF_DISCONNECTED
+/* Fix the issue that sc(gatt service chagned configuration) cannot be saved because of sc entries are all used.
+ * Root cause: the sc entries configured by unbonded peer devices are not cleared.
+ * Fix: Clear the sc entries configred by unbonded peer devices if those peer devices are disconnected.
+ */
+#define BFLB_BLE_PATCH_CLEAR_UNBONDED_DEVICE_SC_WHEN_DISCONNECTED
+/* Fix the issue that gatt configurations are not cleared even if the peer devices are unpaired.
+ * Root cause: 1.when CONFIG_BT_SETTINGS is not enabled, bt_gatt_clear is not called to clear the configurations.
+ * 2. Unpaired device's address is cleared before doing bt_gatt_clear, then gatt configurations cannot be found.
+ * Fix: 1.Whether CONFIG_BT_SETTINGS is enabled or not, clear the configurations when doing unpair.
+ * 2. When doing unpair, clear gatt congigurations before clearing the peer device address.
+ */
+#define BFLB_BLE_PATCH_DO_GATT_CLEAR_IF_UNPAIRED
+#define BFLB_BLE_PATCH_SC_CFG_FAIL_TO_BE_REMOVED_FROM_FLASH
+#define BFLB_BLE_PATCH_AVOID_NEXT_ATT_REQ_SENT_BEFORE_PREVIOUS_ATT_RSP_RCVD
+/*Fix issue in two cases:
+ * 1.upper layer calls bt_conn_create_le, host receives target's adv, and sends stop ble scan hci cmd,then recv_thread is blocked. At that time, upper layer calls bt_conn_disconnect
+ * in cli task, bt_conn_disconnect updates the conn->state to BT_CONN_DISCONNECTED from BT_CONN_CONNECT_SCAN state, and reduce conn->ref. But actally this disconnect operation doesn't
+ * stop the connection procedure. Connection is established successfully. After 5s,upper layer calls bt_conn_disconnect again to disconnect the connection, then assert happens in
+ * bt_conn_unref because conn->ref is reduced when uppper layer calls bt_conn_disconnect at the first time.
+ *
+ * 2.upper layer calls bt_conn_create_le. Before host receives target's adv, upper layer calls bt_conn_disconnect in a lower task. Before conn->state is updated to BT_CONN_DISCONNECTED from
+ * BT_CONN_CONNECT_SCAN, host receives target's adv in recv_thread and bt_conn_disconnect is interrupted. After recv_thread is blocked, bt_conn_disconnect continues to work, it updates
+ * the conn->state to BT_CONN_DISCONNECTED from BT_CONN_CONNECT, and reduce conn->ref. But actally this disconnect operation doesn't
+ * stop the connection procedure. Connection is established successfully. After 5s,upper layer calls bt_conn_disconnect again to disconnect the connection, then assert happens in
+ * bt_conn_unref because conn->ref is reduced when uppper layer calls bt_conn_disconnect at the first time.
+*/
+#define BFLB_BLE_PATCH_AVOID_CONNECT_DISCONNECT_RISK
+/* Fix the issue:upper layer calls bt_conn_disconnect in a lower task. Sometimes, hci_disconnect_complete event comes while the processing in bt_conn_set_state to
+change conn->state to disconnect is not completed. conn->state is changed to disconnected when handing hci_disconnect_complete event. Once hci_disconnect_complete event
+processing is completed, it continues the processing in bt_conn_set_state to change conn_state to disconnect. Because conn->state has been changed to discconnected,
+then it does disconnected flow once more. This will cause hardfault issue because some resourse has been released in previouse disconnected flow.
+(We see conn_cleanup is called twice).
+*/
+#define BFLB_BLE_PATCH_FIX_CONN_STATE_CHANGE_RISK
+#define BFLB_BLE_PATCH_FREE_CONN_UPDATE_WORK_WHEN_CANCEL_CONN_IN_CONNECT_STATE
 #define BFLB_BLE_AUTO_CLEAN_KEY_WHEN_KEY_MISSING
 #define BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC
 #define BFLB_BLE_FREE_CONN_UPDATE_WORK_WHEN_DISCONNECT_IN_CONN_SCAN_STATE
+#define BFLB_BLE_REJECT_CONNECTABLE_ADV_IF_MAX_LINKS_REACH
+/* If there are multiple subscriptions, and host's acl tx buffer is not enough, it will block receive task to wait for host's 
+ * available tx buffer with timout 30s, this make receive task cannot handle att response for last write ccc req to release tx buffer. 
+ * ATT_TIMEOUT will happen because there is no available tx buffer.
+ * Make application layer to do this subscriptions.
+*/
+#define BFLB_BLE_NOT_FORCE_WRITE_CCC_FOR_EXISTED_SUBSCRIPTIONS_IN_STACK
 #if defined (CONFIG_BT_GAP_PERIPHERAL_PREF_PARAMS)
 #define BFLB_BLE_ENABLE_OR_DISABLE_SLAVE_PREF_CONN_PARAM_UDPATE
 #endif
+#define BFLB_BLE_DO_DISCONNECT_WHEN_ATT_TIMEOUT
+#define BFLB_BLE_AVOID_REMOVE_GATT_SUBSCRIPTION_RISK
 #endif /* BLE_CONFIG_H */

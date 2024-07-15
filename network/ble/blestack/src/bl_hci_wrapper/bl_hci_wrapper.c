@@ -11,11 +11,11 @@
 *****************************************************************************************/
 
 #include <string.h>
-#include <log.h>
+#include <bt_log.h>
 #include "hci_host.h"
 #include "bl_hci_wrapper.h"
 #include "hci_driver.h"
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include "byteorder.h"
 #include "hci_onchip.h"
 
@@ -186,7 +186,7 @@ void bl_packet_to_host(uint8_t pkt_type, uint16_t src_id, uint8_t *param, uint8_
         {
             prio = false;
             bt_buf_set_type(buf, BT_BUF_ACL_IN);
-            tlt_len = bt_onchiphci_hanlde_rx_acl(param, buf_data);
+            tlt_len = bt_onchiphci_handle_rx_acl(param, buf_data);
             break;
         }
         #endif
@@ -226,6 +226,7 @@ void bl_trigger_queued_msg()
 {
     struct net_buf *buf= NULL;
     struct rx_msg_struct *msg = NULL;
+    uint8_t *param = NULL;
 
     do
     {
@@ -256,14 +257,16 @@ void bl_trigger_queued_msg()
 
         bl_packet_to_host(msg->pkt_type, msg->src_id, msg->param, msg->param_len, buf);
 
-        irq_unlock(lock);
+        param = msg->param;
 
-        if(msg->param)
-        {
-            k_free(msg->param);
-        }
         memset(msg, 0, sizeof(struct rx_msg_struct));
 
+        irq_unlock(lock);
+
+        if(param)
+        {
+            k_free(param);
+        }
     }
     while(buf);
 

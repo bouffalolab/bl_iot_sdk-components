@@ -37,7 +37,6 @@
 #include "bl702l_psram.h"
 #include "bl702l_l1c.h"
 #include "bl702l_glb.h"
-#include <blog.h>
 
 /** @addtogroup  BL702_Peripheral_Case
  *  @{
@@ -62,6 +61,7 @@
 /** @defgroup  DUAL_CS_PSRAM_WRITE_THROUGH_Private_Variables
  *  @{
  */
+static uint8_t psramId[8];
 
 /*@} end of group DUAL_CS_PSRAM_WRITE_THROUGH_Private_Variables */
 
@@ -97,8 +97,6 @@
 *******************************************************************************/
 void ATTR_TCM_SECTION bl_psram_init(void)
 {
-    uint8_t psramId[8];
-
     SPI_Psram_Cfg_Type apMemory1604 = {
         .readIdCmd = 0x9F,
         .readIdDmyClk = 0,
@@ -150,8 +148,10 @@ void ATTR_TCM_SECTION bl_psram_init(void)
 
     Psram_Cache_Write_Set(&apMemory1604, SF_CTRL_QIO_MODE, ENABLE, DISABLE, DISABLE);
     //L1C_Cache_Enable_Set(L1C_WAY_DISABLE_NONE);
+}
 
-    blog_info("PSRAM ID: %02X %02X %02X %02X %02X %02X %02X %02X.\r\n",
-                psramId[0], psramId[1], psramId[2], psramId[3], psramId[4], psramId[5], psramId[6], psramId[7]);
-
+void bl_psram_dump_id(void)
+{
+    printf("PSRAM ID: %02X %02X %02X %02X %02X %02X %02X %02X\r\n",
+            psramId[0], psramId[1], psramId[2], psramId[3], psramId[4], psramId[5], psramId[6], psramId[7]);
 }

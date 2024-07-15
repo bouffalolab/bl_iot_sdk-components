@@ -5,7 +5,11 @@
 #include "hci_core.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#if defined(CONFIG_SHELL)
+#include "shell.h"
+#else
 #include "cli.h"
+#endif /* CONFIG_SHELL */
 #include "bl_port.h"
 #include "ble_cli_cmds.h"
 #if defined(BL702) || defined(BL602)
@@ -43,110 +47,274 @@ static int ble_adv_id;
 #endif
 
 #define vOutputString(...)  printf(__VA_ARGS__)
-
-static void blecli_enable(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_init(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-#if defined(BL702)
-static void blecli_set_2M_phy(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_set_coded_phy(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_set_default_phy(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+#if defined(CONFIG_SHELL)
+#define BLE_CLI(func) static void blecli_##func(int argc, char **argv)
+#else
+#define BLE_CLI(func) static void blecli_##func(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 #endif
-static void blecli_get_device_name(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_set_device_name(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+
+BLE_CLI(enable);
+BLE_CLI(set_chan_map);
+BLE_CLI(init);
+#if defined(BL702)
+BLE_CLI(set_2M_phy);
+BLE_CLI(set_coded_phy);
+BLE_CLI(set_default_phy);
+#endif
+BLE_CLI(get_device_name);
+BLE_CLI(set_device_name);
 #if defined(CONFIG_BT_OBSERVER)
-static void blecli_start_scan(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_stop_scan(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(start_scan);
+BLE_CLI(stop_scan);
 #if defined(BL702) || defined(BL602)
-static void blecli_scan_filter_size(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(scan_filter_size);
 #endif /* BL702 || BL602 */
 #endif
-static void blecli_read_local_address(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_set_local_address(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(read_local_address);
+BLE_CLI(set_local_address);
 #if defined(CONFIG_BT_PERIPHERAL)
-static void blecli_set_adv_channel(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_start_advertise(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_stop_advertise(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(set_adv_channel);
+BLE_CLI(start_advertise);
+BLE_CLI(stop_advertise);
 #endif
 #if defined(CONFIG_BLE_TP_SERVER)
-static void blecli_tp_start(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(tp_start);
 #endif
 #if defined(CONFIG_BT_CONN)
 #if defined(CONFIG_BT_CENTRAL)
-static void blecli_connect(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(connect);
 #if defined(CONFIG_BT_WHITELIST)
-static void blecli_auto_connect(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_whitelist_add(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_whitelist_rem(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_whitelist_clear(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(auto_connect);
+BLE_CLI(whitelist_add);
+BLE_CLI(whitelist_rem);
+BLE_CLI(whitelist_clear);
 #endif /* CONFIG_BT_WHITELIST */
 #endif
-static void blecli_disconnect(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_select_conn(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_conn_update(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_send_l2cap_conn_param_update_req(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(disconnect);
+BLE_CLI(select_conn);
+BLE_CLI(conn_update);
+BLE_CLI(send_l2cap_conn_param_update_req);
 #if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)
-static void blecli_l2cap_send_test_data(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
-static void blecli_l2cap_disconnect(char *p_write_buffer, int write_buffer_len, int argc, char **argv);
+BLE_CLI(l2cap_send_test_data);
+BLE_CLI(l2cap_disconnect);
 #endif
 #if(BFLB_BLE_ENABLE_TEST_PSM)
-static void blecli_register_test_psm(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_connect_test_psm(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(register_test_psm);
+BLE_CLI(connect_test_psm);
 #endif
-static void blecli_read_rssi(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_unpair(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(read_rssi);
+BLE_CLI(unpair);
 #if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
-static void blecli_ble_throughput_calc(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(ble_throughput_calc);
 #endif
 #endif
 #if defined(CONFIG_BT_SMP)
-static void blecli_security(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_auth(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_auth_cancel(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_auth_passkey_confirm(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_auth_pairing_confirm(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_auth_passkey(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(security);
+BLE_CLI(auth);
+BLE_CLI(auth_cancel);
+BLE_CLI(auth_passkey_confirm);
+BLE_CLI(auth_pairing_confirm);
+BLE_CLI(auth_passkey);
 #endif
-static void blecli_exchange_mtu(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_discover(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_read(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_write(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_write_without_rsp(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_subscribe(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_unsubscribe(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_set_data_len(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_get_all_conn_info(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_disable(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(exchange_mtu);
+BLE_CLI(discover);
+BLE_CLI(read);
+BLE_CLI(write);
+BLE_CLI(write_without_rsp);
+BLE_CLI(subscribe);
+BLE_CLI(unsubscribe);
+BLE_CLI(set_data_len);
+BLE_CLI(get_all_conn_info);
+BLE_CLI(disable);
 #if defined(CONFIG_BLE_MULTI_ADV)
-static void blecli_start_multi_advertise(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_stop_multi_advertise(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(start_multi_advertise);
+BLE_CLI(stop_multi_advertise);
 #endif
 
-static void blecli_set_tx_pwr(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(set_tx_pwr);
 
 #if defined(CONFIG_HOGP_SERVER)
-static void blecli_hog_srv_notify(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(hog_srv_notify);
 #endif
 #if defined(BFLB_BLE_DYNAMIC_SERVICE)
 #if defined(CONFIG_BT_PERIPHERAL)
 #if defined(CONFIG_BT_SPP_SERVER)
-static void blecli_add_spp_service(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_del_spp_service(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(add_spp_service);
+BLE_CLI(del_spp_service);
 #endif
-static void blecli_gatts_get_service_info(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_gatts_get_char(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_gatts_get_desp(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+BLE_CLI(gatts_get_service_info);
+BLE_CLI(gatts_get_char);
+BLE_CLI(gatts_get_desp);
 #endif
 #endif
+BLE_CLI(le_enh_tx_test);
+BLE_CLI(le_enh_rx_test);
+BLE_CLI(le_test_end);
 
-static void blecli_le_enh_tx_test(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_le_enh_rx_test(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-static void blecli_le_test_end(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
-
+#if defined(CONFIG_SHELL)
+    SHELL_CMD_EXPORT_ALIAS(blecli_enable, ble_enable, ble enable Parameter:[Null]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_set_chan_map, ble_set_chan_map, ble set channel map Parameter:[channels]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_init, ble_init, ble Initialize Parameter:[Null]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_get_device_name, ble_get_device_name, ble get device name Parameter:[Null]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_set_device_name, ble_set_device_name, ble set device name Parameter:[Lenth of name] [name]);
+#if defined(CONFIG_BLE_TP_SERVER)
+    SHELL_CMD_EXPORT_ALIAS(blecli_tp_start, ble_tp_start, throughput start Parameter:[TP test 1:enable; 0:disable]);
+#endif /* CONFIG_BLE_TP_SERVER */
+#if defined(BL702)
+#if defined(CONFIG_BT_CONN)
+    SHELL_CMD_EXPORT_ALIAS(blecli_set_default_phy, ble_set_default_phy, ble set default phy Parameter:[defualt phys]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_set_2M_phy, ble_set_2M_Phy, ble set 2M Phy Parameter:[defualt phys]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_set_coded_phy, ble_set_coded_phy, ble set coded phy Parameter:[all phys] [coded option]);
+#endif /* CONFIG_BT_CONN */
+#endif /* BL702 */
+#if defined(CONFIG_BT_OBSERVER)
+#if defined(BL702) || defined(BL602)
+    SHELL_CMD_EXPORT_ALIAS(blecli_scan_filter_size, ble_scan_filter_size, ble scan filter sizer Parameter:[filter table size]);
+#endif /* BL702 || BL602 */
+#endif /* CONFIG_BT_OBSERVER */
+#if defined(BFLB_DISABLE_BT)
+    SHELL_CMD_EXPORT_ALIAS(blecli_disable, ble_disable, ble disable Parameter:[Null]);
+#endif /* BFLB_DISABLE_BT */
+#if defined(CONFIG_BT_OBSERVER)
+    SHELL_CMD_EXPORT_ALIAS(blecli_start_scan, ble_start_scan, ble start scan \
+        Parameter:[Scan type: 0:passive scan; 1:active scan] \
+        [filtering: 0:Disable duplicate; 1:Enable duplicate] \
+        [Scan interval: 0x0004-4000;e.g.0080] \
+        [Scan window: 0x0004-4000;e.g.0050]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_stop_scan, ble_stop_scan, ble stop scan Parameter:[Null]);
+#endif /* CONFIG_BT_OBSERVER */
+#if defined(CONFIG_BT_PERIPHERAL)
+    SHELL_CMD_EXPORT_ALIAS(blecli_set_adv_channel, ble_set_adv_channel, ble set adv channel Parameter:[adv channel]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_start_advertise, ble_start_adv, ble start adv \
+        Parameter:[Adv type: 0:adv_ind; 1:adv_scan_ind; 2:adv_nonconn_ind] \
+        [Mode: 0:discov; 1:non-discov] \
+        [Adv Interval Min: 0x0020-4000; e.g.0030] \
+        [Adv Interval Max: 0x0020-4000; e.g.0060]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_stop_advertise, ble_stop_adv, ble stop adv Parameter:[Null]);
+#if defined(CONFIG_BLE_MULTI_ADV)
+    SHELL_CMD_EXPORT_ALIAS(blecli_start_multi_advertise, ble_start_multi_adv, ble start multi adv Parameter:[Null]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_stop_multi_advertise, ble_stop_multi_adv, ble stop multi adv Parameter:[instant id]);
+#endif /* CONFIG_BLE_MULTI_ADV */
+    SHELL_CMD_EXPORT_ALIAS(blecli_read_local_address, ble_read_local_address, ble read local address Parameter:[Null]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_set_local_address, ble_set_local_address, ble set local address Parameter:[bt address]);
+#endif /* CONFIG_BT_PERIPHERAL */
+#if defined(CONFIG_BT_CONN)
+#if defined(CONFIG_BT_CENTRAL)
+    SHELL_CMD_EXPORT_ALIAS(blecli_connect, ble_connect, ble Connect remote device \
+        Parameter:[Address type: 0:ADDR_PUBLIC; 1:ADDR_RAND; 2:ADDR_RPA_OR_PUBLIC; 3:ADDR_RPA_OR_RAND] \
+        [Address value; e.g.112233AABBCC]);
+    #if defined(CONFIG_BT_WHITELIST)
+    SHELL_CMD_EXPORT_ALIAS(blecli_auto_connect, ble_auto_connect, ble Connect remote device \
+        Parameter:[Address type: 0:ADDR_PUBLIC; 1:ADDR_RAND; 2:ADDR_RPA_OR_PUBLIC; 3:ADDR_RPA_OR_RAND] \
+        [Address value: e.g.112233AABBCC]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_whitelist_add, ble_whitelist_add, Add white list \
+        Parameter [Address type: 0:ADDR_PUBLIC; 1:ADDR_RAND; 2:ADDR_RPA_OR_PUBLIC; 3:ADDR_RPA_OR_RAND] \
+        [Address value: e.g.112233AABBCC]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_whitelist_rem, ble_whitelist_rem, Remove white list \
+        Parameter [Address type: 0:ADDR_PUBLIC; 1:ADDR_RAND; 2:ADDR_RPA_OR_PUBLIC; 3:ADDR_RPA_OR_RAND] \
+        [Address value: e.g.112233AABBCC]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_whitelist_clear, ble_whitelist_clear, Clear white list Parameter []);
+#endif /* CONFIG_BT_WHITELIST */
+#endif /* CONFIG_BT_CENTRAL */
+    SHELL_CMD_EXPORT_ALIAS(blecli_disconnect, ble_disconnect, Disconnect remote device \
+        Parameter:[Address type: 0:ADDR_PUBLIC; 1:ADDR_RAND; 2:ADDR_RPA_OR_PUBLIC; 3:ADDR_RPA_OR_RAND] \
+        [Address value: e.g.112233AABBCC]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_select_conn, ble_select_conn, Select a specific connection \
+        Parameter:[Address type: 0:ADDR_PUBLIC; 1:ADDR_RAND; 2:ADDR_RPA_OR_PUBLIC; 3:ADDR_RPA_OR_RAND] \
+        [Address value: e.g.112233AABBCC]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_unpair, ble_unpair, bleUnpair connection] \
+        Parameter:[Address type: 0:ADDR_PUBLIC; 1:ADDR_RAND; 2:ADDR_RPA_OR_PUBLIC; 3:ADDR_RPA_OR_RAND] \
+        [Address value: all 0: unpair all connection; otherwise:unpair specific connection]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_conn_update, ble_conn_update, ble conn update \
+        Parameter:[Conn Interval Min: 0x0006-0C80; e.g.0030] \
+        [Conn Interval Max: 0x0006-0C80; e.g.0030] \
+        [Conn Latency: 0x0000-01f3; e.g.0004] \
+        [Supervision Timeout: 0x000A-0C80; e.g.0010]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_send_l2cap_conn_param_update_req, ble_send_l2cap_conn_param_update_req, ble l2cap conn parameters update \
+        Parameter:[Conn Interval Min: 0x0006-0C80; e.g.0030] \
+        [Conn Interval Max: 0x0006-0C80; e.g.0030] \
+        [Conn Latency: 0x0000-01f3; e.g.0004] \
+        [Supervision Timeout: 0x000A-0C80; e.g.0010]);
+#if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
+    SHELL_CMD_EXPORT_ALIAS(blecli_ble_throughput_calc, ble_set_throughput_calc, ble set throughputcalc \
+        Parameter:[enable];[duration]);
+#endif
+    #if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)
+    SHELL_CMD_EXPORT_ALIAS(blecli_l2cap_send_test_data, ble_l2cap_send_test_data, ble send l2cap data Parameter:[channel id]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_l2cap_disconnect, ble_l2cap_disconnect, ble send l2cap data Parameter:[channel id]);
+    #endif /* CONFIG_BT_L2CAP_DYNAMIC_CHANNEL */
+    #if(BFLB_BLE_ENABLE_TEST_PSM)
+    SHELL_CMD_EXPORT_ALIAS(blecli_register_test_psm, ble_register_test_psm, register ble test psm Parameter:[psm: security level]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_connect_test_psm, ble_connect_test_psm, connect ble test psm Parameter:[psm]);
+    #endif /* BFLB_BLE_ENABLE_TEST_PSM */
+    SHELL_CMD_EXPORT_ALIAS(blecli_read_rssi, ble_read_rssi, ble read rssi Parameter:[Null]);
+ #if defined(CONFIG_BT_SMP)
+    SHELL_CMD_EXPORT_ALIAS(blecli_security, ble_security, Start security \
+        Parameter:[Security level: Default value 4; 2:BT_SECURITY_MEDIUM; 3:BT_SECURITY_HIGH; 4:BT_SECURITY_FIPS]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_auth, ble_auth, Register auth callback Parameter:[Null]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_auth_cancel, ble_auth_cancel, Cancel register auth callback Parameter:[Null]]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_auth_passkey_confirm, ble_auth_passkey_confirm, Confirm passkey Parameter:[Null]]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_auth_pairing_confirm, ble_auth_pairing_confirm, Confirm pairing in secure connection Parameter:[Null]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_auth_passkey, ble_auth_passkey, Input passkey Parameter:[Passkey: 00000000-000F423F]);
+#endif /* CONFIG_BT_SMP */
+#if defined(CONFIG_BT_GATT_CLIENT)
+    SHELL_CMD_EXPORT_ALIAS(blecli_exchange_mtu, ble_exchange_mtu, Exchange mtu Parameter:[Null]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_discover, ble_discover, Gatt discovery \
+        Parameter:[Discovery type: 0:Primary; 1:Secondary; 2:Include; 3:Characteristic; 4:Descriptor] \
+        [Uuid value: 2 Octets; e.g.1800] \
+        [Start handle: 2 Octets; e.g.0001] \
+        [End handle: 2 Octets; e.g.ffff]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_read, ble_read, Gatt Read \
+        Parameter:[Attribute handle: 2 Octets]\
+        [Value offset: 2 Octets]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_write, ble_write, Gatt write\
+        Parameter:[Attribute handle: 2 Octets]\
+        [Value offset: 2 Octets]\
+        [Value length: 2 Octets]\
+        [Value data]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_write_without_rsp, ble_write_without_rsp, Gatt write without response \
+        Parameter:[Sign: 0: No need; signed: 1; Signed write cmd if no smp] \
+        [Attribute handle: 2 Octets] \
+        [Value length: 2 Octets] \
+        [Value data]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_subscribe, ble_subscribe, Gatt subscribe \
+        Parameter:[CCC handle: 2 Octets] \
+        [Value handle: 2 Octets] \
+        [Value: 1:notify: 2:indicate]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_unsubscribe, ble_unsubscribe, Gatt unsubscribe Parameter:[Null]);
+#endif /* CONFIG_BT_GATT_CLIENT */
+    SHELL_CMD_EXPORT_ALIAS(blecli_set_data_len, ble_set_data_len, LE Set Data Length \
+        Parameter:[tx octets: 2 octets] [tx time: 2 octets]);
+    SHELL_CMD_EXPORT_ALIAS(blecli_get_all_conn_info, ble_conn_info, LE get all connection devices info Parameter:[Null]);
+#endif /* CONFIG_BT_CONN */
+    SHELL_CMD_EXPORT_ALIAS(blecli_set_tx_pwr, ble_set_tx_pwr, Set tx power mode Parameter:[mode: 1 octet; value:5; 6; 7]);
+        
+#if defined(CONFIG_HOGP_SERVER)
+    SHELL_CMD_EXPORT_ALIAS(blecli_hog_srv_notify, ble_hog_srv_notify, HOG srv notify Parameter [hid usage] [press]);
+#endif /* CONFIG_HOGP_SERVER */
+#if defined(BFLB_BLE_DYNAMIC_SERVICE)
+#if defined(CONFIG_BT_PERIPHERAL)
+    #if defined(CONFIG_BT_SPP_SERVER)
+    SHELL_CMD_EXPORT_ALIAS(blecli_add_spp_service, ble_add_spp_svc, );
+    SHELL_CMD_EXPORT_ALIAS(blecli_del_spp_service, ble_del_spp_svc, );
+    #endif /* CONFIG_BT_SPP_SERVER */
+    SHELL_CMD_EXPORT_ALIAS(blecli_gatts_get_service_info, ble_get_svc_info, );
+    SHELL_CMD_EXPORT_ALIAS(blecli_gatts_get_char, ble_get_svc_char, );
+    SHELL_CMD_EXPORT_ALIAS(blecli_gatts_get_desp, ble_get_svc_desp, );
+#endif /* CONFIG_BT_PERIPHERAL */
+#endif /* BFLB_BLE_DYNAMIC_SERVICE */
+    SHELL_CMD_EXPORT_ALIAS(blecli_le_enh_tx_test, ble_tx_test, LE tx test \
+        parameter:[tx channel:1 octet;test data length:1 octet;packet payload:1 octet; phy:1 octet);
+    SHELL_CMD_EXPORT_ALIAS(blecli_le_enh_rx_test, ble_rx_test, LE tx test \
+        parameter:[rx channel:1 octet;phy:1 octet;modulation index:1 octet);
+    SHELL_CMD_EXPORT_ALIAS(blecli_le_test_end, ble_test_end, );
+#else /* CONFIG_SHELL */
 const struct cli_command btStackCmdSet[] STATIC_CLI_CMD_ATTRIBUTE = {
 #if 1
     /*1.The cmd string to type, 2.Cmd description, 3.The function to run, 4.Number of parameters*/
 
     {"ble_enable", "ble enable\r\nParameter [Null]\r\n", blecli_enable},
+    {"ble_set_chan_map", "ble set channel map\r\nParameter [channels]\r\n", blecli_set_chan_map},
     {"ble_init", "ble Initialize\r\nParameter [Null]\r\n", blecli_init},
     {"ble_get_device_name", "ble get device name\r\nParameter [Null]\r\n", blecli_get_device_name},
     {"ble_set_device_name", "ble set device name\r\nParameter [Lenth of name] [name]\r\n", blecli_set_device_name},
@@ -369,6 +537,7 @@ const struct cli_command btStackCmdSet[] STATIC_CLI_CMD_ATTRIBUTE = {
 #endif
 #endif
 };
+#endif /* CONFIG_SHELL */
 
 #if defined(CONFIG_BT_CONN)
 static void connected(struct bt_conn *conn, u8_t err)
@@ -500,14 +669,14 @@ void btcli_enable_cb(int err)
         bt_addr_le_t bt_addr;
         bt_conn_cb_register(&conn_callbacks);
         bt_get_local_public_address(&bt_addr);
-        printf("BD_ADDR:(MSB)%02x:%02x:%02x:%02x:%02x:%02x(LSB) \n",
+        printf("BD_ADDR:(MSB)%02x:%02x:%02x:%02x:%02x:%02x(LSB) \r\n",
             bt_addr.a.val[5], bt_addr.a.val[4], bt_addr.a.val[3], bt_addr.a.val[2], bt_addr.a.val[1], bt_addr.a.val[0]);
     }else{
          printf("bt_enable_failed\n");
     }
 }
 
-static void blecli_enable(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(enable)
 {
     if (atomic_test_bit(bt_dev.flags, BT_DEV_ENABLE)) {
         return;
@@ -524,17 +693,59 @@ static void blecli_enable(char *pcWriteBuffer, int xWriteBufferLen, int argc, ch
     bt_enable(btcli_enable_cb);
 }
 
-static void blecli_init(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(set_chan_map)
+{
+    u8_t chan_map[5] = {0};
+    uint8_t nb_good_channels = 0;
+    int err,i,j;
+
+    if(argc != 2){
+       vOutputString("Number of Parameters is not correct\r\n");
+       return;
+    }
+    get_bytearray_from_string(&argv[1], chan_map, sizeof(chan_map));
+
+    // Make sure that the three most significant bits are 0
+    if (chan_map[5 - 1] >> 5){
+        vOutputString("Parameters is not correct\r\n");
+        return;
+    }
+
+    // Count number of good channels
+    for(i = 0; i < 5; ++i){
+        for(j = 0; j < 8; ++j){
+            if(chan_map[i]&(1<<j)){
+                nb_good_channels++;
+            }
+        }
+    }
+    if(nb_good_channels == 0){
+        vOutputString("Parameters is not correct\r\n");
+        return;
+    }
+
+    printf("channel map %02x %02x %02x %02x %02x\r\n",
+            chan_map[0], chan_map[1], chan_map[2], chan_map[3], chan_map[4]);
+    err = bt_le_set_chan_map(chan_map);
+    if(!err){
+        vOutputString("Set ble channel map pending\r\n");
+    }else{
+        vOutputString("Failed to set ble channel map\r\n");
+    }
+}
+
+BLE_CLI(init)
 {
     #if defined(CONFIG_BT_CONN)
     default_conn = NULL;
     bt_conn_cb_register(&conn_callbacks);
     #endif
+    vOutputString("Init successfully\r\n");
 }
 
 #if defined(BL702)
 #if defined(CONFIG_BT_CONN)
-static void blecli_set_2M_phy(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(set_2M_phy)
 {
     int err = 0;
 
@@ -552,7 +763,7 @@ static void blecli_set_2M_phy(char *pcWriteBuffer, int xWriteBufferLen, int argc
     }
 }
 
-static void blecli_set_coded_phy(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(set_coded_phy)
 {
     int err = 0;
     uint8_t all_phys = 0;
@@ -586,7 +797,7 @@ static void blecli_set_coded_phy(char *pcWriteBuffer, int xWriteBufferLen, int a
     }
 }
 
-static void blecli_set_default_phy(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(set_default_phy)
 {
     u8_t default_phy = 0;
     
@@ -601,7 +812,7 @@ static void blecli_set_default_phy(char *pcWriteBuffer, int xWriteBufferLen, int
 #endif
 #endif
 
-static void blecli_le_enh_tx_test(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(le_enh_tx_test)
 {
     int err;
     u8_t tx_ch;
@@ -630,7 +841,7 @@ static void blecli_le_enh_tx_test(char *pcWriteBuffer, int xWriteBufferLen, int 
 
 }
 
-static void blecli_le_enh_rx_test(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(le_enh_rx_test)
 {
     int err;
     u8_t rx_ch;
@@ -656,7 +867,7 @@ static void blecli_le_enh_rx_test(char *pcWriteBuffer, int xWriteBufferLen, int 
     }
 }
 
-static void blecli_le_test_end(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(le_test_end)
 {
     int err;
     err = bt_le_test_end();
@@ -672,7 +883,7 @@ static void blecli_le_test_end(char *pcWriteBuffer, int xWriteBufferLen, int arg
 
 
 
-static void blecli_get_device_name(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(get_device_name)
 {
 	const char *device_name = bt_get_name();
 
@@ -682,7 +893,7 @@ static void blecli_get_device_name(char *pcWriteBuffer, int xWriteBufferLen, int
 		vOutputString("Failed to read device name\r\n");
 }
 
-static void blecli_set_device_name(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(set_device_name)
 {
 	int	err = 0;
 
@@ -696,8 +907,9 @@ static void blecli_set_device_name(char *pcWriteBuffer, int xWriteBufferLen, int
 		vOutputString("Invaild lenth(%d)\r\n",strlen(argv[1]));
 	}
 }
+
 #if defined(CONFIG_BLE_TP_SERVER)
-static void blecli_tp_start(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(tp_start)
 {
     extern u8_t tp_start;
     if(argc != 2){
@@ -714,7 +926,6 @@ static void blecli_tp_start(char *pcWriteBuffer, int xWriteBufferLen, int argc, 
         vOutputString("Invalid parameter\r\n");
     }
 }
-
 #endif
 
 #if defined(CONFIG_BT_OBSERVER)
@@ -748,7 +959,7 @@ static void device_found(const bt_addr_le_t *addr, s8_t rssi, u8_t evtype,
 	vOutputString("[DEVICE]: %s, AD evt type %u, RSSI %i %s \r\n",le_addr, evtype, rssi, name);
 }
 
-static void blecli_start_scan(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(start_scan)
 {
     struct bt_le_scan_param scan_param;
     int err;
@@ -777,8 +988,7 @@ static void blecli_start_scan(char *pcWriteBuffer, int xWriteBufferLen, int argc
     }
 }
 
-
-static void blecli_stop_scan(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(stop_scan)
 {
 	int err;
     
@@ -791,7 +1001,7 @@ static void blecli_stop_scan(char *pcWriteBuffer, int xWriteBufferLen, int argc,
 }
 
 #if defined(BL702) || defined(BL602)
-static void blecli_scan_filter_size(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(scan_filter_size)
 {
 	uint8_t size;
     int8_t err;
@@ -816,7 +1026,7 @@ static void blecli_scan_filter_size(char *pcWriteBuffer, int xWriteBufferLen, in
 
 
 #if defined(CONFIG_BT_PERIPHERAL)
-static void blecli_read_local_address(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(read_local_address)
 {
 	bt_addr_le_t local_pub_addr;
 	bt_addr_le_t local_ram_addr;
@@ -831,7 +1041,7 @@ static void blecli_read_local_address(char *pcWriteBuffer, int xWriteBufferLen, 
 	vOutputString("Local random addr : %s\r\n", le_addr);
 }
 
-static void blecli_set_local_address(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(set_local_address)
 {
     bt_addr_le_t addr;
     u8_t  addr_val[6];
@@ -856,7 +1066,7 @@ static void blecli_set_local_address(char *pcWriteBuffer, int xWriteBufferLen, i
 
 }
 
-static void blecli_set_adv_channel(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(set_adv_channel)
 {
     u8_t channel = 7;
 
@@ -878,7 +1088,7 @@ static void blecli_set_adv_channel(char *pcWriteBuffer, int xWriteBufferLen, int
     }
 }
 
-static void blecli_start_advertise(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(start_advertise)
 {
     struct bt_le_adv_param param;
     const struct bt_data *ad;
@@ -971,7 +1181,7 @@ static void blecli_start_advertise(char *pcWriteBuffer, int xWriteBufferLen, int
 
 }
 
-static void blecli_stop_advertise(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(stop_advertise)
 {
 #if defined(CONFIG_BLE_MULTI_ADV)
     bool err = -1;
@@ -992,7 +1202,7 @@ static void blecli_stop_advertise(char *pcWriteBuffer, int xWriteBufferLen, int 
 #if defined(CONFIG_BLE_MULTI_ADV)
 struct bt_data data_1 = (struct bt_data)BT_DATA_BYTES(BT_DATA_NAME_COMPLETE, "multi_adv_connect_01");
 struct bt_data data_2 = (struct bt_data)BT_DATA_BYTES(BT_DATA_NAME_COMPLETE, "multi_adv_nonconn_02");
-static void blecli_start_multi_advertise(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(start_multi_advertise)
 {
     struct bt_le_adv_param param_1, param_2;
     struct bt_data *ad_1, *ad_2;
@@ -1033,7 +1243,7 @@ static void blecli_start_multi_advertise(char *pcWriteBuffer, int xWriteBufferLe
     }
 }
 
-static void blecli_stop_multi_advertise(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(stop_multi_advertise)
 {
     uint8_t instant_id;
 
@@ -1054,7 +1264,7 @@ static void blecli_stop_multi_advertise(char *pcWriteBuffer, int xWriteBufferLen
 
 #if defined(CONFIG_BT_CONN)
 #if defined(CONFIG_BT_CENTRAL)
-static void blecli_connect(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(connect)
 {
     bt_addr_le_t addr;
     struct bt_conn *conn;
@@ -1107,7 +1317,7 @@ static void blecli_connect(char *pcWriteBuffer, int xWriteBufferLen, int argc, c
 }
 
 #if defined(CONFIG_BT_WHITELIST)
-static void blecli_auto_connect(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(auto_connect)
 {
 	int err;
 	unsigned char enable = 0U;
@@ -1137,7 +1347,7 @@ static void blecli_auto_connect(char *pcWriteBuffer, int xWriteBufferLen, int ar
 	}
 }
 
-static void blecli_whitelist_add(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(whitelist_add)
 {
 	bt_addr_le_t waddr;
 	int 		err;
@@ -1159,7 +1369,7 @@ static void blecli_whitelist_add(char *pcWriteBuffer, int xWriteBufferLen, int a
 	}
 }
 
-static void blecli_whitelist_rem(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(whitelist_rem)
 {
 	bt_addr_le_t waddr;
 	int 		err;
@@ -1181,7 +1391,7 @@ static void blecli_whitelist_rem(char *pcWriteBuffer, int xWriteBufferLen, int a
 	}
 }
 
-static void blecli_whitelist_clear(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(whitelist_clear)
 {
 	int 		err;
 
@@ -1199,7 +1409,7 @@ static void blecli_whitelist_clear(char *pcWriteBuffer, int xWriteBufferLen, int
 
 #endif //#if defined(CONFIG_BT_CENTRAL)
 
-static void blecli_disconnect(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(disconnect)
 {
     bt_addr_le_t addr;
     u8_t  addr_val[6];
@@ -1235,7 +1445,7 @@ static void blecli_disconnect(char *pcWriteBuffer, int xWriteBufferLen, int argc
     bt_conn_unref(conn);
 }
 
-static void blecli_select_conn(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(select_conn)
 {
     bt_addr_le_t addr;
     struct bt_conn *conn;
@@ -1267,7 +1477,7 @@ static void blecli_select_conn(char *pcWriteBuffer, int xWriteBufferLen, int arg
     default_conn = conn;
 }
 
-static void blecli_unpair(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(unpair)
 {
     bt_addr_le_t addr;
     u8_t  addr_val[6];
@@ -1294,7 +1504,7 @@ static void blecli_unpair(char *pcWriteBuffer, int xWriteBufferLen, int argc, ch
     }
 }
 
-static void blecli_conn_update(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(conn_update)
 {
 	struct bt_le_conn_param param;
 	int err;
@@ -1316,7 +1526,7 @@ static void blecli_conn_update(char *pcWriteBuffer, int xWriteBufferLen, int arg
 	}
 }
 
-static void blecli_send_l2cap_conn_param_update_req(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(send_l2cap_conn_param_update_req)
 {
 	struct bt_le_conn_param param;
 	int err;
@@ -1339,7 +1549,7 @@ static void blecli_send_l2cap_conn_param_update_req(char *pcWriteBuffer, int xWr
 }
 
 #if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)
-static void blecli_l2cap_send_test_data(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+BLE_CLI(l2cap_send_test_data)
 {
     int err = 0;
     uint8_t test_data[10] = {0x01, 0x02, 0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a};
@@ -1372,7 +1582,7 @@ static void blecli_l2cap_send_test_data(char *p_write_buffer, int write_buffer_l
 }
 
 
-static void blecli_l2cap_disconnect(char *p_write_buffer, int write_buffer_len, int argc, char **argv)
+BLE_CLI(l2cap_disconnect)
 {
     int err = 0;
     uint16_t tx_cid;
@@ -1394,7 +1604,7 @@ static void blecli_l2cap_disconnect(char *p_write_buffer, int write_buffer_len, 
 #endif
 
 #if(BFLB_BLE_ENABLE_TEST_PSM)
-static void blecli_register_test_psm(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(register_test_psm)
 {
     int err = 0;
     uint16_t psm;
@@ -1417,7 +1627,7 @@ static void blecli_register_test_psm(char *pcWriteBuffer, int xWriteBufferLen, i
     }
 }
 
-static void blecli_connect_test_psm(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(connect_test_psm)
 {
     int err = 0;
     uint16_t psm;
@@ -1440,7 +1650,7 @@ static void blecli_connect_test_psm(char *pcWriteBuffer, int xWriteBufferLen, in
 }
 #endif
 
-static void blecli_read_rssi(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(read_rssi)
 {
     int8_t rssi;
     int err;
@@ -1459,7 +1669,7 @@ static void blecli_read_rssi(char *pcWriteBuffer, int xWriteBufferLen, int argc,
 }
 
 #if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
-static void blecli_ble_throughput_calc(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(ble_throughput_calc)
 {  
     int err;
     u8_t enable;
@@ -1487,7 +1697,7 @@ static void blecli_ble_throughput_calc(char *pcWriteBuffer, int xWriteBufferLen,
 #endif //#if defined(CONFIG_BT_CONN)
 
 #if defined(CONFIG_BT_SMP)
-static void blecli_security(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(security)
 {
     int err;
     u8_t sec_level = /*BT_SECURITY_FIPS*/BT_SECURITY_L4;
@@ -1581,7 +1791,7 @@ static struct bt_conn_auth_cb auth_cb_display = {
 	.pairing_complete = auth_pairing_complete,
 };
 
-static void blecli_auth(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(auth)
 {
     int err;
 
@@ -1594,7 +1804,7 @@ static void blecli_auth(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
     }
 }
 
-static void blecli_auth_cancel(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(auth_cancel)
 {
 	struct bt_conn *conn;
     
@@ -1612,7 +1822,7 @@ static void blecli_auth_cancel(char *pcWriteBuffer, int xWriteBufferLen, int arg
 	bt_conn_auth_cancel(conn);
 }
 
-static void blecli_auth_passkey_confirm(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(auth_passkey_confirm)
 {
     
 	if (!default_conn) {
@@ -1623,7 +1833,7 @@ static void blecli_auth_passkey_confirm(char *pcWriteBuffer, int xWriteBufferLen
 	bt_conn_auth_passkey_confirm(default_conn);
 }
 
-static void blecli_auth_pairing_confirm(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(auth_pairing_confirm)
 {
    
 	if (!default_conn) {
@@ -1634,7 +1844,7 @@ static void blecli_auth_pairing_confirm(char *pcWriteBuffer, int xWriteBufferLen
 	bt_conn_auth_pairing_confirm(default_conn);
 }
 
-static void blecli_auth_passkey(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(auth_passkey)
 {
 	uint32_t passkey;
 
@@ -1669,7 +1879,7 @@ static void exchange_func(struct bt_conn *conn, u8_t err,
 
 static struct bt_gatt_exchange_params exchange_params;
 
-static void blecli_exchange_mtu(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(exchange_mtu)
 {
 	int err;
     
@@ -1774,7 +1984,7 @@ u8_t discover_func(struct bt_conn *conn, const struct bt_gatt_attr *attr, struct
 	return BT_GATT_ITER_CONTINUE;
 }
 
-static void blecli_discover(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(discover)
 {
 	int err;
     u8_t disc_type;
@@ -1854,7 +2064,7 @@ static u8_t read_func(struct bt_conn *conn, u8_t err, struct bt_gatt_read_params
 	return BT_GATT_ITER_CONTINUE;
 }
 
-static void blecli_read(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(read)
 {
 	int err;
 
@@ -1892,7 +2102,7 @@ static void write_func(struct bt_conn *conn, u8_t err,
 	(void)memset(&write_params, 0, sizeof(write_params));
 }
 
-static void blecli_write(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(write)
 {
 	int err;
     uint16_t data_len;
@@ -1940,7 +2150,7 @@ static void blecli_write(char *pcWriteBuffer, int xWriteBufferLen, int argc, cha
 	}
 }
 
-static void blecli_write_without_rsp(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(write_without_rsp)
 {
 	u16_t handle;
 	int err;
@@ -2011,7 +2221,7 @@ static u8_t notify_func(struct bt_conn *conn,
     return BT_GATT_ITER_CONTINUE;
 }
 
-static void blecli_subscribe(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(subscribe)
 {
     if(argc != 4){
         vOutputString("Number of Parameters is not correct\r\n");
@@ -2037,7 +2247,7 @@ static void blecli_subscribe(char *pcWriteBuffer, int xWriteBufferLen, int argc,
 
 }
 
-static void blecli_unsubscribe(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(unsubscribe)
 {
     if (!default_conn) {
         vOutputString("Not connected\r\n");
@@ -2058,7 +2268,7 @@ static void blecli_unsubscribe(char *pcWriteBuffer, int xWriteBufferLen, int arg
 }
 #endif /* CONFIG_BT_GATT_CLIENT */
 
-static void blecli_set_data_len(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(set_data_len)
 {
 	u16_t tx_octets;
 	u16_t tx_time;
@@ -2087,7 +2297,7 @@ static void blecli_set_data_len(char *pcWriteBuffer, int xWriteBufferLen, int ar
 	}
 }
 
-static void blecli_get_all_conn_info(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(get_all_conn_info)
 {
         struct bt_conn_info info[CONFIG_BT_MAX_CONN];
         char le_addr[BT_ADDR_LE_STR_LEN];
@@ -2108,9 +2318,9 @@ static void blecli_get_all_conn_info(char *pcWriteBuffer, int xWriteBufferLen, i
 	        vOutputString("[%d]: address %s\r\n", i, le_addr);
         }
 }
-#endif /* CONFIG_BT_CONN*/
+#endif /* CONFIG_BT_CONN */
 
-static void blecli_set_tx_pwr(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(set_tx_pwr)
 {
     u8_t power;
     int err;
@@ -2144,7 +2354,7 @@ static void blecli_set_tx_pwr(char *pcWriteBuffer, int xWriteBufferLen, int argc
 }
 
 #if defined(BFLB_DISABLE_BT)
-static void blecli_disable(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(disable)
 {
 	int err;
 
@@ -2155,10 +2365,10 @@ static void blecli_disable(char *pcWriteBuffer, int xWriteBufferLen, int argc, c
         vOutputString("Disable bt successfully\r\n");
     }
 }
-#endif
+#endif /* BFLB_DISABLE_BT */
 
 #if defined(CONFIG_HOGP_SERVER)
-static void blecli_hog_srv_notify(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(hog_srv_notify)
 {
     uint16_t hid_usage;
     uint8_t press;
@@ -2179,25 +2389,25 @@ static void blecli_hog_srv_notify(char *pcWriteBuffer, int xWriteBufferLen, int 
         vOutputString("Notification sent successfully\r\n");
     }
 }
-#endif
+#endif /* CONFIG_HOGP_SERVER */
 #if defined(BFLB_BLE_DYNAMIC_SERVICE)
 #if defined(CONFIG_BT_PERIPHERAL)
 
 #if defined(CONFIG_BT_SPP_SERVER)
-static void blecli_add_spp_service(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(add_spp_service)
 {
     extern void bt_dyn_register_spp_srv(void);
     bt_dyn_register_spp_srv();
 }
 
-static void blecli_del_spp_service(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(del_spp_service)
 {
     void bt_dyn_unregister_spp_srv(void);
     bt_dyn_unregister_spp_srv();
 }
-#endif
+#endif /* CONFIG_BT_SPP_SERVER */
 
-static void blecli_gatts_get_service_info(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(gatts_get_service_info)
 {
     struct simple_svc_info svc_info[2];
     uint16_t svc_id;
@@ -2217,7 +2427,7 @@ static void blecli_gatts_get_service_info(char *pcWriteBuffer, int xWriteBufferL
     }
 }
 
-static void blecli_gatts_get_char(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(gatts_get_char)
 {
     struct char_info cinfo[3];
     uint16_t svc_id;
@@ -2238,7 +2448,7 @@ static void blecli_gatts_get_char(char *pcWriteBuffer, int xWriteBufferLen, int 
 
 }
 
-static void blecli_gatts_get_desp(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+BLE_CLI(gatts_get_desp)
 {
     struct descrip_info dinfo[4];
     uint16_t svc_id;
@@ -2257,8 +2467,8 @@ static void blecli_gatts_get_desp(char *pcWriteBuffer, int xWriteBufferLen, int 
             dinfo[i].uuid,dinfo[i].desp_idx);
     }
 }
-#endif
-#endif
+#endif /* CONFIG_BT_PERIPHERAL */
+#endif /* BFLB_BLE_DYNAMIC_SERVICE */
 int ble_cli_register(void)
 {
     // static command(s) do NOT need to call aos_cli_register_command(s) to register.

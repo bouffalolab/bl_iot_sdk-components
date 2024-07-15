@@ -30,6 +30,8 @@
  * @file
  *   This file implements a simple CLI for the CoAP service.
  */
+#define _GNU_SOURCE
+#include <string.h>
 
 #include "cli_coap.hpp"
 
@@ -67,7 +69,7 @@ Coap::Coap(otInstance *aInstance, OutputImplementer &aOutputImplementer)
     memset(&mRequestUri, 0, sizeof(mRequestUri));
 #endif
     memset(&mUriPath, 0, sizeof(mUriPath));
-    strncpy(mResourceContent, "0", sizeof(mResourceContent));
+    memcpy(mResourceContent, "0", sizeof(mResourceContent));
     mResourceContent[sizeof(mResourceContent) - 1] = '\0';
 }
 
@@ -172,7 +174,7 @@ template <> otError Coap::Process<Cmd("resource")>(Arg aArgs[])
         }
 #endif
 
-        strncpy(mUriPath, aArgs[0].GetCString(), sizeof(mUriPath) - 1);
+        memcpy(mUriPath, aArgs[0].GetCString(), sizeof(mUriPath) - 1);
 
 #if OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE
         otCoapAddBlockWiseResource(GetInstancePtr(), &mResource);
@@ -200,7 +202,7 @@ template <> otError Coap::Process<Cmd("set")>(Arg aArgs[])
     if (!aArgs[0].IsEmpty())
     {
         VerifyOrExit(aArgs[0].GetLength() < sizeof(mResourceContent), error = OT_ERROR_INVALID_ARGS);
-        strncpy(mResourceContent, aArgs[0].GetCString(), sizeof(mResourceContent));
+        memcpy(mResourceContent, aArgs[0].GetCString(), sizeof(mResourceContent));
         mResourceContent[sizeof(mResourceContent) - 1] = '\0';
 
 #if OPENTHREAD_CONFIG_COAP_OBSERVE_API_ENABLE
@@ -375,7 +377,7 @@ otError Coap::ProcessRequest(Arg aArgs[], otCoapCode aCoapCode)
 
     VerifyOrExit(!aArgs[1].IsEmpty(), error = OT_ERROR_INVALID_ARGS);
     VerifyOrExit(aArgs[1].GetLength() < sizeof(coapUri), error = OT_ERROR_INVALID_ARGS);
-    strcpy(coapUri, aArgs[1].GetCString());
+    strlcpy(coapUri, aArgs[1].GetCString(), kMaxUriLength);
 
     // CoAP-Type
     if (!aArgs[2].IsEmpty())
@@ -505,7 +507,7 @@ otError Coap::ProcessRequest(Arg aArgs[], otCoapCode aCoapCode)
         memcpy(&mRequestAddr, &coapDestinationIp, sizeof(mRequestAddr));
         mRequestTokenLength = otCoapMessageGetTokenLength(message);
         memcpy(mRequestToken, otCoapMessageGetToken(message), mRequestTokenLength);
-        // Use `memcpy` instead of `strncpy` here because GCC will give warnings for `strncpy` when the dest's length is
+        // Use `memcpy` instead of `strlcpy` here because GCC will give warnings for `strlcpy` when the dest's length is
         // not bigger than the src's length.
         memcpy(mRequestUri, coapUri, sizeof(mRequestUri) - 1);
     }

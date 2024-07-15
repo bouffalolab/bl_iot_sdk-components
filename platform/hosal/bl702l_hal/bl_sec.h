@@ -3,9 +3,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <FreeRTOS.h>
-#include <semphr.h>
-
 #include <bl_sec_common.h>
 #include <bl_sec_pka.h>
 #include <bl_sec_aes.h>
@@ -13,8 +10,6 @@
 #if defined(__cplusplus)
 extern "C" {
 #endif
-
-extern SemaphoreHandle_t g_bl_sec_sha_mutex;
 
 int bl_sec_init(void);
 int bl_sec_test(void);

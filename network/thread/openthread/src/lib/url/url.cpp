@@ -41,6 +41,7 @@ otError Url::Init(char *aUrl)
 {
     otError error = OT_ERROR_NONE;
     char   *url   = aUrl;
+    char   *psave;
 
     mEnd      = aUrl + strlen(aUrl);
     mProtocol = aUrl;
@@ -57,7 +58,8 @@ otError Url::Init(char *aUrl)
     {
         mQuery = ++url;
 
-        for (char *cur = strtok(url, "&"); cur != nullptr; cur = strtok(nullptr, "&"))
+        psave = nullptr;
+        for (char *cur = strtok_r(url, "&", &psave); cur != nullptr; cur = strtok_r(nullptr, "&", &psave))
         {
             cur[-1] = '\0';
         }

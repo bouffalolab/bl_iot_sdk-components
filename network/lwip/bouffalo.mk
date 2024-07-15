@@ -28,12 +28,6 @@ COMPONENT_PRIV_INCLUDEDIRS :=
 COMPONENT_SRCDIRS := src/api src/core src/core/ipv4 src/netif lwip-port/FreeRTOS lwip-port src/apps/altcp_tls
 COMPONENT_SRCDIRS += src/apps/sntp
 
-ifeq ($(CONFIG_COMPONENT_BUGKILLER_ENABLE),1)
-COMPONENT_ADD_INCLUDEDIRS += bugkiller/include
-COMPONENT_SRCDIRS += bugkiller
-CFLAGS += -DBUGKILLER
-endif
-
 ifeq ($(CONFIG_LWIP_NETCONN_DUPLEX),1)
 CFLAGS += -DLWIP_NETCONN_DUPLEX_SWITCH
 endif

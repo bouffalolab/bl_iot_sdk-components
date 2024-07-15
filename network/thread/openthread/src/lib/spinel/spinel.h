@@ -5052,7 +5052,7 @@ SPINEL_API_EXTERN spinel_ssize_t spinel_datatype_unpack(const uint8_t *data_in,
  *         `spinel_datatype_unpack()` expects a `spinel_eui64_t **` is included.
  *       - For `SPINEL_DATATYPE_UTF8_C`, this function expects two arguments, the first of type `char *` and the
  *         second is of type `size_t` to indicate length of the provided buffer in the first argument just like
- *         `strncpy()`, while `spinel_datatype_unpack()` only expects a `const char **`.
+ *         `strlcpy()`, while `spinel_datatype_unpack()` only expects a `const char **`.
  *
  * @sa spinel_datatype_vunpack_in_place()
  *
@@ -5082,7 +5082,7 @@ SPINEL_API_EXTERN spinel_ssize_t spinel_datatype_vunpack(const uint8_t *data_in,
  *         `spinel_datatype_vunpack()` expects a `spinel_eui64_t **` is included.
  *       - For `SPINEL_DATATYPE_UTF8_C`, this function expects two arguments, the first of type `char *` and the
  *         second is of type `size_t` to indicate length of the provided buffer in the first argument just like
- *         `strncpy()`, while `spinel_datatype_vunpack()` only expects a `const char **`.
+ *         `strlcpy()`, while `spinel_datatype_vunpack()` only expects a `const char **`.
  *
  * @sa spinel_datatype_unpack_in_place()
  *

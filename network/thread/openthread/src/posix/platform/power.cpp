@@ -50,14 +50,15 @@ otError TargetPower::FromString(char *aString)
 {
     otError error = OT_ERROR_NONE;
     char   *str;
+    char   *pSave = nullptr;
 
-    VerifyOrExit((str = strtok(aString, ",")) != nullptr, error = OT_ERROR_PARSE);
+    VerifyOrExit((str = strtok_r(aString, ",", &pSave)) != nullptr, error = OT_ERROR_PARSE);
     SuccessOrExit(error = Utils::CmdLineParser::ParseAsUint8(str, mChannelStart));
 
-    VerifyOrExit((str = strtok(nullptr, ",")) != nullptr, error = OT_ERROR_PARSE);
+    VerifyOrExit((str = strtok_r(nullptr, ",", &pSave)) != nullptr, error = OT_ERROR_PARSE);
     SuccessOrExit(error = Utils::CmdLineParser::ParseAsUint8(str, mChannelEnd));
 
-    VerifyOrExit((str = strtok(nullptr, ",")) != nullptr, error = OT_ERROR_PARSE);
+    VerifyOrExit((str = strtok_r(nullptr, ",", &pSave)) != nullptr, error = OT_ERROR_PARSE);
     SuccessOrExit(error = Utils::CmdLineParser::ParseAsInt16(str, mTargetPower));
 
 exit:
@@ -98,7 +99,7 @@ otError CalibratedPower::FromString(char *aString)
 {
     otError error = OT_ERROR_NONE;
     char   *str;
-    char   *pSave;
+    char   *pSave = nullptr;
 
     VerifyOrExit((str = strtok_r(aString, ",", &pSave)) != nullptr, error = OT_ERROR_PARSE);
     SuccessOrExit(error = Utils::CmdLineParser::ParseAsUint8(str, mChannelStart));

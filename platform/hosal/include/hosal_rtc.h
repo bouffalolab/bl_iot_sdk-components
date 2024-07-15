@@ -64,6 +64,7 @@ typedef struct {
     uint8_t sec;     /**< DEC format:value range from 0 to 59, BCD format:value range from 0x00 to 0x59 */
     uint8_t min;     /**< DEC format:value range from 0 to 59, BCD format:value range from 0x00 to 0x59 */
     uint8_t hr;      /**< DEC format:value range from 0 to 23, BCD format:value range from 0x00 to 0x23 */
+    uint8_t weekday; /**< DEC format:value range from 1 to  7, BCD format:value range from 0x01 to 0x07 */
     uint8_t date;    /**< DEC format:value range from 1 to 31, BCD format:value range from 0x01 to 0x31 */
     uint8_t month;   /**< DEC format:value range from 1 to 12, BCD format:value range from 0x01 to 0x12 */
     uint16_t year;   /**< DEC format:value range from 0 to 9999, BCD format:value range from 0x0000 to 0x9999 */

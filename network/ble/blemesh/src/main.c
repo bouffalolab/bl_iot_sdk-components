@@ -8,18 +8,19 @@
 
 #include <zephyr.h>
 #include <stdbool.h>
-#include <sys/errno.h>
+#include <bt_errno.h>
 
 #include <net/buf.h>
 #include <bluetooth.h>
 #include <conn.h>
+#include <hci_core.h>
 #include "../../blestack/src/include/bluetooth/uuid.h"
 
 #include <include/mesh.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG)
 #define LOG_MODULE_NAME bt_mesh_main
-#include "log.h"
+#include "bt_log.h"
 
 #include "test.h"
 #include "adv.h"
@@ -53,7 +54,7 @@ int bt_mesh_provision(const u8_t net_key[16], u16_t net_idx,
 				net_idx, flags, iv_index);
 
 	BT_INFO("Primary Element: 0x%04x", addr);
-	BT_DBG("net_idx 0x%04x flags 0x%02x iv_index 0x%04x",
+	BT_DBG("net_idx 0x%04x flags 0x%02x iv_index 0x%04lx",
 	       net_idx, flags, iv_index);
 
 	if (IS_ENABLED(CONFIG_BT_MESH_PB_GATT)) {
@@ -242,6 +243,8 @@ static void model_suspend(struct bt_mesh_model *mod, struct bt_mesh_elem *elem,
 	}
 }
 
+static bool mesh_state_before_suspend;
+
 int bt_mesh_suspend(void)
 {
 	int err;
@@ -253,6 +256,18 @@ int bt_mesh_suspend(void)
 	if (atomic_test_and_set_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
 		return -EALREADY;
 	}
+
+#if defined(BFLB_BLE)
+	extern bool le_check_valid_adv(void);
+	mesh_state_before_suspend = le_check_valid_adv();
+
+	err = bt_le_adv_stop();
+	if (err) {
+		atomic_clear_bit(bt_mesh.flags, BT_MESH_SUSPENDED);
+		BT_WARN("Disabling advertising failed (err %d)", err);
+		return err;
+	}
+#endif /*BFLB_BLE*/
 
 	err = bt_mesh_scan_disable();
 	if (err) {
@@ -296,7 +311,11 @@ int bt_mesh_resume(void)
 	if (!atomic_test_and_clear_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
 		return -EALREADY;
 	}
-
+#if defined(BFLB_BLE)
+	if(mesh_state_before_suspend){
+		set_adv_enable(1);
+	}
+#endif /*BFLB_BLE*/
 	err = bt_mesh_scan_enable();
 	if (err) {
 		BT_WARN("Re-enabling scanning failed (err %d)", err);

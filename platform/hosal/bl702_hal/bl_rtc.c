@@ -1,15 +1,42 @@
 #include "bl_rtc.h"
+#include "bl_timer.h"
+#include "blog.h"
 
 
 void bl_rtc_init(void)
 {
+    uint32_t tmpVal;
+    uint32_t pu32k;
+    
 #ifdef CFG_USE_XTAL32K
+    tmpVal = BL_RD_REG(HBN_BASE, HBN_XTAL32K);
+    pu32k = BL_GET_REG_BITS_VAL(tmpVal, HBN_PU_XTAL32K);
+    if(!pu32k){
+        HBN_Power_On_Xtal_32K();
+    }
+    
     HBN_32K_Sel(HBN_32K_XTAL);
 #else
+    tmpVal = BL_RD_REG(HBN_BASE, HBN_GLB);
+    pu32k = BL_GET_REG_BITS_VAL(tmpVal, HBN_PU_RC32K);
+    if(!pu32k){
+        HBN_Power_On_RC32K();
+    }
+    
     HBN_32K_Sel(HBN_32K_RC);
 #endif
     
     HBN_Enable_RTC_Counter();
+    
+    // if rtc counter does not change, something must be wrong, e.g. CFG_USE_XTAL32K is defined but XTAL32K crystal is not mounted
+    uint32_t now = bl_timer_now_us();
+    uint32_t timeout = 1000000;
+    uint64_t cnt = bl_rtc_get_counter();
+    while(bl_rtc_get_counter() - cnt < 3){
+        if(bl_timer_now_us() - now >= timeout){
+            blog_assert(0);
+        }
+    }
 }
 
 uint64_t bl_rtc_get_counter(void)

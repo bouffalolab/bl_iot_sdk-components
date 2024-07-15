@@ -584,7 +584,7 @@ void vprint(const char *fmt, va_list argp)
     char string[4];
 
     if (sys_log_all_enable) {
-        vsnprintf_ex(string, 512, fmt, argp);
+        vsnprintf_ex(string, 2048, fmt, argp);
     }
 #endif
 }

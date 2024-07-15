@@ -8,7 +8,7 @@
 
 #include <zephyr.h>
 #include <string.h>
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <stdbool.h>
 #include <types.h>
 #include <util.h>
@@ -20,7 +20,7 @@
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_MODEL)
 #define LOG_MODULE_NAME bt_mesh_cfg_cli
-#include "log.h"
+#include "bt_log.h"
 
 #include "net.h"
 #include "foundation.h"
@@ -1655,7 +1655,7 @@ static int mod_member_list_get(u32_t op, u32_t expect_op, u16_t net_idx,
 
 	BT_DBG("net_idx 0x%04x addr 0x%04x elem_addr 0x%04x",
 	       net_idx, addr, elem_addr);
-	BT_DBG("mod_id 0x%04x cid 0x%04x op: %x", mod_id, cid, op);
+	BT_DBG("mod_id 0x%04x cid 0x%04x op: %lx", mod_id, cid, op);
 
 	bt_mesh_model_msg_init(&msg, op);
 	net_buf_simple_add_le16(&msg, elem_addr);

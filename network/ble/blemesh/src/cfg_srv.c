@@ -8,7 +8,7 @@
 
 #include <zephyr.h>
 #include <string.h>
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <stdbool.h>
 #include <types.h>
 #include <util.h>
@@ -20,7 +20,7 @@
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_MODEL)
 #define LOG_MODULE_NAME bt_mesh_cfg_srv
-#include "log.h"
+#include "bt_log.h"
 
 //#include "host/testing.h"
 #include "mesh_config.h"
@@ -37,7 +37,6 @@
 #include "foundation.h"
 #include "friend.h"
 #include "mesh_settings.h"
-
 #if defined(CONFIG_AUTO_PTS)
 #include "testing.h"
 #endif
@@ -240,7 +239,7 @@ static u8_t _mod_pub_set(struct bt_mesh_model *model, u16_t pub_addr,
 	}
 
 	if (!bt_mesh_app_key_find(app_idx)
-	#if defined(CONFIG_AUTO_PTS)
+	#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		|| !bt_mesh_model_has_key(model, app_idx)
 	#endif
 		) {
@@ -268,7 +267,7 @@ static u8_t _mod_pub_set(struct bt_mesh_model *model, u16_t pub_addr,
 		s32_t period_ms;
 
 		period_ms = bt_mesh_model_pub_period_get(model);
-		BT_DBG("period %u ms", period_ms);
+		BT_DBG("period %lu ms", period_ms);
 
 		if (period_ms > 0) {
 			k_delayed_work_submit(&model->pub->timer,
@@ -3220,7 +3219,7 @@ static void heartbeat_sub_set(struct bt_mesh_model *model,
 	/* Let the transport layer know it needs to handle this address */
 	bt_mesh_set_hb_sub_dst(cfg->hb_sub.dst);
 
-	BT_DBG("period_ms %u", period_ms);
+	BT_DBG("period_ms %lu", period_ms);
 
 	if (period_ms) {
 		cfg->hb_sub.expiry = k_uptime_get() + period_ms;
@@ -3236,7 +3235,7 @@ static void heartbeat_sub_set(struct bt_mesh_model *model,
 	if (!period_ms) {
 		cfg->hb_sub.min_hops = 0U;
 	}
-#if defined(CONFIG_AUTO_PTS)
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	/* MESH/NODE/CFG/HBS/BV-02-C expects us to return previous
 	 * count value and then reset it to 0.
 	 */
@@ -3244,7 +3243,7 @@ static void heartbeat_sub_set(struct bt_mesh_model *model,
 	    sub_dst != BT_MESH_ADDR_UNASSIGNED && !sub_period) {
 		cfg->hb_sub.count = 0;
 	}
-#endif /* CONFIG_AUTO_PTS */*/
+#endif /* CONFIG_AUTO_PTS */
 }
 
 const struct bt_mesh_model_op bt_mesh_cfg_srv_op[] = {
@@ -3455,7 +3454,9 @@ static void mod_reset(struct bt_mesh_model *mod, struct bt_mesh_elem *elem,
 		/** Added by bouffalo lab, when reset callback dont't set, 
 		 *  call mod bind.
 		 * */
-		bt_mesh_store_mod_bind(mod);
+		 if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		 	bt_mesh_store_mod_bind(mod);
+		 }
 	}
 }
 
@@ -3652,3 +3653,10 @@ void bt_mesh_subnet_del(struct bt_mesh_subnet *sub, bool store)
 	(void)memset(sub, 0, sizeof(*sub));
 	sub->net_idx = BT_MESH_KEY_UNUSED;
 }
+
+#if defined(BFLB_BLE)
+int bt_mesh_comp_get_page_0(struct net_buf_simple *buf)
+{
+	return comp_get_page_0(buf);    
+}
+#endif

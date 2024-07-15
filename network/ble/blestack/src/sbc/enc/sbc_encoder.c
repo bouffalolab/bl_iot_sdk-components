@@ -24,7 +24,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "log.h"
+#include "bt_log.h"
 #include "sbc_encoder.h"
 #include "sbc_enc_func_declare.h"
 

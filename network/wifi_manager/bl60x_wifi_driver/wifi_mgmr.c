@@ -176,10 +176,8 @@ int wifi_mgmr_scan_beacon_save( wifi_mgmr_scan_item_t *scan )
 #define SCAN_UPDATE_LIMIT_TIME_MS (3000)
 
     int i, j, pos_empty = -1, ret = 0, flag = 0;
-    uint32_t oldest = 0xFFFFFFFF;
     uint32_t counter = 0;
     int8_t lowest_rssi = 0, pos_rssi = -1;
-    int8_t pos_oldest = -1;
     int8_t pos_same_ssid = -1;
     wifi_mgmr_scan_item_t tmp_item;
 
@@ -215,8 +213,6 @@ int wifi_mgmr_scan_beacon_save( wifi_mgmr_scan_item_t *scan )
         if(0 == flag) {
             lowest_rssi = wifiMgmr.scan_items[i].rssi;
             pos_rssi = i;
-            oldest = wifiMgmr.scan_items[i].timestamp_lastseen;
-            pos_oldest = i;
             flag = 1;
         }
 
@@ -622,6 +618,24 @@ err_t dhcp_server_stop(struct netif *netif);
     return false;
 }
 
+static bool stateGlobalGuard_ap_chan_switch(void *ev, struct event *event)
+{
+    wifi_mgmr_msg_t *msg;
+
+    msg = event->data;
+    if (ev != (void *)msg->ev) {
+        return false;
+    }
+
+    if (!wifiMgmr.inf_ap_enabled) {
+        return false;
+    }
+
+    bl_main_apm_chan_switch((int)(intptr_t)msg->data1, (uint8_t)(uintptr_t)msg->data2);
+
+    return false;
+}
+
 static bool stateGlobalGuard_conf_max_sta(void *ev, struct event *event )
 {
     wifi_mgmr_msg_t *msg;
@@ -790,6 +804,7 @@ const static struct state stateGlobal = {
       {EVENT_TYPE_GLB, (void*)WIFI_MGMR_EVENT_GLB_ENABLE_AUTORECONNECT, &stateGlobalGuard_enable_autoreconnect, &stateGlobalAction, &stateIdle},
       {EVENT_TYPE_APP, (void*)WIFI_MGMR_EVENT_APP_AP_START, &stateGlobalGuard_AP, &stateGlobalAction, &stateIdle},
       {EVENT_TYPE_APP, (void*)WIFI_MGMR_EVENT_APP_AP_STOP, &stateGlobalGuard_stop, &stateGlobalAction, &stateIdle},
+      {EVENT_TYPE_APP, (void*)WIFI_MGMR_EVENT_APP_AP_CHAN_SWITCH, &stateGlobalGuard_ap_chan_switch, &stateGlobalAction, &stateIdle},
       {EVENT_TYPE_APP, (void*)WIFI_MGMR_EVENT_APP_CONF_MAX_STA, &stateGlobalGuard_conf_max_sta, &stateGlobalAction, &stateIdle},
       {EVENT_TYPE_APP, (void*)WIFI_MGMR_EVENT_APP_DENOISE, &stateGlobalGuard_denoise, &stateGlobalAction, &stateIdle},
       {EVENT_TYPE_APP, (void*)WIFI_MGMR_EVENT_APP_CONNECT, &stateGlobalGuard_connect, &stateGlobalAction_connect, &stateConnecting},
@@ -799,7 +814,7 @@ const static struct state stateGlobal = {
       {EVENT_TYPE_FW,  (void*)WIFI_MGMR_EVENT_FW_DATA_RAW_SEND, &stateSnifferGuard_raw_send, &stateGlobalAction, &stateIdle},
       {EVENT_TYPE_FW,  (void*)WIFI_MGMR_EVENT_FW_CFG_REQ, &stateGlobal_cfg_req, &stateGlobalAction, &stateIdle},
    },
-   .numTransitions = 12,
+   .numTransitions = 13,
    .data = "group",
    .entryAction = &stateEnter,
    .exitAction = &stateExit,
@@ -1150,6 +1165,7 @@ static void stateConnectedIPNoAction_disconn( void *oldStateData, struct event *
             (char*)newStateData
     );
 
+    wifiMgmr.wlan_sta.sta.rssi = 0;
     wifi_netif_dhcp_stop(&(wifiMgmr.wlan_sta.netif));
     netifapi_netif_set_addr(&(wifiMgmr.wlan_sta.netif), NULL, NULL, NULL);
 }
@@ -1222,6 +1238,7 @@ static void stateConnectedIPYes_action( void *oldStateData, struct event *event,
             (char*)oldStateData,
             (char*)newStateData
     );
+    wifiMgmr.wlan_sta.sta.rssi = 0;
     wifi_netif_dhcp_stop(&(wifiMgmr.wlan_sta.netif));
     netifapi_netif_set_addr(&(wifiMgmr.wlan_sta.netif), NULL, NULL, NULL);
 }

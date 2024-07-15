@@ -356,11 +356,11 @@ static const ATTR_TCM_CONST_SECTION SPI_Flash_Cfg_Type flashCfg_FM_Q80 = {
     .exitQpi = 0xff,
 
     /*AC*/
-    .timeEsector = 300,
-    .timeE32k = 1200,
-    .timeE64k = 1200,
+    .timeEsector = 3000,
+    .timeE32k = 4000,
+    .timeE64k = 4000,
     .timePagePgm = 5,
-    .timeCe = 33000,
+    .timeCe = 65*1000,
     .pdDelay = 20,
     .qeData = 0,
 };
@@ -553,6 +553,61 @@ static const ATTR_TCM_CONST_SECTION Flash_Info_t flashInfos[] = {
         .jedecID = 0x15345E,
         .name = "ZB_25Q16A_15_33",
         .cfg = &flashCfg_Winb_16JV,
+    },
+    {
+        .jedecID = 0x1560c4,
+        //.name="gt25q16_16_33",
+        .cfg = &flashCfg_Winb_16JV,
+    },
+    {
+        .jedecID = 0x1660c4,
+        //.name="gt25q32_32_33",
+        .cfg = &flashCfg_Winb_16JV,
+    },
+    {
+        .jedecID = 0x142085,
+        //.name="py25q80hb_80_33",
+        .cfg = &flashCfg_FM_Q80,
+    },
+    {
+        .jedecID = 0x152085,
+        //.name="py25q16hb_16_33",
+        .cfg = &flashCfg_FM_Q80,
+    },
+    {
+        .jedecID = 0x162085,
+        //.name="py25q32hb_32_33",
+        .cfg = &flashCfg_FM_Q80,
+    },
+    {
+        .jedecID = 0x172085,
+        //.name="py25q64ha_64_33",
+        .cfg = &flashCfg_FM_Q80,
+    },
+    {
+        .jedecID = 0x182085,
+        //.name="py25q128ha_128_33",
+        .cfg = &flashCfg_FM_Q80,
+    },
+    {
+        .jedecID = 0x192085,
+        //.name="py25q256hb_256_33",
+        .cfg = &flashCfg_FM_Q80,
+    },
+    {
+        .jedecID = 0x166125,
+        //.name="sk25e032_32_33",
+        .cfg = &flashCfg_FM_Q80,
+    },
+    {
+        .jedecID=0x17400B,
+        .name="xt_25f64b_64_33",
+        .cfg=&flashCfg_FM_Q80,
+    },
+    {
+        .jedecID=0x18400B,
+        .name="xt_25f128b_128_33",
+        .cfg=&flashCfg_FM_Q80,
     },
 };
 

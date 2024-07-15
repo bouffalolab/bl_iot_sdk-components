@@ -59,7 +59,7 @@ extern uint32_t __HeapLimit;
 //extern uint32_t __zero_table_start__;
 //extern uint32_t __zero_table_end__;
 
-void start_load(void)
+__attribute__((optimize("O0"))) void start_load(void)
 {
     uint32_t *pSrc, *pDest;
     uint32_t *pTable __attribute__((unused));

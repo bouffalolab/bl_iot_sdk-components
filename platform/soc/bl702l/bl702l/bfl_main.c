@@ -19,9 +19,9 @@
 #include <bl_irq.h>
 #include <bl_rtc.h>
 #include <bl_sec.h>
+#include <bl_wdt.h>
 #include <hal_boot2.h>
 #include <hal_board.h>
-#include <hal_hwtimer.h>
 #include <hal_tcal.h>
 #include <hosal_uart.h>
 #include <hosal_dma.h>
@@ -39,11 +39,15 @@
 #ifdef SYS_USER_VFS_ROMFS_ENABLE
 #include <bl_romfs.h>
 #endif
+#if defined(CFG_USE_PSRAM)
+#include <bl_psram.h>
+#endif
 
-#ifdef CFG_USE_ROM_CODE
-#include <rom_freertos_ext.h>
+#if defined(CFG_USE_ROM_CODE)
 #include <rom_hal_ext.h>
-#include <rom_lmac154_ext.h>
+#if !defined(CFG_BUILD_FREERTOS)
+#include <rom_freertos_ext.h>
+#endif
 #endif
 
 HOSAL_UART_DEV_DECL(uart_stdio, 0, 14, 15, 2000000);
@@ -52,26 +56,24 @@ extern uint8_t _heap_start;
 extern uint8_t _heap_size; // @suppress("Type cannot be resolved")
 extern uint8_t _heap2_start;
 extern uint8_t _heap2_size; // @suppress("Type cannot be resolved")
-static HeapRegion_t xHeapRegions[] =
+static const HeapRegion_t xHeapRegions[] =
 {
     { &_heap_start,  (unsigned int) &_heap_size },
     { &_heap2_start, (unsigned int) &_heap2_size },
-    { NULL, 0 }, /* Terminates the array. */
     { NULL, 0 } /* Terminates the array. */
 };
 
 #if defined(CFG_USE_PSRAM)
 extern uint8_t _heap3_start;
 extern uint8_t _heap3_size; // @suppress("Type cannot be resolved")
-static HeapRegion_t xHeapRegionsPsram[] =
+static const HeapRegion_t xHeapRegionsPsram[] =
 {
     { &_heap3_start, (unsigned int) &_heap3_size },
-    { NULL, 0 }, /* Terminates the array. */
     { NULL, 0 } /* Terminates the array. */
 };
 #endif
 
-#ifndef CFG_USE_ROM_CODE
+#if !defined(CFG_USE_ROM_CODE) || defined(CFG_BUILD_FREERTOS)
 void __attribute__((weak)) vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
 #else
 void __attribute__((weak)) user_vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
@@ -86,7 +88,7 @@ void __attribute__((weak)) user_vApplicationStackOverflowHook( TaskHandle_t xTas
     }
 }
 
-#ifndef CFG_USE_ROM_CODE
+#if !defined(CFG_USE_ROM_CODE) || defined(CFG_BUILD_FREERTOS)
 void __attribute__((weak)) vApplicationMallocFailedHook(void)
 #else
 void __attribute__((weak)) user_vApplicationMallocFailedHook(void)
@@ -105,13 +107,14 @@ void __attribute__((weak)) user_vApplicationMallocFailedHook(void)
     }
 }
 
-#ifndef CFG_USE_ROM_CODE
+#if !defined(CFG_USE_ROM_CODE) || defined(CFG_BUILD_FREERTOS)
 void __attribute__((weak)) vApplicationIdleHook(void)
 {
+    bl_wdt_feed();
+
     __asm volatile(
             "   wfi     "
     );
-    /*empty*/
 }
 
 #if ( configUSE_TICKLESS_IDLE != 0 )
@@ -174,7 +177,7 @@ void __attribute__((weak)) vApplicationGetTimerTaskMemory(StaticTask_t **ppxTime
 }
 #endif
 
-#ifndef CFG_USE_ROM_CODE
+#if !defined(CFG_USE_ROM_CODE) || defined(CFG_BUILD_FREERTOS)
 void user_vAssertCalled(void) __attribute__ ((weak, alias ("vAssertCalled")));
 void __attribute__((weak)) vAssertCalled(void)
 #else
@@ -259,7 +262,6 @@ static void aos_loop_proc(void *pvParameters)
 #endif
 
 #if defined(CFG_TCAL_ENABLE)
-    hal_hwtimer_init();
     hal_tcal_init();
     bl_wireless_capcode_tcal_en_set(1);
 #endif
@@ -339,7 +341,7 @@ void setup_heap()
 {
     bl_sys_em_config();
 
-#ifdef CFG_USE_ROM_CODE
+#if defined(CFG_USE_ROM_CODE)
     // Initialize rom data
     extern uint8_t _rom_data_run;
     extern uint8_t _rom_data_load;
@@ -350,16 +352,14 @@ void setup_heap()
     // Invoked during system boot via start.S
     vPortDefineHeapRegions(xHeapRegions);
 
-
 #if defined(CFG_USE_PSRAM)
     extern uint8_t _psram_start;
     extern uint8_t _psram_end;
-    extern void bl_psram_init(void);
 
     bl_psram_init();
     memset(&_psram_start, 0, &_psram_end - &_psram_start);
     vPortDefineHeapRegionsPsram(xHeapRegionsPsram);
-#endif /*CFG_USE_PSRAM*/
+#endif
 }
 
 static void system_early_init(void)
@@ -377,6 +377,10 @@ static void system_early_init(void)
     hosal_dma_init();
 #endif
 
+#ifdef CFG_WATCHDOG_ENABLE
+    bl_wdt_init(4000);
+#endif
+
     /* To be added... */
     /* board config is set after system is init*/
     hal_board_cfg(0);
@@ -388,23 +392,24 @@ void bl702_main()
 
     bl_sys_early_init();
     
-#ifdef CFG_USE_ROM_CODE
+#if defined(CFG_USE_ROM_CODE)
+    rom_hal_init();
+#if !defined(CFG_BUILD_FREERTOS)
 #ifdef CFG_ZIGBEE_ENABLE
     rom_freertos_init(384, 400);
 #else
     rom_freertos_init(256, 400);
 #endif
-    rom_hal_init();
-    //rom_lmac154_hook_init();
 #endif
-
-#if defined(GPIO_SIM_PRINT)
-    extern int bl_gpio_uart_init(uint8_t tx_pin, uint32_t baudrate);
-    bl_gpio_uart_init(8, 1000000);
 #endif
 
     /*Init UART In the first place*/
+#if !defined(GPIO_SIM_PRINT)
     hosal_uart_init(&uart_stdio);
+#else
+    extern int bl_gpio_uart_tx_init(uint8_t id, uint8_t tx_pin, uint32_t baudrate);
+    bl_gpio_uart_tx_init(0, GPIO_SIM_PRINT_TX_PIN, GPIO_SIM_PRINT_BAUDRATE);
+#endif
     puts("Starting bl702 now....\r\n");
 
     _dump_boot_info();
@@ -419,6 +424,7 @@ void bl702_main()
 
 #if defined(CFG_USE_PSRAM)
     printf("PSRAM Heap %u@%p\r\n",(unsigned int)&_heap3_size, &_heap3_start);
+    bl_psram_dump_id();
 #endif
 
     system_early_init();

@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -29,7 +29,7 @@
 #endif
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
-#include "log.h"
+#include "bt_log.h"
 
 //#include "util/util.h"
 //#include "hal/ccm.h"

@@ -9,12 +9,12 @@ NOTES
 */
 /****************************************************************************/
 
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <FreeRTOS.h>
 #include <task.h>
-#include <blog.h>
+//#include <blog.h>
 
 #include "bluetooth.h"
 #include "conn.h"
@@ -23,7 +23,7 @@ NOTES
 #include "hci_core.h"
 #include "uuid.h"
 #include "ble_tp_svc.h"
-#include "log.h"
+#include "bt_log.h"
 
 #define TP_PRIO configMAX_PRIORITIES - 5
 #if defined(CONFIG_BLE_TP_SVC_COMPATIBILITY_TEST)
@@ -34,19 +34,31 @@ static void ble_tp_connected(struct bt_conn *conn, u8_t err);
 static void ble_tp_disconnected(struct bt_conn *conn, u8_t reason);
 static int bl_tp_send_indicate(struct bt_conn *conn, const struct bt_gatt_attr *attr, const void *data, u16_t len);
 
+#define TP_ATT_TIMEOUT      K_SECONDS(30)
 struct bt_conn *ble_tp_conn;
 struct bt_gatt_exchange_params exchg_mtu;
-TaskHandle_t ble_tp_task_h;
+TaskHandle_t ble_tp_notify_task_h;
+#define BLE_TP_QUEUE_LEN   10
+static struct k_thread ble_tp_task_h;
+static struct k_fifo ble_tp_queue;
 
 int tx_mtu_size = 20;
 u8_t tp_start = 0;
 static u8_t created_tp_task = 0;
 static u8_t isRegister = 0;
+struct k_sem tp_sem;
 
 static struct bt_conn_cb ble_tp_conn_callbacks = {
 	.connected	=   ble_tp_connected,
 	.disconnected	=   ble_tp_disconnected,
 };
+
+typedef enum{
+    TP_MSG_EXCHAGNE_MTU,
+    TP_MSG_EXCHANGE_DATA_LEN,
+    TP_MSG_TX_GATT_INDICATE,
+    TP_MSG_TX_GATT_NOTIFY,
+}ble_tp_msg_type;
 
 /*************************************************************************
 NAME
@@ -55,21 +67,14 @@ NAME
 static void ble_tp_tx_mtu_size(struct bt_conn *conn, u8_t err,
 			  struct bt_gatt_exchange_params *params)
 {
-   int tx_octets = 0x00fb;
-   int tx_time = 0x0848;
-   int ret = -1;
+   k_sem_give(&tp_sem);
    if(!err)
    {
-        tx_mtu_size = bt_gatt_get_mtu(ble_tp_conn);  
-        //set data length after connected.
-        ret = bt_le_set_data_len(ble_tp_conn, tx_octets, tx_time);
-        if(!ret)
-        {
-            BT_WARN("ble tp set data length success.");
-        }
-        else
-        {
-            BT_WARN("ble tp set data length failure, err: %d\n", ret);
+        tx_mtu_size = bt_gatt_get_mtu(ble_tp_conn);
+        uint8_t *msg = k_malloc(sizeof(uint8_t));
+        if(msg){
+            *msg = TP_MSG_EXCHANGE_DATA_LEN;
+            k_fifo_put(&ble_tp_queue, (void *)msg);
         }
         BT_WARN("ble tp echange mtu size success, mtu size: %d", tx_mtu_size);
    }
@@ -85,7 +90,6 @@ NAME
 */
 static void ble_tp_connected(struct bt_conn *conn, u8_t err)
 {
-    int ret = -1;
     if(err || conn->type != BT_CONN_TYPE_LE)
     {
         return;
@@ -104,13 +108,10 @@ static void ble_tp_connected(struct bt_conn *conn, u8_t err)
     arch_delay_ms(100);
     #endif
     #endif
-    //exchange mtu size after connected.
-    exchg_mtu.func = ble_tp_tx_mtu_size;
-    ret = bt_gatt_exchange_mtu(ble_tp_conn, &exchg_mtu);
-    if (!ret) {
-        BT_WARN("ble tp exchange mtu size pending.");
-    } else {
-        BT_WARN("ble tp exchange mtu size failure, err: %d", ret);
+    uint8_t *msg = k_malloc(sizeof(uint8_t));
+    if(msg){
+        *msg = TP_MSG_EXCHAGNE_MTU;
+        k_fifo_put(&ble_tp_queue, (void *)msg);
     }
 }
 
@@ -164,7 +165,7 @@ NAME
 static int ble_tp_recv_wr(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                         const void *buf, u16_t len, u16_t offset, u8_t flags)
 {
-    BT_INFO("recv data len=%d, offset=%d, flag=%d", len, offset, flags);
+    BT_WARN("recv data len=%d, offset=%d, flag=%d", len, offset, flags);
     #if defined(CONFIG_BLE_TP_SVC_COMPATIBILITY_TEST)
 	u16_t iLen = (len < 16)?len:16;
 	u8_t err = 0;
@@ -219,7 +220,8 @@ NAME
 */ 
 void indicate_rsp(struct bt_conn *conn, const struct bt_gatt_attr *attr,	u8_t err)
 {
-    BT_INFO("receive confirm, err:%d", err);
+    k_sem_give(&tp_sem);
+    BT_WARN("receive confirm, err:%d", err);
 }
 
 /*************************************************************************
@@ -228,13 +230,14 @@ NAME
 */
 static void ble_tp_ind_ccc_changed(const struct bt_gatt_attr *attr, u16_t value)
 {
-    int err = -1;
-    char data[9] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
     BT_WARN("ccc:value=[%d]",value);
-
-    if(value == BT_GATT_CCC_INDICATE) {
-        err = bl_tp_send_indicate(ble_tp_conn, get_attr(BT_CHAR_BLE_TP_IND_ATTR_VAL_INDEX), data, 9);
-        BT_INFO("ble tp send indatcate: %d", err);
+    if(value == BT_GATT_CCC_INDICATE)
+    {
+        uint8_t *msg = k_malloc(sizeof(uint8_t));
+        if(msg){
+            *msg = TP_MSG_TX_GATT_INDICATE;
+            k_fifo_put(&ble_tp_queue, (void *)msg);
+        }
     }
 }
 
@@ -273,19 +276,83 @@ static void ble_tp_notify_task(void *pvParameters)
     #endif
 }
 
+static void ble_tp_task(void *pvParameters)
+{
+    int ret = 0;
+   
+    while(1){
+         uint8_t *msg = k_fifo_get(&ble_tp_queue, K_FOREVER);
+         if(msg == NULL)
+             continue;
+ 
+         switch(*msg){
+             case TP_MSG_EXCHAGNE_MTU:
+             {
+                 exchg_mtu.func = ble_tp_tx_mtu_size;
+                 ret = bt_gatt_exchange_mtu(ble_tp_conn, &exchg_mtu);
+                 if (!ret) {
+                     BT_WARN("ble tp exchange mtu size pending.");
+                 } else {
+                     BT_WARN("ble tp exchange mtu size failure, err: %d", ret);
+                 }
+                 k_sem_take(&tp_sem, TP_ATT_TIMEOUT);
+             }
+             break;
+             case TP_MSG_EXCHANGE_DATA_LEN:
+             {
+                 int tx_octets = 0x00fb;
+                 int tx_time = 0x0848;
+                 ret = bt_le_set_data_len(ble_tp_conn, tx_octets, tx_time);
+                 if(!ret)
+                 {
+                     BT_WARN("ble tp set data length success.");
+                 }
+                 else
+                 {
+                     BT_WARN("ble tp set data length failure, err: %d\n", ret);
+                 }
+             }
+             break;
+             case TP_MSG_TX_GATT_INDICATE:
+             {
+                 char data[9] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+                 ret = bl_tp_send_indicate(ble_tp_conn, get_attr(BT_CHAR_BLE_TP_IND_ATTR_VAL_INDEX), data, 9);
+                 BT_WARN("ble tp send indicate: %d", ret);
+                 k_sem_take(&tp_sem, TP_ATT_TIMEOUT);
+             }
+             break;
+ 
+             case TP_MSG_TX_GATT_NOTIFY:
+             {
+                 ret = bt_gatt_notify(ble_tp_conn, get_attr(BT_CHAR_BLE_TP_NOT_ATTR_VAL_INDEX), "notify", strlen("notify"));
+                 BT_WARN("ble tp send notify: %d", ret);
+             }
+             break;
+
+             default:
+                break;
+         }
+
+         k_free(msg);
+    }     
+}
+
 /*************************************************************************
 NAME    
     ble_tp_not_ccc_changed
 */ 
 static void ble_tp_not_ccc_changed(const struct bt_gatt_attr *attr, u16_t value)
 {
-    BT_WARN("ccc:value=[%d]\r\n",value);
+    int err;
+
+    UNUSED(err);
+    BT_WARN("ccc:value=[%d]",value);
     
     if(tp_start)
     {
         if(value == BT_GATT_CCC_NOTIFY)
         {
-            if(xTaskCreate(ble_tp_notify_task, (char*)"bletp", 256, NULL, TP_PRIO, &ble_tp_task_h) == pdPASS)
+            if(xTaskCreate(ble_tp_notify_task, (char*)"bletpnotify", 256, NULL, TP_PRIO, &ble_tp_notify_task_h) == pdPASS)
             {
                 created_tp_task = 1;
                 BT_WARN("Create throughput tx task success.");
@@ -301,7 +368,7 @@ static void ble_tp_not_ccc_changed(const struct bt_gatt_attr *attr, u16_t value)
             if(created_tp_task)
             {
                 BT_WARN("Delete throughput tx task.");
-                vTaskDelete(ble_tp_task_h);
+                vTaskDelete(ble_tp_notify_task_h);
                 created_tp_task = 0;
             }
         }
@@ -311,8 +378,15 @@ static void ble_tp_not_ccc_changed(const struct bt_gatt_attr *attr, u16_t value)
         if(created_tp_task)
         {
             BT_WARN("Delete throughput tx task.");
-            vTaskDelete(ble_tp_task_h);
+            vTaskDelete(ble_tp_notify_task_h);
             created_tp_task = 0;
+        }
+        if(value == BT_GATT_CCC_NOTIFY) {
+            uint8_t *msg = k_malloc(sizeof(uint8_t));
+            if(msg){
+                *msg = TP_MSG_TX_GATT_NOTIFY;
+                k_fifo_put(&ble_tp_queue, (void *)msg);
+            }
         }
     }
 }
@@ -339,7 +413,7 @@ static struct bt_gatt_attr attrs[]= {
 
 	BT_GATT_CHARACTERISTIC(BT_UUID_CHAR_BLE_TP_IND,
 							BT_GATT_CHRC_INDICATE,
-							NULL,
+							0,
 							NULL,
 							NULL,
 							NULL),
@@ -348,7 +422,7 @@ static struct bt_gatt_attr attrs[]= {
 
 	BT_GATT_CHARACTERISTIC(BT_UUID_CHAR_BLE_TP_NOT,
 							BT_GATT_CHRC_NOTIFY,
-							NULL,
+							0,
 							NULL,
 							NULL,
 							NULL),
@@ -399,6 +473,10 @@ void ble_tp_init()
     {
         isRegister = 1;
         bt_gatt_service_register(&ble_tp_server);
+        k_sem_init(&tp_sem, 0, 1);
+        k_fifo_init(&ble_tp_queue, BLE_TP_QUEUE_LEN);
+        if(ble_tp_queue._queue.hdl)
+            k_thread_create(&ble_tp_task_h, "bletp", 1024,(k_thread_entry_t)ble_tp_task, TP_PRIO);
     }
 }
 

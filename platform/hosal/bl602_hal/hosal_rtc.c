@@ -231,7 +231,7 @@ static void __tm_to_rtctime(hosal_rtc_time_t *rtc_time, const struct tm *time, u
     rtc_time->sec = _INT_TO_BCD(is_bcd, time->tm_sec);
     rtc_time->min = _INT_TO_BCD(is_bcd, time->tm_min);
     rtc_time->hr = _INT_TO_BCD(is_bcd, time->tm_hour);
-    //rtc_time->weekday = _INT_TO_BCD(is_bcd, time->tm_wday);
+    rtc_time->weekday = _INT_TO_BCD(is_bcd, time->tm_wday);
     rtc_time->date = _INT_TO_BCD(is_bcd, time->tm_mday);
     rtc_time->month = _INT_TO_BCD(is_bcd, time->tm_mon + 1);
     rtc_time->year = _INT_TO_BCD(is_bcd, time->tm_year - 70);
@@ -242,7 +242,7 @@ static void __rtctime_to_tm(struct tm *tim, const hosal_rtc_time_t *time, uint8_
     tim->tm_sec = _BCD_TO_INT(is_bcd, time->sec);
     tim->tm_min = _BCD_TO_INT(is_bcd, time->min);
     tim->tm_hour = _BCD_TO_INT(is_bcd, time->hr);
-    //tim->tm_wday = _BCD_TO_INT(is_bcd, time->weekday);
+    tim->tm_wday = _BCD_TO_INT(is_bcd, time->weekday);
     tim->tm_mday = _BCD_TO_INT(is_bcd, time->date);
     tim->tm_mon = _BCD_TO_INT(is_bcd, time->month);
     tim->tm_mon -= 1;
@@ -272,6 +272,20 @@ static time_t __clock_calendar2utc(int year, int month, int day)
     /* Then convert the seconds and add in hours, minutes, and seconds */
 
     return days;
+}
+
+static int get_week_day(uint16_t y, uint8_t m, uint8_t d)
+{
+    int week;
+
+    if (m == 1 || m == 2) {
+        m += 12;
+        y -= 1;
+    }
+
+    week = ( d + 2 * m + 3 * ( m + 1 ) / 5 + y + y / 4 - y / 100 + y / 400 ) % 7;
+
+    return week + 1;
 }
 
 static struct tm *__gmtime_r(const time_t *timer, struct tm *result)
@@ -310,6 +324,7 @@ static struct tm *__gmtime_r(const time_t *timer, struct tm *result)
     result->tm_year  = (int)year - 1900; /* Relative to 1900 */
     result->tm_mon   = (int)month - 1;   /* zero-based */
     result->tm_mday  = (int)day;         /* one-based */
+    result->tm_wday  = get_week_day(year, month, day);
     result->tm_hour  = (int)hour;
     result->tm_min   = (int)min;
     result->tm_sec   = (int)sec;

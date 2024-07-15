@@ -1,5 +1,6 @@
-#include "bflb_clock.h"
+//#include "bflb_clock.h"
 #include "bl702_clock.h"
+#include "bflb_clock.h"
 
 uint32_t bflb_clk_get_system_clock(uint8_t type)
 {

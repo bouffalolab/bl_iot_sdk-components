@@ -32,18 +32,3 @@ CFLAGS := $(patsubst -Os,-O2,$(CFLAGS))
 endif
 
 ASMFLAGS += -DportasmHANDLE_INTERRUPT=interrupt_entry
-
-ifeq ($(CONFIG_ZIGBEE), 1)
-CFLAGS   += -DCFG_ZIGBEE_ENABLE
-CPPFLAGS += -DCFG_ZIGBEE_ENABLE
-endif
-
-ifeq ($(CONFIG_ZBSTACK_DEBUG), 1)
-CFLAGS   += -D_DEBUG
-CPPFLAGS += -D_DEBUG
-endif
-
-ifeq ($(CONFIG_USE_PSRAM),1)
-CFLAGS   += -DCFG_USE_PSRAM
-CPPFLAGS += -DCFG_USE_PSRAM
-endif

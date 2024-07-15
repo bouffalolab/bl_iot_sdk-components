@@ -612,6 +612,12 @@ struct bt_hci_rp_configure_data_path {
 	uint8_t  status;
 } __packed;
 
+#define BT_HCI_OP_SET_MIN_ENC_KEY_SIZE          BT_OP(BT_OGF_BASEBAND, 0x0084)
+struct bt_hci_cp_set_min_enc_key_size {
+    uint8_t min_enc_key_size;  
+} __packed;
+
+
 /* HCI version from Assigned Numbers */
 #define BT_HCI_VERSION_1_0B                     0
 #define BT_HCI_VERSION_1_1                      1

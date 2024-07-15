@@ -155,9 +155,10 @@ void Radio::Init(void)
         uint8_t          channel       = ot::Radio::kChannelMin;
         int8_t           power         = kPowerDefault;
         otError          error;
+        char             *psave = nullptr;
 
-        for (str = strtok(const_cast<char *>(maxPowerTable), ","); str != nullptr && channel <= ot::Radio::kChannelMax;
-             str = strtok(nullptr, ","))
+        for (str = strtok_r(const_cast<char *>(maxPowerTable), ",", &psave); str != nullptr && channel <= ot::Radio::kChannelMax;
+             str = strtok_r(nullptr, ",", &psave))
         {
             power = static_cast<int8_t>(strtol(str, nullptr, 0));
             error = sRadioSpinel.SetChannelMaxTransmitPower(channel, power);
@@ -578,10 +579,11 @@ otError otPlatDiagGpioGet(uint32_t aGpio, bool *aValue)
     char    cmd[OPENTHREAD_CONFIG_DIAG_CMD_LINE_BUFFER_SIZE];
     char    output[OPENTHREAD_CONFIG_DIAG_OUTPUT_BUFFER_SIZE];
     char   *str;
+    char   *psave = nullptr;
 
     snprintf(cmd, sizeof(cmd), "gpio get %d", aGpio);
     SuccessOrExit(error = sRadioSpinel.PlatDiagProcess(cmd, output, sizeof(output)));
-    VerifyOrExit((str = strtok(output, "\r")) != nullptr, error = OT_ERROR_FAILED);
+    VerifyOrExit((str = strtok_r(output, "\r", &psave)) != nullptr, error = OT_ERROR_FAILED);
     *aValue = static_cast<bool>(atoi(str));
 
 exit:
@@ -606,10 +608,11 @@ otError otPlatDiagGpioGetMode(uint32_t aGpio, otGpioMode *aMode)
     char    cmd[OPENTHREAD_CONFIG_DIAG_CMD_LINE_BUFFER_SIZE];
     char    output[OPENTHREAD_CONFIG_DIAG_OUTPUT_BUFFER_SIZE];
     char   *str;
+    char   *psave = nullptr;
 
     snprintf(cmd, sizeof(cmd), "gpio mode %d", aGpio);
     SuccessOrExit(error = sRadioSpinel.PlatDiagProcess(cmd, output, sizeof(output)));
-    VerifyOrExit((str = strtok(output, "\r")) != nullptr, error = OT_ERROR_FAILED);
+    VerifyOrExit((str = strtok_r(output, "\r", &psave)) != nullptr, error = OT_ERROR_FAILED);
 
     if (strcmp(str, "in") == 0)
     {
@@ -699,12 +702,13 @@ otError otPlatDiagRadioGetRawPowerSetting(otInstance *aInstance,
     char    cmd[OPENTHREAD_CONFIG_DIAG_CMD_LINE_BUFFER_SIZE];
     char    output[OPENTHREAD_CONFIG_DIAG_OUTPUT_BUFFER_SIZE];
     char   *str;
+    char   *psave = nullptr;
 
     assert((aRawPowerSetting != nullptr) && (aRawPowerSettingLength != nullptr));
 
     snprintf(cmd, sizeof(cmd), "rawpowersetting");
     SuccessOrExit(error = sRadioSpinel.PlatDiagProcess(cmd, output, sizeof(output)));
-    VerifyOrExit((str = strtok(output, "\r")) != nullptr, error = OT_ERROR_FAILED);
+    VerifyOrExit((str = strtok_r(output, "\r", &psave)) != nullptr, error = OT_ERROR_FAILED);
     SuccessOrExit(error = ot::Utils::CmdLineParser::ParseAsHexString(str, *aRawPowerSettingLength, aRawPowerSetting));
 
 exit:

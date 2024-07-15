@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <zephyr.h>
 #include <bluetooth.h>
 #include <conn.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_SETTINGS)
 #define LOG_MODULE_NAME bt_settings
-#include "log.h"
+#include "bt_log.h"
 
 #include "hci_core.h"
 #include "settings.h"
@@ -57,8 +57,8 @@ void bt_settings_encode_key(char *path, size_t path_size, const char *subsys,
 		/* Key format:
 		 *  "bt/<subsys>/<addr><type>/<key>", "/<key>" is optional
 		 */
-		strcpy(path, "bt/");
-		strncpy(&path[len], subsys, path_size - len);
+		strlcpy(path, "bt/", path_size);
+		strlcpy(&path[len], subsys, path_size - len);
 		len = strlen(path);
 		if (len < path_size) {
 			path[len] = '/';
@@ -81,7 +81,7 @@ void bt_settings_encode_key(char *path, size_t path_size, const char *subsys,
 		if (key && len < path_size) {
 			path[len] = '/';
 			len++;
-			strncpy(&path[len], key, path_size - len);
+			strlcpy(&path[len], key, path_size - len);
 			len += strlen(&path[len]);
 		}
 

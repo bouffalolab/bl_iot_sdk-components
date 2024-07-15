@@ -3,11 +3,10 @@
 #include "bl_irq.h"
 #include <bl702_timer.h>
 #include <bl702_glb.h>
-#include <FreeRTOS.h>
-#include <task.h>
+
 
 #define MTIMER_TICKS_PER_US     (4)
-static inline uint64_t timer_us_now()
+static uint64_t timer_tick_now(void)
 {
     uint32_t tick_low, tick_high, tick_tmp;
     uint64_t tick64;
@@ -25,25 +24,25 @@ static inline uint64_t timer_us_now()
 
 uint32_t bl_timer_now_us(void)
 {
-    return timer_us_now() / MTIMER_TICKS_PER_US;
+    return timer_tick_now() / MTIMER_TICKS_PER_US;
 }
 
 uint64_t bl_timer_now_us64(void)
 {
-    return timer_us_now() / MTIMER_TICKS_PER_US;
+    return timer_tick_now() / MTIMER_TICKS_PER_US;
 }
 
 void bl_timer_delay_us(uint32_t us)
 {
-    uint32_t tick_now, tick_start;
-    int ticks, diff;
+    uint64_t tick_now, tick_start;
+    uint64_t ticks, diff;
 
-    tick_start = *(volatile uint32_t*)0x0200BFF8;
+    tick_start = timer_tick_now();
     ticks = us * MTIMER_TICKS_PER_US;
 
     do {
-        tick_now = *(volatile uint32_t*)0x0200BFF8;
-        diff = (int32_t)tick_now - (int32_t)tick_start;
+        tick_now = timer_tick_now();
+        diff = tick_now - tick_start;
     } while (diff < ticks);
 }
 

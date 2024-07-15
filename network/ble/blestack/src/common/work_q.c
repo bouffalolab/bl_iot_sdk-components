@@ -13,8 +13,8 @@
 
 
 #include <zephyr.h>
-#include <log.h>
-#include <sys/errno.h>
+#include <bt_log.h>
+#include <bt_errno.h>
 
 struct k_thread work_q_thread;
 #if !defined(BFLB_BLE)
@@ -41,7 +41,8 @@ static void work_queue_main(void *p1)
         work = k_fifo_get(&g_work_queue_main.fifo, K_FOREVER);
 
         if (atomic_test_and_clear_bit(work->flags, K_WORK_STATE_PENDING)) {
-            work->handler(work);
+            if(work->handler)
+                work->handler(work);
         }
 
         k_yield();
@@ -119,6 +120,11 @@ static int k_delayed_work_submit_to_queue(struct k_work_q *work_q,
         if (err < 0) {
             goto done;
         }
+    }
+
+    if(work->work.handler == NULL){
+        err = -ENOTSUP;
+        goto done;
     }
 
     if (!delay) {
@@ -214,6 +220,7 @@ int k_delayed_work_free(struct k_delayed_work *work)
     work->work_q = NULL;
     work->timer.timeout = 0;
     work->timer.start_ms = 0;
+    work->work.handler = NULL;
 
 exit:
     return err;

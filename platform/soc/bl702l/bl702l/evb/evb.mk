@@ -23,59 +23,50 @@ COMPONENT_OBJS := $(patsubst %.S,%.o, $(COMPONENT_OBJS))
 COMPONENT_SRCS := $(COMPONENT_SRCS1)
 COMPONENT_SRCDIRS := evb/src/boot/$(toolchains) evb/src
 
+CONFIG_CHIP_REVISION ?= A0
+
 ifneq ($(CONFIG_LINK_CUSTOMER),1)
+ifeq ($(CONFIG_BUILD_ROM_CODE),1)
+    ifeq ($(CONFIG_LINK_RAM),1)
+        LINKER_SCRIPTS := ram.ld
+    else ifeq ($(CONFIG_USE_PSRAM),1)
+        LINKER_SCRIPTS := psram_flash.ld
+    else ifeq ($(CONFIG_PDS_ENABLE),1)
+        LINKER_SCRIPTS := flash_lp.ld
+    else
+        LINKER_SCRIPTS := flash.ld
+    endif
 
-ifeq ($(CONFIG_GEN_ROM),1)
-	LINKER_SCRIPTS := rom.ld
+    $(info use $(LINKER_SCRIPTS))
+    COMPONENT_ADD_LDFLAGS += -L $(COMPONENT_PATH)/evb/ld -T $(LINKER_SCRIPTS)
+    COMPONENT_ADD_LINKER_DEPS := evb/ld/$(LINKER_SCRIPTS)
 else
-	ifeq ($(CONFIG_LINK_RAM),1)
-		ifeq ($(CONFIG_BUILD_ROM_CODE),1)
-			LINKER_SCRIPTS := ram.ld
-		else
-			LINKER_SCRIPTS := ram_rom.ld
-		endif
-	else
-		ifeq ($(CONFIG_BUILD_ROM_CODE),1)
-			ifeq ($(CONFIG_USE_PSRAM),1)
-				LINKER_SCRIPTS := psram_flash.ld
-			else ifeq ($(CONFIG_PDS_ENABLE),1)
-				LINKER_SCRIPTS := flash_lp.ld
-			else
-				LINKER_SCRIPTS := flash.ld
-			endif
-		else
-			ifeq ($(CONFIG_USE_PSRAM),1)
-				LINKER_SCRIPTS := psram_flash_rom.ld
-			else ifeq ($(CONFIG_PDS_ENABLE),1)
-				LINKER_SCRIPTS := flash_rom_lp.ld
-			else
-				LINKER_SCRIPTS := flash_rom.ld
-			endif
-		endif
-	endif
+    ifeq ($(CONFIG_LINK_RAM),1)
+        LINKER_SCRIPTS := ram_rom.ld
+    else ifeq ($(CONFIG_USE_PSRAM),1)
+        LINKER_SCRIPTS := psram_flash_rom.ld
+    else ifeq ($(CONFIG_PDS_ENABLE),1)
+        ifeq ($(CONFIG_BUILD_FREERTOS),1)
+            LINKER_SCRIPTS := flash_rom_lp_freertos.ld
+        else
+            LINKER_SCRIPTS := flash_rom_lp.ld
+        endif
+    else
+        ifeq ($(CONFIG_BUILD_FREERTOS),1)
+            LINKER_SCRIPTS := flash_rom_freertos.ld
+        else
+            LINKER_SCRIPTS := flash_rom.ld
+        endif
+    endif
+
+    $(info use $(CONFIG_CHIP_REVISION)/$(LINKER_SCRIPTS))
+    COMPONENT_ADD_LDFLAGS += -L $(COMPONENT_PATH)/evb/ld/$(CONFIG_CHIP_REVISION) -T $(LINKER_SCRIPTS)
+    COMPONENT_ADD_LINKER_DEPS := evb/ld/$(CONFIG_CHIP_REVISION)/$(LINKER_SCRIPTS)
 endif
-
-$(info use $(LINKER_SCRIPTS))
-
-##
-COMPONENT_ADD_LDFLAGS += -L $(COMPONENT_PATH)/evb/ld \
-                         $(addprefix -T ,$(LINKER_SCRIPTS))
-##                        
-COMPONENT_ADD_LINKER_DEPS := $(addprefix evb/ld/,$(LINKER_SCRIPTS))
-
 endif
 
 ifeq ($(CONFIG_DISABLE_PRINT),1)
 CPPFLAGS += -DDISABLE_PRINT
-endif
-
-ifeq ($(CONFIG_GPIO_SIM_PRINT),1)
-CPPFLAGS += -DGPIO_SIM_PRINT
-endif
-
-ifeq ($(CONFIG_ZIGBEE), 1)
-CFLAGS   += -DCFG_ZIGBEE_ENABLE
-CPPFLAGS += -DCFG_ZIGBEE_ENABLE
 endif
 
 ifeq ($(CONFIG_CPP_ENABLE), 1)

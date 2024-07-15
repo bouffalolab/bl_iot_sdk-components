@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <bl702.h>
 #include <bl702_dma.h>
+#include <bl702_rf_public.h>
 
 #include "bl_efuse.h"
 #include "bl_wireless.h"
@@ -12,7 +13,7 @@ typedef struct _bl_wireless_env {
     uint8_t mac_addr[8];
     int8_t power_offset_zigbee[16];
     int8_t power_offset_ble[40];
-    uint8_t tcal_en;
+    uint8_t power_tcal_en;
 } bl_wireless_env_t;
 
 bl_wireless_env_t wireless_env;
@@ -64,14 +65,14 @@ int8_t bl_wireless_power_offset_ble_get(uint8_t ch)
     }
 }
 
-void bl_wireless_tcal_en_set(uint8_t en)
+void bl_wireless_power_tcal_en_set(uint8_t en)
 {
-    wireless_env.tcal_en = en;
+    wireless_env.power_tcal_en = en;
 }
 
-uint8_t bl_wireless_tcal_en_get(void)
+uint8_t bl_wireless_power_tcal_en_get(void)
 {
-    return wireless_env.tcal_en;
+    return wireless_env.power_tcal_en;
 }
 
 
@@ -138,4 +139,12 @@ void rf_full_cal_start_callback(uint32_t addr, uint32_t size)
         //printf("DMA ch%d ok\r\n");
         continue;
     }
+}
+
+void rf_reset_done_callback(void)
+{
+#if defined(CFG_TCAL_ENABLE)
+    extern int hal_tcal_restart(void);
+    hal_tcal_restart();
+#endif
 }

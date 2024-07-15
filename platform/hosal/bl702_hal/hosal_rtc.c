@@ -31,9 +31,9 @@
 #include <stdint.h>
 #include <time.h>
 #include <hosal_rtc.h>
-#include "bl_rtc.h"
-#include <FreeRTOS.h>
-#include <task.h>
+#include <bl_rtc.h>
+#include <bl_hbn.h>
+#include <bl_sys.h>
 #include <blog.h>
 
 #define SEC_PER_MIN  ((time_t)60)
@@ -41,6 +41,7 @@
 #define SEC_PER_DAY  ((time_t)24 * SEC_PER_HOUR)
 
 static struct tm *s_rtc_base = NULL;
+ATTR_HBN_NOINIT_SECTION static uint64_t s_rtc_ref_cnt;
 
 static const uint8_t leap_year[12] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 static const uint8_t noleap_year[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -232,7 +233,7 @@ static void __tm_to_rtctime(hosal_rtc_time_t *rtc_time, const struct tm *time, u
     rtc_time->sec = _INT_TO_BCD(is_bcd, time->tm_sec);
     rtc_time->min = _INT_TO_BCD(is_bcd, time->tm_min);
     rtc_time->hr = _INT_TO_BCD(is_bcd, time->tm_hour);
-    //rtc_time->weekday = _INT_TO_BCD(is_bcd, time->tm_wday);
+    rtc_time->weekday = _INT_TO_BCD(is_bcd, time->tm_wday);
     rtc_time->date = _INT_TO_BCD(is_bcd, time->tm_mday);
     rtc_time->month = _INT_TO_BCD(is_bcd, time->tm_mon + 1);
     rtc_time->year = _INT_TO_BCD(is_bcd, time->tm_year - 70);
@@ -243,7 +244,7 @@ static void __rtctime_to_tm(struct tm *tim, const hosal_rtc_time_t *time, uint8_
     tim->tm_sec = _BCD_TO_INT(is_bcd, time->sec);
     tim->tm_min = _BCD_TO_INT(is_bcd, time->min);
     tim->tm_hour = _BCD_TO_INT(is_bcd, time->hr);
-    //tim->tm_wday = _BCD_TO_INT(is_bcd, time->weekday);
+    tim->tm_wday = _BCD_TO_INT(is_bcd, time->weekday);
     tim->tm_mday = _BCD_TO_INT(is_bcd, time->date);
     tim->tm_mon = _BCD_TO_INT(is_bcd, time->month);
     tim->tm_mon -= 1;
@@ -273,6 +274,20 @@ static time_t __clock_calendar2utc(int year, int month, int day)
     /* Then convert the seconds and add in hours, minutes, and seconds */
 
     return days;
+}
+
+static int get_week_day(uint16_t y, uint8_t m, uint8_t d)
+{
+    int week;
+
+    if (m == 1 || m == 2) {
+        m += 12;
+        y -= 1;
+    }
+
+    week = ( d + 2 * m + 3 * ( m + 1 ) / 5 + y + y / 4 - y / 100 + y / 400 ) % 7;
+
+    return week + 1;
 }
 
 static struct tm *__gmtime_r(const time_t *timer, struct tm *result)
@@ -311,6 +326,7 @@ static struct tm *__gmtime_r(const time_t *timer, struct tm *result)
     result->tm_year  = (int)year - 1900; /* Relative to 1900 */
     result->tm_mon   = (int)month - 1;   /* zero-based */
     result->tm_mday  = (int)day;         /* one-based */
+    result->tm_wday  = get_week_day(year, month, day);
     result->tm_hour  = (int)hour;
     result->tm_min   = (int)min;
     result->tm_sec   = (int)sec;
@@ -354,11 +370,14 @@ int hosal_rtc_init(hosal_rtc_dev_t *rtc)
         return -1;
     }
     if (NULL == s_rtc_base) {
-        s_rtc_base = pvPortMalloc(sizeof(struct tm));
+        s_rtc_base = malloc(sizeof(struct tm));
         if (NULL == s_rtc_base) {
             return -1;
         }
         bl_rtc_init();
+        if (BL_RST_POR == bl_sys_rstinfo_get()) {
+            s_rtc_ref_cnt = 0;
+        }
     }
 
     return 0;
@@ -375,13 +394,16 @@ int hosal_rtc_init(hosal_rtc_dev_t *rtc)
 int hosal_rtc_get_time(hosal_rtc_dev_t *rtc, hosal_rtc_time_t *time)
 {
     struct tm tim;
-    uint64_t time_stamp_ms = bl_rtc_get_timestamp_ms();
-    
-    memset(&tim, 0, sizeof(struct tm));
+    uint64_t time_stamp_ms;
+
     if (time == NULL || rtc == NULL) {
         return -1;
     }
+    if (NULL == s_rtc_base) {
+        return -1;
+    }
 
+    time_stamp_ms = bl_rtc_get_delta_time_ms(s_rtc_ref_cnt);
     time_stamp_ms = time_stamp_ms / 1000;
     time_stamp_ms += __mktime(s_rtc_base);
     __gmtime_r((const time_t *)&time_stamp_ms, &tim);
@@ -415,7 +437,10 @@ int hosal_rtc_set_time(hosal_rtc_dev_t *rtc, const hosal_rtc_time_t *time)
     if ((ret = __check_tm_ok(&tim)) != 0) {
         return ret;
     }
+
     __rtctime_to_tm(s_rtc_base, time, (rtc->config.format == HOSAL_RTC_FORMAT_BCD));
+    s_rtc_ref_cnt = bl_rtc_get_counter();
+
     return 0;
 }
 
@@ -429,17 +454,16 @@ int hosal_rtc_set_time(hosal_rtc_dev_t *rtc, const hosal_rtc_time_t *time)
  */
 int hosal_rtc_set_count(hosal_rtc_dev_t *rtc, uint64_t *time_stamp)
 {
-    struct tm tim;
-    hosal_rtc_time_t time;
     if (rtc == NULL) {
         return -1;
     }
     if (NULL == s_rtc_base) {
         return -1;
     }
-    memset(&tim, 0, sizeof(struct tm));
-    memset(&time, 0, sizeof(hosal_rtc_time_t));
+
     __gmtime_r((const time_t *)time_stamp, s_rtc_base);
+    s_rtc_ref_cnt = bl_rtc_get_counter();
+
     return 0;
 }
 
@@ -453,13 +477,17 @@ int hosal_rtc_set_count(hosal_rtc_dev_t *rtc, uint64_t *time_stamp)
  */
 int hosal_rtc_get_count(hosal_rtc_dev_t *rtc, uint64_t *time_stamp)
 {
-    uint64_t time_stamp_ms = bl_rtc_get_timestamp_ms();
+    uint64_t time_stamp_ms;
+
     if (rtc == NULL) {
         return -1;
     }
+
+    time_stamp_ms = bl_rtc_get_delta_time_ms(s_rtc_ref_cnt);
     time_stamp_ms = time_stamp_ms / 1000;
     time_stamp_ms += __mktime(s_rtc_base);
     *time_stamp = time_stamp_ms;
+
     return 0;
 }
 
@@ -477,7 +505,7 @@ int hosal_rtc_finalize(hosal_rtc_dev_t *rtc)
     }
 
     if (s_rtc_base) {
-        vPortFree(s_rtc_base);
+        free(s_rtc_base);
         s_rtc_base = NULL;
     }
 

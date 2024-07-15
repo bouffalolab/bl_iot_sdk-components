@@ -21,9 +21,6 @@
 static uint32_t trng_buffer[TRNG_SIZE_IN_WORD];
 static unsigned int trng_idx = 0;
 
-static StaticSemaphore_t sha_mutex_buf;
-SemaphoreHandle_t g_bl_sec_sha_mutex = NULL;
-
 static inline void _trng_ht_disable()
 {
     uint32_t TRNGx = SEC_ENG_BASE;
@@ -162,7 +159,6 @@ void sec_trng_IRQHandler(void)
 
 int bl_sec_init(void)
 {
-    g_bl_sec_sha_mutex = xSemaphoreCreateMutexStatic(&sha_mutex_buf);
     bl_sec_sha_init();
     bl_sec_pka_init();
     bl_sec_aes_init();

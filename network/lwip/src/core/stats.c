@@ -243,7 +243,11 @@ netstat_tcp_pcbs_dump(struct tcp_pcb *pcb_head)
 #endif /* LWIP_SO_RCVBUF */
     }
 #endif /* LWIP_NETCONN */
+#if TCP_QUEUE_OOSEQ
     rxmem_size = rxq_size + (pcb->ooseq ? pcb->ooseq->len : 0);
+#else
+    rxmem_size = rxq_size;
+#endif
 
     txq_size = (pcb->unsent ? pcb->unsent->len : 0) +
         (pcb->unacked ? pcb->unacked->len : 0);

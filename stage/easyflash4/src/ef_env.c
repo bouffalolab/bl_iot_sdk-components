@@ -1106,9 +1106,11 @@ static EfErrCode del_env(const char *key, env_node_obj_t old_env, bool complete_
     uint8_t status_table[DIRTY_STATUS_TABLE_SIZE];
 #endif
 
+    struct env_node_obj env;
+
     /* need find ENV */
     if (!old_env) {
-        struct env_node_obj env;
+        //struct env_node_obj env;
         /* find ENV */
         if (find_env(key, &env)) {
             old_env = &env;
@@ -1130,7 +1132,8 @@ static EfErrCode del_env(const char *key, env_node_obj_t old_env, bool complete_
             if (key != NULL) {
                 /* when using del_env(key, NULL, true) or del_env(key, env, true) in ef_del_env() and set_env() */
                 update_env_cache(key, strlen(key), FAILED_ADDR);
-            } else if (old_env != NULL) {
+            //} else if (old_env != NULL) {
+            } else {
                 /* when using del_env(NULL, env, true) in move_env() */
                 update_env_cache(old_env->name, old_env->name_len, FAILED_ADDR);
             }
@@ -1671,9 +1674,9 @@ EfErrCode ef_env_set_default(void)
         }
         sector.empty_env = FAILED_ADDR;
         create_env_blob(&sector, default_env_set[i].key, default_env_set[i].value, value_len);
-        if (result != EF_NO_ERR) {
-            goto __exit;
-        }
+        //if (result != EF_NO_ERR) {
+        //    goto __exit;
+        //}
     }
 
 __exit:

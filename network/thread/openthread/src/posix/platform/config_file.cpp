@@ -57,6 +57,7 @@ otError ConfigFile::Get(const char *aKey, int &aIterator, char *aValue, int aVal
     FILE    *fp = nullptr;
     char    *ret;
     long int pos;
+    char   *psave;
 
     VerifyOrExit((aKey != nullptr) && (aValue != nullptr), error = OT_ERROR_INVALID_ARGS);
     VerifyOrExit((fp = fopen(mFilePath, "r")) != nullptr, error = OT_ERROR_NOT_FOUND);
@@ -77,7 +78,8 @@ otError ConfigFile::Get(const char *aKey, int &aIterator, char *aValue, int aVal
         }
 
         // Remove comments
-        strtok(line, kCommentDelimiter);
+        psave = nullptr;
+        strtok_r(line, kCommentDelimiter, &psave);
 
         if ((str = strstr(line, "=")) == nullptr)
         {

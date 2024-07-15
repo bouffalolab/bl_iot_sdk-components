@@ -16,7 +16,7 @@
 #include "bl_irq.h"
 #include "hal_gpio.h"
 #include "hal_button.h"
-#include "hal_hbn.h"
+//#include "hal_hbn.h"
 
 /* scan time ms */
 #define BUTTON_SCAN_TIME    20
@@ -298,14 +298,14 @@ void fdt_button_module_init(const void *fdt, int button_offset)
     button_ctx_t stbutton;
 
     stgpio.arg = &stbutton;
-    uint8_t *pinbuf;
-    uint8_t pinbuf_size = 0;
+    //uint8_t *pinbuf;
+    //uint8_t pinbuf_size = 0;
 
-    pinbuf = pvPortMalloc(GPIO_MODULE_MAX);
-    if (!pinbuf) {
-        blog_error("mem error.\r\n");
-        return;
-    }
+    //pinbuf = pvPortMalloc(GPIO_MODULE_MAX);
+    //if (!pinbuf) {
+    //    blog_error("mem error.\r\n");
+    //    return;
+    //}
 
     for (i = 0; i < GPIO_MODULE_MAX; i++) {
         memset(gpio_node, 0, sizeof(gpio_node));
@@ -357,11 +357,11 @@ void fdt_button_module_init(const void *fdt, int button_offset)
         stgpio.gpioPin = BL_FDT32_TO_U32(addr_prop, 0);
         blog_info("i = %d, stgpio.gpioPin = %d\r\n", i, stgpio.gpioPin);
 
-        result = fdt_stringlist_get(fdt, offset1, "hbn_use", 0, &lentmp);
-        if ((lentmp == 4) && (memcmp("okay", result, 4) == 0)) {
-            blog_warn("gpio[%d] status = %s\r\n", i, result);
-            pinbuf[pinbuf_size++] = stgpio.gpioPin;
-        }
+        //result = fdt_stringlist_get(fdt, offset1, "hbn_use", 0, &lentmp);
+        //if ((lentmp == 4) && (memcmp("okay", result, 4) == 0)) {
+        //    blog_warn("gpio[%d] status = %s\r\n", i, result);
+        //    pinbuf[pinbuf_size++] = stgpio.gpioPin;
+        //}
 
         offset2 = fdt_subnode_offset(fdt, offset1, "button");
         if (0 >= offset2) {
@@ -470,7 +470,7 @@ void fdt_button_module_init(const void *fdt, int button_offset)
         hal_button_register_handler_with_dts(&stgpio);
     }
 
-    blog_buf(pinbuf, pinbuf_size);
-    hal_hbn_init(pinbuf, pinbuf_size);
-    vPortFree(pinbuf);
+    //blog_buf(pinbuf, pinbuf_size);
+    //hal_hbn_init(pinbuf, pinbuf_size);
+    //vPortFree(pinbuf);
 }

@@ -1,7 +1,7 @@
 #include "byteorder.h"
 #include "oad_service.h"
 #include "oad.h"
-#include "log.h"
+#include "bt_log.h"
 #include "hci_core.h"
 #include "conn_internal.h"
  

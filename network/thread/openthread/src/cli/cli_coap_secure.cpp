@@ -30,6 +30,8 @@
  * @file
  *   This file implements a simple CLI for the CoAP Secure service.
  */
+#define _GNU_SOURCE
+#include <string.h>
 
 #include "cli_coap_secure.hpp"
 
@@ -60,7 +62,7 @@ CoapSecure::CoapSecure(otInstance *aInstance, OutputImplementer &aOutputImplemen
     memset(&mPsk, 0, sizeof(mPsk));
     memset(&mPskId, 0, sizeof(mPskId));
     memset(&mUriPath, 0, sizeof(mUriPath));
-    strncpy(mResourceContent, "0", sizeof(mResourceContent));
+    memcpy(mResourceContent, "0", sizeof(mResourceContent));
     mResourceContent[sizeof(mResourceContent) - 1] = '\0';
 }
 
@@ -112,7 +114,7 @@ template <> otError CoapSecure::Process<Cmd("resource")>(Arg aArgs[])
         }
 #endif
 
-        strncpy(mUriPath, aArgs[0].GetCString(), sizeof(mUriPath) - 1);
+        memcpy(mUriPath, aArgs[0].GetCString(), sizeof(mUriPath) - 1);
 #if OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE
         otCoapSecureAddBlockWiseResource(GetInstancePtr(), &mResource);
 #else
@@ -135,7 +137,7 @@ template <> otError CoapSecure::Process<Cmd("set")>(Arg aArgs[])
     if (!aArgs[0].IsEmpty())
     {
         VerifyOrExit(aArgs[0].GetLength() < sizeof(mResourceContent), error = OT_ERROR_INVALID_ARGS);
-        strncpy(mResourceContent, aArgs[0].GetCString(), sizeof(mResourceContent));
+        memcpy(mResourceContent, aArgs[0].GetCString(), sizeof(mResourceContent));
         mResourceContent[sizeof(mResourceContent) - 1] = '\0';
     }
     else
@@ -228,7 +230,7 @@ otError CoapSecure::ProcessRequest(Arg aArgs[], otCoapCode aCoapCode)
 
     VerifyOrExit(!aArgs[0].IsEmpty(), error = OT_ERROR_INVALID_ARGS);
     VerifyOrExit(aArgs[0].GetLength() < sizeof(coapUri), error = OT_ERROR_INVALID_ARGS);
-    strcpy(coapUri, aArgs[0].GetCString());
+    strlcpy(coapUri, aArgs[0].GetCString(), kMaxUriLength);
 
     if (!aArgs[1].IsEmpty())
     {

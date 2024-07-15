@@ -60,7 +60,7 @@ enum {
 	BT_DEV_ADV_ADDRESS_IS_PUBLIC,
 #endif
 
-#if defined(CONFIG_AUTO_PTS)
+#if defined(CONFIG_BT_STACK_PTS) || defined(CONFIG_AUTO_PTS)
 	BT_DEV_SETTED_NON_RESOLV_ADDR, //The non-reslovable address have been set.
 #endif
 
@@ -290,6 +290,7 @@ int bt_le_read_chan_map(struct bt_conn *conn, struct bt_hci_rp_le_read_chan_map 
 
 #if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
 int bt_le_throughput_calc(bool enable, u8_t interval);
+int bt_le_set_conn_window(u8_t percentage);
 #endif
 
 int bt_le_enh_tx_test(u8_t tx_ch, u8_t test_data_len, u8_t pkt_payload, u8_t phy);
@@ -311,5 +312,5 @@ void bt_register_host_assist_cb(struct blhast_cb *cb);
 
 typedef void (*bredr_name_callback)(const char *name);
 int remote_name_req(const bt_addr_t *addr, bredr_name_callback cb);
-
+bool bt_is_ready(void);
 #endif

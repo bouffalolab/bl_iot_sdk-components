@@ -51,7 +51,7 @@ endif
 # Component Makefile
 #
 ## These include paths would be exported to project level
-COMPONENT_ADD_INCLUDEDIRS := $(ble_stack_srcs_include_dirs)
+COMPONENT_ADD_INCLUDEDIRS += $(ble_stack_srcs_include_dirs)
 
 ## not be exported to project level
 COMPONENT_PRIV_INCLUDEDIRS   :=
@@ -88,7 +88,8 @@ ble_stack_srcs  := src/port/bl_port.c \
 					src/host/hci_core.c \
 					src/host/hci_ecc.c \
 					src/host/l2cap.c \
-					src/host/uuid.c
+					src/host/uuid.c \
+					src/host/version_bthost.c
 
 ifneq ($(CONFIG_BT_CONN), 0)
 ble_stack_srcs  += src/host/att.c \
@@ -118,7 +119,7 @@ ble_stack_srcs   += src/services/oad/oad_main.c \
 endif
 
 ifeq ($(CONFIG_BT_SPP_SERVER),1)
-ble_stack_srcs   += src/services/spp.c
+ble_stack_srcs   += src/services/ble_spp.c
 endif
 
 
@@ -172,7 +173,7 @@ endif
 ble_audio_srcs   := src/host/iso.c
 
 bredr_stack_srcs := src/host/keys_br.c \
-                    src/host/l2cap_br.c \
+                    src/host/l2cap_br.c
 
 sbc_codec_srcs := 	src/sbc/dec/alloc.c \
 					src/sbc/dec/bitalloc.c \
@@ -195,10 +196,10 @@ sbc_codec_srcs := 	src/sbc/dec/alloc.c \
 					src/sbc/enc/sbc_enc_bit_alloc_ste.c \
 					src/sbc/enc/sbc_enc_coeffs.c \
 					src/sbc/enc/sbc_encoder.c \
-					src/sbc/enc/sbc_packing.c \
+					src/sbc/enc/sbc_packing.c
 
 sbc_codec_include_dirs := 	src/sbc/dec \
-							src/sbc/enc \
+							src/sbc/enc
 
 COMPONENT_SRCS := $(ble_stack_srcs)
 

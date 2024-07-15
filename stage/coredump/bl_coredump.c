@@ -67,11 +67,17 @@ extern uint8_t _ld_ram_size1, _ld_ram_addr1;
 extern uint8_t _ld_ram_size2, _ld_ram_addr2;
 extern uint8_t _ld_ram_size3, _ld_ram_addr3;
 extern uint8_t _ld_ram_size4, _ld_ram_addr4;
-#ifdef BL702
-extern uint8_t _ld_ram_sha_size, _ld_ram_sha_addr;
+
 #ifdef CFG_USE_PSRAM
 extern uint8_t _ld_psram_size, _ld_psram_addr;
 #endif
+
+#ifdef BL702
+extern uint8_t _ld_ram_sha_size, _ld_ram_sha_addr;
+extern uint8_t __LD_BLE_CORE_REG_SIZE;
+#endif
+#ifdef BL702L
+extern uint8_t __LD_BLE_CORE_REG_SIZE;
 #endif
 
 //#define DEBUG
@@ -171,14 +177,20 @@ static const struct mem_hdr {
     {(uintptr_t)&_ld_ram_addr3, (unsigned int)&_ld_ram_size3, DUMP_BASE64_BYTE, "stack"},
     {(uintptr_t)&_ld_ram_sha_addr, (unsigned int)&_ld_ram_sha_size, DUMP_BASE64_BYTE, "ocram_sha"},
 #ifdef CFG_USE_PSRAM
-    {(uintptr_t)&_ld_psram_addr, (unsigned int)&_ld_psram_size, DUMP_BASE64_BYTE, "stack"},
+    {(uintptr_t)&_ld_psram_addr, (unsigned int)&_ld_psram_size, DUMP_BASE64_BYTE, "psram"},
 #endif
     {(uintptr_t)0x28008000, (unsigned int)&__LD_CONFIG_EM_SEL, DUMP_BASE64_WORD, "EM_REG"},
+    {(uintptr_t)0x28000000, (unsigned int)&__LD_BLE_CORE_REG_SIZE, DUMP_BASE64_WORD, "BLE_CORE_REG"},
 #elif BL702L
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "tcm_ocram"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "hbnram"},
     {(uintptr_t)&_ld_ram_addr3, (unsigned int)&_ld_ram_size3, DUMP_BASE64_BYTE, "stack"},
+#ifdef CFG_USE_PSRAM
+    {(uintptr_t)&_ld_psram_addr, (unsigned int)&_ld_psram_size, DUMP_BASE64_BYTE, "psram"},
+#endif
+    {(uintptr_t)0x21020000, (unsigned int)0x20000, DUMP_BASE64_BYTE, "romcode"},
     {(uintptr_t)0x28008000, (unsigned int)&__LD_CONFIG_EM_SEL, DUMP_BASE64_WORD, "EM_REG"},
+    {(uintptr_t)0x28000000, (unsigned int)&__LD_BLE_CORE_REG_SIZE, DUMP_BASE64_WORD, "BLE_CORE_REG"},
 #elif BL808
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "ram_psram"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "ram_wifi"},

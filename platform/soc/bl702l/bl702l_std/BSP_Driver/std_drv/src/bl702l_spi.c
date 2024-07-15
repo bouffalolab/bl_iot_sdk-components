@@ -747,7 +747,6 @@ BL_Err_Type SPI_SendData(SPI_ID_Type spiNo, void *buff, uint32_t length, SPI_Tim
                     BL_WR_REG(spixBase, SPI_FIFO_WDATA, tx_data);
                     buff += 2;
                     break;
-                case 3:
                 case 4:
                     tx_data = BL_RDWD_FRM_BYTEP(((uint8_t *)buff));
                     BL_WR_REG(spixBase, SPI_FIFO_WDATA, tx_data);
@@ -854,7 +853,6 @@ BL_Err_Type SPI_ReceiveData(SPI_ID_Type spiNo, void *recvBuff, uint32_t length, 
                     *(uint8_t *)(recvBuff + 1) = (uint8_t)(tmpVal >> 8);
                     recvBuff += 2;
                     break;
-                case 3:
                 case 4:
                     tmpVal = BL_RD_REG(spixBase, SPI_FIFO_RDATA);
                     *(uint8_t *)recvBuff = (uint8_t)tmpVal;
@@ -929,7 +927,6 @@ BL_Err_Type SPI_SendRecvData(SPI_ID_Type spiNo, void *sendBuff, void *recvBuff, 
                 BL_WR_REG(spixBase, SPI_FIFO_WDATA, tmpVal);
                 sendBuff += 2;
                 break;
-            case 3:
             case 4:
                 tmpVal = BL_RDWD_FRM_BYTEP(((uint8_t *)sendBuff));
                 BL_WR_REG(spixBase, SPI_FIFO_WDATA, tmpVal);
@@ -982,7 +979,6 @@ BL_Err_Type SPI_SendRecvData(SPI_ID_Type spiNo, void *sendBuff, void *recvBuff, 
                         tx_cnt--;
                     }
                     break;
-                case 3:
                 case 4:
                     tmpVal = BL_RD_REG(spixBase, SPI_FIFO_RDATA);
                     *((uint8_t *)recvBuff++) = (uint8_t)tmpVal;

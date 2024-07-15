@@ -26,6 +26,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
 #include <string.h>
 
 #include <openthread/config.h>
@@ -366,7 +367,7 @@ void TestDnsName(void)
         {
             uint16_t startOffset = offset;
 
-            strcpy(label, test.mLabels[index]);
+            strlcpy(label, test.mLabels[index], sizeof(label));
 
             SuccessOrQuit(Dns::Name::CompareLabel(*message, offset, label));
             VerifyOrQuit(offset != startOffset, "Name::CompareLabel() did not change offset");
@@ -382,7 +383,7 @@ void TestDnsName(void)
         }
 
         // Compare the whole name.
-        strcpy(name, test.mExpectedReadName);
+        strlcpy(name, test.mExpectedReadName, sizeof(name));
 
         offset = 0;
         SuccessOrQuit(Dns::Name::CompareName(*message, offset, name));
@@ -401,7 +402,7 @@ void TestDnsName(void)
         // Remove the terminating '.' in expected name and verify
         // that it can still be used by `CompareName()`.
         offset = 0;
-        strcpy(name, test.mExpectedReadName);
+        strlcpy(name, test.mExpectedReadName, sizeof(name));
         name[strlen(name) - 1] = '\0';
         SuccessOrQuit(Dns::Name::CompareName(*message, offset, name));
         VerifyOrQuit(offset == len, "Name::CompareName() returned incorrect offset");

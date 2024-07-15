@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 int bl_psram_init(void);
+void bl_psram_dump_id(void);
 
 #ifdef __cplusplus
 }

@@ -177,4 +177,5 @@ void lmac154_fptDump(int print_func(const char *fmt, ...));
 *******************************************************************************/
 void lmac154_setTxRxTransTime(uint8_t timeInUs);
 
+
 #endif

@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#define VERSION_LMAC154_BL702LA0_MAJOR 1
+#define VERSION_LMAC154_BL702LA0_MINOR 6
+#define VERSION_LMAC154_BL702LA0_PATCH 3
 
 typedef void (*lmac154_isr_t)(void);
 
@@ -119,8 +122,8 @@ typedef enum {
 } lmac154_fptResult_t;
 
 
-typedef struct {
-    union {
+typedef union {
+    struct {
         uint32_t isExist:1;
         uint32_t isFramePended:1;
         uint32_t nbrIdx:7;
@@ -166,7 +169,7 @@ typedef struct {
 
 #define LMAC154_FRAME_IS_FRAME_2015(x)              (((x) & LMAC154_FRAME_VERSION_MASK) == LMAC154_FRAME_VERSION_2015)
 
-#define LMAC153_FRAME_IS_FRAME_PENDED(x)            ((x) & LMAC154_FRAME_ACK_REQUEST_MASK)
+#define LMAC154_FRAME_IS_FRAME_PENDED(x)            ((x) & LMAC154_FRAME_FRAME_PENDING_MASK)
 #define LMAC154_FRAME_IS_NORMAL_SECURITY(x)         ((x & LMAC154_FRAME_SECURITY_MASK) == LMAC154_FRAME_SECURITY_MASK)
 
 #define LMAC154_FRAME_IS_MPP(x)                     ((x & LMAC154_FRAME_CONTROL_FRAME_TYPE_MASK) == LMAC154_FRAME_CONTROL_FRAME_TYPE_MPP)
@@ -335,8 +338,8 @@ lmac154_isr_t lmac154_get2015InterruptHandler(void);
  * @return The version of liblmac154.a
  *
 *******************************************************************************/
-char * lmac154_getLibVersion(void);
-
+uint32_t lmac154_getVersionNumber(void);
+char * lmac154_getVersionString(void);
 
 /****************************************************************************//**
  * @brief  Enable standard or enhanced rx promiscuous mode (default disabled)
@@ -1107,7 +1110,7 @@ void lmac154_sleepRestoreRegs(uint32_t *retentionMem);
  * @return Result
  *
 *******************************************************************************/
-lmac154_fptSearchResult_t lmac154_framePendingResult(void);
+lmac154_fptSearchResult_t lmac154_framePendingResult(uint32_t tout);
 
 /****************************************************************************//**
  * @brief  Run AES CCM
@@ -1260,5 +1263,13 @@ void lmac154_rxMhrEvent(uint8_t *rx_buf, uint8_t rx_len, uint8_t pkt_len);
 *******************************************************************************/
 void lmac154_rxSecMhrEvent(uint8_t *rx_buf, uint8_t rx_len, uint8_t pkt_len);
 
-
+/****************************************************************************//**
+ * @brief  Set tx-rx transition time
+ *
+ * @param  time: us
+ *
+ * @return None
+ *
+*******************************************************************************/
+void lmac154_setTxRxTransTime(uint8_t timeInUs);
 #endif

@@ -16,7 +16,7 @@ static void gpio_init(uint8_t pin)
     cfg.drive = 0;
     cfg.smtCtrl = 1;
     cfg.gpioMode = GPIO_MODE_OUTPUT;
-    cfg.pullType = GPIO_PULL_DOWN;
+    cfg.pullType = GPIO_PULL_NONE;
     cfg.gpioPin = pin;
     cfg.gpioFun = 8;
 
@@ -156,7 +156,7 @@ static void pwm_mc_get_duty(uint8_t ch, float *p_duty)
 }
 
 
-int32_t bl_pwm_port_init(uint8_t id, uint32_t freq)
+int32_t bl_pwm_port_init(bl_pwm_t id, uint32_t freq)
 {
     if(id > 1){
         return -1;
@@ -180,18 +180,18 @@ int32_t bl_pwm_port_init(uint8_t id, uint32_t freq)
     return 0;
 }
 
-int32_t bl_pwm_channel_init(uint8_t ch, uint8_t pin)
+int32_t bl_pwm_gpio_init(bl_pwm_ch_t ch, uint8_t pin)
 {
-    if(ch != pin % 5){
+    if(ch > 4 || pin > 31 || ch != pin % 5){
         return -1;
     }
 
-	gpio_init(pin);
+    gpio_init(pin);
 
     return 0;
 }
 
-int32_t bl_pwm_start(uint8_t ch)
+int32_t bl_pwm_start(bl_pwm_ch_t ch)
 {
     if(ch > 4){
         return -1;
@@ -206,7 +206,7 @@ int32_t bl_pwm_start(uint8_t ch)
     return 0;
 }
 
-int32_t bl_pwm_stop(uint8_t ch)
+int32_t bl_pwm_stop(bl_pwm_ch_t ch)
 {
     if(ch > 4){
         return -1;
@@ -221,7 +221,7 @@ int32_t bl_pwm_stop(uint8_t ch)
     return 0;
 }
 
-int32_t bl_pwm_set_duty(uint8_t ch, float duty)
+int32_t bl_pwm_set_duty(bl_pwm_ch_t ch, float duty)
 {
     uint16_t threshold1 = 0;
     uint16_t threshold2;
@@ -247,7 +247,7 @@ int32_t bl_pwm_set_duty(uint8_t ch, float duty)
     return 0;
 }
 
-int32_t bl_pwm_set_duty_ex(uint8_t ch, float duty, uint16_t *threshold1, uint16_t *threshold2)
+int32_t bl_pwm_set_duty_ex(bl_pwm_ch_t ch, float duty, uint16_t *threshold1, uint16_t *threshold2)
 {
     if(ch > 4){
         return -1;
@@ -270,7 +270,7 @@ int32_t bl_pwm_set_duty_ex(uint8_t ch, float duty, uint16_t *threshold1, uint16_
     return 0;
 }
 
-int32_t bl_pwm_get_duty(uint8_t ch, float *p_duty)
+int32_t bl_pwm_get_duty(bl_pwm_ch_t ch, float *p_duty)
 {
     if(ch > 4){
         return -1;

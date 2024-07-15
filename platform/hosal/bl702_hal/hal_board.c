@@ -450,20 +450,16 @@ static void update_rf_temp_config(const void *fdt, int offset1)
     const uint8_t *addr_prop = 0;
     int lentmp = 0;
     int en_tcal;
-    int en_tsen_trim;
-    int16_t tsen_refcode;
 
     addr_prop = fdt_getprop(fdt, offset1, "en_tcal", &lentmp);
     if (addr_prop) {
         en_tcal = BL_FDT32_TO_U32(addr_prop, 0);
-        en_tsen_trim = !bl_efuse_read_tsen_refcode(&tsen_refcode);
-
-        if (en_tcal && en_tsen_trim) {
-            bl_wireless_tcal_en_set(1);
-            blog_info("en_tcal = %d, en_tsen_trim = %d, tcal enabled\r\n", en_tcal, en_tsen_trim);
+        if (en_tcal) {
+            bl_wireless_power_tcal_en_set(1);
+            blog_info("en_tcal = %d, power tcal enabled\r\n", en_tcal);
         } else {
-            bl_wireless_tcal_en_set(0);
-            blog_info("en_tcal = %d, en_tsen_trim = %d, tcal disabled\r\n", en_tcal, en_tsen_trim);
+            bl_wireless_power_tcal_en_set(0);
+            blog_info("en_tcal = %d, power tcal disabled\r\n", en_tcal);
         }
     } else {
         blog_info("en_tcal NULL.\r\n");

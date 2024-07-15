@@ -396,6 +396,36 @@ void exception_entry(uint32_t mcause, uint32_t mepc, uint32_t mtval, uintptr_t *
     }
 }
 
+void check_trap(uint32_t label_is_exception, uint32_t sp)
+{
+    uint32_t mcause;
+    uint32_t mepc;
+    uint32_t start_addr;
+    uint32_t end_addr;
+
+    /*check exception nest*/
+    mcause = read_csr(mcause);
+    if ((mcause >> 31) == 0) {
+        mepc = read_csr(mepc);
+        start_addr = (uint32_t)__builtin_return_address(0);
+        end_addr = label_is_exception;
+        if (mepc >= start_addr && mepc < end_addr) {
+            printf("Exception nested! mepc 0x%08lx\r\n", mepc);
+            while (1) {
+                /*dead loop now*/
+            }
+        }
+    }
+
+    /*check sp*/
+    if ((sp & 0x0FFFFFFF) < 0x02010000) {
+        printf("Invalid sp 0x%08lx\r\n", sp);
+        while (1) {
+            /*dead loop now*/
+        }
+    }
+}
+
 void bl_irq_init(void)
 {
     uint32_t ptr;

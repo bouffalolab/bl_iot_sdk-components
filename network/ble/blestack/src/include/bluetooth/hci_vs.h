@@ -339,6 +339,19 @@ struct hci_vsc_set_a2dp_duty_cycle_cmd {
     u8_t duty_cycle;
 }__packed;
 
+#define HCI_VS_BLE_CONN_WINDOW_SETTING_CMD_OPCODE   BT_OP(BT_OGF_VS, 0x0079)
+struct hci_vsc_ble_conn_window_setting_cmd
+{
+    uint8_t percentage;
+}__packed;
+
+#define HCI_VS_BT_SET_TX_PWR   BT_OP(BT_OGF_VS, 0x007a)
+struct hci_vsc_bt_tx_pwr_cmd
+{
+    int8_t br_power;
+    int8_t edr_power;
+}__packed;
+
 
 #ifdef __cplusplus
 }

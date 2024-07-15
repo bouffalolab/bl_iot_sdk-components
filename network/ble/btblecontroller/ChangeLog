@@ -1,4 +1,64 @@
 # Changes
+## 2024-06-24
+1.[BL616]Add a vendor command for setting br/edr tx power.
+
+## 2024-06-21
+1.[BL616][BL702L]do coredump when assert triggered.
+2.[BL616]Fix an assert issue which happens when doing ble extended create_connection because of an unassigned variable.
+
+## 2024-06-17
+1.[bl702L][bl616]Fix the memory leak issue that the allocated memory for ble tx acl packet in hci layer is not released in case that disconnected state is detected.
+
+## 2024-06-14
+1.[bl616]Fix the issue that extended adv packets are discarded unexpectedly.
+
+## 2024-06-13
+1.[bl702L][bl616]Report number complete packets event to blestack when disconnected if there are acl packets not sent out successfully. Otherwise, blestack's tx thread may not work properly in some corner case.
+
+## 2024-06-06
+1.[bl702L][bl616]For mfg firmware，support hci commads of le_rx_test_v1_cmd, le_tx_test_v1_cmd and read bluetooth address.
+
+## 2024-06-04
+1.[BREDR][FEATURE] Sets the minimal size of encryption key.
+
+## 2024-05-30
+1.[bl702L][bl616]Fix ble link loss issue because of an unexpected controller's sleep time in some corner cases.
+
+## 2024-05-14
+1.[bl702L][bl616]Fix an assert issue caused by an unexpected adv parameter field in a corner case.
+
+## 2024-04-01
+1.[bl702L]In mfg test,use a weak funtion to print out logging instead of using printf directly.
+
+## 2024-03-15
+1.[bl702L]Bring up BL702L_A1 with btblecontroller rom code.
+
+## 2024-03-07
+1.[BL616]Add the codes for bouffalo sdk mfg
+
+## 2024-02-22
+1.[BL616]Fix the issues of code scan
+
+## 2024-02-05
+1.[BL616]Update the function of getting mac address from efuse
+
+## 2024-02-01
+1.[BL616]Fix the issues of code scan
+
+## 2024-01-25
+1.[BL702L][BL616]Fix the assert caused by a risk issue of conneciton update indication processing in a corner case.
+
+## 2023-12-19
+1.[BL616][BL702L]Fix the issue that ble connection will be disconnected with reason 0x22(LMP response timeout) when central and peripheral devices sent connection parameter request at the same time.
+
+## 2023-11-30
+1.[BL702L][bl616]fix the issue that it fails to add device to resolving list.
+
+## 2023-11-30
+1.[BL616]fix crash caused by btblecontroller irq not disable and clear.
+
+## 2023-11-2
+1.[BL616/BL702L]Add the feature of setting ble connection window.
 
 ## 2023-10-11
 1.[BL702L]Add btblecontroller_702l_m4s1p.

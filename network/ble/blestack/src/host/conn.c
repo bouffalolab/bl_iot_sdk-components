@@ -8,7 +8,7 @@
 
 #include <zephyr.h>
 #include <string.h>
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <stdbool.h>
 #include <atomic.h>
 #include <misc/byteorder.h>
@@ -25,7 +25,7 @@
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_CONN)
 #define LOG_MODULE_NAME bt_conn
-#include "log.h"
+#include "bt_log.h"
 
 #include "hci_core.h"
 #include "conn_internal.h"
@@ -403,6 +403,9 @@ static void conn_update_timeout(struct k_work *work)
 	BT_DBG("conn %p", conn);
 
 	if (conn->state == BT_CONN_DISCONNECTED) {
+		#ifdef BFLB_BLE_PATCH_FREE_ALLOCATED_BUFFER_IN_OS
+		k_delayed_work_free(&conn->update_work);
+		#endif
 		bt_l2cap_disconnected(conn);
 		#if !defined(BFLB_BLE)
 		notify_disconnected(conn);
@@ -425,6 +428,9 @@ static void conn_update_timeout(struct k_work *work)
 		 * auto connect flag if it was set, instead just cancel
 		 * connection directly
 		 */
+		#if defined(BFLB_BLE_PATCH_FREE_CONN_UPDATE_WORK_WHEN_CANCEL_CONN_IN_CONNECT_STATE)
+		k_delayed_work_free(&conn->update_work);
+		#endif
 		bt_hci_cmd_send_sync(BT_HCI_OP_LE_CREATE_CONN_CANCEL, NULL, NULL);
 		return;
 	}
@@ -631,7 +637,7 @@ struct bt_conn *bt_conn_create_br(const bt_addr_t *peer,
 	bt_conn_set_state(conn, BT_CONN_CONNECT);
 	conn->role = BT_CONN_ROLE_MASTER;
 
-	bt_conn_unref(conn);
+	//bt_conn_unref(conn);
 	return conn;
 }
 
@@ -833,7 +839,7 @@ static int pin_code_reply(struct bt_conn *conn, const char *pin, u8_t len)
 
 	bt_addr_copy(&cp->bdaddr, &conn->br.dst);
 	cp->pin_len = len;
-	strncpy((char *)cp->pin_code, pin, sizeof(cp->pin_code));
+	strlcpy((char *)cp->pin_code, pin, sizeof(cp->pin_code));
 
 	return bt_hci_cmd_send_sync(BT_HCI_OP_PIN_CODE_REPLY, buf, NULL);
 }
@@ -1138,6 +1144,26 @@ static int conn_auth(struct bt_conn *conn)
 #endif /* CONFIG_BT_BREDR */
 
 #if defined(CONFIG_BT_SMP)
+
+bool bt_conn_ltk_present(const struct bt_conn *conn)
+{
+	const struct bt_keys *keys = conn->le.keys;
+
+	if (!keys) {
+		keys = bt_keys_find_addr(conn->id, &conn->le.dst);
+	}
+
+	if (keys) {
+		if (conn->role == BT_CONN_ROLE_MASTER) {
+			return keys->keys & (BT_KEYS_LTK_P256 | BT_KEYS_SLAVE_LTK);
+		} else {
+			return keys->keys & (BT_KEYS_LTK_P256 | BT_KEYS_LTK);
+		}
+	}
+
+	return false;
+}
+
 void bt_conn_identity_resolved(struct bt_conn *conn)
 {
 	const bt_addr_le_t *rpa;
@@ -1162,6 +1188,10 @@ int bt_conn_le_start_encryption(struct bt_conn *conn, u8_t rand[8],
 	struct bt_hci_cp_le_start_encryption *cp;
 	struct net_buf *buf;
 
+	if (len > sizeof(cp->ltk)) {
+		return -EINVAL;
+	}
+
 	buf = bt_hci_cmd_create(BT_HCI_OP_LE_START_ENCRYPTION, sizeof(*cp));
 	if (!buf) {
 		return -ENOBUFS;
@@ -1176,7 +1206,7 @@ int bt_conn_le_start_encryption(struct bt_conn *conn, u8_t rand[8],
 	if (len < sizeof(cp->ltk)) {
 		(void)memset(cp->ltk + len, 0, sizeof(cp->ltk) - len);
 	}
-
+	BT_WARN("BLE LTK: %s\r\n",bt_hex(ltk,len));
 	return bt_hci_cmd_send_sync(BT_HCI_OP_LE_START_ENCRYPTION, buf, NULL);
 }
 #endif /* CONFIG_BT_SMP */
@@ -1709,6 +1739,11 @@ static void conn_cleanup(struct bt_conn *conn)
 	bt_conn_reset_rx_state(conn);
 
     k_delayed_work_submit(&conn->update_work, K_NO_WAIT);
+
+    #ifdef BFLB_BLE_PATCH_FREE_ALLOCATED_BUFFER_IN_OS
+    k_queue_free(&conn->tx_queue._queue);
+    conn->tx_queue._queue.hdl = NULL;
+    #endif
 }
 
 int bt_conn_prepare_events(struct k_poll_event events[])
@@ -1763,14 +1798,23 @@ void bt_conn_process_tx(struct bt_conn *conn)
 	struct net_buf *buf;
 
 	BT_DBG("conn %p", conn);
-
+	#if defined(BFLB_BLE_PATCH_NOT_DO_TX_IF_DISCONNECTED)
+	if (conn->state == BT_CONN_DISCONNECTED){     
+		if(atomic_test_and_clear_bit(conn->flags, BT_CONN_CLEANUP)) {
+			BT_DBG("handle %u disconnected - cleaning up", conn->handle);
+			conn_cleanup(conn);
+		} 
+		return;
+	}
+	#else
 	if (conn->state == BT_CONN_DISCONNECTED &&
 	    atomic_test_and_clear_bit(conn->flags, BT_CONN_CLEANUP)) {
 		BT_DBG("handle %u disconnected - cleaning up", conn->handle);
 		conn_cleanup(conn);
 		return;
 	}
-
+    #endif
+    
 	/* Get next ACL packet for connection */
 	buf = net_buf_get(&conn->tx_queue, K_NO_WAIT);
 	BT_ASSERT(buf);
@@ -1871,7 +1915,11 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 	}
 
 	/* Actions needed for entering the new state */
+	#if defined(BFLB_BLE_PATCH_FIX_CONN_STATE_CHANGE_RISK)
+	switch (state) {
+	#else
 	switch (conn->state) {
+	#endif
 	case BT_CONN_CONNECTED:
 		if (conn->type == BT_CONN_TYPE_SCO) {
 			/* TODO: Notify sco connected */
@@ -1900,11 +1948,6 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 			process_unack_tx(conn);
 			tx_notify(conn);
 
-			/* Cancel Connection Update if it is pending */
-			if (conn->type == BT_CONN_TYPE_LE) {
-				k_delayed_work_cancel(&conn->update_work);
-			}
-
 			atomic_set_bit(conn->flags, BT_CONN_CLEANUP);
 			k_poll_signal_raise(&conn_change, 0);
 			/* The last ref will be dropped during cleanup */
@@ -1923,6 +1966,7 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 			/* this indicate Directed advertising stopped */
 			if (conn->err) {
 				notify_connected(conn);
+				bt_conn_unref(conn);//bouffalo fix:unref the ref is increased in bt_conn_create_slave_le.
 			}
 
 			bt_conn_unref(conn);
@@ -1950,6 +1994,7 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 	case BT_CONN_DISCONNECT:
 		#if defined(BFLB_BLE_PATCH_DISCONNECT_ERROR_WHEN_TASK_YEILD)
 		if(old_state == BT_CONN_DISCONNECTED){
+			conn->state = old_state;
 			bt_conn_unref(conn);
 		}
 		#endif /* BFLB_BLE_PATCH_DISCONNECT_ERROR_WHEN_TASK_YEILD */
@@ -2123,7 +2168,7 @@ void bt_conn_unref(struct bt_conn *conn)
 
 	old = atomic_dec(&conn->ref);
 
-	BT_DBG("handle %u ref %ld -> %ld", conn->handle, old,
+	BT_DBG("handle %u ref %d -> %d", conn->handle, old,
 	       atomic_get(&conn->ref));
 
 	BT_ASSERT(old > 0);
@@ -2167,17 +2212,18 @@ int bt_conn_get_info(const struct bt_conn *conn, struct bt_conn_info *info)
 
 int bt_conn_get_remote_dev_info(struct bt_conn_info *info)
 {
-        int link_num = 0;
+    int link_num = 0;
 
-        for (int i = 0; i < ARRAY_SIZE(conns); i++) {
-                if (!atomic_get(&conns[i].ref)) {
-                        continue;
-                }
-                bt_conn_get_info(&conns[i], &info[link_num]);
-                link_num ++;
-	}
+    for (int i = 0; i < ARRAY_SIZE(conns); i++) {
+        if ((!atomic_get(&conns[i].ref)) || (conns[i].state == BT_CONN_DISCONNECTED)) {
+                continue;
+        }
+        if(info)
+            bt_conn_get_info(&conns[i], &info[link_num]);
+        link_num ++;
+    }
 
-	return link_num;
+   return link_num;
 }
 
 static int bt_hci_disconnect(struct bt_conn *conn, u8_t reason)
@@ -2274,6 +2320,12 @@ int bt_conn_disconnect(struct bt_conn *conn, u8_t reason)
 	 * and we could send LE Create Connection as soon as the remote
 	 * starts advertising.
 	 */
+	#if defined(BFLB_BLE_PATCH_AVOID_CONNECT_DISCONNECT_RISK)
+	unsigned int key = irq_lock();
+	if(conn->state == BT_CONN_CONNECT_SCAN)
+		conn->disconnect_was_triggered = true;
+	irq_unlock(key);
+	#endif
 #if !defined(CONFIG_BT_WHITELIST)
 	if (IS_ENABLED(CONFIG_BT_CENTRAL) &&
 	    conn->type == BT_CONN_TYPE_LE) {
@@ -2283,6 +2335,11 @@ int bt_conn_disconnect(struct bt_conn *conn, u8_t reason)
 
 	switch (conn->state) {
 	case BT_CONN_CONNECT_SCAN:
+		#if defined(BFLB_BLE_PATCH_AVOID_CONNECT_DISCONNECT_RISK)
+		if(conn->notPermit_disconnect){
+			return -EACCES;
+		}
+		#endif
 		conn->err = reason;
 		bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
 		if (IS_ENABLED(CONFIG_BT_CENTRAL)) {
@@ -2291,6 +2348,9 @@ int bt_conn_disconnect(struct bt_conn *conn, u8_t reason)
 			k_delayed_work_free(&conn->update_work);
 			#endif
 		}
+		#if defined(BFLB_BLE_PATCH_AVOID_CONNECT_DISCONNECT_RISK)
+		conn->disconnect_was_triggered = false;
+		#endif
 		return 0;
 	case BT_CONN_CONNECT_DIR_ADV:
 		conn->err = reason;
@@ -2311,6 +2371,9 @@ int bt_conn_disconnect(struct bt_conn *conn, u8_t reason)
 
 		if (IS_ENABLED(CONFIG_BT_CENTRAL)) {
 			k_delayed_work_cancel(&conn->update_work);
+			#if defined(BFLB_BLE_PATCH_FREE_CONN_UPDATE_WORK_WHEN_CANCEL_CONN_IN_CONNECT_STATE)
+			k_delayed_work_free(&conn->update_work);
+			#endif
 			return bt_hci_cmd_send_sync(BT_HCI_OP_LE_CREATE_CONN_CANCEL,
 					       NULL, NULL);
 		}
@@ -2578,6 +2641,7 @@ struct bt_conn *bt_conn_create_slave_le(const bt_addr_le_t *peer,
 		return NULL;
 	}
 
+    conn->role = BT_HCI_ROLE_SLAVE;//bouffalo fix
 start_adv:
 	bt_conn_set_state(conn, BT_CONN_CONNECT_DIR_ADV);
 	err = bt_le_adv_start_internal(&param_int, NULL, 0, NULL, 0, peer);
@@ -2664,10 +2728,6 @@ int bt_conn_auth_cb_register(const struct bt_conn_auth_cb *cb)
 	if (!cb) {
 		bt_auth = NULL;
 		return 0;
-	}
-
-	if (bt_auth) {
-		return -EALREADY;
 	}
 
 	/* The cancel callback must always be provided if the app provides

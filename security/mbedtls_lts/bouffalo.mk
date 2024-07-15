@@ -116,9 +116,13 @@ COMPONENT_SRCS := $(addprefix $(LIBRARY_DIR)/, $(LIBRARY_SRCS))
 COMPONENT_SRCS += \
         port/pkparse.c          \
         port/mbedtls_port_mem.c \
-        port/net_sockets.c      \
         port/hw_entropy_poll.c  \
         port/bignum_ext.c       \
+
+# Build net_sockets.c by default unless CONFIG_MBEDTLS_NET_SOCKET is defined as 0.
+ifneq ($(CONFIG_MBEDTLS_NET_SOCKET),0)
+COMPONENT_SRCS += port/net_sockets.c
+endif
 
 MBEDTLS_USE_HW=0
 

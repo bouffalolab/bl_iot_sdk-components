@@ -6,6 +6,7 @@ sdk_add_compile_definitions_ifdef(CONFIG_LWIP_LP -DCONFIG_LWIP_LP)
 
 sdk_library_add_sources(src/apps/lwiperf/lwiperf.c)
 sdk_library_add_sources(src/apps/http/fs.c)
+sdk_library_add_sources(src/apps/http/http_client.c)
 # sdk_library_add_sources(src/apps/http/fsdata_custom.c)
 # sdk_library_add_sources(src/apps/http/fsdata.c)
 # sdk_library_add_sources(src/apps/http/httpd.c)

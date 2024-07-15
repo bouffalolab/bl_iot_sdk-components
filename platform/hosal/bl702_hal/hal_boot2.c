@@ -72,11 +72,16 @@ static void _dump_partition(void)
     }
 }
 
-uint32_t hal_boot2_get_flash_addr(void)
+uint32_t hal_boot2_get_pt_addr(void)
 {
     extern uint8_t __boot2_pt_addr_src;
 
-    return (uint32_t)&__boot2_pt_addr_src + 4 + 
+    return (uint32_t)&__boot2_pt_addr_src;
+}
+
+uint32_t hal_boot2_get_flash_addr(void)
+{
+    return hal_boot2_get_pt_addr() + 4 + 
                      sizeof(PtTable_Config) + sizeof(PtTable_Entry_Config) * boot2_partition_table.table.ptTable.entryCnt + 4;
 }
 
@@ -223,6 +228,11 @@ int hal_boot2_partition_addr_inactive(const char *name, uint32_t *addr, uint32_t
 uint8_t hal_boot2_get_active_partition(void)
 {
     return boot2_partition_table.partition_active_idx;
+}
+
+uint32_t hal_boot2_get_active_partition_age(void)
+{
+    return boot2_partition_table.table.ptTable.age;
 }
 
 int hal_boot2_get_active_entries_byname(uint8_t *name, HALPartition_Entry_Config *ptEntry_hal) 

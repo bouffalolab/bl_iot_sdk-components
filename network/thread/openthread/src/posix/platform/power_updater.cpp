@@ -125,15 +125,16 @@ otError PowerUpdater::GetDomain(uint16_t aRegionCode, Power::Domain &aDomain)
     int     iterator = 0;
     char    value[kMaxValueSize];
     char   *str;
+    char   *psave = nullptr;
 
     while (mProductConfigFile.Get(kKeyRegionDomainMapping, iterator, value, sizeof(value)) == OT_ERROR_NONE)
     {
-        if ((str = strtok(value, kCommaDelimiter)) == nullptr)
+        if ((str = strtok_r(value, kCommaDelimiter, &psave)) == nullptr)
         {
             continue;
         }
 
-        while ((str = strtok(nullptr, kCommaDelimiter)) != nullptr)
+        while ((str = strtok_r(nullptr, kCommaDelimiter, &psave)) != nullptr)
         {
             if ((strlen(str) == 2) && (StringToRegionCode(str) == aRegionCode))
             {
@@ -156,7 +157,7 @@ otError PowerUpdater::GetNextTargetPower(const Power::Domain &aDomain, int &aIte
     otError error = OT_ERROR_NOT_FOUND;
     char    value[kMaxValueSize];
     char   *domain;
-    char   *psave;
+    char   *psave = nullptr;
 
     while (mProductConfigFile.Get(kKeyTargetPower, aIterator, value, sizeof(value)) == OT_ERROR_NONE)
     {

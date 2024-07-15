@@ -391,9 +391,8 @@ float bl_audio_get_digital_gain(void)
 
 
 #if 0
-#define FRAME_SIZE 4000
-#define FRAME_NUM  4
-int16_t audio_buf[FRAME_SIZE * FRAME_NUM];
+#define FRAME_SIZE 308
+#define FRAME_NUM  240  // 308*240/16000 = 4.62s
 int16_t pcm_buf[2][FRAME_SIZE];
 
 void audio_callback(int buf_idx)
@@ -401,12 +400,15 @@ void audio_callback(int buf_idx)
     static uint32_t len = 0;
     
     printf("audio_callback: %d\r\n", buf_idx);
-    memcpy(audio_buf + len, pcm_buf[buf_idx], sizeof(int16_t) * FRAME_SIZE);
+    printf("rawdata start\r\n");
+    extern int UART_SendData(uint8_t uartId, uint8_t *data, uint32_t len);
+    UART_SendData(0, (uint8_t *)pcm_buf[buf_idx], sizeof(int16_t) * FRAME_SIZE);
+    printf("\r\nrawdata end\r\n\r\n");
     len += FRAME_SIZE;
     if(len == FRAME_SIZE * FRAME_NUM){
         bl_audio_stop();
         len = 0;
-        /* Now you can dump audio_buf and play the audio with Cool Edit. */
+        printf("Please use customer_app/bl702l_remote_control/audio_parser.py to convert this log file to pcm file.\r\n\r\n");
     }
 }
 

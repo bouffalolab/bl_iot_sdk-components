@@ -8,7 +8,7 @@
 
 #include <zephyr.h>
 #include <string.h>
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <atomic.h>
 #include <misc/byteorder.h>
 #include <misc/util.h>
@@ -17,10 +17,13 @@
 #include <bluetooth.h>
 #include <conn.h>
 #include <hci_driver.h>
-
+#if defined(CONFIG_BT_SMP)
+#include "smp.h"
+#include "keys.h"
+#endif
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_L2CAP)
 #define LOG_MODULE_NAME bt_l2cap
-#include "log.h"
+#include "bt_log.h"
 
 #include "hci_core.h"
 #include "conn_internal.h"
@@ -869,6 +872,14 @@ static void le_conn_req(struct bt_l2cap *l2cap, u8_t ident,
 
 	/* Check if connection has minimum required security level */
     #if defined(CONFIG_BT_SMP)
+	if(server->sec_level == BT_SECURITY_L4)
+	{
+		if (conn->le.keys->enc_size<BT_SMP_MAX_ENC_KEY_SIZE)
+		{
+			rsp->result = sys_cpu_to_le16(BT_L2CAP_LE_ERR_KEY_SIZE);
+			goto rsp;
+		}
+	}
 	if (conn->sec_level < server->sec_level) {
 		rsp->result = sys_cpu_to_le16(BT_L2CAP_LE_ERR_ENCRYPTION);
 		goto rsp;
@@ -1745,7 +1756,7 @@ void bt_l2cap_recv(struct bt_conn *conn, struct net_buf *buf)
 	BT_DBG("Packet for CID %u len %u", cid, buf->len);
 
 	chan = bt_l2cap_le_lookup_rx_cid(conn, cid);
-	if (!chan) {
+	if (!chan || !chan->conn) {
 		BT_WARN("Ignoring data for unknown CID 0x%04x", cid);
 		net_buf_unref(buf);
 		return;

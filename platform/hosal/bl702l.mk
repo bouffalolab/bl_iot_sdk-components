@@ -16,12 +16,15 @@ COMPONENT_SRCS := bl702l_hal/bl_adc.c \
                   bl702l_hal/bl_efuse.c \
                   bl702l_hal/bl_flash.c \
                   bl702l_hal/bl_gpio.c \
+                  bl702l_hal/bl_gpio_ir.c \
                   bl702l_hal/bl_gpio_uart.c \
                   bl702l_hal/bl_hbn.c \
                   bl702l_hal/bl_ir.c \
                   bl702l_hal/bl_irq.c \
                   bl702l_hal/bl_kys.c \
+                  bl702l_hal/bl_os_port.c \
                   bl702l_hal/bl_pwm.c \
+                  bl702l_hal/bl_pwm_ir.c \
                   bl702l_hal/bl_rtc.c \
                   bl702l_hal/bl_sec.c \
                   bl702l_hal/bl_sec_aes.c \
@@ -30,12 +33,11 @@ COMPONENT_SRCS := bl702l_hal/bl_adc.c \
                   bl702l_hal/bl_uart.c \
                   bl702l_hal/bl_wdt.c \
                   bl702l_hal/bl_wireless.c \
+                  bl702l_hal/hal_anti_rollback.c \
                   bl702l_hal/hal_board.c \
                   bl702l_hal/hal_boot2.c \
                   bl702l_hal/hal_button.c \
                   bl702l_hal/hal_gpio.c \
-                  bl702l_hal/hal_hbn.c \
-                  bl702l_hal/hal_hwtimer.c \
                   bl702l_hal/hal_ota.c \
                   bl702l_hal/hal_sys.c \
                   bl702l_hal/hal_tcal.c \
@@ -73,52 +75,3 @@ COMPONENT_SRCDIRS += bl702l_hal sec_common
 
 COMPONENT_OBJS := $(patsubst %.c,%.o, $(COMPONENT_SRCS))
 COMPONENT_OBJS := $(patsubst %.S,%.o, $(COMPONENT_OBJS))
-
-##
-CPPFLAGS += -DARCH_RISCV -DBFLB_CRYPT_HARDWARE
-ifndef CONFIG_USE_STD_DRIVER
-CPPFLAGS += -DBFLB_USE_HAL_DRIVER
-endif
-
-ifeq ($(CONFIG_BLUETOOTH),1)
-CPPFLAGS += -DCFG_BLE_ENABLE
-endif
-
-ifeq ($(CONFIG_BLE_MFG),1)
-CPPFLAGS += -DCONFIG_BLE_MFG
-endif
-
-ifeq ($(CONFIG_ZIGBEE),1)
-CPPFLAGS += -DCFG_ZIGBEE_ENABLE
-endif
-
-ifeq ($(CONFIG_THREAD),1)
-CPPFLAGS += -DCFG_OPENTHREAD_ENABLE
-endif
-
-ifeq ($(CONFIG_TCAL),1)
-CPPFLAGS += -DCFG_TCAL_ENABLE
-endif
-
-ifeq ($(CONFIG_PDS_ENABLE),1)
-CPPFLAGS += -DCFG_PDS_ENABLE
-CONFIG_PDS_LEVEL ?= 31
-CPPFLAGS += -DCFG_PDS_LEVEL=$(CONFIG_PDS_LEVEL)
-ifeq ($(CONFIG_PDS_LEVEL),31)
-CPPFLAGS += -DCFG_PDS_OPTIMIZE
-endif
-CPPFLAGS += -DCONFIG_HW_SEC_ENG_DISABLE
-endif
-
-ifeq ($(CONFIG_HBN_ENABLE),1)
-CPPFLAGS += -DCFG_HBN_ENABLE
-CPPFLAGS += -DCFG_HBN_OPTIMIZE
-endif
-
-ifeq ($(CONFIG_USE_PSRAM),1)
-CPPFLAGS += -DCFG_USE_PSRAM
-endif
-
-ifeq ($(CONFIG_USE_XTAL32K),1)
-CPPFLAGS += -DCFG_USE_XTAL32K
-endif

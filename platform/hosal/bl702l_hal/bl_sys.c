@@ -47,6 +47,11 @@ BL_RST_REASON_E bl_sys_rstinfo_get(void)
     return sys_rstinfo;
 }
 
+BL_CHIP_REVISION_E bl_sys_chip_revision_get(void)
+{
+    return (*(volatile uint32_t *)0x40007074 >> 14) & 0x0F;
+}
+
 int bl_sys_logall_enable(void)
 {
     sys_log_all_enable = true;
@@ -161,6 +166,35 @@ int bl_sys_cache_config(void)
     return 0;
 }
 
+int bl_sys_run_at_max_speed(void)
+{
+    unsigned long mstatus_tmp;
+    mstatus_tmp = read_csr(mstatus);
+    clear_csr(mstatus, MSTATUS_MIE);
+
+    GLB_Set_System_CLK(GLB_DLL_XTAL_32M, GLB_SYS_CLK_DLL128M);
+    HBN_Set_XCLK_CLK_Sel(HBN_XCLK_CLK_XTAL);
+    GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_42P67M, 0);
+
+    write_csr(mstatus, mstatus_tmp);
+
+    return 0;
+}
+
+int bl_sys_run_at_normal_speed(void)
+{
+    unsigned long mstatus_tmp;
+    mstatus_tmp = read_csr(mstatus);
+    clear_csr(mstatus, MSTATUS_MIE);
+
+    GLB_Set_System_CLK(GLB_DLL_XTAL_32M, GLB_SYS_CLK_XTAL);
+    GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_XCLK, 0);
+
+    write_csr(mstatus, mstatus_tmp);
+
+    return 0;
+}
+
 int bl_sys_early_init(void)
 {
     bl_sys_rstinfo_process();
@@ -184,12 +218,9 @@ int bl_sys_early_init(void)
 //    HBN_Set_Ldo11_All_Vout(HBN_LDO_LEVEL_1P00V);
 
 #if !(defined(CFG_PDS_ENABLE) || defined(CFG_HBN_ENABLE))
-    GLB_Set_System_CLK(GLB_DLL_XTAL_32M, GLB_SYS_CLK_DLL128M);
-    HBN_Set_XCLK_CLK_Sel(HBN_XCLK_CLK_XTAL);
-    GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_42P67M, 0);
+    bl_sys_run_at_max_speed();
 #else
-    GLB_Set_System_CLK(GLB_DLL_XTAL_32M, GLB_SYS_CLK_XTAL);
-    GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_XCLK, 0);
+    bl_sys_run_at_normal_speed();
 #endif
 
     GLB_Set_MTimer_CLK(1, GLB_MTIMER_CLK_XCLK, 15);
@@ -198,6 +229,8 @@ int bl_sys_early_init(void)
     AON_Set_Xtal_CapCode_Extra(1);
 
     GLB_AHB_MCU_Software_Reset(GLB_AHB_MCU_SW_UART0);
+
+    GLB_GPIO_O_Latch_Mode_Set(1);
 
     /*debuger may NOT ready don't print anything*/
     return 0;

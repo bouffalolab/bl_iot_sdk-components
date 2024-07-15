@@ -2,49 +2,27 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifdef BL702
-#include <bl702.h>
-#include <bl_irq.h>
-#include <bl_timer.h>
-#include <bl_wireless.h>
 #include <lmac154.h>
-#endif
-#ifdef BL702L
-#include <bl702l.h>
-#include <bl_irq.h>
-#include <bl_timer.h>
-#include <bl_wireless.h>
+#ifdef CFG_OT_USE_ROM_CODE
 #include <rom_lmac154_ext.h>
 #endif
-#include <utils_list.h>
-
-#include <openthread/config.h>
-#include <openthread/thread.h>
-#include <platforms/utils/link_metrics.h>
-#include <openthread-core-config.h>
 #include <openthread_port.h>
-
-#include <FreeRTOS.h>
-#include <portmacro.h>
-#include <task.h>
-
-#include <ot_internel.h>
+#include <ot_radio_trx.h>
 #include <ot_utils_ext.h>
 
-
-__attribute__((section(".bss"))) static otRadio_t                otRadioVar;
-__attribute__((section(".bss"))) static uint8_t                  otRadio_buffPool[TOTAL_RX_FRAME_SIZE * (OTRADIO_RX_FRAME_BUFFER_NUM + 1) + (ALIGNED_RX_FRAME_SIZE + MAX_ACK_FRAME_SIZE) * 2];
-#ifdef BL702
-otRadio_t                       *otRadioVar_ptr = NULL;
-#endif
-#ifdef BL702L
+static otRadio_t                otRadioVar;
+static uint8_t                  otRadio_buffPool[MAC_FRAME_SIZE * (OTRADIO_RX_FRAME_BUFFER_NUM + 1) + MAX_ACK_FRAME_SIZE * OTRADIO_ACK_FRAME_BUFFER_NUM];
+#ifdef CFG_OT_USE_ROM_CODE
 extern otRadio_t                *otRadioVar_ptr;
+#else
+otRadio_t                       *otRadioVar_ptr = &otRadioVar;
 #endif
-
 void ot_radioInit(otRadio_opt_t opt) 
 {
     otRadio_rxFrame_t *pframe = NULL;
     otRadioVar_ptr = &otRadioVar;
+
+    lmac154_init();
 
     memset(otRadioVar_ptr, 0, sizeof(otRadio_t));
 
@@ -55,33 +33,24 @@ void ot_radioInit(otRadio_opt_t opt)
     utils_dlist_init(&otRadioVar_ptr->rxFrameList);
 
     for (int i = 0; i < OTRADIO_RX_FRAME_BUFFER_NUM; i ++) {
-        pframe = (otRadio_rxFrame_t *) (otRadio_buffPool + TOTAL_RX_FRAME_SIZE * (i + 1));
-        pframe->frame.mPsdu = ((uint8_t *)pframe) + ALIGNED_RX_FRAME_SIZE;
+        pframe = (otRadio_rxFrame_t *) (otRadio_buffPool + MAC_FRAME_SIZE * (i + 1));
+        pframe->frame.mPsdu = ((uint8_t *)pframe) + FRAME_OVERHEAD_SIZE;
         utils_dlist_add_tail(&pframe->dlist, &otRadioVar_ptr->frameList);
     }
 
-    otRadioVar_ptr->pTxAckFrame = (otRadioFrame *)(otRadio_buffPool + TOTAL_RX_FRAME_SIZE * (OTRADIO_RX_FRAME_BUFFER_NUM + 1));
-    otRadioVar_ptr->pTxAckFrame->mPsdu = ((uint8_t *)otRadioVar_ptr->pTxAckFrame) + ALIGNED_RX_FRAME_SIZE;
-    otRadioVar_ptr->pRxAckFrame = (otRadioFrame *)(otRadioVar_ptr->pTxAckFrame->mPsdu + MAX_ACK_FRAME_SIZE);
-    otRadioVar_ptr->pRxAckFrame->mPsdu = ((uint8_t *)otRadioVar_ptr->pRxAckFrame) + ALIGNED_RX_FRAME_SIZE;
+    otRadioVar_ptr->pTxAckFrame = (otRadioFrame *)(otRadio_buffPool + MAC_FRAME_SIZE * (OTRADIO_RX_FRAME_BUFFER_NUM + 1));
+    otRadioVar_ptr->pTxAckFrame->mPsdu = ((uint8_t *)otRadioVar_ptr->pTxAckFrame) + FRAME_OVERHEAD_SIZE;
+    otRadioVar_ptr->pRxAckFrame = (otRadioFrame *)(((uint8_t *)otRadioVar_ptr->pTxAckFrame) + MAX_ACK_FRAME_SIZE);
+    otRadioVar_ptr->pRxAckFrame->mPsdu = ((uint8_t *)otRadioVar_ptr->pRxAckFrame) + FRAME_OVERHEAD_SIZE;
 
     if (opt.bf.isLinkMetricEnable) {
-        otLinkMetrics_init(LMAC154_RADIO_RECEIVE_SENSITIVITY);
+        otLinkMetrics_init(IEEE802_15_4_RADIO_RECEIVE_SENSITIVITY);
     }
 
-#if (OPENTHREAD_RADIO == 0)
-#ifdef BL702
+#if (OPENTHREAD_FTD || OPENTHREAD_MTD)
     otRadioVar_ptr->ot_findAddresses_ptr = ot_findAddresses_ftd;
 #endif
-#ifdef BL702L
-#ifdef CFG_PDS_ENABLE
-    otRadioVar_ptr->ot_findAddresses_ptr = ot_findAddresses_mtd;
-#else
-    otRadioVar_ptr->ot_findAddresses_ptr = ot_findAddresses_ftd;
-#endif
-#endif
-
-#endif
+    
     otrExitCrit(tag);
 }
 
@@ -137,9 +106,7 @@ void ot_radioTask(ot_system_event_t trxEvent)
             otrExitCrit(tag);
 
             if (!utils_dlist_empty(&otRadioVar_ptr->rxFrameList)) {
-                /**
-                 * [weiyin], issue OT_SYSTEM_EVENT_RADIO_RX_DONE to handle next pending packet
-                 */
+                /* post OT_SYSTEM_EVENT_RADIO_RX_DONE to handle next pending packet */
                 otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_RX_DONE);
             }
         }
@@ -150,17 +117,16 @@ void ot_radioTask(ot_system_event_t trxEvent)
 }
 
 /************************************ LMAC 15.4 event function ***********************************/
-#if defined(BL702)
 void lmac154_txDoneEvent (lmac154_tx_status_t tx_status)
 {
     if (otRadioVar_ptr->pTxFrame) {
         if (LMAC154_TX_STATUS_TX_FINISHED == tx_status) {
-            if (!(otRadioVar_ptr->pTxFrame->mPsdu[0] & LMAC154_FRAME_ACK_REQUEST_MASK)) {
+            if (!LMAC154_FRAME_IS_ACK_REQ(otRadioVar_ptr->pTxFrame->mPsdu[0])) {
                 otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_DONE_NO_ACK_REQ);
             }
         }
         else {
-            otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_NO_ACK);
+            otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_ERROR);
         }
     }
 }
@@ -191,22 +157,16 @@ void lmac154_rxDoneEvent(uint8_t *rx_buf, uint8_t rx_len, uint8_t crc_fail)
         return;
     }
 
-    if (lmac154_isRxPromiscuousModeEnabled() && LMAC154_FRAME_IS_ACK_REQ(rx_buf[0])) {
-        lmac154_enableRx();
-    }
-
-    ot_radioEnqueueRecvPacket((uint32_t *)rx_buf, rx_len, true);
+    ot_radioEnqueueRecvPacket((uint32_t *)rx_buf, rx_len);
 }
-#endif
 
 /*************************** Openthread radio interface implementation ***************************/
-
 otRadioFrame *otPlatRadioGetTransmitBuffer(otInstance *aInstance) 
 {
     otRadioVar_ptr->aInstance = aInstance;
 
     otRadioFrame * txframe = (otRadioFrame *)otRadio_buffPool;
-    txframe->mPsdu = otRadio_buffPool + ALIGNED_RX_FRAME_SIZE;
+    txframe->mPsdu = otRadio_buffPool + FRAME_OVERHEAD_SIZE;
 
     txframe->mInfo.mTxInfo.mIeInfo = &otRadioVar_ptr->transmitIeInfo;
 
@@ -218,9 +178,8 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
     int iret = -1;
 
     if (otRadioVar_ptr->pTxFrame == NULL) {
-
+        
         iret = ot_radioSend(aFrame);
-
         if (iret) {
             otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_ERROR);
         }
@@ -240,29 +199,11 @@ otRadioCaps otPlatRadioGetCaps(otInstance *aInstance)
 }
 const char *otPlatRadioGetVersionString(otInstance *aInstance) 
 {
-    return lmac154_getLibVersion();
+    return ot_utils_getVersionString();
 }
 int8_t otPlatRadioGetReceiveSensitivity(otInstance *aInstance) 
 {
-    return LMAC154_RADIO_RECEIVE_SENSITIVITY;
-}
-void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64) 
-{
-    uint8_t temp;
-
-    bl_wireless_mac_addr_get(aIeeeEui64);
-
-    for (int i = 0; i < OT_EXT_ADDRESS_SIZE / 2; i ++) {
-        temp = aIeeeEui64[OT_EXT_ADDRESS_SIZE - i - 1];
-        aIeeeEui64[OT_EXT_ADDRESS_SIZE - i - 1] = aIeeeEui64[i];
-        aIeeeEui64[i] = temp;
-    }
-
-    if (aIeeeEui64[OT_EXT_ADDRESS_SIZE - 1] == 0 && aIeeeEui64[OT_EXT_ADDRESS_SIZE - 2] == 0) {
-        aIeeeEui64[OT_EXT_ADDRESS_SIZE - 1] = aIeeeEui64[OT_EXT_ADDRESS_SIZE - 3];
-        aIeeeEui64[OT_EXT_ADDRESS_SIZE - 2] = aIeeeEui64[OT_EXT_ADDRESS_SIZE - 4];
-        aIeeeEui64[OT_EXT_ADDRESS_SIZE - 3] = aIeeeEui64[OT_EXT_ADDRESS_SIZE - 5];
-    }
+    return IEEE802_15_4_RADIO_RECEIVE_SENSITIVITY;
 }
 
 void otPlatRadioSetPanId(otInstance *aInstance, otPanId aPanId) 
@@ -308,12 +249,7 @@ bool otPlatRadioGetPromiscuous(otInstance *aInstance)
 }
 void otPlatRadioSetPromiscuous(otInstance *aInstance, bool aEnable) 
 {
-    if (aEnable) {
-        lmac154_enableRxPromiscuousMode(true, false);
-    }
-    else {
-        lmac154_disableRxPromiscuousMode();
-    }
+    ot_setRxPromiscuousMode(aEnable, true);
 }
 
 void otPlatRadioSetMacKey(otInstance *            aInstance,
@@ -349,11 +285,6 @@ void otPlatRadioSetMacFrameCounter(otInstance *aInstance, uint32_t aMacFrameCoun
     uint32_t tag = otrEnterCrit();
     otRadioVar_ptr->macFrameCounter = aMacFrameCounter;
     otrExitCrit(tag);
-}
-
-uint64_t otPlatRadioGetNow(otInstance *aInstance)
-{
-    return bl_timer_now_us64();
 }
 
 otRadioState otPlatRadioGetState(otInstance *aInstance) 
@@ -392,26 +323,7 @@ otRadioState otPlatRadioGetState(otInstance *aInstance)
     return state;
 }
 
-otError otPlatRadioEnable(otInstance *aInstance) 
-{
-    ot_radioEnable();
 
-#ifdef CFG_PDS_ENABLE
-    otPds_setDataPollCsma(CFG_DATA_POLL_CSMA);
-#endif
-
-    bl_irq_enable(M154_IRQn);
-
-    return OT_ERROR_NONE;
-}
-
-otError otPlatRadioDisable(otInstance *aInstance) 
-{
-    bl_irq_disable(M154_IRQn);
-    lmac154_disableRx();
-
-    return OT_ERROR_NONE;
-}
 bool otPlatRadioIsEnabled(otInstance *aInstance) 
 {
     return !lmac154_isDisabled();
@@ -421,26 +333,9 @@ otError otPlatRadioSleep(otInstance *aInstance)
 {
     lmac154_disableRx();
 
-#if !defined(CONFIG_NCP) || CONFIG_NCP == 1
+#if (OPENTHREAD_FTD) || (OPENTHREAD_MTD)
     lmac154_setRxStateWhenIdle(otThreadGetLinkMode(aInstance).mRxOnWhenIdle);
 #endif
-
-    return OT_ERROR_NONE;
-}
-otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel) 
-{
-    uint8_t ch = aChannel - OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN;
-
-#ifdef BL702L
-    extern bool bz_phy_optimize_tx_channel(uint32_t channel);
-    bz_phy_optimize_tx_channel(2405 + 5 * ch);
-#endif
-
-    lmac154_setChannel((lmac154_channel_t)ch);
-#if !defined(CONFIG_NCP) || CONFIG_NCP == 1
-    lmac154_setRxStateWhenIdle(otThreadGetLinkMode(aInstance).mRxOnWhenIdle);
-#endif
-    lmac154_enableRx();
 
     return OT_ERROR_NONE;
 }
@@ -482,26 +377,26 @@ otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const otExtAddre
 void otPlatRadioClearSrcMatchShortEntries(otInstance *aInstance) 
 {
     uint8_t num = 128;
-    uint16_t * plist = (uint16_t *)pvPortMalloc(sizeof(uint16_t) * num);
+    uint16_t * plist = (uint16_t *)malloc(sizeof(uint16_t) * num);
 
     lmac154_fpt_GetShortAddrList(plist, &num);
     for (uint32_t i = 0; i < num; i ++) 
     {
         lmac154_fptRemoveShortAddr(plist[i]);
     }
-    vPortFree(plist);
+    free(plist);
 }
 void otPlatRadioClearSrcMatchExtEntries(otInstance *aInstance) 
 {
     uint8_t num = 32;
-    uint8_t * plist = (uint8_t *)pvPortMalloc(sizeof(uint8_t) * 8 * num);
+    uint8_t * plist = (uint8_t *)malloc(sizeof(uint8_t) * 8 * num);
 
     lmac154_fptGetLongAddrList(plist, &num);
     for (uint32_t i = 0; i < num; i ++) 
     {
         lmac154_fptRemoveLongAddr(plist + i * 8);
     }
-    vPortFree(plist);
+    free(plist);
 }
 uint32_t otPlatRadioGetSupportedChannelMask(otInstance *aInstance) 
 {

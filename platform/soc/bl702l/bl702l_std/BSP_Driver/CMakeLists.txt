@@ -59,6 +59,7 @@ list(REMOVE_ITEM ADD_SRCS
 else()
 list(REMOVE_ITEM ADD_SRCS 
 "${CMAKE_CURRENT_SOURCE_DIR}/std_drv/src/bl702l_romapi.c"
+"${CMAKE_CURRENT_SOURCE_DIR}/std_drv/src/bl702l_romapi_patch.c"
 )
 endif()
 if(CONFIG_HALAPI)

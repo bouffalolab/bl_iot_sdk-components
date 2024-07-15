@@ -3,7 +3,7 @@
 #include "bl_wireless.h"
 #include "bl_efuse.h"
 #include "bl_adc.h"
-#include "hal_hwtimer.h"
+#include "bl_os_port.h"
 #include "hal_tcal.h"
 
 #define TCAL_PERIOD_MS             (1000*10)
@@ -11,7 +11,7 @@
 #define printf(...)                (void)0
 
 static int tcal_init = 0;
-static hw_timer_t *tcal_timer = NULL;
+static void *tcal_timer = NULL;
 static int16_t tcal_temperature = 0;
 
 static void hal_tcal_callback(int16_t tsen_val)
@@ -71,7 +71,7 @@ int hal_tcal_restart(void)
 {
     // Stop periodical tcal trigger
     if(tcal_timer != NULL){
-        hal_hwtimer_delete(tcal_timer);
+        bl_os_timer_delete(tcal_timer);
         tcal_timer = NULL;
     }
     
@@ -80,7 +80,10 @@ int hal_tcal_restart(void)
     hal_tcal_trigger();
     
     // Start periodical tcal trigger
-    tcal_timer = hal_hwtimer_create(TCAL_PERIOD_MS, hal_tcal_trigger, 1);
+    tcal_timer = bl_os_timer_create("tcal", TCAL_PERIOD_MS, hal_tcal_trigger, 1);
+    if(tcal_timer != NULL){
+        bl_os_timer_start(tcal_timer);
+    }
     
     printf("[tcal] hal_tcal_restart\r\n");
     
@@ -90,7 +93,7 @@ int hal_tcal_restart(void)
 int hal_tcal_pause(void)
 {
     if(tcal_timer != NULL){
-        hal_hwtimer_delete(tcal_timer);
+        bl_os_timer_delete(tcal_timer);
         tcal_timer = NULL;
     }
     
@@ -104,7 +107,10 @@ int hal_tcal_pause(void)
 int hal_tcal_resume(void)
 {
     if(tcal_timer == NULL){
-        tcal_timer = hal_hwtimer_create(TCAL_PERIOD_MS, hal_tcal_trigger, 1);
+        tcal_timer = bl_os_timer_create("tcal", TCAL_PERIOD_MS, hal_tcal_trigger, 1);
+    }
+    if(tcal_timer != NULL){
+        bl_os_timer_start(tcal_timer);
     }
     
     printf("[tcal] hal_tcal_resume\r\n");

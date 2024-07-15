@@ -15,10 +15,13 @@
 #include <bl702_glb.h>
 #include <bl_sys.h>
 #include <bl_chip.h>
+#include <bl_wireless.h>
 #include <bl_irq.h>
+#include <bl_rtc.h>
 #include <bl_sec.h>
 #include <hal_boot2.h>
 #include <hal_board.h>
+#include <hal_tcal.h>
 #include <hosal_uart.h>
 #include <hosal_dma.h>
 
@@ -37,38 +40,40 @@
 #endif
 #if defined(CFG_USE_PSRAM)
 #include <bl_psram.h>
-#endif /* CFG_USE_PSRAM */
-
+#endif
 
 HOSAL_UART_DEV_DECL(uart_stdio, 0, 14, 15, 2000000);
+#ifdef CONFIG_USE_UART_1_FOR_DEBUG
+HOSAL_UART_DEV_DECL(uart_stdio_1, 1, 17, 27, 2000000);
+#endif
 
 extern uint8_t _heap_start;
 extern uint8_t _heap_size; // @suppress("Type cannot be resolved")
 extern uint8_t _heap2_start;
 extern uint8_t _heap2_size; // @suppress("Type cannot be resolved")
-static HeapRegion_t xHeapRegions[] =
+static const HeapRegion_t xHeapRegions[] =
 {
-    { &_heap_start,  (unsigned int) &_heap_size}, //set on runtime
+    { &_heap_start,  (unsigned int) &_heap_size },
     { &_heap2_start, (unsigned int) &_heap2_size },
-    { NULL, 0 }, /* Terminates the array. */
     { NULL, 0 } /* Terminates the array. */
 };
+
 #if defined(CFG_USE_PSRAM)
 extern uint8_t _heap3_start;
 extern uint8_t _heap3_size; // @suppress("Type cannot be resolved")
 static const HeapRegion_t xHeapRegionsPsram[] =
 {
-    { &_heap3_start, (unsigned int) &_heap3_size},
+    { &_heap3_start, (unsigned int) &_heap3_size },
     { NULL, 0 } /* Terminates the array. */
 };
-#endif /* CFG_USE_PSRAM */
+#endif
 
-void __attribute__((weak)) vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName )
+void __attribute__((weak)) vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
 {
     puts("Stack Overflow checked\r\n");
-	if(pcTaskName){
-		printf("Stack name %s\r\n", pcTaskName);
-	}
+    if(pcTaskName){
+        printf("Stack name %s\r\n", pcTaskName);
+    }
     while (1) {
         /*empty here*/
     }
@@ -79,6 +84,11 @@ void __attribute__((weak)) vApplicationMallocFailedHook(void)
     printf("Memory Allocate Failed. Current left size is %d bytes\r\n",
         xPortGetFreeHeapSize()
     );
+#if defined(CFG_USE_PSRAM)
+    printf("Current psram left size is %d bytes\r\n",
+        xPortGetFreeHeapSizePsram()
+    );
+#endif
     while (1) {
         /*empty here*/
     }
@@ -174,7 +184,11 @@ void __attribute__((weak)) app_aos_init()
 {
 #ifdef SYS_AOS_CLI_ENABLE
     int fd_console;
+#ifndef CONFIG_USE_UART_1_FOR_DEBUG
     fd_console = aos_open("/dev/ttyS0", 0);
+#else
+    fd_console = aos_open("/dev/ttyS1", 0);
+#endif
     if (fd_console >= 0) {
         printf("Init CLI with event Driven\r\n");
         aos_cli_init(0);
@@ -230,6 +244,10 @@ static void aos_loop_proc(void *pvParameters)
 #endif
 
     app_aos_init();
+
+#if defined(CFG_TCAL_ENABLE)
+    hal_tcal_init();
+#endif
 
     xTaskCreate(app_main_entry,
             (char*)"main",
@@ -316,7 +334,7 @@ void setup_heap()
     bl_psram_init();
     memset(&_psram_start, 0, &_psram_end - &_psram_start);
     vPortDefineHeapRegionsPsram(xHeapRegionsPsram);
-#endif /*CFG_USE_PSRAM*/
+#endif
 }
 
 static void system_early_init(void)
@@ -326,6 +344,7 @@ static void system_early_init(void)
 #endif
 
     bl_irq_init();
+    bl_rtc_init();
     bl_sec_init();
     hal_boot2_init();
 
@@ -340,13 +359,15 @@ static void system_early_init(void)
 
 void bl702_main()
 {
-    static StackType_t aos_loop_proc_stack[CFG_AOS_LOOP_STACK_DEPTH];
-    static StaticTask_t aos_loop_proc_task;
+    TaskHandle_t aos_loop_proc_task;
 
     bl_sys_early_init();
 
     /*Init UART In the first place*/
     hosal_uart_init(&uart_stdio);
+#ifdef CONFIG_USE_UART_1_FOR_DEBUG
+    hosal_uart_init(&uart_stdio_1);
+#endif
     puts("Starting bl702 now....\r\n");
 
     _dump_boot_info();
@@ -359,14 +380,15 @@ void bl702_main()
             (unsigned int)&_heap2_size, &_heap2_start
     );
 
-    system_early_init();
-
 #if defined(CFG_USE_PSRAM)
     printf("PSRAM Heap %u@%p\r\n",(unsigned int)&_heap3_size, &_heap3_start);
-#endif /*CFG_USE_PSRAM*/
+    bl_psram_dump_id();
+#endif
+
+    system_early_init();
 
     puts("[OS] Starting aos_loop_proc task...\r\n");
-    xTaskCreateStatic(aos_loop_proc, (char*)"event_loop", sizeof(aos_loop_proc_stack)/4, NULL, SYS_AOS_LOOP_TASK_PRIORITY, aos_loop_proc_stack, &aos_loop_proc_task);
+    xTaskCreate(aos_loop_proc, (char*)"event_loop", CFG_AOS_LOOP_STACK_DEPTH, NULL, SYS_AOS_LOOP_TASK_PRIORITY, &aos_loop_proc_task);
 
     puts("[OS] Starting OS Scheduler...\r\n");
     vTaskStartScheduler();

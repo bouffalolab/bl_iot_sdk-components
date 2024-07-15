@@ -26,6 +26,9 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
+#include <string.h>
+
 #include <limits.h>
 
 #include "common/array.hpp"
@@ -182,7 +185,7 @@ void TestIp6AddressFromString(void)
         length = ot::StringLength(testVector.mString, kMaxString);
         memcpy(string, testVector.mString, length);
         VerifyOrQuit(length + sizeof("/128") <= kMaxString);
-        strcpy(&string[length], "/128");
+        strlcpy(&string[length], "/128", kMaxString - length);
 
         printf("%s\n", string);
 

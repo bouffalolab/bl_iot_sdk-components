@@ -98,6 +98,23 @@ typedef struct server_hdr_v1 {
     int32_t jitter2;
 } server_hdr;
 
+static void iperf_tcp_set_sock_time(int sock, int optname, int time)
+{
+    int timeout_ms;
+
+    timeout_ms = time;
+    #if LWIP_SO_SNDRCVTIMEO_NONSTANDARD
+    int opt_on = timeout_ms;
+    #else
+    struct timeval opt_on = {
+        .tv_sec = timeout_ms / 1000,
+        .tv_usec = (timeout_ms - (opt_on.tv_sec * 1000)) * 1000,
+    };
+    #endif
+
+    setsockopt(sock, SOL_SOCKET, optname, (void *)&opt_on, sizeof(opt_on));
+}
+
 static void iperf_client_tcp(void *arg)
 {
     int i;
@@ -110,6 +127,7 @@ static void iperf_client_tcp(void *arg)
     struct sockaddr_in addr;
     iperf_param_t *iperf_param = (iperf_param_t *)arg;
     uint64_t bytes_transfered = 0;
+    int send_timeout_cnt;
 
     char speed[64] = { 0 };
     float f_min = 8000.0, f_max = 0.0;
@@ -138,17 +156,57 @@ static void iperf_client_tcp(void *arg)
         addr.sin_port = htons(iperf_param->port);
         addr.sin_addr.s_addr = inet_addr(iperf_param->host);
 
+        int flags = fcntl(sock, F_GETFL, 0);
+        fcntl(sock, F_SETFL, flags | O_NONBLOCK);
         ret = connect(sock, (const struct sockaddr*)&addr, sizeof(addr));
         if (ret == -1)
         {
-            printf("Connect failed!\r\n");
-            closesocket(sock);
+            if (errno != EINPROGRESS) {
+                printf("Connect failed!\r\n");
+                closesocket(sock);
+                vTaskDelay(1000);
+                continue;
+            }
 
-            vTaskDelay(1000);
-            continue;
+            printf("Connect in progress\r\n");
+
+            int tm_ms = 2000;
+            struct timeval tm = {
+                .tv_sec = tm_ms / 1000,
+                .tv_usec = 0,
+            };
+            fd_set rset, wset, errset;
+            FD_ZERO(&rset); FD_ZERO(&wset); FD_ZERO(&errset);
+            FD_SET(sock, &rset); FD_SET(sock, &wset); FD_SET(sock, &errset);
+
+            int res;
+_select:
+            res = select(sock+1, &rset, &wset, &errset, &tm);
+            /* Check whether connect success */
+            if (exit_flag) {
+                closesocket(sock);
+                vTaskDelay(1000);
+                continue;
+            }
+
+            if (res == 0) {
+                printf("Connect timeout\r\n");
+                goto _select;
+            }
+
+            if ((res < 0) || FD_ISSET(sock, &errset) || !FD_ISSET(sock, &wset)) {
+                printf("Connect err\r\n");
+                closesocket(sock);
+                vTaskDelay(1000);
+                continue;
+            }
+
+            printf("Connect OK\r\n");
         }
 
-        printf("Connect to iperf server successful!\r\n");
+        fcntl(sock, F_SETFL, flags);
+
+        iperf_tcp_set_sock_time(sock, SO_SNDTIMEO, 4000);
 
         {
             int flag = 1;
@@ -161,6 +219,7 @@ static void iperf_client_tcp(void *arg)
         }
 
         sentlen = 0;
+        send_timeout_cnt = 0;
 
         tick0 = xTaskGetTickCount();
         tick1 = tick0;
@@ -194,12 +253,19 @@ static void iperf_client_tcp(void *arg)
             }
 
             ret = send(sock, send_buf, IPERF_BUFSZ, 0);
-            if (ret > 0)
-            {
+            if (ret >= 0) {
                 sentlen += ret;
+                send_timeout_cnt = 0;
+            } else if (ret == ERR_TIMEOUT || ret == ERR_MEM) {
+                if (++send_timeout_cnt > 3) {
+                    printf("Send failed, send_timeout_cnt: %d\n\r", send_timeout_cnt);
+                    break;
+                }
+                continue;
+            } else {
+                printf("Send failed, ret: %d\n\r", ret);
+                break;
             }
-
-            if (ret < 0) break;
         }
 
         closesocket(sock);
@@ -214,6 +280,7 @@ __exit:
     if (iperf_param->host) vPortFree(iperf_param->host);
     if (iperf_param) vPortFree(iperf_param);
     printf("iper stop\r\n");
+    vTaskDelete(NULL);
 }
 
 static void iperf_client_tcp_entry(const char *name)
@@ -239,7 +306,10 @@ static void iperf_client_tcp_entry(const char *name)
 
     iperf_param->port = IPERF_PORT;
 
-    aos_task_new("ipc", iperf_client_tcp, (void *)iperf_param, 4096);
+    if (pdPASS != xTaskCreate(iperf_client_tcp, "ipc", 4096, (void *)iperf_param, 10, NULL)) {
+        goto _ERROUT;
+    }
+
     return;
 
 _ERROUT:
@@ -368,6 +438,7 @@ __exit:
     if (iperf_param->host) vPortFree(iperf_param->host);
     if (iperf_param) vPortFree(iperf_param);
     printf("disconnected! ret %d\r\n",  ret);
+    vTaskDelete(NULL);
 }
 
 struct iperf_server_udp_ctx {
@@ -573,6 +644,7 @@ static void iperf_server_udp(void *arg)
 
 err:
     printf("ipus exit..\r\n");
+    vTaskDelete(NULL);
 }
 
 static void iperf_client_udp_entry(const char *name)
@@ -598,7 +670,10 @@ static void iperf_client_udp_entry(const char *name)
 
     iperf_param->port = IPERF_PORT;
 
-    aos_task_new("ipu", iperf_client_udp, (void *)iperf_param, 4096);
+    if (pdPASS != xTaskCreate(iperf_client_udp, "ipu", 4096, (void *)iperf_param, 10, NULL)) {
+        goto _ERROUT;
+    }
+
     return;
 
 _ERROUT:
@@ -622,7 +697,10 @@ static void iperf_server_udp_entry(const char *name)
 
     iperf_param->port = IPERF_PORT;
 
-    aos_task_new("ipus", iperf_server_udp, (void *)iperf_param, 4096);
+    if (pdPASS != xTaskCreate(iperf_server_udp, "ipus", 4096, (void *)iperf_param, 10, NULL)) {
+        goto _ERROUT;
+    }
+
     return;
 
 _ERROUT:
@@ -636,13 +714,14 @@ static void iperf_server(void *arg)
     uint8_t *recv_data;
     uint32_t sin_size;
     uint32_t tick0, tick1, tick2;
-    int sock = -1, connected, bytes_received, recvlen;
+    int sock = -1, connected = -1, bytes_received, recvlen;
     struct sockaddr_in server_addr, client_addr;
     char speed[64] = { 0 };
     iperf_param_t *iperf_param = (iperf_param_t *)arg;
     uint64_t bytes_transfered = 0;
     float f_min = 8000.0, f_max = 0.0;
     exit_flag = 0;
+    int recv_timeout_cnt;
 
     recv_data = (uint8_t *)pvPortMalloc(IPERF_BUFSZ);
     if (recv_data == NULL)
@@ -675,10 +754,30 @@ static void iperf_server(void *arg)
     while (!exit_flag) {
         sin_size = sizeof(struct sockaddr_in);
 
-        connected = accept(sock, (struct sockaddr *)&client_addr, (socklen_t *)&sin_size);
+        /* enable accept timeout */
+        iperf_tcp_set_sock_time(sock, SO_RCVTIMEO, 2000);
+
+        printf("Accepting...\r\n");
+        while (connected < 0) {
+            connected = accept(sock, (struct sockaddr *)&client_addr, (socklen_t *)&sin_size);
+            if (exit_flag) {
+                if (connected >= 0) {
+                    closesocket(connected);
+                    connected = -1;
+                }
+                goto __exit;
+            } else {
+                if (connected >= 0) {
+                    break;
+                }
+            }
+        }
 
         printf("new client connected from (%s, %d)\r\n",
                   inet_ntoa(client_addr.sin_addr),ntohs(client_addr.sin_port));
+
+        /* enable receive timeout */
+        iperf_tcp_set_sock_time(sock, SO_RCVTIMEO, 4000);
 
         {
             int flag = 1;
@@ -690,13 +789,28 @@ static void iperf_server(void *arg)
                 sizeof(int));    /* length of option value */
         }
 
+        recv_timeout_cnt = 0;
         recvlen = 0;
         tick0 = xTaskGetTickCount();
         tick1 = tick0;
         while (!exit_flag) {
             bytes_received = recv(connected, recv_data, IPERF_BUFSZ, 0);
-            if (bytes_received <= 0) break;
+            if (exit_flag) {
+                break;
+            }
 
+            if (bytes_received == ERR_TIMEOUT || bytes_received == ERR_MEM) {
+                if (++recv_timeout_cnt > 3) {
+                    printf("recv failed, recv_timeout_cnt: %d\r\n", recv_timeout_cnt);
+                    break;
+                }
+                continue;
+            } else if (bytes_received < 0) {
+                printf("recv failed, bytes_received: %d\r\n", bytes_received);
+                break;
+            }
+
+            recv_timeout_cnt = 0;
             recvlen += bytes_received;
 
             tick2 = xTaskGetTickCount();
@@ -739,6 +853,7 @@ __exit:
     if (iperf_param) vPortFree(iperf_param);
     exit_flag = 0;
     printf("ips exit..\r\n");
+    vTaskDelete(NULL);
 }
 
 static void iperf_server_entry(const char *name)
@@ -755,7 +870,10 @@ static void iperf_server_entry(const char *name)
 
     iperf_param->port = IPERF_PORT;
 
-    aos_task_new("ips", iperf_server, (void *)iperf_param, 4096);
+    if (pdPASS != xTaskCreate(iperf_server, "ips", 4096, (void *)iperf_param, 10, NULL)) {
+        goto _ERROUT;
+    }
+
     return;
 
 _ERROUT:
@@ -887,19 +1005,27 @@ static void iperf_cmd(char *buf, int len, int argc, char **argv)
 
         if (tcp_udp == IPERF_TCP) {
             printf(DEBUG_HEADER "[IPC] Connecting with default address %s port %d\r\n", iperf_param->host ? iperf_param->host: DEFAULT_HOST_IP, iperf_param->port);
-            aos_task_new("ipc", iperf_client_tcp, (void *)iperf_param, 4096);
+            if (pdPASS != xTaskCreate(iperf_client_tcp, "ipc", 4096, (void *)iperf_param, 10, NULL)) {
+                goto _ERROUT;
+            }
         } else if (tcp_udp == IPERF_UDP) {
             printf(DEBUG_HEADER "[IPU] Connecting with default address %s port %d\r\n", iperf_param->host ? iperf_param->host: DEFAULT_HOST_IP, iperf_param->port);
-            aos_task_new("ipu", iperf_client_udp, (void *)iperf_param, 4096);
+            if (pdPASS != xTaskCreate(iperf_client_udp, "ipu", 4096, (void *)iperf_param, 10, NULL)) {
+                goto _ERROUT;
+            }
         }
         return;
     } else if (server_client == IPERF_SERVER) {
         if (tcp_udp == IPERF_TCP) {
             printf(DEBUG_HEADER "[IPS] Starting iperf server on %s port %d\r\n", IPERF_IP_LOCAL, iperf_param->port);
-            aos_task_new("ips", iperf_server, (void *)iperf_param, 4096);
+            if (pdPASS != xTaskCreate(iperf_server, "ips", 4096, (void *)iperf_param, 10, NULL)) {
+                goto _ERROUT;
+            }
         } else if (tcp_udp == IPERF_UDP) {
             printf(DEBUG_HEADER "[IPUS] Starting iperf server on %s port %d\r\n", IPERF_IP_LOCAL, iperf_param->port);
-            aos_task_new("ipus", iperf_server_udp, (void *)iperf_param, 4096);
+            if (pdPASS != xTaskCreate(iperf_server_udp, "ipus", 4096, (void *)iperf_param, 10, NULL)) {
+                goto _ERROUT;
+            }
         }
         return;
     }

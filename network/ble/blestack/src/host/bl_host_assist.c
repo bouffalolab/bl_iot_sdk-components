@@ -8,8 +8,8 @@
 #include "hci_core.h"
 #include "hci_driver.h"
 #include "byteorder.h"
-#include "log.h"
-#include <sys/errno.h>
+#include "bt_log.h"
+#include <bt_errno.h>
 
 struct blhast_le_adv_data{
     u8_t ad[31];
@@ -227,7 +227,7 @@ static int blhast_br_reset(void)
 	}
 
 	name_cp = net_buf_add(buf, sizeof(*name_cp));
-	strncpy((char *)name_cp->local_name, CONFIG_BT_DEVICE_NAME,
+	strlcpy((char *)name_cp->local_name, CONFIG_BT_DEVICE_NAME,
 		sizeof(name_cp->local_name));
 
 	err = bt_hci_cmd_send_sync(BT_HCI_OP_WRITE_LOCAL_NAME, buf, NULL);

@@ -14,7 +14,7 @@
 #define BT_ATT_MTU CONFIG_BT_L2CAP_TX_MTU
 #endif
 
-#if defined(CONFIG_AUTO_PTS)
+#if defined(CONFIG_AUTO_PTS)||defined(CONFIG_BT_STACK_PTS)
 #ifdef BT_ATT_MTU
 #undef BT_ATT_MTU
 #define BT_ATT_MTU 23

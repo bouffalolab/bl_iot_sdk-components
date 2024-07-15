@@ -3,10 +3,65 @@
 #include <blog.h>
 #include "bl_efuse.h"
 
+int bl_efuse_reload(void)
+{
+    EF_Ctrl_Load_Efuse_R0();
+
+    return 0;
+}
+
+int bl_efuse_read(uint32_t offset, uint32_t *data, uint32_t len)
+{
+    if(offset % 4 != 0){
+        return -1;
+    }
+
+    if(!data || !len){
+        return -2;
+    }
+
+    if(offset + len * 4 > 128){
+        return -3;
+    }
+
+    ARCH_MemCpy4(data, (uint32_t *)(EF_DATA_BASE + offset), len);
+
+    return 0;
+}
+
+int bl_efuse_write(uint32_t offset, uint32_t *data, uint32_t len)
+{
+    if(offset % 4 != 0){
+        return -1;
+    }
+
+    if(!data || !len){
+        return -2;
+    }
+
+    if(offset + len * 4 > 128){
+        return -3;
+    }
+
+    ARCH_MemCpy4((uint32_t *)(EF_DATA_BASE + offset), data, len);
+
+    return 0;
+}
+
+int bl_efuse_program(void)
+{
+    EF_Ctrl_Program_Direct_R0(0, NULL, 0);
+    while(SET == EF_Ctrl_Busy());
+    EF_Ctrl_Load_Efuse_R0();
+
+    return 0;
+}
+
 int bl_efuse_read_mac(uint8_t mac[8])
 {
     uint8_t empty;
 
+#if 0
     empty = EF_Ctrl_Is_MAC_Address_Slot_Empty(2, 0);
     if(!empty){
         if(EF_Ctrl_Read_MAC_Address_Opt(2, mac, 0) == 0){
@@ -14,6 +69,7 @@ int bl_efuse_read_mac(uint8_t mac[8])
             return 0;
         }
     }
+#endif
 
     empty = EF_Ctrl_Is_MAC_Address_Slot_Empty(1, 0);
     if(!empty){

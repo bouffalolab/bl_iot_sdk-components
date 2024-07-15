@@ -1,5 +1,6 @@
 #include "bl_ir.h"
 #include "bl_irq.h"
+#include "blog.h"
 #include "hosal_dma.h"
 
 
@@ -91,9 +92,7 @@ void bl_ir_led_drv_cfg(uint8_t led0_en, uint8_t led1_en)
 
 void bl_ir_custom_tx_cfg(IR_TxCfg_Type *txCfg, IR_TxPulseWidthCfg_Type *txPWCfg)
 {
-    /* Run IR at 2M */
     GLB_PER_Clock_UnGate(GLB_AHB_CLOCK_IR);
-    GLB_Set_IR_CLK(ENABLE, GLB_IR_CLK_SRC_XCLK, 15);
 
     IR_Disable(IR_TX);
     IR_TxSWM(DISABLE);
@@ -103,6 +102,9 @@ void bl_ir_custom_tx_cfg(IR_TxCfg_Type *txCfg, IR_TxPulseWidthCfg_Type *txPWCfg)
 
 void bl_ir_nec_tx_cfg(void)
 {
+    /* Run IR at 2M */
+    GLB_Set_IR_CLK(ENABLE, GLB_IR_CLK_SRC_XCLK, 15);
+
     IR_TxCfg_Type txCfg = {
         32,              /* 32-bit data */
         DISABLE,         /* Disable signal of tail pulse inverse */
@@ -113,7 +115,11 @@ void bl_ir_nec_tx_cfg(void)
         DISABLE,         /* Disable signal of logic 0 pulse inverse */
         ENABLE,          /* Enable signal of data pulse */
         ENABLE,          /* Enable signal of output modulation */
+#if !defined(IR_OUTPUT_INVERSE)
         DISABLE,         /* Disable signal of output inverse */
+#else
+        ENABLE,          /* Enable signal of output inverse */
+#endif
         DISABLE,         /* Disable tx freerun mode */
         DISABLE,         /* Disable tx freerun continuous mode */
         IR_FRAME_SIZE_32 /* Frame size */
@@ -138,6 +144,9 @@ void bl_ir_nec_tx_cfg(void)
 
 void bl_ir_rc5_tx_cfg(void)
 {
+    /* Run IR at 2M */
+    GLB_Set_IR_CLK(ENABLE, GLB_IR_CLK_SRC_XCLK, 15);
+
     IR_TxCfg_Type txCfg = {
         13,              /* 13-bit data, head pulse as the first start bit */
         DISABLE,         /* Disable signal of tail pulse inverse */
@@ -148,7 +157,11 @@ void bl_ir_rc5_tx_cfg(void)
         DISABLE,         /* Disable signal of logic 0 pulse inverse */
         ENABLE,          /* Enable signal of data pulse */
         ENABLE,          /* Enable signal of output modulation */
+#if !defined(IR_OUTPUT_INVERSE)
         DISABLE,         /* Disable signal of output inverse */
+#else
+        ENABLE,          /* Enable signal of output inverse */
+#endif
         DISABLE,         /* Disable tx freerun mode */
         DISABLE,         /* Disable tx freerun continuous mode */
         IR_FRAME_SIZE_32 /* Frame size */
@@ -171,11 +184,40 @@ void bl_ir_rc5_tx_cfg(void)
     bl_ir_custom_tx_cfg(&txCfg, &txPWCfg);
 }
 
+void bl_ir_nec_tx(uint32_t wdata)
+{
+    IR_SendCommand(&wdata, 1);
+}
+
+void bl_ir_rc5_tx(uint32_t wdata)
+{
+    IR_SendCommand(&wdata, 1);
+}
+
 void bl_ir_swm_tx_cfg(float freq_hz, float duty_cycle)
 {
-    uint16_t pw_unit = (uint16_t)(2000000 / freq_hz);
-    uint8_t mod_width_0 = (uint8_t)(pw_unit * duty_cycle + 0.5);
-    uint8_t mod_width_1 = pw_unit - mod_width_0;
+    uint32_t div = 1;
+    uint32_t clk = 32000000;
+    uint32_t pw_unit;
+    uint32_t mod_width_0;
+    uint32_t mod_width_1;
+
+    while(1){
+        pw_unit = (uint32_t)(clk / freq_hz);
+        mod_width_0 = (uint32_t)(pw_unit * duty_cycle + 0.5);
+        mod_width_1 = pw_unit - mod_width_0;
+        if((pw_unit >= 4096) || (mod_width_0 >= 256) || (mod_width_1 >= 256)){
+            div <<= 1;
+            clk >>= 1;
+        }else{
+            break;
+        }
+    }
+
+    blog_assert(div <= 64);
+
+    /* Run IR at 32M/div */
+    GLB_Set_IR_CLK(ENABLE, GLB_IR_CLK_SRC_XCLK, div - 1);
 
     IR_TxCfg_Type txCfg = {
         1,                                                   /* Number of pulse */
@@ -187,7 +229,11 @@ void bl_ir_swm_tx_cfg(float freq_hz, float duty_cycle)
         DISABLE,                                             /* Don't care when SWM is enabled */
         DISABLE,                                             /* Don't care when SWM is enabled */
         ENABLE,                                              /* Enable signal of output modulation */
+#if !defined(IR_OUTPUT_INVERSE)
         DISABLE,                                             /* Disable signal of output inverse */
+#else
+        ENABLE,                                              /* Enable signal of output inverse */
+#endif
         DISABLE,                                             /* Disable tx freerun mode */
         DISABLE,                                             /* Disable tx freerun continuous mode */
         IR_FRAME_SIZE_32                                     /* Frame size */
@@ -211,17 +257,7 @@ void bl_ir_swm_tx_cfg(float freq_hz, float duty_cycle)
     bl_ir_tx_interrupt_cfg();
 }
 
-void bl_ir_nec_tx(uint32_t wdata)
-{
-    IR_SendCommand(&wdata, 1);
-}
-
-void bl_ir_rc5_tx(uint32_t wdata)
-{
-    IR_SendCommand(&wdata, 1);
-}
-
-int bl_ir_swm_tx(uint16_t data[], uint8_t len)
+int bl_ir_swm_tx(uint8_t k, uint16_t data[], uint8_t len)
 {
     uint32_t tmpVal;
     uint32_t pwVal;
@@ -236,10 +272,18 @@ int bl_ir_swm_tx(uint16_t data[], uint8_t len)
     tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_DATA_NUM, len - 1);
     BL_WR_REG(IR_BASE, IRTX_CONFIG, tmpVal);
 
+    tmpVal = BL_RD_REG(IR_BASE, IRTX_PULSE_WIDTH);
+    uint32_t mod_width_0 = BL_GET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_MOD_PH0_W) + 1;
+    uint32_t mod_width_1 = BL_GET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_MOD_PH1_W) + 1;
+    uint32_t pw_unit = (mod_width_0 + mod_width_1) * k;
+    blog_assert(pw_unit <= 4096);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_PW_UNIT, pw_unit - 1);
+    BL_WR_REG(IR_BASE, IRTX_PULSE_WIDTH, tmpVal);
+
     pwVal = 0;
     for(i=0; i<len; i++){
         j = i % 4;
-        pwVal |= ((data[i] - 1) & 0xFF) << 8 * j;
+        pwVal |= ((data[i] / k - 1) & 0xFF) << 8 * j;
         if(i == len - 1 || j == 3){
             ir_tx_dma_data[i / 4] = pwVal;
             pwVal = 0;
@@ -260,6 +304,11 @@ int bl_ir_swm_tx_busy(void)
 {
     uint32_t tmpVal;
 
+    tmpVal = BL_RD_REG(IR_BASE, IRTX_INT_STS);
+    if(BL_GET_REG_BITS_VAL(tmpVal, IRTX_END_INT)){
+        return 0;
+    }
+
     tmpVal = BL_RD_REG(IR_BASE, IRTX_CONFIG);
     return BL_GET_REG_BITS_VAL(tmpVal, IR_CR_IRTX_EN);
 }
@@ -268,3 +317,20 @@ __attribute__((weak)) void bl_ir_swm_tx_done_callback(void)
 {
     
 }
+
+
+#if 0
+void bl_ir_swm_test(void)
+{
+    uint16_t data[] = {2, 2, 4, 2, 6};
+
+    bl_ir_swm_tx_cfg(37700, 0.3333);
+    bl_ir_led_drv_cfg(1, 0);
+
+    while(1){
+        bl_ir_swm_tx(1, data, sizeof(data)/sizeof(data[0]));
+        while(bl_ir_swm_tx_busy());
+        arch_delay_ms(500);
+    }
+}
+#endif

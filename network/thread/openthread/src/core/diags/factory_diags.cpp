@@ -30,6 +30,8 @@
  * @file
  *   This file implements the diagnostics module.
  */
+#define _GNU_SOURCE
+#include <string.h>
 
 #include "factory_diags.hpp"
 
@@ -812,7 +814,7 @@ Error Diags::ProcessLine(const char *aString, char *aOutput, size_t aOutputMaxLe
 
     VerifyOrExit(StringLength(aString, kMaxCommandBuffer) < kMaxCommandBuffer, error = kErrorNoBufs);
 
-    strcpy(buffer, aString);
+    strlcpy(buffer, aString, kMaxCommandBuffer);
     error = ParseCmd(buffer, argCount, args);
 
 exit:

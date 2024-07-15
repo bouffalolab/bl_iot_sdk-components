@@ -1,26 +1,17 @@
 #include <string.h>
 #include <stdio.h>
-#include <device/vfs_spi.h>
-#include <vfs_err.h>
-#include <vfs_register.h>
-#include <aos/kernel.h>
 
-#include <bl_dma.h>
-#include <bl_gpio.h>
 #include <bl702_spi.h>
 #include <bl702_gpio.h>
 #include <bl702_glb.h>
 #include <bl702_dma.h>
 #include <bl702.h>
 #include <bl_irq.h>
-#include <bl_dma.h>
 #include <bl_gpio.h>
 #include <hosal_dma.h>
 #include <hosal_spi.h>
 
 #include <FreeRTOS.h>
-#include <task.h>
-#include <timers.h>
 #include <event_groups.h>
 
 #include <libfdt.h>
@@ -35,7 +26,7 @@
 
 static void hosal_spi_int_handler_tx(void *arg, uint32_t flag);
 static void hosal_spi_int_handler_rx(void *arg, uint32_t flag);
-static void spi_irq_process(void *p_arg);
+static void spi_irq_process(hosal_spi_dev_t *spi);
 
 typedef struct {
     uint8_t *tx_data;
@@ -49,109 +40,80 @@ typedef struct {
 typedef struct {
     int8_t tx_dma_ch;
     int8_t rx_dma_ch;
-    uint8_t rx_enable;
     EventGroupHandle_t spi_event_group;
 } spi_dma_priv_t;
 
-static void spi_basic_init(hosal_spi_dev_t *arg)
+static void *hosal_spi_priv = NULL;
+static uint8_t hosal_spi_cs_init = 0;
+
+static void hosal_spi_basic_init(hosal_spi_dev_t *spi)
 {
-    hosal_spi_dev_t *hw_arg = arg;
     SPI_CFG_Type spicfg;
     SPI_FifoCfg_Type fifocfg;
-    SPI_ID_Type spi_id; //TODO change SPI_ID_Type
-    
-    spi_id = hw_arg->port;
+    SPI_ID_Type spi_id = SPI_ID_0; //spi->port;
 
-    SPI_SetClock(spi_id,hw_arg->config.freq);
-    /* spi config */
     spicfg.deglitchEnable = DISABLE;
     spicfg.continuousEnable = ENABLE;
-    spicfg.byteSequence = SPI_BYTE_INVERSE_BYTE0_FIRST,
-    spicfg.bitSequence = SPI_BIT_INVERSE_MSB_FIRST,
+    spicfg.byteSequence = SPI_BYTE_INVERSE_BYTE0_FIRST;
+    spicfg.bitSequence = SPI_BIT_INVERSE_MSB_FIRST;
     spicfg.frameSize = SPI_FRAME_SIZE_8;
 
-    if (hw_arg->config.polar_phase == 0) {
+    if (spi->config.polar_phase == 0) {
         spicfg.clkPhaseInv = SPI_CLK_PHASE_INVERSE_0;
         spicfg.clkPolarity = SPI_CLK_POLARITY_LOW;
-    } else if (hw_arg->config.polar_phase == 1) {
+    } else if (spi->config.polar_phase == 1) {
         spicfg.clkPhaseInv = SPI_CLK_PHASE_INVERSE_1;
         spicfg.clkPolarity = SPI_CLK_POLARITY_LOW;
-    } else if (hw_arg->config.polar_phase == 2) {
+    } else if (spi->config.polar_phase == 2) {
         spicfg.clkPhaseInv = SPI_CLK_PHASE_INVERSE_0;
         spicfg.clkPolarity = SPI_CLK_POLARITY_HIGH;
-    } else if (hw_arg->config.polar_phase == 3) {
+    } else {
         spicfg.clkPhaseInv = SPI_CLK_PHASE_INVERSE_1;
         spicfg.clkPolarity = SPI_CLK_POLARITY_HIGH;
-    } else {
-        blog_error("node support polar_phase \r\n");
-        return;
-    }
-    SPI_Init(0,&spicfg);
-
-    if (hw_arg->config.mode == 0)
-    {
-        SPI_Disable(spi_id, SPI_WORK_MODE_MASTER);
-    } else {
-        SPI_Disable(spi_id, SPI_WORK_MODE_SLAVE);
     }
 
-    SPI_IntMask(spi_id,SPI_INT_ALL,MASK);
+    SPI_Init(spi_id, &spicfg);
+    SPI_SetClock(spi_id, spi->config.freq);
+    SPI_IntMask(spi_id, SPI_INT_ALL, MASK);
+    SPI_RxIgnoreDisable(spi_id);
 
-    /* fifo */
     fifocfg.txFifoThreshold = 0;
     fifocfg.rxFifoThreshold = 0;
-    if (hw_arg->config.dma_enable) {
+    if (spi->config.dma_enable) {
         fifocfg.txFifoDmaEnable = ENABLE;
         fifocfg.rxFifoDmaEnable = ENABLE;
-        SPI_FifoConfig(spi_id,&fifocfg);
+        SPI_FifoConfig(spi_id, &fifocfg);
     } else {
         fifocfg.txFifoDmaEnable = DISABLE;
         fifocfg.rxFifoDmaEnable = DISABLE;
-        SPI_FifoConfig(spi_id,&fifocfg);
-        bl_irq_register_with_ctx(SPI_IRQn, spi_irq_process, (void *)hw_arg);
-        blog_info("spi no dma mode\r\n");
+        SPI_FifoConfig(spi_id, &fifocfg);
     }
 }
 
-static int lli_list_init(DMA_LLI_Ctrl_Type **pptxlli, DMA_LLI_Ctrl_Type **pprxlli, uint8_t *ptx_data, uint8_t *prx_data, uint32_t length)
+static void lli_list_init(DMA_LLI_Ctrl_Type **pptxlli, DMA_LLI_Ctrl_Type **pprxlli, uint8_t *ptx_data, uint8_t *prx_data, uint32_t length)
 {
-    uint32_t i = 0;
+    uint32_t i;
     uint32_t count;
     uint32_t remainder;
-    struct DMA_Control_Reg dmactrl;
-
-    memset(&dmactrl, 0, sizeof(dmactrl));
+    struct DMA_Control_Reg dmactrl = {
+        .SBSize = DMA_BURST_SIZE_1,
+        .DBSize = DMA_BURST_SIZE_1,
+        .SWidth = DMA_TRNS_WIDTH_8BITS,
+        .DWidth = DMA_TRNS_WIDTH_8BITS,
+    };
 
     count = length / LLI_BUFF_SIZE;
     remainder = length % LLI_BUFF_SIZE;
-
     if (remainder != 0) {
         count = count + 1;
     }
 
-    dmactrl.SBSize = DMA_BURST_SIZE_1;
-    dmactrl.DBSize = DMA_BURST_SIZE_1;
-    dmactrl.SWidth = DMA_TRNS_WIDTH_8BITS;
-    dmactrl.DWidth = DMA_TRNS_WIDTH_8BITS;
-    dmactrl.Prot = 0;
-    dmactrl.SLargerD = 0;
-    dmactrl.dst_add_mode = DISABLE;
-    dmactrl.dst_min_mode = DISABLE;
-    dmactrl.fix_cnt = 0;
-
-    *pptxlli = pvPortMalloc(sizeof(DMA_LLI_Ctrl_Type) * count);
-    if (*pptxlli == NULL) {
-        blog_error("malloc lli failed. \r\n");
-        return -1;
+    if (ptx_data) {
+        *pptxlli = malloc(sizeof(DMA_LLI_Ctrl_Type) * count);
     }
 
-    if (NULL != prx_data) {
-        *pprxlli = pvPortMalloc(sizeof(DMA_LLI_Ctrl_Type) * count);
-        if (*pprxlli == NULL) {
-            blog_error("malloc lli failed. \r\n");
-            vPortFree(*pptxlli);
-            return -1;
-        }
+    if (prx_data) {
+        *pprxlli = malloc(sizeof(DMA_LLI_Ctrl_Type) * count);
     }
 
     for (i = 0; i < count; i++) {
@@ -170,8 +132,8 @@ static int lli_list_init(DMA_LLI_Ctrl_Type **pptxlli, DMA_LLI_Ctrl_Type **pprxll
         } else {
             dmactrl.I = 0;
         }
-        
-        if (NULL != ptx_data) {
+
+        if (ptx_data) {
             dmactrl.SI = DMA_MINC_ENABLE;
             dmactrl.DI = DMA_MINC_DISABLE;
             (*pptxlli)[i].srcDmaAddr = (uint32_t)(ptx_data + i * LLI_BUFF_SIZE);
@@ -183,7 +145,7 @@ static int lli_list_init(DMA_LLI_Ctrl_Type **pptxlli, DMA_LLI_Ctrl_Type **pprxll
             (*pptxlli)[i].nextLLI = 0;
         }
 
-        if (NULL != prx_data) {
+        if (prx_data) {
             dmactrl.SI = DMA_MINC_DISABLE;
             dmactrl.DI = DMA_MINC_ENABLE;
             (*pprxlli)[i].srcDmaAddr = (uint32_t)(SPI_BASE + SPI_FIFO_RDATA_OFFSET);
@@ -195,47 +157,36 @@ static int lli_list_init(DMA_LLI_Ctrl_Type **pptxlli, DMA_LLI_Ctrl_Type **pprxll
             (*pprxlli)[i].nextLLI = 0;
         }
     }
-
-    return 0;
 }
 
-static int hosal_spi_dma_trans(hosal_spi_dev_t *arg, uint8_t *TxData, uint8_t *RxData, uint32_t Len, uint32_t timeout)
+static int hosal_spi_dma_trans(hosal_spi_dev_t *spi, uint8_t *TxData, uint8_t *RxData, uint32_t Len, uint32_t timeout)
 {
     EventBits_t uxBits;
     DMA_LLI_Cfg_Type txllicfg;
     DMA_LLI_Cfg_Type rxllicfg;
     DMA_LLI_Ctrl_Type *ptxlli = NULL;
     DMA_LLI_Ctrl_Type *prxlli = NULL;
-    int ret;
-
-    if (!arg) {
-        blog_error("arg err.\r\n");
-        return -1;
-    }
-
-    spi_dma_priv_t *dma_arg = (spi_dma_priv_t*)arg->priv;
+    spi_dma_priv_t *dma_arg = (spi_dma_priv_t *)hosal_spi_priv;
+    SPI_ID_Type spi_id = SPI_ID_0; //spi->port;
 
     if (TxData) {
+        dma_arg->tx_dma_ch = hosal_dma_chan_request(0);
         if (dma_arg->tx_dma_ch == -1) {
-            dma_arg->tx_dma_ch = hosal_dma_chan_request(0);
-            if (dma_arg->tx_dma_ch < 0) {
-                blog_error("SPI TX DMA CHANNEL get failed!\r\n");
-                return -1;
-            }
+            blog_error("SPI TX DMA CHANNEL get failed!\r\n");
+            return -1;
         }
-    } else {
-        dma_arg->tx_dma_ch = -1;
     }
+
     if (RxData) {
+        dma_arg->rx_dma_ch = hosal_dma_chan_request(0);
         if (dma_arg->rx_dma_ch == -1) {
-            dma_arg->rx_dma_ch = hosal_dma_chan_request(0);
-            if (dma_arg->rx_dma_ch < 0) {
-                blog_error("SPI RX DMA CHANNEL get failed!\r\n");
-                return -1;
+            if (dma_arg->tx_dma_ch >= 0) {
+                hosal_dma_chan_release(dma_arg->tx_dma_ch);
+                dma_arg->tx_dma_ch = -1;
             }
+            blog_error("SPI RX DMA CHANNEL get failed!\r\n");
+            return -1;
         }
-    } else {
-        dma_arg->rx_dma_ch = -1;
     }
 
     txllicfg.dir = DMA_TRNS_M2P;
@@ -246,64 +197,58 @@ static int hosal_spi_dma_trans(hosal_spi_dev_t *arg, uint8_t *TxData, uint8_t *R
     rxllicfg.srcPeriph = DMA_REQ_SPI_RX;
     rxllicfg.dstPeriph = DMA_REQ_NONE;
 
-    xEventGroupClearBits(dma_arg->spi_event_group, EVT_GROUP_SPI_TR);
-
-    if (arg->config.mode == 0) {
-        SPI_Enable(arg->port, SPI_WORK_MODE_MASTER);
+    if (spi->config.mode == 0) {
+        SPI_Enable(spi_id, SPI_WORK_MODE_MASTER);
     } else {
-        SPI_Enable(arg->port, SPI_WORK_MODE_SLAVE);
+        SPI_Enable(spi_id, SPI_WORK_MODE_SLAVE);
     }
 
-    ret = lli_list_init(&ptxlli, &prxlli, TxData, RxData, Len);
-    if (ret < 0) {
-        blog_error("init lli failed. \r\n");
+    lli_list_init(&ptxlli, &prxlli, TxData, RxData, Len);
 
-        return -1;
-    }
-
-    if (NULL != RxData) {
-        hosal_dma_irq_callback_set(dma_arg->rx_dma_ch, hosal_spi_int_handler_rx, arg);
+    if (RxData) {
+        hosal_dma_irq_callback_set(dma_arg->rx_dma_ch, hosal_spi_int_handler_rx, spi);
         DMA_LLI_Init(dma_arg->rx_dma_ch, &rxllicfg);
         DMA_LLI_Update(dma_arg->rx_dma_ch,(uint32_t)prxlli);
         hosal_dma_chan_start(dma_arg->rx_dma_ch);
     }
 
-    if (NULL != TxData) {
-        hosal_dma_irq_callback_set(dma_arg->tx_dma_ch, hosal_spi_int_handler_tx, arg);
+    if (TxData) {
+        hosal_dma_irq_callback_set(dma_arg->tx_dma_ch, hosal_spi_int_handler_tx, spi);
         DMA_LLI_Init(dma_arg->tx_dma_ch, &txllicfg);
         DMA_LLI_Update(dma_arg->tx_dma_ch,(uint32_t)ptxlli);
         hosal_dma_chan_start(dma_arg->tx_dma_ch);
     }
 
+    uxBits = xEventGroupWaitBits(dma_arg->spi_event_group, EVT_GROUP_SPI_TR, pdTRUE, pdTRUE, timeout);
+    xEventGroupClearBits(dma_arg->spi_event_group, EVT_GROUP_SPI_TR);
 
-    uxBits = xEventGroupWaitBits(dma_arg->spi_event_group,
-                                     EVT_GROUP_SPI_TR,
-                                     pdTRUE,
-                                     pdTRUE,
-                                     timeout);
+    if (dma_arg->tx_dma_ch >= 0) {
+        hosal_dma_chan_stop(dma_arg->tx_dma_ch);
+        hosal_dma_chan_release(dma_arg->tx_dma_ch);
+        dma_arg->tx_dma_ch = -1;
+    }
+    if (dma_arg->rx_dma_ch >= 0) {
+        hosal_dma_chan_stop(dma_arg->rx_dma_ch);
+        hosal_dma_chan_release(dma_arg->rx_dma_ch);
+        dma_arg->rx_dma_ch = -1;
+    }
+
+    if (ptxlli) {
+        free(ptxlli);
+    }
+    if (prxlli) {
+        free(prxlli);
+    }
 
     if ((uxBits & EVT_GROUP_SPI_TR) == EVT_GROUP_SPI_TR) {
-        if (dma_arg->tx_dma_ch >= 0) {
-            hosal_dma_chan_stop(dma_arg->tx_dma_ch);
-            hosal_dma_chan_release(dma_arg->tx_dma_ch);
-            dma_arg->tx_dma_ch = -1;
-        }
-        if (dma_arg->rx_dma_ch >= 0) {
-            hosal_dma_chan_stop(dma_arg->rx_dma_ch);
-            hosal_dma_chan_release(dma_arg->rx_dma_ch);
-            dma_arg->rx_dma_ch = -1;
-        }
-        if (arg->cb) {
-            arg->cb(arg->p_arg);
+        if (spi->cb) {
+            spi->cb(spi->p_arg);
         }
     } else {
-        blog_error(" trans timeout\r\n");
+        blog_error("transmission timeout\r\n");
+        return -1;
     }
 
-    vPortFree(ptxlli);
-    if (NULL != RxData) {
-        vPortFree(prxlli);
-    }
 	return 0;
 }
 
@@ -311,243 +256,162 @@ static void hosal_spi_int_handler_tx(void *arg, uint32_t flag)
 {
     BaseType_t xResult = pdFAIL;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    hosal_spi_dev_t *dev = (hosal_spi_dev_t *)arg;
-    if (NULL != dev) {
-        if (dev->config.dma_enable) {
-            spi_dma_priv_t *priv=  (spi_dma_priv_t *)dev->priv;
-            bl_dma_int_clear(priv->tx_dma_ch);
-            if (priv->spi_event_group != NULL) {
-                xResult = xEventGroupSetBitsFromISR(priv->spi_event_group, EVT_GROUP_SPI_TX, &xHigherPriorityTaskWoken);
+    spi_dma_priv_t *priv = (spi_dma_priv_t *)hosal_spi_priv;
 
-                if (priv->rx_dma_ch == -1) {
-                    xEventGroupSetBitsFromISR(priv->spi_event_group, EVT_GROUP_SPI_RX, &xHigherPriorityTaskWoken);
-                }
-            }
-            if(xResult != pdFAIL) {
-                portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-            }
-        } 
+    if (priv->rx_dma_ch == -1) {
+        xResult = xEventGroupSetBitsFromISR(priv->spi_event_group, EVT_GROUP_SPI_TR, &xHigherPriorityTaskWoken);
     } else {
-        blog_error("hosal_spi_int_handler_tx no clear isr.\r\n");
+        xResult = xEventGroupSetBitsFromISR(priv->spi_event_group, EVT_GROUP_SPI_TX, &xHigherPriorityTaskWoken);
     }
-    return;
+    if(xResult != pdFAIL) {
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
 }
 
 static void hosal_spi_int_handler_rx(void *arg, uint32_t flag)
 {
     BaseType_t xResult = pdFAIL;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    hosal_spi_dev_t *dev = (hosal_spi_dev_t *)arg;
-    if (NULL != dev) {
-        if (dev->config.dma_enable) {
-            spi_dma_priv_t *priv=  (spi_dma_priv_t *)dev->priv;
-            bl_dma_int_clear(priv->tx_dma_ch);
-            if (priv->spi_event_group != NULL) {
-                xResult = xEventGroupSetBitsFromISR(priv->spi_event_group, EVT_GROUP_SPI_RX, &xHigherPriorityTaskWoken);
+    spi_dma_priv_t *priv = (spi_dma_priv_t *)hosal_spi_priv;
 
-                if (priv->tx_dma_ch == -1) {
-                    xEventGroupSetBitsFromISR(priv->spi_event_group, EVT_GROUP_SPI_TX, &xHigherPriorityTaskWoken);
-                }
-            }
-            if(xResult != pdFAIL) {
-                portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-            }
-        } 
+    if (priv->tx_dma_ch == -1) {
+        xResult = xEventGroupSetBitsFromISR(priv->spi_event_group, EVT_GROUP_SPI_TR, &xHigherPriorityTaskWoken);
     } else {
-        blog_error("hosal_spi_int_handler_tx no clear isr.\r\n");
+        xResult = xEventGroupSetBitsFromISR(priv->spi_event_group, EVT_GROUP_SPI_RX, &xHigherPriorityTaskWoken);
     }
-    return;
+    if(xResult != pdFAIL) {
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
 }
 
-static void spi_irq_process(void *p_arg)
+static void spi_irq_process(hosal_spi_dev_t *spi)
 {
     BaseType_t xResult = pdFAIL;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    hosal_spi_dev_t *spi = (hosal_spi_dev_t *)p_arg;
-    spi_priv_t *spi_priv = (spi_priv_t *)spi->priv;
-    uint32_t tmpVal;
-    uint32_t SPIx =SPI_BASE;
-    hosal_spi_irq_t pfn;
-    void *parg;
-    pfn = spi->cb;
-    parg = spi->p_arg;
-    
-    tmpVal = BL_RD_REG(SPIx,SPI_INT_STS);
-    if(BL_IS_REG_BIT_SET(tmpVal,SPI_END_INT) && !BL_IS_REG_BIT_SET(tmpVal,SPI_CR_SPI_END_MASK)){
-        BL_WR_REG(SPIx,SPI_INT_STS,BL_SET_REG_BIT(tmpVal,SPI_CR_SPI_END_CLR));
-    }
+    spi_priv_t *spi_priv = (spi_priv_t *)hosal_spi_priv;
+    SPI_ID_Type spi_id = SPI_ID_0; //spi->port;
+
     /* TX fifo ready interrupt(fifo count > fifo threshold) */
-    if(BL_IS_REG_BIT_SET(tmpVal,SPI_TXF_INT) && !BL_IS_REG_BIT_SET(tmpVal,SPI_CR_SPI_TXF_MASK)){
-        if (spi_priv->tx_data) {
-            if (spi_priv->tx_index < spi_priv->length) {
-                BL_WR_REG(SPIx, SPI_FIFO_WDATA, (uint32_t)spi_priv->tx_data[spi_priv->tx_index]);
-                spi_priv->tx_index++;
+    if (SPI_GetIntStatus(spi_id, SPI_INT_TX_FIFO_REQ) == SET) {
+        SPI_ClrIntStatus(spi_id, SPI_INT_TX_FIFO_REQ);
+        if (spi_priv->tx_index < spi_priv->length) {
+            if (spi_priv->tx_data) {
+                BL_WR_REG(SPI_BASE, SPI_FIFO_WDATA, (uint32_t)spi_priv->tx_data[spi_priv->tx_index]);
             } else {
+                BL_WR_REG(SPI_BASE, SPI_FIFO_WDATA, 0);
             }
-        } else { /* send 0 while only recv */
-            if (spi_priv->tx_index < spi_priv->length) {
-                BL_WR_REG(SPIx,SPI_FIFO_WDATA, 0);
-                spi_priv->tx_index++;
-            } else {
-            }
+            spi_priv->tx_index++;
         }
     }
-    /*  RX fifo ready interrupt(fifo count > fifo threshold) */
-    if(BL_IS_REG_BIT_SET(tmpVal,SPI_RXF_INT) && !BL_IS_REG_BIT_SET(tmpVal,SPI_CR_SPI_RXF_MASK)){
+
+    /* RX fifo ready interrupt(fifo count > fifo threshold) */
+    if (SPI_GetIntStatus(spi_id, SPI_INT_RX_FIFO_REQ) == SET) {
+        SPI_ClrIntStatus(spi_id, SPI_INT_RX_FIFO_REQ);
         if (spi_priv->rx_data) {
-            spi_priv->rx_data[spi_priv->rx_index] = (uint8_t)(BL_RD_REG(SPIx, SPI_FIFO_RDATA)&0xff);
-            spi_priv->rx_index++;
-            if (spi_priv->rx_index == spi_priv->length) {
-                /* spi callback */
-                if (pfn) {
-                    pfn(parg);
-                }
-                bl_irq_disable(SPI_IRQn);
-                xResult = xEventGroupSetBitsFromISR(spi_priv->spi_event_group, EVT_GROUP_SPI_TX, &xHigherPriorityTaskWoken);
-                xEventGroupSetBitsFromISR(spi_priv->spi_event_group, EVT_GROUP_SPI_RX, &xHigherPriorityTaskWoken);
-                if(xResult != pdFAIL) {
-                    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-                }
-            }
-        } else {
-            spi_priv->rx_index++;
-            if (spi_priv->rx_index == spi_priv->length) {
-                /* spi callback */
-                if (pfn) {
-                    pfn(parg);
-                }
-                bl_irq_disable(SPI_IRQn);
-                xResult = xEventGroupSetBitsFromISR(spi_priv->spi_event_group, EVT_GROUP_SPI_TX, &xHigherPriorityTaskWoken);
-                xEventGroupSetBitsFromISR(spi_priv->spi_event_group, EVT_GROUP_SPI_RX, &xHigherPriorityTaskWoken);
-                if(xResult != pdFAIL) {
-                    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-                }
+            spi_priv->rx_data[spi_priv->rx_index] = BL_RD_REG(SPI_BASE, SPI_FIFO_RDATA) & 0xff;
+        }
+        spi_priv->rx_index++;
+        if (spi_priv->rx_index == spi_priv->length) {
+            bl_irq_disable(SPI_IRQn);
+            xResult = xEventGroupSetBitsFromISR(spi_priv->spi_event_group, EVT_GROUP_SPI_TR, &xHigherPriorityTaskWoken);
+            if(xResult != pdFAIL) {
+                portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
             }
         }
-    }
-    /* Slave mode transfer time-out interrupt,triggered when bus is idle for the given value */
-    if(BL_IS_REG_BIT_SET(tmpVal,SPI_STO_INT) && !BL_IS_REG_BIT_SET(tmpVal,SPI_CR_SPI_STO_MASK)){
-        BL_WR_REG(SPIx,SPI_INT_STS,BL_SET_REG_BIT(tmpVal,SPI_CR_SPI_STO_CLR));
-        blog_info(" slave timeout\r\n");
-    }
-    /* Slave mode tx underrun error interrupt,trigged when tx is not ready during transfer */
-    if(BL_IS_REG_BIT_SET(tmpVal,SPI_TXU_INT) && !BL_IS_REG_BIT_SET(tmpVal,SPI_CR_SPI_TXU_MASK)){
-        BL_WR_REG(SPIx,SPI_INT_STS,BL_SET_REG_BIT(tmpVal,SPI_CR_SPI_TXU_CLR));
-        blog_info(" slave tx underrun error\r\n");
-    }
-    /* TX/RX fifo overflow/underflow interrupt */
-    if(BL_IS_REG_BIT_SET(tmpVal,SPI_FER_INT) && !BL_IS_REG_BIT_SET(tmpVal,SPI_CR_SPI_FER_MASK)){
-        blog_info(" tx/rx overfloe/underflow\r\n");
     }
 }
 
 static int hosal_spi_trans(hosal_spi_dev_t *spi, uint8_t *tx_data, uint8_t *rx_data, uint32_t length, uint32_t timeout)
 {
-    if (!spi) {
-        blog_error("arg error\r\n");
-        return -1;
-    }
     EventBits_t uxBits;
-    spi_priv_t *spi_priv = (spi_priv_t *)spi->priv;
-    blog_info("spi trans\r\n");
-    uint32_t tmpVal;
-    uint32_t SPIx = SPI_BASE;
-    SPI_ID_Type spi_id; //TODO change SPI_ID_Type
-    spi_id = spi->port;
+    spi_priv_t *spi_priv = (spi_priv_t *)hosal_spi_priv;
+    SPI_ID_Type spi_id = SPI_ID_0; //spi->port;
 
     spi_priv->tx_data = tx_data;
     spi_priv->rx_data = rx_data;
     spi_priv->length  = length;
     spi_priv->tx_index  = 0;
     spi_priv->rx_index  = 0;
-    
-    /* Set valid width for each fifo entry */
-    tmpVal = BL_RD_REG(SPIx,SPI_CONFIG);
-    BL_WR_REG(SPIx,SPI_CONFIG,BL_SET_REG_BITS_VAL(tmpVal,SPI_CR_SPI_FRAME_SIZE,0));
-    
-    /* Disable rx ignore */
-    tmpVal = BL_RD_REG(SPIx,SPI_CONFIG);
-    BL_WR_REG(SPIx,SPI_CONFIG,BL_CLR_REG_BIT(tmpVal,SPI_CR_SPI_RXD_IGNR_EN));
-    
-    /* Clear tx and rx fifo */
-    tmpVal = BL_RD_REG(SPIx,SPI_FIFO_CONFIG_0);
-    tmpVal = BL_SET_REG_BIT(tmpVal,SPI_TX_FIFO_CLR);
-    tmpVal = BL_SET_REG_BIT(tmpVal,SPI_RX_FIFO_CLR);
-    BL_WR_REG(SPIx,SPI_FIFO_CONFIG_0,tmpVal);
+
+    SPI_ClrTxFifo(spi_id);
+    SPI_ClrRxFifo(spi_id);
 
     if (spi->config.mode == 0) {
-        SPI_Enable(spi->port, SPI_WORK_MODE_MASTER);
+        SPI_Enable(spi_id, SPI_WORK_MODE_MASTER);
     } else {
-        SPI_Enable(spi->port, SPI_WORK_MODE_SLAVE);
+        SPI_Enable(spi_id, SPI_WORK_MODE_SLAVE);
     }
 
-    SPI_IntMask(spi_id, SPI_INT_ALL,UNMASK);
+    SPI_IntMask(spi_id, SPI_INT_TX_FIFO_REQ, UNMASK);
+    SPI_IntMask(spi_id, SPI_INT_RX_FIFO_REQ, UNMASK);
+    bl_irq_register_with_ctx(SPI_IRQn, spi_irq_process, spi);
     bl_irq_enable(SPI_IRQn);
+
     uxBits = xEventGroupWaitBits(spi_priv->spi_event_group, EVT_GROUP_SPI_TR, pdTRUE, pdTRUE, timeout);
+    xEventGroupClearBits(spi_priv->spi_event_group, EVT_GROUP_SPI_TR);
 
     if ((uxBits & EVT_GROUP_SPI_TR) == EVT_GROUP_SPI_TR) {
-        blog_info("recv all event group.\r\n");
+        if (spi->cb) {
+            spi->cb(spi->p_arg);
+        }
     } else {
-        blog_error(" transimission timeout\r\n");
+        blog_error("transmission timeout\r\n");
+        return -1;
     }
-    return 0;
 
+    return 0;
 }
 
-static void hosal_spi_gpio_init(hosal_spi_dev_t *arg)
+static void hosal_spi_gpio_init(hosal_spi_dev_t *spi)
 {
-
-    if (!arg) {
-        blog_error("arg err.\r\n");
-        return;
-    }
-
     GLB_GPIO_Type gpiopins[4];
-    gpiopins[0] = arg->config.pin_cs;
-    gpiopins[1] = arg->config.pin_clk;
-    gpiopins[2] = arg->config.pin_mosi;
-    gpiopins[3] = arg->config.pin_miso;
-    GLB_GPIO_Func_Init(GPIO_FUN_SPI,gpiopins,sizeof(gpiopins)/sizeof(gpiopins[0]));
+    gpiopins[0] = spi->config.pin_cs;
+    gpiopins[1] = spi->config.pin_clk;
+    gpiopins[2] = spi->config.pin_mosi;
+    gpiopins[3] = spi->config.pin_miso;
+    GLB_GPIO_Func_Init(GPIO_FUN_SPI, gpiopins, sizeof(gpiopins)/sizeof(gpiopins[0]));
 
-    if (arg->config.mode == 0) {
+    if (spi->config.mode == 0) {
         GLB_Set_SPI_0_ACT_MOD_Sel(GLB_SPI_PAD_ACT_AS_MASTER);
     } else {
         GLB_Set_SPI_0_ACT_MOD_Sel(GLB_SPI_PAD_ACT_AS_SLAVE);
     }
-
-    return;
 }
 
 int hosal_spi_init(hosal_spi_dev_t *spi)
 {
-    hosal_spi_dev_t *dev = spi;
-    if (!spi) {
-        blog_error("arg err.\r\n");
+    if (spi == NULL) {
+        return -1;
     }
-    hosal_spi_gpio_init(dev);
-    spi_basic_init(dev);
-    if (dev->config.dma_enable) {
-        spi_dma_priv_t *priv = (spi_dma_priv_t *)pvPortMalloc(sizeof(spi_dma_priv_t));
-        priv->spi_event_group = xEventGroupCreate();
-        priv->tx_dma_ch = -1;
-        priv->rx_dma_ch = -1;
-        dev->priv = priv;
-    } else {
-        spi_priv_t *priv = (spi_priv_t *)pvPortMalloc(sizeof(spi_priv_t));
-        priv->spi_event_group = xEventGroupCreate();
-        priv->tx_data = NULL;
-        priv->rx_data = NULL;
-        priv->length  = 0;
-        priv->tx_index = 0;
-        priv->rx_index = 0;
-        dev->priv = priv;
+
+    if (hosal_spi_priv == NULL) {
+        if (spi->config.dma_enable) {
+            spi_dma_priv_t *priv = malloc(sizeof(spi_dma_priv_t));
+            priv->tx_dma_ch = -1;
+            priv->rx_dma_ch = -1;
+            priv->spi_event_group = xEventGroupCreate();
+            hosal_spi_priv = priv;
+        } else {
+            spi_priv_t *priv = malloc(sizeof(spi_priv_t));
+            priv->spi_event_group = xEventGroupCreate();
+            hosal_spi_priv = priv;
+        }
     }
+
+    hosal_spi_cs_init = 0;
+
+    hosal_spi_gpio_init(spi);
+    hosal_spi_basic_init(spi);
     return 0;
 }
 
 int hosal_spi_set_cs(uint8_t pin, uint8_t value)
 {
-    bl_gpio_enable_output(pin, 1, 0);
+    if (hosal_spi_cs_init == 0) {
+        bl_gpio_enable_output(pin, 0, 0);
+        hosal_spi_cs_init = 1;
+    }
+
     bl_gpio_output_set(pin, value);
     return 0;
 }
@@ -557,6 +421,7 @@ int hosal_spi_irq_callback_set(hosal_spi_dev_t *spi, hosal_spi_irq_t pfn, void *
     if (spi == NULL) {
         return -1;
     }
+
     spi->cb = pfn;
     spi->p_arg = p_arg;
     return 0;
@@ -567,24 +432,24 @@ int hosal_spi_finalize(hosal_spi_dev_t *spi)
     if (spi == NULL) {
         return -1;
     }
-    
-    if (spi->config.dma_enable) {
-        spi_dma_priv_t *spi_priv = (spi_dma_priv_t *)spi->priv;
-        if (spi_priv->tx_dma_ch >= 0) {
-            hosal_dma_chan_release(spi_priv->tx_dma_ch);
+
+    if (hosal_spi_priv != NULL) {
+        if (spi->config.dma_enable) {
+            spi_dma_priv_t *priv = (spi_dma_priv_t *)hosal_spi_priv;
+            vEventGroupDelete(priv->spi_event_group);
+            free(priv);
+        } else {
+            spi_priv_t *priv = (spi_priv_t *)hosal_spi_priv;
+            vEventGroupDelete(priv->spi_event_group);
+            free(priv);
         }
-        if (spi_priv->rx_dma_ch >= 0) {
-            hosal_dma_chan_release(spi_priv->rx_dma_ch);
-        }
-        vEventGroupDelete(spi_priv->spi_event_group);
-        vPortFree(spi_priv);
-    } else {
-        spi_priv_t *spi_priv = (spi_priv_t *)spi->priv;
-        vEventGroupDelete(spi_priv->spi_event_group);
-        vPortFree(spi_priv);
+        hosal_spi_priv = NULL;
     }
-    bl_irq_disable(SPI_IRQn);
-    SPI_DeInit(0);
+
+    hosal_spi_cs_init = 0;
+
+    SPI_ID_Type spi_id = SPI_ID_0; //spi->port;
+    SPI_DeInit(spi_id);
     return 0;
 }
 
@@ -592,14 +457,16 @@ int hosal_spi_send(hosal_spi_dev_t *spi, const uint8_t *data, uint16_t size, uin
 {
     int ret;
 
-    if (NULL == spi) {
-        log_error("not init.\r\n");
+    if (spi == NULL || data == NULL) {
+        blog_error("wrong para\r\n");
         return -1;
     }
 
-    if (data == NULL) {
-        printf("wrong para \r\n");
+    if (hosal_spi_priv == NULL) {
+        blog_error("please hosal_spi_init!\r\n");
+        return -1;
     }
+
     if (spi->config.dma_enable) {
         ret = hosal_spi_dma_trans(spi, (uint8_t *)data, NULL, size, timeout);
     } else {
@@ -610,16 +477,18 @@ int hosal_spi_send(hosal_spi_dev_t *spi, const uint8_t *data, uint16_t size, uin
 
 int hosal_spi_recv(hosal_spi_dev_t *spi, uint8_t *data, uint16_t size, uint32_t timeout)
 {
-	int ret;
+    int ret;
 
-    if (NULL == spi) {
-        log_error("not init.\r\n");
+    if (spi == NULL || data == NULL) {
+        blog_error("wrong para\r\n");
         return -1;
     }
 
-    if (data == NULL) {
-        printf("wrong para \r\n");
+    if (hosal_spi_priv == NULL) {
+        blog_error("please hosal_spi_init!\r\n");
+        return -1;
     }
+
     if (spi->config.dma_enable) {
         ret = hosal_spi_dma_trans(spi, NULL, data, size, timeout);
     } else {
@@ -630,13 +499,20 @@ int hosal_spi_recv(hosal_spi_dev_t *spi, uint8_t *data, uint16_t size, uint32_t 
 
 int hosal_spi_send_recv(hosal_spi_dev_t *spi, uint8_t *tx_data, uint8_t *rx_data, uint16_t size, uint32_t timeout)
 {
-	int ret;
-    if (NULL == spi || tx_data == NULL || rx_data == NULL) {
-        log_error("not init.\r\n");
+    int ret;
+
+    if (spi == NULL || tx_data == NULL || rx_data == NULL) {
+        blog_error("wrong para\r\n");
         return -1;
     }
+
+    if (hosal_spi_priv == NULL) {
+        blog_error("please hosal_spi_init!\r\n");
+        return -1;
+    }
+
     if (spi->config.dma_enable) {
-        ret = hosal_spi_dma_trans(spi, (uint8_t *)tx_data, (uint8_t *)rx_data, size, timeout);
+        ret = hosal_spi_dma_trans(spi, tx_data, rx_data, size, timeout);
     } else {
         ret = hosal_spi_trans(spi, tx_data, rx_data, size, timeout);
     }

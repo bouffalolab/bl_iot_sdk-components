@@ -2,15 +2,11 @@
 #define __BL_HBN_H__
 
 
-#include "bl702_glb.h"
-#include "bl702_sec_eng.h"
-#include "bl702_sf_cfg.h"
-#include "bl702_sflash.h"
-#include "bl702_acomp.h"
 #include "bl702_romdriver.h"
+#include "bl702_acomp.h"
+#include "bl702_sec_eng.h"
 
 
-#define ATTR_NOINLINE              __attribute__((noinline))
 #define ATTR_HBN_CODE_SECTION      __attribute__((section(".hbn_code." ATTR_UNI_SYMBOL)))
 #define ATTR_HBN_DATA_SECTION      __attribute__((section(".hbn_data")))
 #define ATTR_HBN_NOINIT_SECTION    __attribute__((section(".hbn_noinit")))
@@ -35,13 +31,4 @@ uint32_t bl_hbn_get_wakeup_gpio(void);
 uint64_t bl_hbn_get_wakeup_time(void);  // in rtc cycles
 
 
-typedef struct _hbn_type {
-    uint8_t buflen;
-    uint8_t active;
-    uint8_t buf[1];
-} hbn_type_t;
-
-int bl_hbn_enter(hbn_type_t *hbn, uint32_t *time);
-
 #endif
-

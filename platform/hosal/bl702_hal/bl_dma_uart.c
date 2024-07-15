@@ -93,25 +93,25 @@ static void gpio_init(bl_dma_uart_cfg_t *cfg)
 static void uart_init(bl_dma_uart_cfg_t *cfg)
 {
     UART_CFG_Type uartCfg = {
-      0,                           /* UART clock */
-      cfg->uart_baudrate,          /* baudrate */
-      UART_DATABITS_8,             /* data bits */
-      UART_STOPBITS_1,             /* stop bits */
-      UART_PARITY_NONE,            /* parity */
-      DISABLE,                     /* Disable auto flow control */
-      DISABLE,                     /* Disable rx input de-glitch function */
-      DISABLE,                     /* Disable RTS output SW control mode */
-      DISABLE,                     /* Disable tx output SW control mode */
-      DISABLE,                     /* Disable tx lin mode */
-      DISABLE,                     /* Disable rx lin mode */
-      0,                           /* Tx break bit count for lin mode */
-      UART_LSB_FIRST,              /* UART each data byte is send out LSB-first */
+        0,                         /* UART clock */
+        cfg->uart_baudrate,        /* baudrate */
+        UART_DATABITS_8,           /* data bits */
+        UART_STOPBITS_1,           /* stop bits */
+        UART_PARITY_NONE,          /* parity */
+        DISABLE,                   /* Disable auto flow control */
+        DISABLE,                   /* Disable rx input de-glitch function */
+        DISABLE,                   /* Disable RTS output SW control mode */
+        DISABLE,                   /* Disable tx output SW control mode */
+        DISABLE,                   /* Disable tx lin mode */
+        DISABLE,                   /* Disable rx lin mode */
+        0,                         /* Tx break bit count for lin mode */
+        UART_LSB_FIRST,            /* UART each data byte is send out LSB-first */
     };
     
     UART_FifoCfg_Type fifoCfg = {
         0,                         /* TX FIFO threshold */
         0,                         /* RX FIFO threshold */
-        ENABLE,                    /* Enable tx dma req/ack interface */
+        cfg->uart_tx_dma_enable,   /* Enable tx dma req/ack interface */
         ENABLE,                    /* Enable rx dma req/ack interface */
     };
     
@@ -193,10 +193,12 @@ static void dma_tx_init(void)
     DMA_Channel_Init(&dmaTxCfg);
 }
 
-static void dma_init(void)
+static void dma_init(bl_dma_uart_cfg_t *cfg)
 {
     dma_rx_init();
-    dma_tx_init();
+    if(cfg->uart_tx_dma_enable){
+        dma_tx_init();
+    }
 }
 
 
@@ -228,24 +230,24 @@ int bl_dma_uart_init(bl_dma_uart_cfg_t *cfg)
     
     hosal_dma_init();
     
-    if(uart_tx_dma_ch == -1){
+    uart_rx_dma_ch = hosal_dma_chan_request(0);
+    if(uart_rx_dma_ch == -1){
+        return -1;
+    }
+    
+    if(cfg->uart_tx_dma_enable){
         uart_tx_dma_ch = hosal_dma_chan_request(0);
         if(uart_tx_dma_ch == -1){
+            hosal_dma_chan_release(uart_rx_dma_ch);
+            uart_rx_dma_ch = -1;
             return -1;
         }
     }
     
-    if(uart_rx_dma_ch == -1){
-        uart_rx_dma_ch = hosal_dma_chan_request(0);
-        if(uart_rx_dma_ch == -1){
-            hosal_dma_chan_release(uart_tx_dma_ch);
-            uart_tx_dma_ch = -1;
-            return -1;
-        }
-    }
-    
-    hosal_dma_irq_callback_set(uart_tx_dma_ch, UART_TX_DMA_Callback, NULL);
     hosal_dma_irq_callback_set(uart_rx_dma_ch, UART_RX_DMA_Callback, NULL);
+    if(uart_tx_dma_ch != -1){
+        hosal_dma_irq_callback_set(uart_tx_dma_ch, UART_TX_DMA_Callback, NULL);
+    }
     
     uart_id = cfg->uart_id;
     uart_tx_pin = cfg->uart_tx_pin;
@@ -267,7 +269,31 @@ int bl_dma_uart_init(bl_dma_uart_cfg_t *cfg)
     
     gpio_init(cfg);
     uart_init(cfg);
-    dma_init();
+    dma_init(cfg);
+    
+    return 0;
+}
+
+int bl_dma_uart_change_baudrate(uint32_t baudrate)
+{
+    uint32_t clk;
+    uint32_t divisor;
+    uint32_t fraction;
+    uint32_t uartAddr[] = {UART0_BASE, UART1_BASE};
+    uint32_t UARTx = uartAddr[uart_id];
+    
+    clk = SystemCoreClockGet();
+    divisor = clk / baudrate;
+    fraction = clk * 10 / baudrate % 10;
+    if(fraction < 5){
+        divisor--;
+    }
+    
+    while(UART_GetTxBusBusyStatus(uart_id) && UART_GetRxBusBusyStatus(uart_id));
+    
+    UART_Disable(uart_id, UART_TXRX);
+    BL_WR_REG(UARTx, UART_BIT_PRD, (divisor << 16) | divisor);
+    UART_Enable(uart_id, UART_TXRX);
     
     return 0;
 }
@@ -290,25 +316,48 @@ uint16_t bl_dma_uart_read(uint8_t *data, uint16_t len)
     return len;
 }
 
-void bl_dma_uart_write(uint8_t *data, uint16_t len)
+int bl_dma_uart_write(uint8_t *data, uint16_t len, uint8_t wait_tx_done)
 {
     if(!uart_ok){
-        return;
+        return -1;
     }
+    
+    if(!len){
+        return -1;
+    }
+    
+    if(uart_tx_dma_ch == -1){
+        return -1;
+    }
+    
+    while(DMA_Channel_Is_Busy(uart_tx_dma_ch));
     
     DMA_Channel_Disable(uart_tx_dma_ch);
     DMA_Channel_Update_SrcMemcfg(uart_tx_dma_ch, (uint32_t)data, len);
     DMA_Channel_Enable(uart_tx_dma_ch);
-}
-
-void bl_dma_uart_deinit(void)
-{
-    if(!uart_ok){
-        return;
+    
+    if(wait_tx_done){
+        while(DMA_Channel_Is_Busy(uart_tx_dma_ch));
     }
     
-    DMA_Channel_Disable(uart_tx_dma_ch);
+    return 0;
+}
+
+int bl_dma_uart_deinit(void)
+{
+    if(!uart_ok){
+        return -1;
+    }
+    
     DMA_Channel_Disable(uart_rx_dma_ch);
+    hosal_dma_chan_release(uart_rx_dma_ch);
+    uart_rx_dma_ch = -1;
+    
+    if(uart_tx_dma_ch != -1){
+        DMA_Channel_Disable(uart_tx_dma_ch);
+        hosal_dma_chan_release(uart_tx_dma_ch);
+        uart_tx_dma_ch = -1;
+    }
     
     UART_DeInit(uart_id);
     
@@ -321,6 +370,8 @@ void bl_dma_uart_deinit(void)
     read_idx = 0;
     read_lli_cnt = 0;
     uart_ok = 0;
+    
+    return 0;
 }
 
 
@@ -335,8 +386,9 @@ void bl_dma_uart_test(void)
     bl_dma_uart_cfg_t cfg = {
         .uart_id = 1,
         .uart_baudrate = 2000000,
-        .uart_tx_pin = 1,
-        .uart_rx_pin = 2,
+        .uart_tx_pin = 18,
+        .uart_rx_pin = 19,
+        .uart_tx_dma_enable = 1,
         .uart_rx_buf = rx_buf,
         .uart_rx_buf_size = sizeof(rx_buf),
         .uart_tx_event = NULL,
@@ -344,13 +396,19 @@ void bl_dma_uart_test(void)
     };
     
     ret = bl_dma_uart_init(&cfg);
-    printf("bl_dma_uart_init: %d\r\n", ret);
+    if(cfg.uart_tx_dma_enable == 0 || cfg.uart_id != 0){
+        printf("bl_dma_uart_init: %d\r\n", ret);
+    }
     
     while(1){
         len = bl_dma_uart_get_rx_count();
         bl_dma_uart_read(tx_buf, len);
-        bl_dma_uart_write(tx_buf, len);
-        arch_delay_ms(500);
+        
+        if(cfg.uart_tx_dma_enable){
+            bl_dma_uart_write(tx_buf, len, 1);
+        }else{
+            UART_SendData(cfg.uart_id, tx_buf, len);
+        }
     }
 }
 #endif

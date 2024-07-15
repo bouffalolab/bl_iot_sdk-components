@@ -1,18 +1,14 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdint.h>
-
-#include <openthread/config.h>
-#include <openthread/platform/logging.h>
 #include <openthread_port.h>
 
-/* this should not be a WEAK function */
+#include <openthread/cli.h>
+#include <openthread/platform/logging.h>
+
 void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
 {
     va_list argp;
 
     va_start(argp, aFormat);
-    ot_uartLog(aFormat, argp);
+    otCliPlatLogv(aLogLevel, aLogRegion, aFormat, argp);
     va_end(argp);
 }
 

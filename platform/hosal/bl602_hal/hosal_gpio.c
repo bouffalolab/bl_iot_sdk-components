@@ -88,15 +88,16 @@ static int exec_gpio_handler(hosal_gpio_ctx_t *node)
     return -1;
 }
 
-static void gpio_interrupt_entry(hosal_gpio_ctx_t *pstnode)
+static void gpio_interrupt_entry(hosal_gpio_ctx_t **pstnode)
 {
     int ret;
-    hosal_gpio_ctx_t *node  = pstnode;
+    hosal_gpio_ctx_t *node  = *pstnode;
 
     while (node) {
         ret = check_gpio_is_interrupt(node->pin);
         if (ret == 0) {
             exec_gpio_handler(node);
+            break;
         }
 
         node = node->next;
@@ -125,7 +126,7 @@ int hosal_gpio_irq_set(hosal_gpio_dev_t *gpio, hosal_gpio_irq_trigger_t trigger_
         gpio_head = node;
         node->next = NULL;
     } else {
-        for (node_f = gpio_head; node_f != NULL; node_f = node_f->next) {
+        for (node_f = gpio_head; node_f->next != NULL; node_f = node_f->next) {
             if (node_f->pin == node->pin) {
 #if 0
                 memcpy(node_f, node, sizeof(hosal_gpio_ctx_t));// will crash beacause next field is NULL
@@ -138,15 +139,24 @@ int hosal_gpio_irq_set(hosal_gpio_dev_t *gpio, hosal_gpio_irq_trigger_t trigger_
                 break;
             }
         }
-        if (node_f == NULL) {
-            node->next = gpio_head;
-            gpio_head = node;
+
+        if (node_f->next == NULL) {
+            if (node_f->pin == node->pin) {
+                node_f->handle = node->handle;
+                node_f->arg    = node->arg;
+                node_f->intCtrlMod = node->intCtrlMod;
+                node_f->intTrigMod = node->intTrigMod;
+                vPortFree(node);
+            }else{
+                node_f->next = node;
+                node->next = NULL;
+            }
         }
     }
 
     bl_gpio_intmask(gpio->port, 1);
     bl_set_gpio_intmod(gpio->port, GLB_GPIO_INT_CONTROL_ASYNC, trigger_type);
-    bl_irq_register_with_ctx(GPIO_INT0_IRQn, gpio_interrupt_entry, gpio_head);
+    bl_irq_register_with_ctx(GPIO_INT0_IRQn, gpio_interrupt_entry, &gpio_head);
     bl_gpio_intmask(gpio->port, 0);
     bl_irq_enable(GPIO_INT0_IRQn);
     return 0;
@@ -168,15 +178,30 @@ int hosal_gpio_finalize(hosal_gpio_dev_t *gpio)
         return -1;
     }
     hosal_gpio_ctx_t *node = NULL;
-    for (node = gpio_head; node != NULL; node = node->next) {
+    hosal_gpio_ctx_t *pre_node = NULL;
+
+    if(gpio_head == NULL)
+        goto end;
+
+    // at least 1 node.
+    pre_node = gpio_head;
+    if(pre_node->pin == gpio->port) {
+        gpio_head = pre_node->next;
+        vPortFree(pre_node);
+        goto end;
+    }
+    for (node = gpio_head->next; node != NULL; pre_node = node, node = node->next) {
         if (node->pin == gpio->port) {
+            pre_node->next = node->next;
             vPortFree(node);
+            break;
         }
     }
-    
+
+end:
     bl_gpio_intmask(gpio->port, 1);
     bl_gpio_int_clear(gpio->port, 0);
-    return 0;    
+    return 0;
 }
 
 

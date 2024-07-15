@@ -759,16 +759,16 @@ static inline int bt_addr_le_to_str(const bt_addr_le_t *addr, char *str,
 
 	switch (addr->type) {
 	case BT_ADDR_LE_PUBLIC:
-		strcpy(type, "public");
+		strlcpy(type, "public", sizeof(type));
 		break;
 	case BT_ADDR_LE_RANDOM:
-		strcpy(type, "random");
+		strlcpy(type, "random", sizeof(type));
 		break;
 	case BT_ADDR_LE_PUBLIC_ID:
-		strcpy(type, "public-id");
+		strlcpy(type, "public-id", sizeof(type));
 		break;
 	case BT_ADDR_LE_RANDOM_ID:
-		strcpy(type, "random-id");
+		strlcpy(type, "random-id", sizeof(type));
 		break;
 	default:
 		snprintk(type, sizeof(type), "0x%02x", addr->type);
@@ -875,6 +875,19 @@ int bt_br_internal_update_a2dp_status(u16_t conHandle,u8_t status);
   * @param DutyValue        the range is 0-100
   */
 int bt_br_set_a2dp_stream_duty(u8_t DutyValue);
+
+/** It's used to set min encryption key size.
+  *
+  * @param KeySize        the range is 1-16
+  */
+int bt_br_set_min_enc_key_size(u8_t KeySize);
+
+/** It's used to set min encryption key size.
+  *
+  *  @param br_power        the range is 0-10, 0xff: use default power
+  *  @param edr_power        the range is 0-8, 0xff: use default power
+  */
+int bt_br_set_tx_pwr(int8_t br_power, int8_t edr_power);
 
 /**
  * @}

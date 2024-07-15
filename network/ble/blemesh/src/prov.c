@@ -7,7 +7,7 @@
  */
 
 #include <zephyr.h>
-#include <sys/errno.h>
+#include <bt_errno.h>
 #include <common/include/atomic.h>
 #include <util.h>
 #include <byteorder.h>
@@ -21,7 +21,7 @@
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_PROV)
 #define LOG_MODULE_NAME bt_mesh_prov
-#include "log.h"
+#include "bt_log.h"
 
 #include "../../blestack/src/host/ecc.h"
 //#include "host/testing.h"
@@ -215,7 +215,7 @@ static void prov_fail(u8_t reason)
 	}
 }
 
-#if defined(CONFIG_AUTO_PTS)
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 /* add by bouffalolab */
 void prov_set_method(uint8_t method, uint8_t action, uint8_t size)
 {
@@ -690,7 +690,7 @@ static void send_confirm(void)
 
 	prov_buf_init(&cfm, PROV_CONFIRM);
 
-	#if defined(CONFIG_AUTO_PTS)
+	#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	if (atomic_test_bit(link.flags, PROVISIONER)) {
 		if (bt_mesh_prov_conf(link.conf_key, link.rand, link.auth,
 				link.conf)) {
@@ -736,7 +736,7 @@ static void send_input_complete(void)
 
 int bt_mesh_input_number(u32_t num)
 {
-	BT_DBG("%u", num);
+	BT_DBG("%lu", num);
 
 	if (!atomic_test_and_clear_bit(link.flags, WAIT_NUMBER)) {
 		return -EINVAL;
@@ -764,9 +764,9 @@ int bt_mesh_input_string(const char *str)
 	}
 
 #if defined(BFLB_BLE)
-    strncpy((char *)link.auth, str, prov->input_size);
+    strlcpy((char *)link.auth, str, prov->input_size);
 #else
-	strncpy(link.auth, str, prov->input_size);
+	strlcpy(link.auth, str, prov->input_size);
 #endif
 
 	send_input_complete();
@@ -774,7 +774,7 @@ int bt_mesh_input_string(const char *str)
 	return 0;
 }
 
-#if defined(CONFIG_AUTO_PTS)
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 /* Add by bouffaloab */
 int bt_mesh_prov_remote_pub_key_set(const uint8_t public_key[64])
 {
@@ -1165,7 +1165,7 @@ static void prov_confirm(const u8_t *data)
 {
 	BT_DBG("Remote Confirm: %s", bt_hex(data, 16));
 
-#if defined(CONFIG_AUTO_PTS)
+#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 	/* MESH/PVNR/PROV/BI-18-C */
 	if (atomic_test_bit(link.flags, PROVISIONER)) {
 		if (!memcmp(data, link.conf, 16)) {
@@ -1251,7 +1251,7 @@ static void prov_data(const u8_t *data)
 	iv_index = sys_get_be32(&pdu[19]);
 	addr = sys_get_be16(&pdu[23]);
 
-	BT_DBG("net_idx %u iv_index 0x%08x, addr 0x%04x",
+	BT_DBG("net_idx %u iv_index 0x%08lx, addr 0x%04x",
 	       net_idx, iv_index, addr);
 
 	prov_buf_init(&msg, PROV_COMPLETE);
@@ -1315,7 +1315,7 @@ static void prov_recv(const struct prov_bearer *bearer, void *cb_data,
 
 	if (type >= ARRAY_SIZE(prov_handlers)) {
 		BT_ERR("Unknown provisioning PDU type 0x%02x", type);
-		#if defined(CONFIG_AUTO_PTS)
+		#if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 		/* MESH/NODE/PROV/BI-15-C */
 		prov_fail(PROV_ERR_NVAL_PDU);
 		#else

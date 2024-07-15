@@ -31,6 +31,9 @@
  *   This file implements the infrastructure interface for posix.
  */
 
+#define _GNU_SOURCE
+#include <string.h>
+
 #include "platform-posix.h"
 
 #if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
@@ -290,7 +293,7 @@ uint32_t InfraNetif::GetFlags(void) const
 
     memset(&ifReq, 0, sizeof(ifReq));
     static_assert(sizeof(ifReq.ifr_name) >= sizeof(mInfraIfName), "mInfraIfName is not of appropriate size.");
-    strcpy(ifReq.ifr_name, mInfraIfName);
+    strlcpy(ifReq.ifr_name, mInfraIfName, IFNAMSIZ);
 
     VerifyOrDie(ioctl(sock, SIOCGIFFLAGS, &ifReq) != -1, OT_EXIT_ERROR_ERRNO);
 
@@ -380,7 +383,7 @@ void InfraNetif::Init(const char *aIfName)
     }
 
     VerifyOrDie(strnlen(aIfName, sizeof(mInfraIfName)) <= sizeof(mInfraIfName) - 1, OT_EXIT_INVALID_ARGUMENTS);
-    strcpy(mInfraIfName, aIfName);
+    strlcpy(mInfraIfName, aIfName, IFNAMSIZ);
 
     // Initializes the infra interface.
     ifIndex = if_nametoindex(aIfName);

@@ -31,6 +31,9 @@
  *   This file implements the platform network on Linux.
  */
 
+#define _GNU_SOURCE
+#include <string.h>
+
 #include "openthread-posix-config.h"
 #include "platform-posix.h"
 
@@ -556,7 +559,7 @@ static void SetLinkState(otInstance *aInstance, bool aState)
 
     VerifyOrExit(sIpFd >= 0);
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, gNetifName, sizeof(ifr.ifr_name));
+    memcpy(ifr.ifr_name, gNetifName, sizeof(ifr.ifr_name));
     VerifyOrExit(ioctl(sIpFd, SIOCGIFFLAGS, &ifr) == 0, perror("ioctl"); error = OT_ERROR_FAILED);
 
     ifState = ((ifr.ifr_flags & IFF_UP) == IFF_UP) ? true : false;
@@ -1879,16 +1882,16 @@ static void platformConfigureTunDevice(otPlatformConfig *aPlatformConfig)
     {
         VerifyOrDie(strlen(interfaceName) < IFNAMSIZ, OT_EXIT_INVALID_ARGUMENTS);
 
-        strncpy(ifr.ifr_name, interfaceName, IFNAMSIZ);
+        memcpy(ifr.ifr_name, interfaceName, IFNAMSIZ);
     }
     else
     {
-        strncpy(ifr.ifr_name, "wpan%d", IFNAMSIZ);
+        memcpy(ifr.ifr_name, "wpan%d", IFNAMSIZ);
     }
 
     VerifyOrDie(ioctl(sTunFd, TUNSETIFF, static_cast<void *>(&ifr)) == 0, OT_EXIT_ERROR_ERRNO);
 
-    strncpy(gNetifName, ifr.ifr_name, sizeof(gNetifName));
+    memcpy(gNetifName, ifr.ifr_name, sizeof(gNetifName));
 
     if (aPlatformConfig->mPersistentInterface)
     {
@@ -1917,7 +1920,7 @@ static void platformConfigureTunDevice(otPlatformConfig *aPlatformConfig)
     VerifyOrDie(sTunFd >= 0, OT_EXIT_ERROR_ERRNO);
 
     memset(&info, 0, sizeof(info));
-    strncpy(info.ctl_name, UTUN_CONTROL_NAME, strlen(UTUN_CONTROL_NAME));
+    memcpy(info.ctl_name, UTUN_CONTROL_NAME, strlen(UTUN_CONTROL_NAME));
     err = ioctl(sTunFd, CTLIOCGINFO, &info);
     VerifyOrDie(err == 0, OT_EXIT_ERROR_ERRNO);
 
@@ -1946,7 +1949,7 @@ static otError destroyTunnel(void)
     struct ifreq ifr;
 
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, gNetifName, sizeof(ifr.ifr_name));
+    memcpy(ifr.ifr_name, gNetifName, sizeof(ifr.ifr_name));
     VerifyOrExit(ioctl(sIpFd, SIOCIFDESTROY, &ifr) == 0, perror("ioctl"); error = OT_ERROR_FAILED);
     error = OT_ERROR_NONE;
 
@@ -1985,7 +1988,7 @@ static void platformConfigureTunDevice(otPlatformConfig *aPlatformConfig)
     VerifyOrDie(last_slash != nullptr, OT_EXIT_ERROR_ERRNO);
     last_slash++;
 
-    strncpy(gNetifName, last_slash, sizeof(gNetifName));
+    memcpy(gNetifName, last_slash, sizeof(gNetifName));
 }
 #endif
 

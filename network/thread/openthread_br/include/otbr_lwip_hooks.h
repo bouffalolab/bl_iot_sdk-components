@@ -8,6 +8,10 @@
 extern "C" {
 #endif
 
+#ifdef LWIP_HOOK_INCLUDE
+#include LWIP_HOOK_INCLUDE
+#endif
+
 bool otbr_lwip_hook_ip6_input(struct pbuf *p, struct netif *inp);
 #define LWIP_HOOK_IP6_INPUT otbr_lwip_hook_ip6_input
 

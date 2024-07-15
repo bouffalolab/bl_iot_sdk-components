@@ -199,6 +199,13 @@ void k_timer_stop(k_timer_t *timer);
  */
 void k_timer_delete(k_timer_t *timer);
 
+/**
+ * @brief Check if a timer is active.
+ *
+ */
+bool k_timer_is_active(k_timer_t *timer);
+
+
 /*time define*/
 #define MSEC_PER_SEC 1000
 #define K_MSEC(ms)     (ms)
@@ -276,5 +283,8 @@ long long k_now_ms(void);
 void k_get_random_byte_array(uint8_t *buf, size_t len);
 void *k_malloc(size_t size);
 void k_free(void *buf);
+
+void bt_assert(void);
+
 #endif /* BL_PORT_H */
 

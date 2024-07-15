@@ -30,6 +30,9 @@
  *   This file implements minimal thread device required Spinel interface to the OpenThread stack.
  */
 
+#define _GNU_SOURCE
+#include <string.h>
+
 #include "openthread-core-config.h"
 
 #include "ncp_base.hpp"
@@ -3747,7 +3750,7 @@ template <> otError NcpBase::HandlePropertySet<SPINEL_PROP_SRP_CLIENT_HOST_NAME>
 
     SuccessOrExit(error = otSrpClientSetHostName(mInstance, name));
 
-    strcpy(hostNameBuffer, name);
+    strlcpy(hostNameBuffer, name, size);
     SuccessOrAssert(error = otSrpClientSetHostName(mInstance, hostNameBuffer));
 
 exit:
@@ -3843,12 +3846,12 @@ template <> otError NcpBase::HandlePropertyInsert<SPINEL_PROP_SRP_CLIENT_SERVICE
     stringBuffer = otSrpClientBuffersGetServiceEntryServiceNameString(entry, &size);
     SuccessOrExit(error = mDecoder.ReadUtf8(serviceName));
     VerifyOrExit(StringLength(serviceName, size) < size, error = OT_ERROR_INVALID_ARGS);
-    strcpy(stringBuffer, serviceName);
+    strlcpy(stringBuffer, serviceName, size);
 
     stringBuffer = otSrpClientBuffersGetServiceEntryInstanceNameString(entry, &size);
     SuccessOrExit(error = mDecoder.ReadUtf8(instanceName));
     VerifyOrExit(StringLength(instanceName, size) < size, error = OT_ERROR_INVALID_ARGS);
-    strcpy(stringBuffer, instanceName);
+    strlcpy(stringBuffer, instanceName, size);
 
     SuccessOrExit(error = mDecoder.ReadUint16(entry->mService.mPort));
     SuccessOrExit(error = mDecoder.ReadUint16(entry->mService.mPriority));

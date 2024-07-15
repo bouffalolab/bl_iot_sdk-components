@@ -6,7 +6,7 @@ include $(COMPONENT_PATH)/../ble_common.mk
 COMPONENT_ADD_INCLUDEDIRS    += src \
                                 src/include  \
                                 src/mesh_cli_cmds  \
-								src/mem_slab \
+                                src/mem_slab					
 
 ifeq ($(CONFIG_BT_MESH_MODEL), 0)
 COMPONENT_ADD_INCLUDEDIRS    += src/mesh_models/include  \
@@ -34,7 +34,7 @@ COMPONENT_SRCS   := src/access.c \
 					src/local_operation.c \
 					src/mem_slab/slab.c
 
-ifneq ($(CONFIG_AUTO_PTS),1)
+ifeq ($(CONFIG_BT_MESH_CLI),1)
 COMPONENT_SRCS += src/mesh_cli_cmds/mesh_cli_cmds.c
 endif
 
@@ -63,6 +63,13 @@ ifeq ($(CONFIG_BT_MESH_MODEL_GEN_SRV),1)
 COMPONENT_SRCS   += src/mesh_models/server/common_srv.c \
                     src/mesh_models/server/gen_srv.c 
 endif
+endif
+
+ifeq ($(CONFIG_BT_MESH_OTA_TARGET),1)
+COMPONENT_SRCS   += src/blob_srv.c \
+                    src/blob_io_flash.c \
+                    src/dfu_srv.c \
+                    src/dfu_metadata.c
 endif
 
 COMPONENT_OBJS   := $(patsubst %.c,%.o, $(COMPONENT_SRCS))

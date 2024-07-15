@@ -60,7 +60,7 @@ extern int hosal_uart_dma_rx_get_data(hosal_uart_dev_t *uart, uint8_t *buf, uint
 
 void vfs_uart_restore(void)
 {
-    hosal_dma_finalize();
+    //hosal_dma_finalize();
 
     hosal_uart_init(g_vfs_uart);
     hosal_uart_dma_rx_init(g_vfs_uart);

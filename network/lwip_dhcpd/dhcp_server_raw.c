@@ -921,3 +921,20 @@ _exit:
     LWIP_NETIF_UNLOCK();
     return;
 }
+
+void dhcpd_stop_with_netif(const struct netif *netif)
+{
+    int res;
+    static char netif_name[3] = {0};
+
+    if (!netif) {
+        return;
+    }
+
+    netif_name[0] = netif->name[0];
+    netif_name[1] = netif->name[1];
+    res = tcpip_callback((tcpip_callback_fn)dhcpd_stop, netif_name);
+    if (res != ERR_OK) {
+        DEBUG_PRINTF("dhcp_server_stop res: %d.\r\n", res);
+    }
+}
