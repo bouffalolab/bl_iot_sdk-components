@@ -19,11 +19,33 @@
 
 #define OT_MAX_KEY_LEN              (12 + sizeof(OPENTHREAD_LFS_NAMESPACE) + 1)
 
+#ifdef CONFIG_BL_SDK
+    static struct lfs_context lfs_ctx = { .partition_name = "PSM" };
+    struct lfs_config lfs_cfg = { .read_size = 256,
+                                  .prog_size = 256,
+                                  .lookahead_size = 256,
+                                  .cache_size = 512,
+                                  .block_size = 4096,
+                                  .block_cycles = 500
+                                };
+    static lfs_t *lfs = NULL;
+#else
+    static lfs_t *lfs = NULL;
+#endif
+
+
 void otPlatSettingsInit(otInstance *aInstance, const uint16_t *aSensitiveKeys, uint16_t aSensitiveKeysLength) 
 {
     int ret;
     struct lfs_info stat;
-    lfs_t * lfs = lfs_xip_init();
+
+    if (NULL == lfs) {
+#ifdef CONFIG_BL_SDK
+        lfs = lfs_xip_init(&lfs_ctx, &lfs_cfg);
+#else
+        lfs = lfs_xip_init();
+#endif
+    }
 
     OT_UNUSED_VARIABLE(aInstance);
     OT_UNUSED_VARIABLE(aSensitiveKeys);
@@ -46,10 +68,9 @@ void otPlatSettingsInit(otInstance *aInstance, const uint16_t *aSensitiveKeys, u
 
 otError otPlatSettingsGet(otInstance *aInstance, uint16_t aKey, int aIndex, uint8_t *aValue, uint16_t *aValueLength)
 {
-    lfs_t      * lfs = lfs_xip_init();
-    char         key[OT_MAX_KEY_LEN];
-    lfs_file_t   file;
-    int          ret = LFS_ERR_OK;
+    char            key[OT_MAX_KEY_LEN];
+    lfs_file_t      file;
+    int             ret = LFS_ERR_OK;
 
     OT_UNUSED_VARIABLE(aInstance);
     if (0 != aIndex) {
@@ -87,7 +108,6 @@ otError otPlatSettingsGet(otInstance *aInstance, uint16_t aKey, int aIndex, uint
 
 otError otPlatSettingsSet(otInstance *aInstance, uint16_t aKey, const uint8_t *aValue, uint16_t aValueLength)
 {
-    lfs_t      * lfs = lfs_xip_init();
     char         key[OT_MAX_KEY_LEN];
     lfs_file_t   file;
     int          ret = LFS_ERR_OK;
@@ -129,7 +149,6 @@ otError otPlatSettingsAdd(otInstance *aInstance, uint16_t aKey, const uint8_t *a
 
 otError otPlatSettingsDelete(otInstance *aInstance, uint16_t aKey, int aIndex)
 {
-    lfs_t      * lfs = lfs_xip_init();
     char         key[OT_MAX_KEY_LEN];
     int          ret;
 
@@ -149,7 +168,6 @@ otError otPlatSettingsDelete(otInstance *aInstance, uint16_t aKey, int aIndex)
 
 void otPlatSettingsWipe(otInstance *aInstance)
 {
-    lfs_t          * lfs = lfs_xip_init();
     char             key[OT_MAX_KEY_LEN];
     lfs_file_t       file;
     int              ret = LFS_ERR_OK;

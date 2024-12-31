@@ -100,7 +100,7 @@ int bl_efuse_read_capcode(uint8_t *capcode)
     empty = EF_Ctrl_Is_CapCode_Empty(2, 0);
     if(!empty){
         if(EF_Ctrl_Read_CapCode_Opt(2, capcode, 0) == 0){
-            blog_info("Read cap code from slot 2\r\n");
+            //blog_info("Read cap code from slot 2\r\n");
             return 0;
         }
     }
@@ -108,7 +108,7 @@ int bl_efuse_read_capcode(uint8_t *capcode)
     empty = EF_Ctrl_Is_CapCode_Empty(1, 0);
     if(!empty){
         if(EF_Ctrl_Read_CapCode_Opt(1, capcode, 0) == 0){
-            blog_info("Read cap code from slot 1\r\n");
+            //blog_info("Read cap code from slot 1\r\n");
             return 0;
         }
     }
@@ -116,12 +116,12 @@ int bl_efuse_read_capcode(uint8_t *capcode)
     empty = EF_Ctrl_Is_CapCode_Empty(0, 0);
     if(!empty){
         if(EF_Ctrl_Read_CapCode_Opt(0, capcode, 0) == 0){
-            blog_info("Read cap code from slot 0\r\n");
+            //blog_info("Read cap code from slot 0\r\n");
             return 0;
         }
     }
 
-    blog_info("Read cap code from slot N/A\r\n");
+    //blog_info("Read cap code from slot N/A\r\n");
     return -1;
 }
 
@@ -132,7 +132,7 @@ int bl_efuse_read_pwroft(int8_t poweroffset[2])
     empty = EF_Ctrl_Is_PowerOffset_Slot_Empty(2, 0);
     if(!empty){
         if(EF_Ctrl_Read_PowerOffset_Opt(2, poweroffset, 0) == 0){
-            blog_info("Read power offset from slot 2\r\n");
+            //blog_info("Read power offset from slot 2\r\n");
             return 0;
         }
     }
@@ -140,7 +140,7 @@ int bl_efuse_read_pwroft(int8_t poweroffset[2])
     empty = EF_Ctrl_Is_PowerOffset_Slot_Empty(1, 0);
     if(!empty){
         if(EF_Ctrl_Read_PowerOffset_Opt(1, poweroffset, 0) == 0){
-            blog_info("Read power offset from slot 1\r\n");
+            //blog_info("Read power offset from slot 1\r\n");
             return 0;
         }
     }
@@ -148,12 +148,12 @@ int bl_efuse_read_pwroft(int8_t poweroffset[2])
     empty = EF_Ctrl_Is_PowerOffset_Slot_Empty(0, 0);
     if(!empty){
         if(EF_Ctrl_Read_PowerOffset_Opt(0, poweroffset, 0) == 0){
-            blog_info("Read power offset from slot 0\r\n");
+            //blog_info("Read power offset from slot 0\r\n");
             return 0;
         }
     }
 
-    blog_info("Read power offset from slot N/A\r\n");
+    //blog_info("Read power offset from slot N/A\r\n");
     return -1;
 }
 
@@ -200,11 +200,28 @@ int bl_efuse_read_tsen_refcode(int16_t *refcode)
     Efuse_TSEN_Refcode_Corner_Type trimTsen;
 
     EF_Ctrl_Read_TSEN_Trim(&trimTsen);
-    *refcode = (uint16_t)trimTsen.tsenRefcodeCorner;
+    *refcode = (uint16_t)trimTsen.tsenRefcodeCorner;  // 12-bit unsigned value
 
     if(trimTsen.tsenRefcodeCornerEn == 1 && trimTsen.tsenRefcodeCornerParity == EF_Ctrl_Get_Trim_Parity(trimTsen.tsenRefcodeCorner, 12)){
         return 0;
     }else{
+        return -1;
+    }
+}
+
+int bl_efuse_read_adc_gain_coe(float *coe)
+{
+    Efuse_ADC_Gain_Coeff_Type trimAdc;
+    int16_t coeff;
+
+    EF_Ctrl_Read_ADC_Gain_Trim(&trimAdc);
+    coeff = (trimAdc.adcGainCoeff < 2048) ? trimAdc.adcGainCoeff : (trimAdc.adcGainCoeff - 4096);  // 12-bit signed value
+
+    if(trimAdc.adcGainCoeffEn == 1 && trimAdc.adcGainCoeffParity == EF_Ctrl_Get_Trim_Parity(trimAdc.adcGainCoeff, 12)){
+        *coe = 1.0 - (float)coeff / 2048;
+        return 0;
+    }else{
+        *coe = 1.0;
         return -1;
     }
 }

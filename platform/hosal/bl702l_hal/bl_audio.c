@@ -125,7 +125,9 @@ static void audio_auadc_init(int auadc_src, void *cfg)
     };
     
     GLB_PER_Clock_UnGate(GLB_AHB_CLOCK_AUDIO);
-    GLB_Set_AUDIO_CLK(0, 1, 0, 4);
+    GLB_Power_On_DLL(GLB_DLL_XTAL_32M);
+    GLB_Enable_DLL_Clk(GLB_DLL_CLK_2P032M);
+    GLB_Set_AUDIO_CLK(0, 1, GLB_AUDIO_CLK_SRC_2P032M, 4);
     
     AUADC_Disable();
     AUADC_Enable();
@@ -393,9 +395,9 @@ float bl_audio_get_digital_gain(void)
 #if 0
 #define FRAME_SIZE 308
 #define FRAME_NUM  240  // 308*240/16000 = 4.62s
-int16_t pcm_buf[2][FRAME_SIZE];
+static int16_t pcm_buf[2][FRAME_SIZE];
 
-void audio_callback(int buf_idx)
+static void audio_callback(int buf_idx)
 {
     static uint32_t len = 0;
     

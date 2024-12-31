@@ -667,10 +667,14 @@ static struct bt_mesh_model sig_models[] = {
 	BT_MESH_MODEL_CFG_SRV(&cfg_srv),
 	BT_MESH_MODEL_CFG_CLI(&cfg_cli),
 	BT_MESH_MODEL_HEALTH_SRV(&health_srv, &health_pub),
-	BT_MESH_MODEL_HEALTH_CLI(&health_cli),
+	#ifdef CONFIG_MESH_IOPT_BV_02_C
+	BT_MESH_MODEL_HEALTH_CLI(&health_cli, &health_pub),
+	#else
+	BT_MESH_MODEL_HEALTH_CLI(&health_cli, NULL),
+	#endif
 
 #if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
-
+#ifndef CONFIG_MESH_IOPT_BV_02_C
 	BFL_BLE_MESH_MODEL_GEN_ONOFF_SRV(&onoff_pub, &onoff_server),
 	BFL_BLE_MESH_MODEL_GEN_LEVEL_SRV(&level_pub, &level_server),
 	BFL_BLE_MESH_MODEL_LIGHT_LIGHTNESS_SRV(&lightness_pub, &lightness_server),
@@ -713,7 +717,7 @@ static struct bt_mesh_model sig_models[] = {
 	BFL_BLE_MESH_MODEL_LIGHT_CTL_CLI(&light_ctl_cli_pub, &light_ctl_client),
 	BFL_BLE_MESH_MODEL_LIGHT_HSL_CLI(&light_hsl_cli_pub, &light_hsl_client),
 	BFL_BLE_MESH_MODEL_LIGHT_XYL_CLI(&light_xyl_cli_pub, &light_xyl_client),
-
+#endif
 #else
 
 #if !defined(CONFIG_BT_MESH_MODEL)
@@ -3342,8 +3346,10 @@ BLEMESH_CLI(init)
 	bt_mesh_lpn_set_cb(lpn_cb);
 #endif
 #if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
+#ifndef CONFIG_MESH_IOPT_BV_02_C
         mmdl_ready();
 	models_callback_init();
+#endif
 #endif
 }
 

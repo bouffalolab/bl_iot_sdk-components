@@ -12,10 +12,9 @@
 #include <hosal_spi.h>
 
 #include <FreeRTOS.h>
+#include <semphr.h>
 #include <event_groups.h>
 
-#include <libfdt.h>
-#include <utils_log.h>
 #include <blog.h>
 
 #define LLI_BUFF_SIZE       2048
@@ -34,7 +33,7 @@ typedef struct {
     uint32_t length;
     uint32_t tx_index;
     uint32_t rx_index;
-    EventGroupHandle_t spi_event_group;
+    SemaphoreHandle_t spi_semphr;  // much less latency then event group
 } spi_priv_t;
 
 typedef struct {
@@ -313,7 +312,8 @@ static void spi_irq_process(hosal_spi_dev_t *spi)
         spi_priv->rx_index++;
         if (spi_priv->rx_index == spi_priv->length) {
             bl_irq_disable(SPI_IRQn);
-            xResult = xEventGroupSetBitsFromISR(spi_priv->spi_event_group, EVT_GROUP_SPI_TR, &xHigherPriorityTaskWoken);
+
+            xResult = xSemaphoreGiveFromISR(spi_priv->spi_semphr, &xHigherPriorityTaskWoken);
             if(xResult != pdFAIL) {
                 portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
             }
@@ -323,7 +323,6 @@ static void spi_irq_process(hosal_spi_dev_t *spi)
 
 static int hosal_spi_trans(hosal_spi_dev_t *spi, uint8_t *tx_data, uint8_t *rx_data, uint32_t length, uint32_t timeout)
 {
-    EventBits_t uxBits;
     spi_priv_t *spi_priv = (spi_priv_t *)hosal_spi_priv;
     SPI_ID_Type spi_id = SPI_ID_0; //spi->port;
 
@@ -347,10 +346,7 @@ static int hosal_spi_trans(hosal_spi_dev_t *spi, uint8_t *tx_data, uint8_t *rx_d
     bl_irq_register_with_ctx(SPI_IRQn, spi_irq_process, spi);
     bl_irq_enable(SPI_IRQn);
 
-    uxBits = xEventGroupWaitBits(spi_priv->spi_event_group, EVT_GROUP_SPI_TR, pdTRUE, pdTRUE, timeout);
-    xEventGroupClearBits(spi_priv->spi_event_group, EVT_GROUP_SPI_TR);
-
-    if ((uxBits & EVT_GROUP_SPI_TR) == EVT_GROUP_SPI_TR) {
+    if (xSemaphoreTake(spi_priv->spi_semphr, timeout)) {
         if (spi->cb) {
             spi->cb(spi->p_arg);
         }
@@ -393,7 +389,7 @@ int hosal_spi_init(hosal_spi_dev_t *spi)
             hosal_spi_priv = priv;
         } else {
             spi_priv_t *priv = malloc(sizeof(spi_priv_t));
-            priv->spi_event_group = xEventGroupCreate();
+            priv->spi_semphr = xSemaphoreCreateBinary();
             hosal_spi_priv = priv;
         }
     }
@@ -440,7 +436,7 @@ int hosal_spi_finalize(hosal_spi_dev_t *spi)
             free(priv);
         } else {
             spi_priv_t *priv = (spi_priv_t *)hosal_spi_priv;
-            vEventGroupDelete(priv->spi_event_group);
+            vSemaphoreDelete(priv->spi_semphr);
             free(priv);
         }
         hosal_spi_priv = NULL;

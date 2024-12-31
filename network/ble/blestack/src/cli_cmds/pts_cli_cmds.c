@@ -1253,15 +1253,16 @@ PTS_CLI(ble_address_register)
 	bt_addr_le_t addr;
 	u8_t type;
 	char le_addr[BT_ADDR_LE_STR_LEN];
-	
+	u8_t  addr_val[6];
 	get_uint8_from_string(&argv[1], &type);
-	get_bytearray_from_string(&argv[2], addr.a.val,6);
+	get_bytearray_from_string(&argv[2], addr_val,6);
 
 	if(type == 0){
 		addr.type = BT_ADDR_LE_PUBLIC;
 	}else if(type == 1)
 		addr.type = BT_ADDR_LE_RANDOM;
 
+	reverse_bytearray(addr_val, addr.a.val, 6);
 	memcpy(&pts_addr,&addr,sizeof(bt_addr_le_t));
 
 	bt_addr_le_to_str(&pts_addr, le_addr, sizeof(le_addr));

@@ -153,7 +153,7 @@ static BL_Err_Type ATTR_TCM_SECTION flash_config_init(SPI_Flash_Cfg_Type *p_flas
     XIP_SFlash_State_Save(p_flash_cfg, &offset);
     flash_sf2_gpio_init();
     SFlash_GetJedecId(p_flash_cfg, (uint8_t *)&jid);
-    memcpy(jedec_id, (uint8_t *)&jid, 3);
+    arch_memcpy(jedec_id, (uint8_t *)&jid, 3);
     jid &= 0xFFFFFF;
     g_jedec_id = jid;
     ret = SF_Cfg_Get_Flash_Cfg_Need_Lock_Ext(jid, p_flash_cfg);

@@ -1,9 +1,19 @@
 sdk_generate_library()
 
-if("${CHIP}" STREQUAL "bl616")
-  sdk_add_private_compile_definitions(-DBL616)
-endif()
+string(TOUPPER "${CHIP}" upper_case_chip)
+string(TOLOWER "${CHIP}" lower_case_chip)
 
+sdk_add_private_compile_definitions(-D${upper_case_chip})
+sdk_add_private_compile_definitions(-DCHIP_HDR=<${lower_case_chip}.h>)
+sdk_add_private_compile_definitions(-DCHIP_GLB_HDR=<${lower_case_chip}_glb.h>)
+sdk_add_private_compile_definitions(-DCHIP_SYS_HDR=<${lower_case_chip}_sys.h>)
+sdk_add_private_compile_definitions(-DCONFIG_BL_SDK)
+
+if ("${upper_case_chip}" STREQUAL "BL616")
+  sdk_add_private_compile_definitions(-DMAC_ADDRESS_MAX_NUM=3)
+else ()
+  sdk_add_private_compile_definitions(-DMAC_ADDRESS_MAX_NUM=2)
+endif()
 
 sdk_add_include_directories(./include)
 
@@ -15,9 +25,13 @@ elseif (CONFIG_EASYFLASH4)
 else ()
   message(FATAL_ERROR "Please select one of CONFIG_LITTLEFS and CONFIG_EASYFLASH4 for OpenThread setting storage.")
 endif()
+
+if (NOT CONFIG_MATTER)
+  sdk_library_add_sources(./ot_freertos.c)
+endif()
+
 sdk_library_add_sources(./ot_sys_bflb.c)
-sdk_library_add_sources(./ot_alarm_bl616.c)
-sdk_library_add_sources(./ot_freertos.c)
+sdk_library_add_sources(./ot_alarm_${lower_case_chip}.c)
 sdk_library_add_sources(./ot_radio.c)
 sdk_library_add_sources(./ot_radio_bflb.c)
 

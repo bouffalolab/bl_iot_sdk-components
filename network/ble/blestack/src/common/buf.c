@@ -28,13 +28,14 @@
 #include "bl_hci_wrapper.h"
 #endif
 
-#if (BFLB_STATIC_ALLOC_MEM)
+//#if (BFLB_STATIC_ALLOC_MEM)
 #include "l2cap.h"
 #include <gatt.h>
 #include <conn.h>
 #include "conn_internal.h"
+#include "l2cap_internal.h"
 #include "att_internal.h"
-#endif
+//#endif
 
 #if defined(CONFIG_NET_BUF_LOG)
 #define NET_BUF_DBG(fmt, ...) LOG_DBG("(%p) " fmt, k_current_get(), \
@@ -122,6 +123,10 @@ __attribute__((section(".tcm_data"))) u8_t data_data_pool[1 * DATA_MTU];
 #endif
 #endif
 
+#if defined(CONFIG_DYNAMIC_GATTS)
+extern struct net_buf_pool dynamic_gatt_pool;
+#endif
+
 struct net_buf_pool *_net_buf_pool_list[] = {&hci_cmd_pool, &hci_rx_pool,
 
     #if defined(CONFIG_BT_CONN)
@@ -161,6 +166,9 @@ struct net_buf_pool *_net_buf_pool_list[] = {&hci_cmd_pool, &hci_rx_pool,
 	#if defined(CONFIG_AUTO_PTS)
 	&server_pool,
 	&data_pool,
+	#endif
+	#if defined(CONFIG_DYNAMIC_GATTS)
+	&dynamic_gatt_pool,
 	#endif
 };
 

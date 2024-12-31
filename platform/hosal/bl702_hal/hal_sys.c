@@ -32,7 +32,7 @@ struct romapi_freertos_map* hal_sys_romapi_get(void)
     uint32_t *gp_data_start = (uint32_t *)gp_head;
     struct romapi_freertos_map* romapi_freertos;
 
-    puts("  Configuring Version 1.0 ROM API...\r\n");
+    //puts("  Configuring Version 1.0 ROM API...\r\n");
 
     /*clear bss/common section in GP area*/
     memset(&__global_pointer_head$, 0, 0x4A0);
@@ -43,7 +43,7 @@ struct romapi_freertos_map* hal_sys_romapi_get(void)
     /* *pullNextTime = &ullNextTime */
     *(gp_data_start + 1) = (uint32_t)((uint8_t*)(gp_data_start) + 0x60);
     /* uxTimerIncrementsForOneTick */
-    *(gp_data_start + 2) = 2000 * 1000 / 1000;//Use 2M on fpga
+    *(gp_data_start + 2) = 4000 * 1000 / 1000;//Use 2M on fpga, but 4M on asic
 
     return romapi_freertos;
 }

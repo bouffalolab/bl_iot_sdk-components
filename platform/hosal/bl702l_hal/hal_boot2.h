@@ -50,6 +50,7 @@ int hal_boot2_partition_addr_inactive(const char *name, uint32_t *addr, uint32_t
 int hal_boot2_partition_addr(const char *name, uint32_t *addr0, uint32_t *addr1, uint32_t *size0, uint32_t *size1, int *active);
 uint8_t hal_boot2_get_active_partition(void);
 uint32_t hal_boot2_get_active_partition_age(void);
+uint32_t hal_boot2_get_fw_age(void);
 int hal_boot2_get_active_entries_byname(uint8_t *name, HALPartition_Entry_Config *ptEntry_hal);
 int hal_boot2_get_active_entries(int type, HALPartition_Entry_Config *ptEntry);
 int hal_boot2_update_ptable(HALPartition_Entry_Config *ptEntry);

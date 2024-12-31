@@ -127,7 +127,7 @@ char * otbr_hostname(void)
     static char hostname[sizeof(OTBR_HOSTNAME) + 8];
 
     otPlatRadioGetIeeeEui64(NULL, eui);
-    snprintf(hostname, sizeof(hostname), "%s-%02x%02x", OTBR_HOSTNAME, eui[6], eui[7]);
+    snprintf(hostname, sizeof(hostname), "%s-%02x%02x", OTBR_HOSTNAME, eui[4], eui[5]);
 
     return hostname;
 }
@@ -148,4 +148,19 @@ char * otbr_product_name(void)
 #endif
 
     return OTBR_PRODUCT_NAME;
+}
+
+void otbr_udp_set_multicast_ttl(struct udp_pcb * pcb, uint32_t ttl) 
+{
+    udp_set_multicast_ttl(pcb, ttl);
+}
+
+void otbr_udp_set_flags(struct udp_pcb * pcb, uint32_t flag) 
+{
+    udp_set_flags(pcb, UDP_FLAGS_MULTICAST_LOOP);
+}
+
+void otbr_udp_clear_flags(struct udp_pcb * pcb, uint32_t flag) 
+{
+    udp_clear_flags(pcb, UDP_FLAGS_MULTICAST_LOOP);
 }

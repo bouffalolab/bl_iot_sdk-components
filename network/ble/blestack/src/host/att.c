@@ -2365,14 +2365,81 @@ static int bt_att_accept(struct bt_conn *conn, struct bt_l2cap_chan **chan)
 }
 
 #if(BFLB_BLE_ENABLE_TEST_PSM)
+
+static struct bt_conn *l2cap_allowlist[CONFIG_BT_MAX_CONN];
+static uint8_t l2cap_policy;
+static bool    l2cap_allow_add;
+#define L2CAP_POLICY_NONE		0x00
+#define L2CAP_POLICY_ALLOWLIST		0x01
+#define L2CAP_POLICY_16BYTE_KEY		0x02
+
+static void l2cap_allowlist_remove(struct bt_conn *conn)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(l2cap_allowlist); i++) {
+		if (l2cap_allowlist[i] == conn) {
+			bt_conn_unref(l2cap_allowlist[i]);
+			l2cap_allowlist[i] = NULL;
+		}
+	}
+}
+
+static int l2cap_accept_policy(struct bt_conn *conn)
+{
+	int i;
+
+	BT_WARN("l2cap_policy =0%x",l2cap_policy);
+	
+	if (l2cap_policy == L2CAP_POLICY_16BYTE_KEY) {
+		uint8_t enc_key_size = bt_conn_enc_key_size(conn);
+
+		if (enc_key_size && enc_key_size < BT_ENC_KEY_SIZE_MAX) {
+			return -EPERM;
+		}
+	} else if (l2cap_policy == L2CAP_POLICY_ALLOWLIST) {
+		for (i = 0; i < ARRAY_SIZE(l2cap_allowlist); i++) {
+			if (l2cap_allowlist[i] == conn) {
+				return 0;
+			}
+		}
+
+		return -EACCES;
+	}
+
+	return 0;
+}
+
+int psm_cmd_allowlist_add(struct bt_conn * conn)
+{
+	int i;
+
+	if (!conn) {
+		BT_ERR("Not connected");
+		return 0;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(l2cap_allowlist); i++) {
+		if (l2cap_allowlist[i] == NULL) {
+			l2cap_allowlist[i] = bt_conn_ref(conn);
+			return 0;
+		}
+	}
+
+	return -ENOMEM;
+}
+
 static void bt_test_connected(struct bt_l2cap_chan *chan)
 {
-    printf("bt_test_connected\r\n");    
+	l2cap_allowlist_remove(chan->conn);
+	printf("bt_test_connected\r\n"); 
+
 }
 
 static void bt_test_disconnected(struct bt_l2cap_chan *chan)
 {
     printf("bt_test_disconnected\r\n");
+
 }
 
 static int bt_test_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
@@ -2393,10 +2460,20 @@ static struct bt_l2cap_le_chan test_chan = {
 
 static int bt_test_accept(struct bt_conn *conn, struct bt_l2cap_chan **chan)
 {
+	if(l2cap_allow_add == true)
+		psm_cmd_allowlist_add(conn);
+
+	int err = l2cap_accept_policy(conn);
+
+	if (err < 0) {
+		return err;
+	}
+
 	if(test_chan.chan.conn)
 	    return -ENOMEM;
 	*chan = &test_chan.chan;
-    return 0;
+  
+	return 0;
 }
 
 int bt_connect_test_psm(struct bt_conn *conn, uint16_t psm)
@@ -2424,13 +2501,14 @@ int bt_connect_test_psm(struct bt_conn *conn, uint16_t psm)
 	return err;
 }
 
-int bt_register_test_psm(uint16_t psm, uint8_t sec_level)
+int bt_register_test_psm(uint16_t psm, uint8_t sec_level, uint8_t policy,bool allow)
 {
     int err;
 	static struct bt_l2cap_server test_server;
 
 	BT_DBG("");
-
+    l2cap_policy = policy;
+    l2cap_allow_add = allow;
     test_server.psm = psm;
     test_server.sec_level = sec_level;
     test_server.accept = bt_test_accept;

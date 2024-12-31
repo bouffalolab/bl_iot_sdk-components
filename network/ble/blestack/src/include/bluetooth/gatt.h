@@ -1245,6 +1245,7 @@ struct bt_gatt_write_params {
  */
 int bt_gatt_write(struct bt_conn *conn, struct bt_gatt_write_params *params);
 
+int bt_gatt_cancle_prepare_writes(struct bt_conn *conn, struct bt_gatt_write_params *params);
 
 #if defined(CONFIG_BT_STACK_PTS)
 int bt_gatt_prepare_write(struct bt_conn *conn,

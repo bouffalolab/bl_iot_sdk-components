@@ -159,7 +159,7 @@ static void bl_gpio_uart_recv_byte(void *arg)
     }
 }
 
-int bl_gpio_uart_rx_init(uint8_t rx_pin_1, uint8_t rx_pin_2, uint32_t baudrate, uint32_t fifo_size)
+int bl_gpio_uart_rx_init(uint8_t rx_pin_1, uint8_t rx_pin_2, uint32_t baudrate, uint8_t *rx_fifo, uint32_t fifo_size)
 {
     if(rx_pin_1 > 31 || rx_pin_2 > 31 || rx_pin_1 == rx_pin_2){
         return -1;
@@ -174,14 +174,9 @@ int bl_gpio_uart_rx_init(uint8_t rx_pin_1, uint8_t rx_pin_2, uint32_t baudrate, 
     }
     
     uart_rx_pin = rx_pin_1;
-    uart_rx_bit_dur = lround(2000000 / (float)baudrate);
+    uart_rx_bit_dur = (2000000 * 10 / baudrate + 5) / 10;
     
-    if(uart_rx_fifo){
-        free(uart_rx_fifo);
-        uart_rx_fifo = NULL;
-    }
-    
-    uart_rx_fifo = malloc(fifo_size);
+    uart_rx_fifo = rx_fifo;
     uart_rx_fifo_size = fifo_size;
     uart_rx_fifo_wptr = 0;
     uart_rx_fifo_rptr = 0;
@@ -217,7 +212,6 @@ int bl_gpio_uart_rx_init(uint8_t rx_pin_1, uint8_t rx_pin_2, uint32_t baudrate, 
         NULL,
     };
     
-    hosal_gpio_finalize(&gpio);
     hosal_gpio_init(&gpio);
     hosal_gpio_irq_set(&gpio, (hosal_gpio_irq_trigger_t)GLB_GPIO_INT_TRIG_ASYNC_FALLING_EDGE, bl_gpio_uart_recv_byte, NULL);
     

@@ -320,7 +320,7 @@ static void registerdump(unsigned int *regs)
 #define REG_A2              9
 #define REG_A3              10
 #define REG_A4              11
-#define REG_A5              13
+#define REG_A5              12
 #define REG_A6              13
 #define REG_A7              14
 #define REG_S2              15

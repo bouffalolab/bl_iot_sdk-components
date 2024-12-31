@@ -4,10 +4,9 @@
 
 #include "bl702_romdriver.h"
 #include "bl702_acomp.h"
-#include "bl702_sec_eng.h"
 
 
-#define ATTR_HBN_CODE_SECTION      __attribute__((section(".hbn_code." ATTR_UNI_SYMBOL)))
+#define ATTR_HBN_CODE_SECTION      __attribute__((section(".hbn_code." ATTR_UNI_SYMBOL), noinline))
 #define ATTR_HBN_DATA_SECTION      __attribute__((section(".hbn_data")))
 #define ATTR_HBN_NOINIT_SECTION    __attribute__((section(".hbn_noinit")))
 

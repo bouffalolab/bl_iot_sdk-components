@@ -557,11 +557,6 @@ int flock(int fd, int operation)
     return 0;
 }
 
-/*
-These functions are implemented and replaced by the 'common/time.c' file
-int _gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp);
-_CLOCK_T_  _times_r(struct _reent *ptr, struct tms *ptms);
-*/
 void newlibc_init(void)
 {
     /*dummy functions*/

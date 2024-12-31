@@ -26,11 +26,19 @@
 #endif
 
 #ifndef CONFIG_BT_MESH_CRPL
+#if defined(CONFIG_AUTO_PTS)
+#define CONFIG_BT_MESH_CRPL (2)
+#else
 #define CONFIG_BT_MESH_CRPL (CONFIG_BT_MESH_NODE_COUNT)
+#endif /* CONFIG_AUTO_PTS */
 #endif
 
 #ifndef CONFIG_BT_MESH_ADV_BUF_COUNT
+#if defined(CONFIG_AUTO_PTS)
+#define CONFIG_BT_MESH_ADV_BUF_COUNT 10
+#else
 #define CONFIG_BT_MESH_ADV_BUF_COUNT 60
+#endif
 #endif
 
 #ifndef CONFIG_BT_MESH_LABEL_COUNT
@@ -56,7 +64,7 @@
 
 #ifndef CONFIG_BT_MESH_MSG_CACHE_SIZE
 #if defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
-#define CONFIG_BT_MESH_MSG_CACHE_SIZE 10
+#define CONFIG_BT_MESH_MSG_CACHE_SIZE (10)
 #else
 #define CONFIG_BT_MESH_MSG_CACHE_SIZE (2*CONFIG_BT_MESH_TX_SEG_MAX+CONFIG_BT_MESH_NODE_COUNT)
 #endif
@@ -83,7 +91,11 @@
 #endif
 
 #ifndef CONFIG_MESH_ADV_STACK_SIZE
+#if defined(CONFIG_AUTO_PTS)
+#define CONFIG_MESH_ADV_STACK_SIZE (1024+128)
+#else
 #define CONFIG_MESH_ADV_STACK_SIZE (1024+512)
+#endif
 #endif
 
 #ifndef CONFIG_BT_MESH_PROXY_FILTER_SIZE
@@ -197,8 +209,7 @@
 #endif
 
 #ifndef CONFIG_BT_MESH_LOOPBACK_BUFS
-#define CONFIG_BT_MESH_LOOPBACK_BUFS (CONFIG_BT_MESH_TX_SEG_MAX \
-								+ CONFIG_BT_MESH_RX_SEG_MAX) //temp value, need to check
+#define CONFIG_BT_MESH_LOOPBACK_BUFS (4)
 #endif
 
 #ifndef CONFIG_BT_MESH_BLOB_BLOCK_SIZE_MIN
@@ -226,6 +237,7 @@
 #endif
 
 #define BL_COMP_ID                           0x0A38
+#define BL_PRODUCT_ID                        0x0001
 
 /********************************BFLB_BLE patch to fix mesh bug**************************************/
 #define BFLB_BLE_MESH_PATCH_DEL_APPKEY
@@ -235,4 +247,5 @@
 #define BFLB_BLE_MESH_PATCH_MOD_PUB_VA_SET
 #define BFLB_BLE_MESH_PATCH_HEARTBEAT_SUB_GET
 #define BFLB_BLE_MESH_PATCH_HEARTBEAT_SUB_SET
+#define BFLB_BLE_MESH_PATCH_PROV_NODE_CFM_RECVED_BEFORE_DH
 #endif

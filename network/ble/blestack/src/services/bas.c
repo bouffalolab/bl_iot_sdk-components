@@ -66,6 +66,12 @@ void bas_init(void)
     bt_gatt_service_register(&bas);
 }
 
+void bas_deinit(void)
+{
+    bt_gatt_service_unregister(&bas);
+}
+
+
 u8_t bt_gatt_bas_get_battery_level(void)
 {
 	return battery_level;

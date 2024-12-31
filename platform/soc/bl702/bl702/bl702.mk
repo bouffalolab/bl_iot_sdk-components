@@ -66,7 +66,26 @@ ifeq ($(CONFIG_USE_XTAL32K),1)
 CPPFLAGS += -DCFG_USE_XTAL32K
 endif
 
+ifneq ($(CONFIG_GEN_ROM),1)
+ifneq ($(CONFIG_BUILD_ROM_CODE),1)
+CPPFLAGS += -DCFG_USE_ROM_CODE
+endif
+endif
+
 LDFLAGS += -Wl,--print-memory-usage
 ifdef CONFIG_CACHE_SIZE
 LDFLAGS += -Wl,--defsym=__CACHE_SIZE=$(CONFIG_CACHE_SIZE)
+endif
+
+ifneq ($(CONFIG_GEN_ROM),1)
+ifneq ($(CONFIG_BUILD_ROM_CODE),1)
+ASMFLAGS := $(patsubst -march=rv32imfc, -march=rv32imc, $(ASMFLAGS))
+ASMFLAGS := $(patsubst -mabi=ilp32f, -mabi=ilp32, $(ASMFLAGS))
+CFLAGS := $(patsubst -march=rv32imfc, -march=rv32imc, $(CFLAGS))
+CFLAGS := $(patsubst -mabi=ilp32f, -mabi=ilp32, $(CFLAGS))
+CXXFLAGS := $(patsubst -march=rv32imfc, -march=rv32imc, $(CXXFLAGS))
+CXXFLAGS := $(patsubst -mabi=ilp32f, -mabi=ilp32, $(CXXFLAGS))
+LDFLAGS := $(patsubst -march=rv32imfc, -march=rv32imc, $(LDFLAGS))
+LDFLAGS := $(patsubst -mabi=ilp32f, -mabi=ilp32, $(LDFLAGS))
+endif
 endif

@@ -4,6 +4,11 @@
 #include "hosal_gpio.h"
 #include "FreeRTOS.h"
 
+#define BTBLE_PDS_VERSION_NUMBER "1.6.1"
+#define BTBLE_PDS_VERSION_MAJOR 1
+#define BTBLE_PDS_VERSION_MINOR 6
+#define BTBLE_PDS_VERSION_PATCH 1
+
 typedef struct{
     uint8_t print_enable;//1: enable uart print in library; 0: disable uart print in library
     uint8_t gpio_irq_restore; //1: restore gpio irq after pds wakeup; 0: do not restore gpio irq after pds wakeup

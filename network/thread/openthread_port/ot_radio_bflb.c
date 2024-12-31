@@ -2,11 +2,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <bl616.h>
-#include <bl616_glb.h>
+#include CHIP_HDR
+#include CHIP_GLB_HDR
 #include <bflb_mtimer.h>
 #include <bflb_efuse.h>
+#include <bflb_flash.h>
 #include <lmac154.h>
+#include <zb_timer.h>
 
 #include <openthread_port.h>
 #include <ot_radio_trx.h>
@@ -14,28 +16,25 @@
 
 void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64) 
 {
-    uint8_t chipid[8];
-    uint8_t mac_addr[6];
     int i;
+    uint32_t flash_id = 0;
 
-    for (i = 2; i >= 0; i --) {
-        if (!bflb_efuse_is_mac_address_slot_empty(2, 0)) {
-            bflb_efuse_read_mac_address_opt(i, mac_addr, 0);
-            break;
+    memset(aIeeeEui64, 0, 8);
+    for (i = MAC_ADDRESS_MAX_NUM - 1; i >= 0; i --) {
+        if (!bflb_efuse_is_mac_address_slot_empty(i, 0)) {
+            bflb_efuse_read_mac_address_opt(i, aIeeeEui64, 0);
+            return;
         }
     }
 
-    bflb_efuse_get_chipid(chipid);
-    if (i >= 0) {
-        memcpy(aIeeeEui64, mac_addr, 6);
-        memcpy(aIeeeEui64 + 6, chipid + 4, 2);
-    }
-    else {
-        memcpy(aIeeeEui64 + 2, chipid, 6);
-        aIeeeEui64[0] = 0xC4;
-        aIeeeEui64[1] = 0xD7;
-        aIeeeEui64[2] = 0xFD;
-    }
+    aIeeeEui64[0] = 0x8C;
+    aIeeeEui64[1] = 0xFD;
+    aIeeeEui64[2] = 0xF0;
+    flash_id = bflb_flash_get_jedec_id();
+    aIeeeEui64[3] = (flash_id >> 24) & 0xff;
+    aIeeeEui64[4] = (flash_id >> 16) & 0xff;
+    aIeeeEui64[5] = (flash_id >> 8) & 0xff;
+    aIeeeEui64[6] = flash_id & 0xff;
 }
 
 uint64_t otPlatRadioGetNow(otInstance *aInstance)
@@ -46,7 +45,8 @@ uint64_t otPlatRadioGetNow(otInstance *aInstance)
 otError otPlatRadioEnable(otInstance *aInstance) 
 {
     ot_radioEnable();
-
+    
+    bflb_irq_attach(M154_INT_IRQn, (irq_callback)lmac154_get2015InterruptHandler(), NULL);
     bflb_irq_enable(M154_INT_IRQn);
 
     return OT_ERROR_NONE;
@@ -62,12 +62,21 @@ otError otPlatRadioDisable(otInstance *aInstance)
 
 otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel) 
 {
-    uint8_t ch = aChannel - OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN;
+    uint8_t ch = lmac154_getChannel();
 
-    lmac154_setChannel((lmac154_channel_t)ch);
 #if (OPENTHREAD_FTD) || (OPENTHREAD_MTD)
-    lmac154_setRxStateWhenIdle(otThreadGetLinkMode(aInstance).mRxOnWhenIdle);
+    if (lmac154_isRxStateWhenIdle() != otThreadGetLinkMode(aInstance).mRxOnWhenIdle) {
+        lmac154_setRxStateWhenIdle(otThreadGetLinkMode(aInstance).mRxOnWhenIdle);
+    }
 #endif
+
+    if (ch != (aChannel - OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN)) {
+
+        lmac154_disableRx();
+
+        lmac154_setChannel(aChannel - OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN);
+    }
+
     lmac154_enableRx();
 
     return OT_ERROR_NONE;

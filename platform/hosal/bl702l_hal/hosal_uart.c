@@ -17,7 +17,7 @@ uint8_t g_uart0_tx_pin = 14;
 uint8_t g_uart0_rx_pin = 15;
 uint32_t g_uart0_baudrate = 2000000;
 
-static const uint32_t g_uart_addr[] = {UART0_BASE};
+static const uint32_t g_uart_addr[1] = {UART0_BASE};
 
 static void gpio_init(uint8_t id, uint8_t tx_pin, uint8_t rx_pin, uint8_t cts_pin, uint8_t rts_pin)
 {
@@ -116,8 +116,8 @@ static int __uart_dma_txcfg(hosal_uart_dev_t *uart, hosal_uart_dma_cfg_t *dma_cf
 	};
     UART_FifoCfg_Type fifoCfg =
     {
-        .txFifoDmaThreshold     = 0x01,
-        .rxFifoDmaThreshold     = 0x01,
+        .txFifoDmaThreshold     = 0,
+        .rxFifoDmaThreshold     = 8,
         .txFifoDmaEnable        = ENABLE,
         .rxFifoDmaEnable        = DISABLE,
     };
@@ -174,8 +174,8 @@ static int __uart_dma_rxcfg(hosal_uart_dev_t *uart, hosal_uart_dma_cfg_t *dma_cf
 	};
     UART_FifoCfg_Type fifoCfg =
     {
-        .txFifoDmaThreshold     = 0x01,
-        .rxFifoDmaThreshold     = 0x01,
+        .txFifoDmaThreshold     = 8,
+        .rxFifoDmaThreshold     = 0,
         .txFifoDmaEnable        = DISABLE,
         .rxFifoDmaEnable        = ENABLE,
     };
@@ -353,8 +353,8 @@ int hosal_uart_init(hosal_uart_dev_t *uart)
     };
     UART_FifoCfg_Type fifoCfg =
     {
-        .txFifoDmaThreshold     = 0x08,
-        .rxFifoDmaThreshold     = 0x08,
+        .txFifoDmaThreshold     = 8,
+        .rxFifoDmaThreshold     = 8,
         .txFifoDmaEnable        = DISABLE,
         .rxFifoDmaEnable        = DISABLE,
     };
@@ -627,9 +627,7 @@ int hosal_uart_dma_rx_start(hosal_uart_dev_t *uart)
 
 int hosal_uart_dma_rx_get_data(hosal_uart_dev_t *uart, uint8_t *buf, uint32_t buf_size)
 {
-    int len1 = sizeof(uart_dma_rx_buf) - DMA_Channel_TranferSize(DMA0_ID, uart->dma_rx_chan);
-    int len2 = hosal_uart_receive(uart, uart_dma_rx_buf + len1, sizeof(uart_dma_rx_buf) - len1);
-    int len = len1 + len2;
+    int len = sizeof(uart_dma_rx_buf) - DMA_Channel_TranferSize(DMA0_ID, uart->dma_rx_chan);
 
     if (len > 0) {
         if (len > buf_size) {

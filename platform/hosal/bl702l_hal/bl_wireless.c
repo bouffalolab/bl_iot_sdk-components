@@ -23,7 +23,7 @@ typedef struct _bl_wireless_env {
     uint8_t capcode_tcal_en;
 } bl_wireless_env_t;
 
-ATTR_HBN_DATA_SECTION
+ATTR_HBN_NOINIT_SECTION
 bl_wireless_env_t wireless_env;
 
 

@@ -1,5 +1,92 @@
 # change log on Thread module
 
+## 2024/12/31
+
+- openthread_br: 1.6.16
+- Changes:
+  - fix a crash issue using a message pointer which message has been recalled
+  - fix an interlocking issue between lwip task and thread task
+
+- openthread/openthread_port/openthread_rest: 1.6.16
+- Changes:
+  - add interface to get stack idle state for sleepy device
+
+## 2024/12/16
+
+- openthread_utils: 1.6.15
+- Changes:
+  - use a specific version to release this module
+
+- openthread_br: 1.6.15
+- Changes:
+  - use a specific version to release this module
+
+- openthread/openthread_port/openthread_rest: 1.6.15
+- Changes:
+  - use a specific version to release these modules
+
+## 2024/12/13
+
+- Version: 1.6.14
+- Changes:
+  - BL616: Improve large network stability
+  - BL702L: Improve large network stability
+
+## 2024/11/26
+
+- Version: 1.6.13
+- Changes:
+  - OTBR: fix memory leak when handle multicast ICMPv6
+
+## 2024/11/18
+
+- Version: 1.6.12
+- Changes:
+  - BL616: Support to get boot reason
+
+## 2024/10/25
+
+- Version: 1.6.11
+- Changes:
+  - BL702/BL702L: Support on Bouffalo SDK
+
+## 2024/10/09
+
+- Version: 1.6.10
+- Changes:
+  - OTBR: Protect all tcp signature code with TCP_SIGNATURE
+
+## 2024/09/05
+
+- Version: 1.6.9
+- Changes:
+  - BL616: Improve network stablity with limits on standard 2015
+
+## 2024/8/30
+
+- Version: 1.6.8
+- Changes:
+  - BL616: Correct efuse slot to get MAC address
+  - support dynamic initialize multi file system
+
+## 2024/8/2
+- Version: 1.6.7
+- Changes:
+  - BL616: Fix eui64 address constructed with flash id
+  - OTBR: Fix udp socket binding issue
+
+## 2024/8/1
+- Version: 1.6.6
+- Changes:
+  - BL616: Update eui64 with efuse 6 bytes mac address and 2 bytes of 0 padding
+  - BL616: Update eui64 with flash ID if no mac address in efuse.
+
+## 2024/7/18
+- Version: 1.6.5
+- Changes:
+  - OTBR: Add RESTful APIs provided on OTBR
+  - OTBR: Reduce dead lock between lwip task and thread task
+
 ## 2024/5/27
 - Version: 1.6.4
 - Changes:

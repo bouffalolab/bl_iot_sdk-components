@@ -12,7 +12,7 @@ void UART1_IRQHandler(void);
 //TODO Do in std driver
 #define UART_NUMBER_SUPPORTED   2
 #define UART_FIFO_TX_CNT        UART_TX_FIFO_SIZE
-static const uint32_t uartAddr[2] = {UART0_BASE, UART1_BASE};
+static const uint32_t uartAddr[UART_NUMBER_SUPPORTED] = {UART0_BASE, UART1_BASE};
 
 typedef struct bl_uart_notify {
     cb_uart_notify_t rx_cb;
@@ -82,8 +82,8 @@ int bl_uart_init(uint8_t id, uint8_t tx_pin, uint8_t rx_pin, uint8_t cts_pin, ui
     };
     UART_FifoCfg_Type fifoCfg =
     {
-        .txFifoDmaThreshold     = 0x10,
-        .rxFifoDmaThreshold     = 0x10,
+        .txFifoDmaThreshold     = 64,
+        .rxFifoDmaThreshold     = 64,
         .txFifoDmaEnable        = DISABLE,
         .rxFifoDmaEnable        = DISABLE,
     };

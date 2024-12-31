@@ -230,6 +230,19 @@ typedef enum __packed{
 #endif 
 
 extern struct bt_dev bt_dev;
+
+#if !defined(BL602) && !defined(BL702)
+struct bt_controller_sdk_ver{
+    uint8_t status;
+    uint8_t ver_major;
+    uint8_t ver_minor;
+    uint8_t ver_patch;
+    uint32_t sdk_commit_id;
+};
+/*If this API return a value other than 0, it means it fails to get controller sdk version.*/
+int bt_get_controller_sdk_version(struct bt_controller_sdk_ver *version);
+#endif
+
 #if defined(CONFIG_BT_SMP) || defined(CONFIG_BT_BREDR)
 extern const struct bt_conn_auth_cb *bt_auth;
 #endif /* CONFIG_BT_SMP || CONFIG_BT_BREDR */

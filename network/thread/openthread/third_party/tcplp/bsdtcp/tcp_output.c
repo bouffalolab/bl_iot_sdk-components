@@ -678,8 +678,9 @@ send:
 	 * Sam: I've done away with the syncache. However, it seems that
 	 * the existing logic works fine for SYN-ACK as well
 	 */
+
+	to.to_flags = 0;
 	if ((tp->t_flags & TF_NOOPT) == 0) {
-		to.to_flags = 0;
 		/* Maximum segment size. */
 		if (flags & TH_SYN) {
 			tp->snd_nxt = tp->iss;
@@ -1089,6 +1090,14 @@ send:
 		 */
 		tp->snd_up = tp->snd_una;		/* drag it along */
 
+#ifdef TCP_SIGNATURE
+	if (to.to_flags & TOF_SIGNATURE) {
+		int sigoff = to.to_signature - opt;
+		tcp_signature_compute(m, 0, len, optlen,
+		    (u_char *)(th + 1) + sigoff, IPSEC_DIR_OUTBOUND);
+	}
+#endif
+	
 	/*
 	 * samkumar: Removed code for TCP signatures.
 	 */
@@ -1405,6 +1414,7 @@ tcp_addoptions(struct tcpopt *to, uint8_t *optp)
 			bcopy((uint8_t *)&to->to_tsecr, optp, sizeof(to->to_tsecr));
 			optp += sizeof(to->to_tsecr);
 			break;
+#ifdef TCP_SIGNATURE
 		case TOF_SIGNATURE:
 			{
 			int siglen = TCPOLEN_SIGNATURE - 2;
@@ -1423,6 +1433,7 @@ tcp_addoptions(struct tcpopt *to, uint8_t *optp)
 				 *optp++ = 0;
 			break;
 			}
+#endif
 		case TOF_SACK:
 			{
 			int sackblks = 0;

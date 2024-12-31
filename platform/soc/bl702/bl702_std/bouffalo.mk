@@ -83,6 +83,7 @@ COMPONENT_SRCS += BSP_Driver/startup/system_bl702.c
 COMPONENT_SRCS += BSP_Driver/startup/GCC/entry.S
 COMPONENT_SRCS += BSP_Driver/startup/GCC/start_load.c
 COMPONENT_SRCS += BSP_Common/platform/bflb_platform.c
+COMPONENT_SRCS += BSP_Common/platform/syscalls.c
 COMPONENT_SRCS += MCU_Common/device/drv_device.c
 COMPONENT_SRCS += MCU_Common/memheap/drv_mmheap.c
 COMPONENT_SRCS += MCU_Common/partition/partition.c

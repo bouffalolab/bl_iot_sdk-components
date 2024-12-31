@@ -62,9 +62,9 @@ extern "C" {
 
 #if defined(CONFIG_BT_STACK_PTS) || defined(CONFIG_BT_MESH_PTS) || defined(CONFIG_AUTO_PTS)
 #if defined(BL_MCU_SDK)
-#define BT_PTS(fmt, ...)   bflb_platform_printf(fmt"\r\n", ##__VA_ARGS__)
+#define BT_PTS(fmt, ...)   bflb_platform_printf("[PTS]"fmt"\r\n", ##__VA_ARGS__)
 #else
-#define BT_PTS(fmt, ...)   printf(fmt"\r\n", ##__VA_ARGS__)
+#define BT_PTS(fmt, ...)   printf("[PTS][%s]"fmt"\r\n", __func__, ##__VA_ARGS__)
 #endif
 #endif
 

@@ -73,6 +73,12 @@ SECTIONS
     *(.static_blogpri_code*)
     _bl_static_blogpri_code_end = .;
 
+    /* section information for components's version */
+    . = ALIGN(4);
+    _version_info_section_start = .;
+    KEEP(*(.version.*))
+    _version_info_section_end = .;
+
     *(.gnu.linkonce.r.*)
   } >flash
 
@@ -98,12 +104,6 @@ SECTIONS
   {
     *(.hbn_noinit)
     *(.retention_noinit)
-  } >hbnram
-
-  .rsvd (NOLOAD) :
-  {
-    *(.rsvd_data)
-    *(.ble_rsvd_mem)
   } >hbnram
 
   .tcmdata (NOLOAD) :

@@ -9,6 +9,7 @@ extern "C" {
 #include <lwip/ip_addr.h>
 #include <lwip/ip4_addr.h>
 #include <lwip/ip6_addr.h>
+#include <lwip/udp.h>
 
 struct netif * otbr_getInfraNetif(void);
 struct netif * otbr_getThreadNetif(void);
@@ -38,6 +39,10 @@ uint32_t otbr_lwip_get_rio_timeout(void);
 
 char * otbr_vendor_name(void);
 char * otbr_product_name(void);
+
+void otbr_udp_set_multicast_ttl(struct udp_pcb * pcb, uint32_t ttl);
+void otbr_udp_set_flags(struct udp_pcb * pcb, uint32_t flag);
+void otbr_udp_clear_flags(struct udp_pcb * pcb, uint32_t flag);
 
 #if !defined(LWIP_MULTICAST_TX_OPTIONS) || !LWIP_MULTICAST_TX_OPTIONS
 #error "LWIP_MULTICAST_TX_OPTIONS is required."

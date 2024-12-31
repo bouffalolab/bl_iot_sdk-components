@@ -154,7 +154,7 @@ static const struct mem_hdr {
     {(uintptr_t)test_data, (unsigned int)sizeof(test_data), DUMP_BASE64_BYTE, "test_data_byte"},
     {(uintptr_t)test_data, (unsigned int)sizeof(test_data), DUMP_BASE64_WORD, "test_data_word"},
     {(uintptr_t) "asdasdasdasdasdsada", 0, DUMP_ASCII, "test_string"},
-#elif BL602
+#elif defined BL602
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "ram"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "wifi_ram"},
     {(uintptr_t)0x24B00000, (unsigned int)0x55c, DUMP_BASE64_WORD, "0x24B00000-0x24B0055C"},
@@ -171,7 +171,7 @@ static const struct mem_hdr {
     {(uintptr_t)0x4000E404, (unsigned int)0x04, DUMP_BASE64_WORD, "PDS_reg"},
     {(uintptr_t)0x4000F030, (unsigned int)0x04, DUMP_BASE64_WORD, "HBN_reg"},
     {(uintptr_t)0x28008000, (unsigned int)&__LD_CONFIG_EM_SEL, DUMP_BASE64_WORD, "EM_REG"},
-#elif BL702
+#elif defined BL702
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "tcm_ocram"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "hbnram"},
     {(uintptr_t)&_ld_ram_addr3, (unsigned int)&_ld_ram_size3, DUMP_BASE64_BYTE, "stack"},
@@ -181,7 +181,7 @@ static const struct mem_hdr {
 #endif
     {(uintptr_t)0x28008000, (unsigned int)&__LD_CONFIG_EM_SEL, DUMP_BASE64_WORD, "EM_REG"},
     {(uintptr_t)0x28000000, (unsigned int)&__LD_BLE_CORE_REG_SIZE, DUMP_BASE64_WORD, "BLE_CORE_REG"},
-#elif BL702L
+#elif defined BL702L
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "tcm_ocram"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "hbnram"},
     {(uintptr_t)&_ld_ram_addr3, (unsigned int)&_ld_ram_size3, DUMP_BASE64_BYTE, "stack"},
@@ -191,16 +191,16 @@ static const struct mem_hdr {
     {(uintptr_t)0x21020000, (unsigned int)0x20000, DUMP_BASE64_BYTE, "romcode"},
     {(uintptr_t)0x28008000, (unsigned int)&__LD_CONFIG_EM_SEL, DUMP_BASE64_WORD, "EM_REG"},
     {(uintptr_t)0x28000000, (unsigned int)&__LD_BLE_CORE_REG_SIZE, DUMP_BASE64_WORD, "BLE_CORE_REG"},
-#elif BL808
+#elif defined BL808
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "ram_psram"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "ram_wifi"},
     {(uintptr_t)&_ld_ram_addr3, (unsigned int)&_ld_ram_size3, DUMP_BASE64_BYTE, "ram_memory"},
     {(uintptr_t)&_ld_ram_addr4, (unsigned int)&_ld_ram_size4, DUMP_BASE64_BYTE, "xram_memory"},
     {(uintptr_t)0x28010000, (unsigned int)&__LD_CONFIG_EM_SEL, DUMP_BASE64_WORD, "EM_REG"},
-#elif WB03
+#elif defined WB03
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "ram_tcm"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "ram_wifi"},
-#elif BL616
+#elif defined BL616
     {(uintptr_t)0xf0004000, (unsigned int)12, DUMP_CSR, "dump riscv csr"},
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "ram_tcm"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "ram_wifi"},
@@ -234,7 +234,7 @@ static int cd_getchar(char *inbuf) {
 static void cd_putchar(const char *buf, size_t len) {
   size_t i;
   for (i=0; i<len; i++) {
-    bl_uart_data_send(COREDUMP_UART, buf[i]);
+    putchar(buf[i]);
   }
 }
 

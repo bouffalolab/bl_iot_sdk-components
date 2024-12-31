@@ -274,6 +274,19 @@ void notify_le_phy_updated(struct bt_conn *conn, u8_t tx_phy, u8_t rx_phy)
 	}
 }
 
+#if defined(CONFIG_USER_DATA_LEN_UPDATE)
+void notify_le_datalen_updated(struct bt_conn *conn, u16_t tx_octets, u16_t tx_time, u16_t rx_octets,u16_t rx_time)
+{
+	struct bt_conn_cb *cb;
+
+	for (cb = callback_list; cb; cb = cb->_next) {
+		if (cb->le_datalen_updated) {
+			cb->le_datalen_updated(conn, tx_octets, tx_time, rx_octets, rx_time);
+		}
+	}
+}
+#endif
+
 bool le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param)
 {
 	struct bt_conn_cb *cb;
@@ -428,9 +441,6 @@ static void conn_update_timeout(struct k_work *work)
 		 * auto connect flag if it was set, instead just cancel
 		 * connection directly
 		 */
-		#if defined(BFLB_BLE_PATCH_FREE_CONN_UPDATE_WORK_WHEN_CANCEL_CONN_IN_CONNECT_STATE)
-		k_delayed_work_free(&conn->update_work);
-		#endif
 		bt_hci_cmd_send_sync(BT_HCI_OP_LE_CREATE_CONN_CANCEL, NULL, NULL);
 		return;
 	}
@@ -601,6 +611,8 @@ struct bt_conn *bt_conn_create_br(const bt_addr_t *peer,
 		switch (conn->state) {
 		case BT_CONN_CONNECT:
 		case BT_CONN_CONNECTED:
+			//fix by bouffalo:not ref if conn of this peer has existed.
+			bt_conn_unref(conn);
 			return conn;
 		default:
 			bt_conn_unref(conn);
@@ -653,6 +665,8 @@ struct bt_conn *bt_conn_create_sco(const bt_addr_t *peer,const struct esco_para 
 		switch (sco_conn->state) {
 		case BT_CONN_CONNECT:
 		case BT_CONN_CONNECTED:
+			//fix by bouffalo:not ref if conn of this peer has existed.
+			bt_conn_unref(sco_conn);
 			return sco_conn;
 		default:
 			bt_conn_unref(sco_conn);
@@ -1947,12 +1961,14 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 		    old_state == BT_CONN_DISCONNECT) {
 			process_unack_tx(conn);
 			tx_notify(conn);
-
 			atomic_set_bit(conn->flags, BT_CONN_CLEANUP);
 			k_poll_signal_raise(&conn_change, 0);
 			/* The last ref will be dropped during cleanup */
 		} else if (old_state == BT_CONN_CONNECT) {
 			/* conn->err will be set in this case */
+			#if defined(BFLB_BLE_PATCH_FREE_CONN_UPDATE_WORK_WHEN_CANCEL_CONN_IN_CONNECT_STATE)
+			k_delayed_work_free(&conn->update_work);
+			#endif
 			notify_connected(conn);
 			bt_conn_unref(conn);
 		} else if (old_state == BT_CONN_CONNECT_SCAN) {
@@ -1960,7 +1976,9 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 			if (conn->err) {
 				notify_connected(conn);
 			}
-
+			#if defined(BFLB_BLE_FREE_CONN_UPDATE_WORK_WHEN_DISCONNECT_IN_CONN_SCAN_STATE)
+			k_delayed_work_free(&conn->update_work);
+			#endif
 			bt_conn_unref(conn);
 		} else if (old_state == BT_CONN_CONNECT_DIR_ADV) {
 			/* this indicate Directed advertising stopped */
@@ -2344,9 +2362,6 @@ int bt_conn_disconnect(struct bt_conn *conn, u8_t reason)
 		bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
 		if (IS_ENABLED(CONFIG_BT_CENTRAL)) {
 			bt_le_scan_update(false);
-			#if defined(BFLB_BLE_FREE_CONN_UPDATE_WORK_WHEN_DISCONNECT_IN_CONN_SCAN_STATE)
-			k_delayed_work_free(&conn->update_work);
-			#endif
 		}
 		#if defined(BFLB_BLE_PATCH_AVOID_CONNECT_DISCONNECT_RISK)
 		conn->disconnect_was_triggered = false;
@@ -2371,9 +2386,6 @@ int bt_conn_disconnect(struct bt_conn *conn, u8_t reason)
 
 		if (IS_ENABLED(CONFIG_BT_CENTRAL)) {
 			k_delayed_work_cancel(&conn->update_work);
-			#if defined(BFLB_BLE_PATCH_FREE_CONN_UPDATE_WORK_WHEN_CANCEL_CONN_IN_CONNECT_STATE)
-			k_delayed_work_free(&conn->update_work);
-			#endif
 			return bt_hci_cmd_send_sync(BT_HCI_OP_LE_CREATE_CONN_CANCEL,
 					       NULL, NULL);
 		}
@@ -2473,6 +2485,29 @@ int bt_conn_create_auto_stop(void)
 	return 0;
 }
 #endif /* defined(CONFIG_BT_WHITELIST) */
+
+#if defined(BFLB_BLE_SUPPORT_CUSTOMIZED_SCAN_PARAMERS_IN_GENERAL_CONN_ESTABLISH)
+u16_t scan_intvl_in_general_conn_est = BT_GAP_SCAN_FAST_INTERVAL_MIN;
+u16_t scan_window_in_general_conn_est = BT_GAP_SCAN_FAST_INTERVAL_MIN;
+int bt_conn_set_scan_parameters_in_general_conn_establish(u16_t scan_interval, u16_t scan_window)
+{
+	if (scan_interval < 0x0004 || scan_interval > 0x4000) {
+		return -EINVAL;
+	}
+
+	if (scan_window < 0x0004 || scan_window > 0x4000) {
+		return -EINVAL;
+	}
+
+	if (scan_window > scan_interval) {
+		return -EINVAL;
+	}
+
+	scan_intvl_in_general_conn_est = scan_interval;
+	scan_window_in_general_conn_est = scan_window;
+	return 0;
+}
+#endif
 
 struct bt_conn *bt_conn_create_le(const bt_addr_le_t *peer,
 				  const struct bt_le_conn_param *param)

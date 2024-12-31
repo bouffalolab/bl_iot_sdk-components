@@ -72,6 +72,13 @@ COMPONENT_SRCS   += src/blob_srv.c \
                     src/dfu_metadata.c
 endif
 
+ifeq ($(CONFIG_BT_MESH_V1d1),1)
+COMPONENT_SRCS   += src/cfg.c \
+					src/priv_beacon_srv.c \
+					src/priv_beacon_cli.c \
+					src/msg.c
+endif
+
 COMPONENT_OBJS   := $(patsubst %.c,%.o, $(COMPONENT_SRCS))
 COMPONENT_SRCDIRS:= src \
                     src/mesh_cli_cmds \

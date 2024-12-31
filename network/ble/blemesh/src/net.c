@@ -19,6 +19,7 @@
 #include <conn.h>
 #include <include/mesh.h>
 #include <mesh_config.h>
+#include "include/cfg.h"
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_NET)
 #define LOG_MODULE_NAME bt_mesh_net
@@ -92,6 +93,9 @@ struct bt_mesh_net bt_mesh = {
 			.app_idx = BT_MESH_KEY_UNUSED,
 		}
 	},
+#if defined(CONFIG_BT_MESH_V1d1) && defined(CONFIG_BT_MESH_PRIV_BEACONS)
+	.priv_beacon_int = 0x3c,
+#endif /* CONFIG_BT_MESH_V1d1 && CONFIG_BT_MESH_PRIV_BEACONS */
 };
 
 #if !defined(BFLB_DYNAMIC_ALLOC_MEM)
@@ -207,13 +211,20 @@ int bt_mesh_net_keys_create(struct bt_mesh_subnet_keys *keys,
 	BT_DBG("NetID %s", bt_hex(keys->net_id, 8));
 
 #if defined(CONFIG_BT_MESH_GATT_PROXY)
+#if defined(CONFIG_BT_MESH_V1d1)
+	err = bt_mesh_identity_key(key, keys->identity.key);
+#else
 	err = bt_mesh_identity_key(key, keys->identity);
+#endif /* CONFIG_BT_MESH_V1d1 */
 	if (err) {
 		BT_ERR("Unable to generate IdentityKey");
 		return err;
 	}
-
+#if defined(CONFIG_BT_MESH_V1d1)
+	BT_DBG("IdentityKey %s", bt_hex(keys->identity.key, 16));
+#else
 	BT_DBG("IdentityKey %s", bt_hex(keys->identity, 16));
+#endif /* CONFIG_BT_MESH_V1d1 */
 #endif /* GATT_PROXY */
 
 	err = bt_mesh_beacon_key(key, keys->beacon);
@@ -224,6 +235,20 @@ int bt_mesh_net_keys_create(struct bt_mesh_subnet_keys *keys,
 
 	BT_DBG("BeaconKey %s", bt_hex(keys->beacon, 16));
 
+#if defined(CONFIG_BT_MESH_V1d1) && defined(CONFIG_BT_MESH_PRIV_BEACONS)
+	err = bt_mesh_private_beacon_key(key, &keys->priv_beacon);
+	if (err) {
+		LOG_ERR("Unable to generate private beacon key");
+		return err;
+	}
+#if defined(CONFIG_AUTP_PTS)
+	BT_PTS("PrivateBeaconKey %s", bt_hex(&keys->priv_beacon, sizeof(struct bt_mesh_key)));
+#else
+	LOG_DBG("PrivateBeaconKey %s", bt_hex(&keys->priv_beacon, sizeof(struct bt_mesh_key)));
+#endif /* CONFIG_AUTP_PTS */
+
+	//keys->valid = 1U;
+#endif /* CONFIG_BT_MESH_V1d1 && CONFIG_BT_MESH_PRIV_BEACONS */
 	return 0;
 }
 
@@ -428,6 +453,7 @@ u8_t bt_mesh_net_flags(struct bt_mesh_subnet *sub)
 	return flags;
 }
 
+#if !defined(CONFIG_BT_MESH_V1d1)
 int bt_mesh_net_beacon_update(struct bt_mesh_subnet *sub)
 {
 	u8_t flags = bt_mesh_net_flags(sub);
@@ -446,6 +472,7 @@ int bt_mesh_net_beacon_update(struct bt_mesh_subnet *sub)
 	return bt_mesh_beacon_auth(keys->beacon, flags, keys->net_id,
 				   bt_mesh.iv_index, sub->auth);
 }
+#endif /* CONFIG_BT_MESH_V1d1 */
 
 int bt_mesh_net_create(u16_t idx, u8_t flags, const u8_t key[16],
 		       u32_t iv_index)
@@ -657,7 +684,11 @@ void bt_mesh_net_sec_update(struct bt_mesh_subnet *sub)
 	}
 
 	if (IS_ENABLED(CONFIG_BT_MESH_GATT_PROXY) &&
-	    bt_mesh_gatt_proxy_get() == BT_MESH_GATT_PROXY_ENABLED) {
+	    (bt_mesh_gatt_proxy_get() == BT_MESH_GATT_PROXY_ENABLED
+		#if defined(CONFIG_BT_MESH_V1d1)
+		|| bt_mesh_priv_gatt_proxy_get() == BT_MESH_PRIV_GATT_PROXY_ENABLED
+		#endif /* CONFIG_BT_MESH_V1d1 */
+		)){
 		bt_mesh_proxy_beacon_send(sub);
 	}
 }
@@ -668,6 +699,16 @@ bool bt_mesh_net_iv_update(u32_t iv_index, bool iv_update)
 
 	if (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS)) {
 		/* We're currently in IV Update mode */
+		#if defined(CONFIG_BT_MESH_V1d1)
+		/* model 1.1 -> 3.11.6 IV Index Recovery procedure */
+		if (iv_index == bt_mesh.iv_index + 1) {
+			BT_WARN("In Progress Performing IV Index Recovery");
+			(void)memset(bt_mesh.rpl, 0, sizeof(bt_mesh.rpl));
+			bt_mesh.iv_index = iv_index;
+			bt_mesh.seq = 0U;
+			goto do_update;
+		}
+		#endif /* CONFIG_BT_MESH_V1d1 */
 
 		if (iv_index != bt_mesh.iv_index) {
 			BT_WARN("IV Index mismatch: 0x%08lx != 0x%08lx",
@@ -761,6 +802,14 @@ do_update:
 		}
 	}
 
+	#if defined(CONFIG_BT_MESH_V1d1)
+	if (IS_ENABLED(CONFIG_BT_MESH_GATT_PROXY) &&
+		(bt_mesh_gatt_proxy_get() == BT_MESH_GATT_PROXY_ENABLED ||
+		 bt_mesh_priv_gatt_proxy_get() == BT_MESH_PRIV_GATT_PROXY_ENABLED)) {
+		bt_mesh_proxy_beacon_send(NULL);
+	}
+	#endif /* CONFIG_BT_MESH_V1d1 */
+	
 	if (IS_ENABLED(CONFIG_BT_MESH_CDB)) {
 		bt_mesh_cdb_iv_update(iv_index, iv_update);
 	}
@@ -1026,6 +1075,23 @@ void bt_mesh_net_loopback_clear(u16_t net_idx)
 	bt_mesh.local_queue = new_list;
 }
 
+#if defined(CONFIG_BT_MESH_V1d1)
+struct bt_mesh_subnet *bt_mesh_subnet_find(bool (*cb)(struct bt_mesh_subnet *sub, void *cb_data),
+					   void *cb_data)
+{
+	for (int i = 0; i < ARRAY_SIZE(bt_mesh.sub); i++) {
+		if (bt_mesh.sub[i].net_idx == BT_MESH_KEY_UNUSED) {
+			continue;
+		}
+
+		if (!cb || cb(&bt_mesh.sub[i], cb_data)) {
+			return &bt_mesh.sub[i];
+		}
+	}
+
+	return NULL;
+}
+#else
 static bool auth_match(struct bt_mesh_subnet_keys *keys,
 		       const u8_t net_id[8], u8_t flags,
 		       u32_t iv_index, const u8_t auth[8])
@@ -1078,6 +1144,194 @@ struct bt_mesh_subnet *bt_mesh_subnet_find(const u8_t net_id[8], u8_t flags,
 
 	return NULL;
 }
+#endif /* CONFIG_BT_MESH_V1d1 */
+
+#if defined(CONFIG_BT_MESH_V1d1)
+size_t bt_mesh_subnet_foreach(void (*cb)(struct bt_mesh_subnet *sub))
+{
+	size_t count = 0;
+
+	for (int i = 0; i < ARRAY_SIZE(bt_mesh.sub); i++) {
+		if (bt_mesh.sub[i].net_idx == BT_MESH_KEY_UNUSED) {
+			continue;
+		}
+
+		cb(&bt_mesh.sub[i]);
+		count++;
+	}
+
+	return count;
+}
+
+struct bt_mesh_subnet *bt_mesh_subnet_next(struct bt_mesh_subnet *sub)
+{
+	if (sub) {
+		sub++;
+	} else {
+		sub = &bt_mesh.sub[0];
+	}
+
+	for (int i = 0; i < ARRAY_SIZE(bt_mesh.sub); i++, sub++) {
+		/* Roll over once we reach the end */
+		if (sub == &bt_mesh.sub[ARRAY_SIZE(bt_mesh.sub)]) {
+			sub = &bt_mesh.sub[0];
+		}
+
+		if (sub->net_idx != BT_MESH_KEY_UNUSED) {
+			return sub;
+		}
+	}
+
+	return NULL;
+}
+#endif /* CONFIG_BT_MESH_V1d1 */
+
+#if defined(CONFIG_BT_MESH_V1d1)
+uint8_t bt_mesh_subnet_node_id_set(uint16_t net_idx,
+				   enum bt_mesh_feat_state node_id)
+{
+	struct bt_mesh_subnet *sub;
+
+	if (node_id == BT_MESH_FEATURE_NOT_SUPPORTED) {
+		return STATUS_CANNOT_SET;
+	}
+
+	sub = bt_mesh_subnet_get(net_idx);
+	if (!sub) {
+		return STATUS_INVALID_NETKEY;
+	}
+
+	if (!IS_ENABLED(CONFIG_BT_MESH_GATT_PROXY)) {
+		return STATUS_FEAT_NOT_SUPP;
+	}
+
+#if defined(CONFIG_BT_MESH_PRIV_BEACONS)
+	/* Implements binding from MshPRTv1.1: 4.2.46.1. When enabling non-private node
+	 * identity state, disable its private counterpart.
+	 */
+	for (int i = 0; i < ARRAY_SIZE(bt_mesh.sub); i++) {
+		if (bt_mesh.sub[i].net_idx != BT_MESH_KEY_UNUSED &&
+		    bt_mesh.sub[i].node_id == BT_MESH_FEATURE_ENABLED &&
+		    bt_mesh.sub[i].priv_beacon_ctx.node_id) {
+			bt_mesh_proxy_identity_stop(&bt_mesh.sub[i]);
+		}
+	}
+#endif
+
+	if (node_id) {
+		bt_mesh_proxy_identity_start(sub, false);
+	} else {
+		bt_mesh_proxy_identity_stop(sub);
+	}
+
+	bt_mesh_adv_update();//origin:bt_mesh_adv_gatt_update();
+
+	return STATUS_SUCCESS;
+}
+
+uint8_t bt_mesh_subnet_node_id_get(uint16_t net_idx,
+				   enum bt_mesh_feat_state *node_id)
+{
+	struct bt_mesh_subnet *sub;
+
+	sub = bt_mesh_subnet_get(net_idx);
+	if (!sub) {
+		*node_id = 0x00;
+		return STATUS_INVALID_NETKEY;
+	}
+
+	*node_id = sub->node_id;
+#if defined(CONFIG_BT_MESH_PRIV_BEACONS)
+	*node_id &= !sub->priv_beacon_ctx.node_id;
+#endif
+
+	return STATUS_SUCCESS;
+}
+
+
+uint8_t bt_mesh_subnet_priv_node_id_set(uint16_t net_idx,
+					enum bt_mesh_feat_state priv_node_id)
+{
+	struct bt_mesh_subnet *sub;
+
+	if (priv_node_id == BT_MESH_FEATURE_NOT_SUPPORTED) {
+		return STATUS_CANNOT_SET;
+	}
+
+	sub = bt_mesh_subnet_get(net_idx);
+	if (!sub) {
+		return STATUS_INVALID_NETKEY;
+	}
+
+	if (!IS_ENABLED(CONFIG_BT_MESH_GATT_PROXY) ||
+	    !IS_ENABLED(CONFIG_BT_MESH_PRIV_BEACONS)) {
+		return STATUS_FEAT_NOT_SUPP;
+	}
+
+#if defined(CONFIG_BT_MESH_PRIV_BEACONS)
+	/* Reverse binding from MshPRTv1.1: 4.2.46.1 doesn't
+	 * allow to set private state if non-private state is enabled.
+	 */
+	for (int i = 0; i < ARRAY_SIZE(bt_mesh.sub); i++) {
+		if (bt_mesh.sub[i].net_idx != BT_MESH_KEY_UNUSED &&
+		    bt_mesh.sub[i].node_id == BT_MESH_FEATURE_ENABLED &&
+		    !bt_mesh.sub[i].priv_beacon_ctx.node_id) {
+			return STATUS_CANNOT_SET;
+		}
+	}
+#endif
+
+	if (priv_node_id) {
+		bt_mesh_proxy_identity_start(sub, true);
+	} else {
+		bt_mesh_proxy_identity_stop(sub);
+	}
+
+	bt_mesh_adv_update();//origin:bt_mesh_adv_gatt_update();
+
+	return STATUS_SUCCESS;
+}
+
+uint8_t bt_mesh_subnet_priv_node_id_get(uint16_t net_idx,
+					enum bt_mesh_feat_state *priv_node_id)
+{
+	struct bt_mesh_subnet *sub;
+
+	sub = bt_mesh_subnet_get(net_idx);
+	if (!sub) {
+		*priv_node_id = 0x00;
+		return STATUS_INVALID_NETKEY;
+	}
+
+#if CONFIG_BT_MESH_GATT_PROXY && CONFIG_BT_MESH_PRIV_BEACONS
+	if (sub->node_id == BT_MESH_FEATURE_ENABLED && sub->priv_beacon_ctx.node_id) {
+		*priv_node_id = sub->node_id;
+	} else {
+		*priv_node_id = BT_MESH_FEATURE_DISABLED;
+	}
+#else
+	*priv_node_id = BT_MESH_FEATURE_NOT_SUPPORTED;
+#endif
+
+	return STATUS_SUCCESS;
+}
+
+enum bt_mesh_subnets_node_id_state bt_mesh_subnets_node_id_state_get(void)
+{
+	for (int i = 0; i < ARRAY_SIZE(bt_mesh.sub); i++) {
+		if (bt_mesh.sub[i].node_id) {
+#if CONFIG_BT_MESH_PRIV_BEACONS
+			if (bt_mesh.sub[i].priv_beacon_ctx.node_id) {
+				return BT_MESH_SUBNETS_NODE_ID_STATE_ENABLED_PRIVATE;
+			}
+#endif
+			return BT_MESH_SUBNETS_NODE_ID_STATE_ENABLED;
+		}
+	}
+
+	return BT_MESH_SUBNETS_NODE_ID_STATE_NONE;
+}
+#endif /* CONFIG_BT_MESH_V1d1 */
 
 static int net_decrypt(struct bt_mesh_subnet *sub, const u8_t *enc,
 		       const u8_t *priv, const u8_t *data,
@@ -1222,7 +1476,11 @@ static bool relay_to_adv(enum bt_mesh_net_if net_if)
 	case BT_MESH_NET_IF_ADV:
 		return (bt_mesh_relay_get() == BT_MESH_RELAY_ENABLED);
 	case BT_MESH_NET_IF_PROXY:
-		return (bt_mesh_gatt_proxy_get() == BT_MESH_GATT_PROXY_ENABLED);
+		return (bt_mesh_gatt_proxy_get() == BT_MESH_GATT_PROXY_ENABLED
+			#if defined(CONFIG_BT_MESH_V1d1)
+			|| bt_mesh_priv_gatt_proxy_get() == BT_MESH_PRIV_GATT_PROXY_ENABLED
+			#endif /* CONFIG_BT_MESH_V1d1 */
+			);
 	default:
 		return false;
 	}
@@ -1241,7 +1499,11 @@ static void bt_mesh_net_relay(struct net_buf_simple *sbuf,
 
 	if (rx->net_if == BT_MESH_NET_IF_ADV &&
 	    bt_mesh_relay_get() != BT_MESH_RELAY_ENABLED &&
-	    bt_mesh_gatt_proxy_get() != BT_MESH_GATT_PROXY_ENABLED) {
+	    bt_mesh_gatt_proxy_get() != BT_MESH_GATT_PROXY_ENABLED
+		#if defined(CONFIG_BT_MESH_V1d1)
+		&& bt_mesh_priv_gatt_proxy_get() != BT_MESH_PRIV_GATT_PROXY_ENABLED
+		#endif /* CONFIG_BT_MESH_V1d1 */
+		) {
 		return;
 	}
 
@@ -1306,7 +1568,11 @@ static void bt_mesh_net_relay(struct net_buf_simple *sbuf,
 	 * is enabled.
 	 */
 	if (IS_ENABLED(CONFIG_BT_MESH_GATT_PROXY) &&
-	    bt_mesh_gatt_proxy_get() == BT_MESH_GATT_PROXY_ENABLED) {
+	    (bt_mesh_gatt_proxy_get() == BT_MESH_GATT_PROXY_ENABLED
+		#if defined(CONFIG_BT_MESH_V1d1)
+		|| bt_mesh_priv_gatt_proxy_get() == BT_MESH_PRIV_GATT_PROXY_ENABLED
+		#endif /* CONFIG_BT_MESH_V1d1 */
+		)) {
 		if (bt_mesh_proxy_relay(&buf->b, rx->ctx.recv_dst) &&
 		    BT_MESH_ADDR_IS_UNICAST(rx->ctx.recv_dst)) {
 			goto done;
@@ -1445,6 +1711,9 @@ void bt_mesh_net_recv(struct net_buf_simple *data, s8_t rssi,
 		bt_mesh_proxy_addr_add(data, rx.ctx.addr);
 
 		if (bt_mesh_gatt_proxy_get() == BT_MESH_GATT_PROXY_DISABLED &&
+			#if defined(CONFIG_BT_MESH_V1d1)
+			bt_mesh_priv_gatt_proxy_get() == BT_MESH_GATT_PROXY_DISABLED &&
+			#endif
 		    !rx.local_match) {
 			BT_INFO("Proxy is disabled; ignoring message");
 			return;
@@ -1528,7 +1797,10 @@ void bt_mesh_net_start(void)
 	if (IS_ENABLED(CONFIG_BT_MESH_PROV)) {
 		u16_t net_idx = bt_mesh.sub[0].net_idx;
 		u16_t addr = bt_mesh_primary_addr();
-
+		#if defined(CONFIG_BLE_MESH_CERT_BASED_PROV)
+		extern int bt_mesh_prov_cert_deinit();
+		bt_mesh_prov_cert_deinit();
+		#endif/* CONFIG_BLE_MESH_CERT_BASED_PROV */
 		bt_mesh_prov_complete(net_idx, addr);
 	}
 }

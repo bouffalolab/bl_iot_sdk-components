@@ -26,6 +26,7 @@
 #include "transport.h"
 #include "access.h"
 #include "foundation.h"
+#include "include/cfg.h"
 
 static const struct bt_mesh_comp *dev_comp;
 static u16_t dev_primary_addr;
@@ -657,8 +658,11 @@ void bt_mesh_model_recv(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 			continue;
 		}
 
-		if (buf->len < op->min_len) {
-			BT_ERR("Too short message for OpCode 0x%08lx", opcode);
+		if ((op->min_len >= 0) && (buf->len < (size_t)op->min_len)) {
+			BT_ERR("Too short message for OpCode 0x%08lx %d", opcode, op->min_len);
+			continue;
+		} else if ((op->min_len < 0) && (buf->len != (size_t)(-op->min_len))) {
+			BT_ERR("Invalid message size for OpCode 0x%08lx %d", opcode, op->min_len);
 			continue;
 		}
 

@@ -40,6 +40,7 @@
 #if defined(CONFIG_AUTO_PTS)
 #include "testing.h"
 #endif
+#include "include/cfg.h"
 
 #define DEFAULT_TTL 7
 
@@ -810,6 +811,14 @@ static void gatt_proxy_set(struct bt_mesh_model *model,
 	}
 
 	cfg->gatt_proxy = buf->data[0];
+	#if defined(CONFIG_BT_MESH_V1d1)
+	/** 4.2.46.1: If the value of the Node Identity state of the node for any subnet is 0x01,
+	 * then the value of the Private Node Identity state shall be Disable (0x00).
+	 */
+	if (IS_ENABLED(CONFIG_BT_MESH_PRIV_BEACONS) && buf->data[0]) {
+		(void)bt_mesh_priv_gatt_proxy_set(BT_MESH_FEATURE_DISABLED);
+	}
+	#endif /* CONFIG_BT_MESH_V1d1 */
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
 		bt_mesh_store_cfg();
@@ -2417,6 +2426,9 @@ static void node_identity_get(struct bt_mesh_model *model,
 	} else {
 		net_buf_simple_add_u8(&msg, STATUS_SUCCESS);
 		node_id = sub->node_id;
+	#if defined(CONFIG_BT_MESH_V1d1) && defined(CONFIG_BT_MESH_PRIV_BEACONS)
+		node_id &= !sub->priv_beacon_ctx.node_id;
+	#endif /* CONFIG_BT_MESH_V1d1 && CONFIG_BT_MESH_PRIV_BEACONS*/
 	}
 
 	net_buf_simple_add_le16(&msg, idx);
@@ -2464,15 +2476,39 @@ static void node_identity_set(struct bt_mesh_model *model,
 		net_buf_simple_add_le16(&msg, idx);
 
 		if (IS_ENABLED(CONFIG_BT_MESH_GATT_PROXY)) {
+			#if defined(CONFIG_BT_MESH_V1d1) && defined(CONFIG_BT_MESH_PRIV_BEACONS)
+			/* Implements binding from MshPRTv1.1: 4.2.46.1. When enabling non-private node
+			* identity state, disable its private counterpart.
+			*/
+			for (int i = 0; i < ARRAY_SIZE(bt_mesh.sub); i++) {
+				if (bt_mesh.sub[i].net_idx != BT_MESH_KEY_UNUSED &&
+					bt_mesh.sub[i].node_id == BT_MESH_FEATURE_ENABLED &&
+					bt_mesh.sub[i].priv_beacon_ctx.node_id) {
+					bt_mesh_proxy_identity_stop(&bt_mesh.sub[i]);
+				}
+			}
+			#endif /* CONFIG_BT_MESH_V1d1 && CONFIG_BT_MESH_PRIV_BEACONS*/
 			if (node_id) {
+				#if defined(CONFIG_BT_MESH_V1d1) && defined(CONFIG_BT_MESH_PRIV_BEACONS)
+				bt_mesh_proxy_identity_start(sub, false);
+				#else
 				bt_mesh_proxy_identity_start(sub);
+				#endif /* CONFIG_BT_MESH_V1d1 && CONFIG_BT_MESH_PRIV_BEACONS*/
 			} else {
 				bt_mesh_proxy_identity_stop(sub);
 			}
 			bt_mesh_adv_update();
+		#if defined(CONFIG_BT_MESH_V1d1)
+			net_buf_simple_add_u8(&msg, sub->node_id);
+		}
+		else{
+			net_buf_simple_add_u8(&msg, 0x02/*BT_MESH_NODE_IDENTITY_NOT_SUPPORTED*/);
+		}
+		#else
 		}
 
 		net_buf_simple_add_u8(&msg, sub->node_id);
+		#endif /* CONFIG_BT_MESH_V1d1 */
 	}
 
 	if (bt_mesh_model_send(model, ctx, &msg, NULL, NULL)) {

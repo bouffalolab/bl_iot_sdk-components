@@ -127,7 +127,10 @@ void __attribute__((weak)) vApplicationSleep( TickType_t xExpectedIdleTime )
 #if ( configUSE_TICK_HOOK != 0 )
 void __attribute__((weak)) vApplicationTickHook( void )
 {
-    /*empty*/
+#if defined(CFG_ZIGBEE_ENABLE)
+    extern void ZB_MONITOR(void);
+    ZB_MONITOR();
+#endif
 }
 #endif
 
@@ -282,9 +285,18 @@ static void aos_loop_proc(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-void __attribute__((weak)) _dump_lib_info(void)
+static void bl_show_component_version(void)
 {
-    /*empty*/
+    extern uint8_t _version_info_section_start;
+    extern uint8_t _version_info_section_end;
+    char **version_str_p = NULL;
+
+    puts("Version of used components:\r\n");
+    for (version_str_p = (char **)&_version_info_section_start; version_str_p < (char **)&_version_info_section_end; version_str_p++) {
+        puts("\tVersion: ");
+        puts(*version_str_p);
+        puts("\r\n");
+    }
 }
 
 static void _dump_boot_info(void)
@@ -325,14 +337,15 @@ static void _dump_boot_info(void)
     puts(BL_SDK_RF_VER); // @suppress("Symbol is not resolved")
     puts("\r\n");
 
-    _dump_lib_info();
-
     puts("Build Date: ");
     puts(__DATE__);
     puts("\r\n");
     puts("Build Time: ");
     puts(__TIME__);
     puts("\r\n");
+
+    bl_show_component_version();
+
     puts("------------------------------------------------------------\r\n");
 
 }

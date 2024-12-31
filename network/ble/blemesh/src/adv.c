@@ -147,9 +147,15 @@ static inline void adv_send(struct net_buf *buf)
 
     adv_int = MAX(adv_int_min,
               BT_MESH_TRANSMIT_INT(BT_MESH_ADV(buf)->xmit));
+    #if defined(CONFIG_AUTO_PTS) && defined(CONFIG_BT_MESH_FRIEND)
+    /* when send cached message to lpn, we shall send only one times */
+    duration = (BT_MESH_TRANSMIT_COUNT(BT_MESH_ADV(buf)->xmit) + 1) *
+             (adv_int + 5);
+    #else
     duration = (MESH_SCAN_WINDOW_MS +
             ((BT_MESH_TRANSMIT_COUNT(BT_MESH_ADV(buf)->xmit) + 1) *
              (adv_int + 10)));
+    #endif /* CONFIG_BT_MESH_FRIEND */
 
     BT_DBG("type %u len %u: %s", BT_MESH_ADV(buf)->type,
            buf->len, bt_hex(buf->data, buf->len));
@@ -164,7 +170,11 @@ static inline void adv_send(struct net_buf *buf)
     if (IS_ENABLED(CONFIG_BT_MESH_DEBUG_USE_ID_ADDR)) {
         param.options = BT_LE_ADV_OPT_USE_IDENTITY;
     } else {
+        #if defined(CONFIG_BT_MESH_V1d1) && defined(CONFIG_AUTO_PTS)
+        param.options = BT_MESH_ADV(buf)->options;
+        #else
         param.options = 0U;
+        #endif /* CONFIG_BT_MESH_V1d1 */
     }
 
     param.id = BT_ID_DEFAULT;
@@ -323,9 +333,51 @@ struct net_buf *bt_mesh_adv_create_from_pool(struct net_buf_pool *pool,
 
 	adv->type         = type;
 	adv->xmit         = xmit;
+	#if defined(CONFIG_BT_MESH_V1d1) && defined(CONFIG_AUTO_PTS)
+	adv->options      = 0;
+	#endif /* CONFIG_BT_MESH_V1d1 && CONFIG_AUTO_PTS */
 
 	return buf;
 }
+
+#if defined(CONFIG_BT_MESH_V1d1) && defined(CONFIG_AUTO_PTS)
+struct net_buf *bt_mesh_adv_create_from_pool_with_options(struct net_buf_pool *pool,
+					     bt_mesh_adv_alloc_t get_id,
+					     enum bt_mesh_adv_type type,
+					     u8_t xmit, s32_t timeout, u16_t options)
+{
+	struct bt_mesh_adv *adv;
+	struct net_buf *buf;
+
+	if (atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
+		BT_WARN("Refusing to allocate buffer while suspended");
+		return NULL;
+	}
+
+	buf = net_buf_alloc(pool, timeout);
+	if (!buf) {
+		return NULL;
+	}
+
+	adv = get_id(net_buf_id(buf));
+	BT_MESH_ADV(buf) = adv;
+
+	(void)memset(adv, 0, sizeof(*adv));
+
+	adv->type         = type;
+	adv->xmit         = xmit;
+	adv->options      = options;
+
+	return buf;
+}
+
+struct net_buf *bt_mesh_adv_create_with_options(enum bt_mesh_adv_type type, u8_t xmit,
+				   s32_t timeout, u16_t options)
+{
+	return bt_mesh_adv_create_from_pool_with_options(&adv_buf_pool, adv_alloc, type,
+					    xmit, timeout, options);
+}
+#endif /* CONFIG_BT_MESH_V1d1 && CONFIG_AUTO_PTS */
 
 struct net_buf *bt_mesh_adv_create(enum bt_mesh_adv_type type, u8_t xmit,
 				   s32_t timeout)

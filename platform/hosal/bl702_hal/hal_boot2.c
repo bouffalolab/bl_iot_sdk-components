@@ -235,6 +235,16 @@ uint32_t hal_boot2_get_active_partition_age(void)
     return boot2_partition_table.table.ptTable.age;
 }
 
+uint32_t hal_boot2_get_fw_age(void)
+{
+    PtTable_Entry_Config ptEntry = {
+        .age = -1,
+    };
+
+    PtTable_Get_Active_Entries(&boot2_partition_table.table, 0, &ptEntry);
+    return ptEntry.age;
+}
+
 int hal_boot2_get_active_entries_byname(uint8_t *name, HALPartition_Entry_Config *ptEntry_hal) 
 {
     PtTable_Entry_Config *ptEntry = (PtTable_Entry_Config*)ptEntry_hal;
@@ -267,6 +277,12 @@ int hal_boot2_init(void)
     );
     _dump_partition();
     bl_flash_config_update();
+
+    uint32_t addr, size;
+    if (hal_boot2_partition_addr_active("FW", &addr, &size) == 0) {
+        bl_flash_fw_protect_set(1, addr, size);
+        blog_info("[HAL] [BOOT2] Enable fw protection, start_addr 0x%08lx, end_addr 0x%08lx\r\n", addr, addr + size);
+    }
 
     return 0;
 }

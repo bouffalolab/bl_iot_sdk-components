@@ -299,6 +299,9 @@ enum {
 
 	/** Use whitelist to filter devices that can connect. */
 	BT_LE_ADV_OPT_FILTER_CONN = BIT(7),
+#if defined(CONFIG_BT_MESH_V1d1) && defined(CONFIG_AUTO_PTS)
+	BT_LE_ADV_OPT_USE_NRPA = BIT(8),
+#endif /* CONFIG_BT_MESH_V1d1 && CONFIG_AUTO_PTS */
 };
 
 /** LE Advertising Parameters. */
@@ -307,7 +310,7 @@ struct bt_le_adv_param {
 	u8_t  id;
 
 	/** Bit-field of advertising options */
-	u8_t  options;
+	u16_t  options;
 
 	/** Minimum Advertising Interval (N * 0.625) */
 	u16_t interval_min;

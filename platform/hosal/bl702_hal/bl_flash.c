@@ -29,6 +29,12 @@ StackType_t* const __psram_taskstack_spn_top = (StackType_t*)(__spn + PSRAM_TEMP
 uint32_t psram_taskstack_spo = 0;
 #endif
 
+static uint8_t fw_protect_en = 0;
+static uint32_t fw_start_addr = 0;
+static uint32_t fw_end_addr = 0;
+
+static uint32_t flash_size = 0;
+
 static struct {
     uint32_t magic;
     SPI_Flash_Cfg_Type flashCfg;
@@ -45,6 +51,19 @@ __attribute__((always_inline)) __STATIC_INLINE uint32_t __get_SP(void)
 
 int bl_flash_erase(uint32_t addr, int len)
 {
+    if(fw_protect_en){
+        uint32_t start_addr = addr & 0xFFFFF000;
+        uint32_t end_addr = (addr + len + 0xFFF) & 0xFFFFF000;
+        if(!(start_addr >= fw_end_addr || end_addr <= fw_start_addr)){
+            blog_error("[FLASH] Attempt to erase fw region, start_addr 0x%08lx, end_addr 0x%08lx\r\n", start_addr, end_addr);
+            return -1;
+        }
+        if(end_addr > flash_size){
+            blog_error("[FLASH] Erase overflow, start_addr 0x%08lx, end_addr 0x%08lx, flash_size 0x%08lx\r\n", start_addr, end_addr, flash_size);
+            return -1;
+        }
+    }
+
     unsigned long mstatus_tmp;
     mstatus_tmp = read_csr(mstatus);
     clear_csr(mstatus, MSTATUS_MIE);
@@ -57,6 +76,19 @@ int bl_flash_erase(uint32_t addr, int len)
 int bl_flash_write(uint32_t addr, uint8_t *src, int len)
 {
     uint8_t* _data = src;
+
+    if(fw_protect_en){
+        uint32_t start_addr = addr;
+        uint32_t end_addr = addr + len;
+        if(!(start_addr >= fw_end_addr || end_addr <= fw_start_addr)){
+            blog_error("[FLASH] Attempt to write fw region, start_addr 0x%08lx, end_addr 0x%08lx\r\n", start_addr, end_addr);
+            return -1;
+        }
+        if(end_addr > flash_size){
+            blog_error("[FLASH] Write overflow, start_addr 0x%08lx, end_addr 0x%08lx, flash_size 0x%08lx\r\n", start_addr, end_addr, flash_size);
+            return -1;
+        }
+    }
 
 #ifdef CFG_USE_PSRAM
     if(IS_PSARAM((uint32_t)src)){
@@ -244,17 +276,38 @@ int bl_flash_read_need_lock(uint32_t addr, uint8_t *dst, int len)
 }
 
 
+static uint32_t _get_flash_size()
+{
+    SPI_Flash_Cfg_Type *pFlashCfg = &boot2_flashCfg.flashCfg;
+    uint32_t jid = 0;
+    uint32_t level;
+    uint32_t size;
+
+    XIP_SFlash_GetJedecId_Need_Lock(pFlashCfg, pFlashCfg->ioMode & 0x0f, (uint8_t *)&jid);
+
+    level = (jid >> 16) & 0x1f;
+    level -= 0x13;
+    size = (1 << level) * 512 * 1024;
+
+    return size;
+}
+
 static void _dump_flash_config()
 {
+    flash_size = _get_flash_size();
+
     blog_info("======= FlashCfg magiccode @%p, code 0x%08lX =======\r\n",
             &boot2_flashCfg.magic,
             boot2_flashCfg.magic
     );
     blog_info("mid \t\t0x%X\r\n", boot2_flashCfg.flashCfg.mid);
+    blog_info("ioMode \t0x%X\r\n", boot2_flashCfg.flashCfg.ioMode);
+    blog_info("pdDelay \t0x%X\r\n", boot2_flashCfg.flashCfg.pdDelay);
     blog_info("clkDelay \t0x%X\r\n", boot2_flashCfg.flashCfg.clkDelay);
     blog_info("clkInvert \t0x%X\r\n", boot2_flashCfg.flashCfg.clkInvert);
     blog_info("sector size\t%uKBytes\r\n", boot2_flashCfg.flashCfg.sectorSize);
     blog_info("page size\t%uBytes\r\n", boot2_flashCfg.flashCfg.pageSize);
+    blog_info("flash size\t%uKBytes\r\n", flash_size/1024);
     blog_info("---------------------------------------------------------------\r\n");
 }
 
@@ -263,6 +316,20 @@ int bl_flash_config_update(void)
     _dump_flash_config();
 
     return 0;
+}
+
+int bl_flash_fw_protect_set(uint8_t en, uint32_t addr, uint32_t size)
+{
+    fw_protect_en = en;
+    fw_start_addr = addr;
+    fw_end_addr = addr + size;
+
+    return 0;
+}
+
+uint32_t bl_flash_get_size(void)
+{
+    return flash_size;
 }
 
 void* bl_flash_get_flashCfg(void)

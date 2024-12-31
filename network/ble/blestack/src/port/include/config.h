@@ -55,7 +55,11 @@
 
 #ifndef CONFIG_BT_RX_STACK_SIZE
 #if defined(CONFIG_BT_MESH)
-#define CONFIG_BT_RX_STACK_SIZE  3072//2048//1536//1024
+#if defined(CONFIG_BT_MESH_MODEL) || defined(CONFIG_AUTO_PTS)
+#define CONFIG_BT_RX_STACK_SIZE  3072
+#else
+#define CONFIG_BT_RX_STACK_SIZE  2048
+#endif
 #else
 #if !defined(CONFIG_BT_CONN)
 #define CONFIG_BT_RX_STACK_SIZE  1024
@@ -122,6 +126,7 @@
 #endif
 
 #if defined(CONFIG_BT_MESH_PTS)
+//#define CONFIG_MESH_IOPT_BV_02_C
 //#define MESH_LCTL_BIND_WITH_GENLVL   //Lighting CTL Temperature state bind with Genneric Level
 //#define MESH_LHSLH_BIND_WITH_GENLVL  //Lighting HSL Hue state bind with Genneric Level
 //#define MESH_LHSLSA_BIND_WITH_GENLVL //Lighting HSL Saturation state bind with Genneric Level
@@ -213,6 +218,13 @@
 #endif
 #endif
 
+#ifndef CONFIG_USER_DATA_LEN_UPDATE
+#define CONFIG_USER_DATA_LEN_UPDATE 1
+#endif
+
+#ifndef CONFIG_BT_GATT_DIS_SETTINGS
+#define CONFIG_BT_GATT_DIS_SETTINGS 1
+#endif
 /**
 * CONFIG_BT_L2CAP_TX_USER_DATA_SIZE: the max length for L2CAP tx buffer user data size
 * range 4 to 65535
@@ -373,6 +385,17 @@
 #ifndef CONFIG_BT_MAX_CONN
 #define CONFIG_BT_MAX_CONN CFG_CON
 #endif
+
+/*If the application layer sends a att reqeust packet simultaneously for each ble connection, 
+*and receives att reqeust packets at the same time, each connection requires 2 acl tx buffers.
+*/
+#if (CONFIG_BT_MAX_CONN <= 3 && CONFIG_BT_L2CAP_TX_BUF_COUNT < 2 * CONFIG_BT_MAX_CONN)
+    #error "Case1, number of acl tx buffers in blestack is too small."
+#elif (CONFIG_BT_MAX_CONN >= 4 && CONFIG_BT_MAX_CONN <= 6 && CONFIG_BT_L2CAP_TX_BUF_COUNT < 2 + CONFIG_BT_MAX_CONN)
+    #error "Case2, number of acl tx buffers in blestack is too small."
+#elif (CONFIG_BT_MAX_CONN >= 7 && CONFIG_BT_L2CAP_TX_BUF_COUNT < CONFIG_BT_MAX_CONN)
+    #error "Case3, number of acl tx buffers in blestack is too small."
+#endif 
 
 /**
 *  CONFIG_BT_DEVICE_NAME:Bluetooth device name. Name can be up
@@ -629,7 +652,6 @@
 #define CONFIG_BT_DEVICE_NAME_GATT_WRITABLE
 #define CONFIG_BT_GAP_APPEARANCE_WRITABLE
 
-
 #if defined(CONFIG_AUTO_PTS)
 #ifdef BFLB_FIXED_IRK
 #undef BFLB_FIXED_IRK
@@ -779,4 +801,14 @@ then it does disconnected flow once more. This will cause hardfault issue becaus
 #endif
 #define BFLB_BLE_DO_DISCONNECT_WHEN_ATT_TIMEOUT
 #define BFLB_BLE_AVOID_REMOVE_GATT_SUBSCRIPTION_RISK
+
+/*Support customized scan interval and scan window in scanning procedure of ble general connection establishment.*/
+#define BFLB_BLE_SUPPORT_CUSTOMIZED_SCAN_PARAMERS_IN_GENERAL_CONN_ESTABLISH
+
+/* Fix the issue : it excutes bt_conn_create_le, bt_le_scan_start, bt_le_scan_stop sequently. After stop scan ,it takes a long time to establish le connection.
+ * Reason: When it stops scan in this case, it restarts scan if there is a connection's state is BT_CONN_CONNECT_SCAN, but it uses background scan parameters
+ * to do slowly scan even if it is not auto connection without whitelist.
+ * Notice:If Auto conn initiated by bt_le_set_auto_conn,it doesn't create le connection from whitelist.It needs scan first.
+*/
+#define BFLB_BLE_NOT_USE_BACKGROUD_SCAN_PARAMETERS_IF_NOT_ATUO_CONN_WITHOUT_WHITELIST
 #endif /* BLE_CONFIG_H */

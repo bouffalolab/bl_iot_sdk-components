@@ -40,6 +40,16 @@ typedef union {
 void lmac154_setFramePendingMode(lmac154_fptMode_t mode);
 
 /****************************************************************************//**
+ * @brief  Get frame pending table mode
+ *
+ * @param  mode: frame pending table working mode
+ *
+ * @return None
+ *
+*******************************************************************************/
+lmac154_fptMode_t lmac154_getFramePendingMode(void);
+
+/****************************************************************************//**
  * @brief  Get frame pending table result when receive a packet
  *
  * @param  tout, timeout to get result with macro second unit

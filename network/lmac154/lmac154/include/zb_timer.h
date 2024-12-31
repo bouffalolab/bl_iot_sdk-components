@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define ZB_TIMER_CH_NUM            10
+#define ZB_TIMER_CH_NUM            6
 #define ZB_TIMER_US_PER_TICK       16
 
 typedef void (*zb_timer_cb_t)(void);

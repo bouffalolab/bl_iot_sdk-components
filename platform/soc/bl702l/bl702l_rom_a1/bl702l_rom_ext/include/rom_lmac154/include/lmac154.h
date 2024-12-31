@@ -407,6 +407,26 @@ void lmac154_disableRx(void);
 *******************************************************************************/
 void lmac154_setRxStateWhenIdle(bool isRxOnWhenIdle);
 
+/****************************************************************************//**
+ * @brief  Get rx on/off state when idle state
+ *
+ * @param  None 
+ *
+ * @return true is rx on when idle; otherwhile is rx off when idle
+ *
+*******************************************************************************/
+bool lmac154_isRxStateWhenIdle(void);
+
+/****************************************************************************//**
+ * @brief  Get rx on/off state when idle state
+ *
+ * @param  None 
+ *
+ * @return true is rx on when idle; otherwhile is rx off when idle
+ *
+*******************************************************************************/
+bool lmac154_isRxStateWhenIdle(void);
+
 
 /****************************************************************************//**
  * @brief  Set the number of maximum retransmission times (default 0)
@@ -879,6 +899,17 @@ void lmac154_disableHwAutoTxAck(void);
 
 
 /****************************************************************************//**
+ * @brief  Get whether hardware auto transmission of ack frame is enabled
+ *
+ * @param  None
+ *
+ * @return ture, enabled
+ *
+*******************************************************************************/
+bool lmac154_isHwAutoTxAckEnabled(void);
+
+
+/****************************************************************************//**
  * @brief  Enable lmac154_ackEvent (default enabled)
  *
  * @param  None
@@ -1033,6 +1064,17 @@ void lmac154_readRxCrc(uint8_t crc[2]);
  *
 *******************************************************************************/
 void lmac154_setAckWaitTime(uint16_t time_us);
+
+
+/****************************************************************************//**
+ * @brief  Set the maximum wait time for enh-ack ack frame (default 1500us)
+ *
+ * @param  time_us: maximum wait time
+ *
+ * @return None
+ *
+*******************************************************************************/
+void lmac154_setEnhAckWaitTime(uint16_t time_us);
 
 
 /****************************************************************************//**

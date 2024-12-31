@@ -88,9 +88,11 @@ ble_stack_srcs  := src/port/bl_port.c \
 					src/host/hci_core.c \
 					src/host/hci_ecc.c \
 					src/host/l2cap.c \
-					src/host/uuid.c \
-					src/host/version_bthost.c
+					src/host/uuid.c
 
+ble_stack_srcs_dirs += ..
+ble_stack_srcs  += ../version_btble_component.c
+				
 ifneq ($(CONFIG_BT_CONN), 0)
 ble_stack_srcs  += src/host/att.c \
                    src/host/conn.c \
@@ -122,6 +124,9 @@ ifeq ($(CONFIG_BT_SPP_SERVER),1)
 ble_stack_srcs   += src/services/ble_spp.c
 endif
 
+ifeq ($(CONFIG_DYNAMIC_GATTS),1)
+ble_stack_srcs   += src/host/dynamic_gatts.c
+endif
 
 ifeq ($(CONFIG_BT_STACK_CLI),1)
 ble_stack_srcs   += src/cli_cmds/ble_cli_cmds.c

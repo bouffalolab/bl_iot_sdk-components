@@ -17,6 +17,11 @@ typedef struct {
     uint8_t ssid_len;
     uint8_t bssid[6];
     char passphrase[64];
+} bl_wps_ap_credential_item_t;
+
+typedef struct {
+    uint8_t cnt;
+    bl_wps_ap_credential_item_t creds[];
 } bl_wps_ap_credential_t;
 
 typedef struct {

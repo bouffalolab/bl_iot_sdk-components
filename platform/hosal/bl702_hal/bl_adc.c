@@ -7,12 +7,37 @@
 #include <hosal_dma.h>
 
 
+#define OFFSET_GAINCAL_REFRESH     1  // will only apply for external channel under single_ended mode
+
+#define SKIP_SAMPLE_CNT            4
 #define ADC_SAMPLE_CNT             64
 #define VBAT_SAMPLE_CNT            64
 #define TSEN_SAMPLE_CNT            16
 
 
-static int16_t tsen_refcode;
+typedef struct bl_adc_common_cfg
+{
+    uint8_t vbat_en;
+    uint8_t tsen_en;
+    uint8_t diff_en;
+    uint8_t dma_en;
+    uint8_t pos_ch;
+    uint8_t neg_ch;
+}bl_adc_common_cfg_t;
+
+
+#if OFFSET_GAINCAL_REFRESH != 0
+static struct {
+    int16_t rsvd;
+    int16_t init;
+    int16_t os2;   // diff
+    uint16_t os1;  // single_ended
+    float coe;
+}adc_new_param;
+#endif
+
+static uint8_t adc_single_ended = 0;
+static int16_t tsen_refcode = 0;
 
 
 static void adc_gpio_init(uint8_t ch)
@@ -30,6 +55,212 @@ static void adc_gpio_init(uint8_t ch)
 }
 
 
+static void bl_adc_common_init(bl_adc_common_cfg_t *cfg)
+{
+    ADC_CFG_Type adcCfg = {
+        .v18Sel = ADC_V18_SEL_1P82V,                      /*!< ADC 1.8V select */
+        .v11Sel = ADC_V11_SEL_1P1V,                       /*!< ADC 1.1V select */
+        .clkDiv = ADC_CLK_DIV_32,                         /*!< Clock divider */
+        .gain1 = ADC_PGA_GAIN_1,                          /*!< PGA gain 1 */
+        .gain2 = ADC_PGA_GAIN_1,                          /*!< PGA gain 2 */
+        .chopMode = ADC_CHOP_MOD_AZ_PGA_ON,               /*!< ADC chop mode select */
+        .biasSel = ADC_BIAS_SEL_MAIN_BANDGAP,             /*!< ADC current form main bandgap or aon bandgap */
+        .vcm = ADC_PGA_VCM_1P2V,                          /*!< ADC VCM value */
+        .vref = ADC_VREF_3P2V,                            /*!< ADC voltage reference */
+        .inputMode = ADC_INPUT_SINGLE_END,                /*!< ADC input signal type */
+        .resWidth = ADC_DATA_WIDTH_16_WITH_256_AVERAGE,   /*!< ADC resolution and oversample rate */
+        .offsetCalibEn = 0,                               /*!< Offset calibration enable */
+        .offsetCalibVal = 0,                              /*!< Offset calibration value */
+    };
+    
+    ADC_FIFO_Cfg_Type adcFifoCfg = {
+        .fifoThreshold = ADC_FIFO_THRESHOLD_1,
+        .dmaEn = DISABLE,
+    };
+    
+    if(cfg->tsen_en){
+        adcCfg.chopMode = ADC_CHOP_MOD_AZ_ON;
+        adcCfg.vref = ADC_VREF_2P0V;
+    }
+    
+    if(cfg->diff_en){
+        adcCfg.inputMode = ADC_INPUT_DIFF;
+    }
+    
+    if(cfg->dma_en){
+        adcFifoCfg.dmaEn = ENABLE;
+    }
+    
+    // Set ADC clock to 32M
+    GLB_Set_ADC_CLK(ENABLE, GLB_ADC_CLK_XCLK, 0);
+    
+    // Initialize ADC
+    ADC_Disable();
+    ADC_Enable();
+    ADC_Reset();
+    ADC_Init(&adcCfg);
+    ADC_FIFO_Cfg(&adcFifoCfg);
+    
+    // Configure VBAT
+    if(cfg->vbat_en){
+        ADC_Vbat_Enable();
+    }else{
+        ADC_Vbat_Disable();
+    }
+    
+    // Configure TSEN
+    if(cfg->tsen_en){
+        ADC_Tsen_Init(ADC_TSEN_MOD_INTERNAL_DIODE);
+    }else{
+        ADC_Tsen_Disable();
+    }
+    
+    // Configure channel
+    if(cfg->diff_en){
+        ADC_Channel_Config(cfg->pos_ch, cfg->neg_ch, ENABLE);
+    }else{
+        ADC_Channel_Config(cfg->pos_ch, ADC_CHAN_GND, ENABLE);
+    }
+}
+
+static void bl_adc_common_get_result(int cnt, uint16_t *udata, int16_t *sdata, float *volt)
+{
+    uint32_t val;
+    ADC_Result_Type result;
+    uint32_t sum_unsigned = 0;
+    int32_t sum_signed = 0;
+    float sum_volt = 0;
+    
+    ADC_Start();
+    while(ADC_Get_FIFO_Count() < SKIP_SAMPLE_CNT);
+    ADC_FIFO_Clear();
+    
+    for(int i=0; i<cnt; i++){
+        while(ADC_Get_FIFO_Count() == 0);
+        val = ADC_Read_FIFO();
+        if(udata){
+            sum_unsigned += (uint16_t)(val & 0xFFFF);
+        }
+        if(sdata){
+            sum_signed += (int16_t)(val & 0xFFFF);
+        }
+        if(volt){
+            ADC_Parse_Result(&val, 1, &result);
+            sum_volt += result.volt;
+        }
+    }
+    
+    ADC_Stop();
+    ADC_FIFO_Clear();
+    
+    // Avoid calling ADC_Start after ADC_Stop without at least 1us delay
+    arch_delay_us(10);
+    
+    if(udata){
+        *udata = sum_unsigned / cnt;
+    }
+    if(sdata){
+        *sdata = sum_signed / cnt;
+    }
+    if(volt){
+        *volt = sum_volt / cnt;
+    }
+}
+
+static void bl_adc_common_get_temperature(uint16_t v0, uint16_t v1, int16_t *temperature)
+{
+    int16_t vdelta = v0 - v1;
+    
+    if(temperature){
+        *temperature = (int16_t)((vdelta - tsen_refcode) / 7.753);
+    }
+}
+
+
+#if OFFSET_GAINCAL_REFRESH != 0
+static void bl_adc_refresh_param(void)
+{
+    int16_t os2;
+    uint16_t os1;
+    float coe;
+    
+    if(adc_new_param.init){
+        return;
+    }
+    
+    bl_adc_common_cfg_t os2_cfg = {
+        .vbat_en = 1,
+        .tsen_en = 0,
+        .diff_en = 1,
+        .dma_en = 0,
+        .pos_ch = ADC_CHAN_VABT_HALF,
+        .neg_ch = ADC_CHAN_VABT_HALF,
+    };
+    
+    bl_adc_common_cfg_t os1_cfg = {
+        .vbat_en = 0,
+        .tsen_en = 0,
+        .diff_en = 0,
+        .dma_en = 0,
+        .pos_ch = ADC_CHAN_GND,
+        .neg_ch = ADC_CHAN_GND,
+    };
+    
+    bl_efuse_read_adc_gain_coe(&coe);
+    
+    bl_adc_common_init(&os2_cfg);
+    bl_adc_common_get_result(5, NULL, &os2, NULL);
+    
+    os2 *= 2;
+    coe -= (float)os2 / 40960;
+    
+    bl_adc_common_init(&os1_cfg);
+    bl_adc_common_get_result(5, &os1, NULL, NULL);
+    
+    adc_new_param.os2 = os2;
+    adc_new_param.os1 = os1;
+    adc_new_param.coe = coe;
+    adc_new_param.init = 1;
+}
+
+static void bl_adc_get_result_with_new_param(int cnt, uint16_t *data, float *volt)
+{
+    int16_t os2 = adc_new_param.os2;
+    uint16_t os1 = adc_new_param.os1;
+    float coe = adc_new_param.coe;
+    uint16_t udata;
+    float new_data;
+    
+    bl_adc_common_get_result(cnt, &udata, NULL, NULL);
+    
+    if(udata < os1){
+        if(data) *data = 0;
+        if(volt) *volt = 0;
+        return;
+    }
+    
+    if(os2 < 0){
+        if(udata < 1.5 * os1){
+            new_data = (udata - os1) / coe;
+        }else if(udata >= 1.5 * os1 - os2){
+            new_data = (udata - os2) / coe;
+        }else{
+            new_data = udata / coe;
+        }
+    }else{
+        if(udata < os1 + os2){
+            new_data = (udata - os1) / coe;
+        }else{
+            new_data = (udata - os2) / coe;
+        }
+    }
+    
+    if(data) *data = (uint16_t)new_data;
+    if(volt) *volt = new_data * 3.2 / 65536;
+}
+#endif
+
+
 int bl_adc_init(uint8_t single_ended, uint8_t pos_ch, uint8_t neg_ch)
 {
     if(pos_ch > 11){
@@ -42,83 +273,69 @@ int bl_adc_init(uint8_t single_ended, uint8_t pos_ch, uint8_t neg_ch)
         }
     }
     
-    ADC_CFG_Type adcCfg = {
-        .v18Sel = ADC_V18_SEL_1P82V,                      /*!< ADC 1.8V select */
-        .v11Sel = ADC_V11_SEL_1P1V,                       /*!< ADC 1.1V select */
-        .clkDiv = ADC_CLK_DIV_32,                         /*!< Clock divider */
-        .gain1 = ADC_PGA_GAIN_1,                          /*!< PGA gain 1 */
-        .gain2 = ADC_PGA_GAIN_1,                          /*!< PGA gain 2 */
-        .chopMode = ADC_CHOP_MOD_AZ_PGA_ON,               /*!< ADC chop mode select */
-        .biasSel = ADC_BIAS_SEL_MAIN_BANDGAP,             /*!< ADC current form main bandgap or aon bandgap */
-        .vcm = ADC_PGA_VCM_1P2V,                          /*!< ADC VCM value */
-        .vref = ADC_VREF_3P2V,                            /*!< ADC voltage reference */
-        .inputMode = ADC_INPUT_SINGLE_END,                /*!< ADC input signal type */
-        .resWidth = ADC_DATA_WIDTH_16_WITH_256_AVERAGE,   /*!< ADC resolution and oversample rate */
-        .offsetCalibEn = 0,                               /*!< Offset calibration enable */
-        .offsetCalibVal = 0,                              /*!< Offset calibration value */
-    };
-    
-    ADC_FIFO_Cfg_Type adcFifoCfg = {
-        .fifoThreshold = ADC_FIFO_THRESHOLD_1,
-        .dmaEn = DISABLE,
-    };
-    
-    if(!single_ended){
-        adcCfg.inputMode = ADC_INPUT_DIFF;
-    }
-    
-    // Set ADC clock to 32M
-    GLB_Set_ADC_CLK(ENABLE, GLB_ADC_CLK_XCLK, 0);
-    
-    // Initialize ADC
-    ADC_Disable();
-    ADC_Enable();
-    ADC_Reset();
-    ADC_Init(&adcCfg);
-    ADC_FIFO_Cfg(&adcFifoCfg);
-    ADC_Vbat_Disable();
-    ADC_Tsen_Disable();
-    
-    if(!single_ended){
-        ADC_Channel_Config(pos_ch, neg_ch, 1);
-    }else{
-        ADC_Channel_Config(pos_ch, ADC_CHAN_GND, 1);
-    }
-    
     adc_gpio_init(pos_ch);
+    
     if(!single_ended){
         adc_gpio_init(neg_ch);
     }
     
+    adc_single_ended = single_ended;
+    
+#if OFFSET_GAINCAL_REFRESH != 0
+    if(adc_single_ended){
+        bl_adc_refresh_param();
+    }
+#endif
+    
+    bl_adc_common_cfg_t cfg = {
+        .vbat_en = 0,
+        .tsen_en = 0,
+        .diff_en = !single_ended,
+        .dma_en = 0,
+        .pos_ch = pos_ch,
+        .neg_ch = neg_ch,
+    };
+    
+    bl_adc_common_init(&cfg);
+    
     return 0;
+}
+
+int bl_adc_get_conversion_result(void)
+{
+    uint16_t udata;
+    int16_t sdata;
+    
+#if OFFSET_GAINCAL_REFRESH != 0
+    if(adc_single_ended){
+        bl_adc_get_result_with_new_param(ADC_SAMPLE_CNT, &udata, NULL);
+        return udata;
+    }
+#endif
+    
+    if(adc_single_ended){
+        bl_adc_common_get_result(ADC_SAMPLE_CNT, &udata, NULL, NULL);
+        return udata;
+    }else{
+        bl_adc_common_get_result(ADC_SAMPLE_CNT, NULL, &sdata, NULL);
+        return sdata;
+    }
 }
 
 float bl_adc_get_val(void)
 {
-    int i;
-    float sum;
-    uint32_t val;
-    ADC_Result_Type result;
+    float volt;
     
-    ADC_Start();
-    while(ADC_Get_FIFO_Count() < 1);
-    ADC_FIFO_Clear();
-    
-    sum = 0;
-    for(i=0; i<ADC_SAMPLE_CNT; i++){
-        while(ADC_Get_FIFO_Count() == 0);
-        val = ADC_Read_FIFO();
-        ADC_Parse_Result(&val, 1, &result);
-        sum += result.volt;
+#if OFFSET_GAINCAL_REFRESH != 0
+    if(adc_single_ended){
+        bl_adc_get_result_with_new_param(ADC_SAMPLE_CNT, NULL, &volt);
+        return volt;
     }
+#endif
     
-    ADC_Stop();
-    ADC_FIFO_Clear();
+    bl_adc_common_get_result(ADC_SAMPLE_CNT, NULL, NULL, &volt);
     
-    // Avoid calling ADC_Start after ADC_Stop without at least 1us delay
-    arch_delay_us(10);
-    
-    return sum / ADC_SAMPLE_CNT;
+    return volt;
 }
 
 int bl_adc_disable(void)
@@ -131,112 +348,42 @@ int bl_adc_disable(void)
 
 int bl_adc_vbat_init(void)
 {
-    ADC_CFG_Type adcCfg = {
-        .v18Sel = ADC_V18_SEL_1P82V,                      /*!< ADC 1.8V select */
-        .v11Sel = ADC_V11_SEL_1P1V,                       /*!< ADC 1.1V select */
-        .clkDiv = ADC_CLK_DIV_32,                         /*!< Clock divider */
-        .gain1 = ADC_PGA_GAIN_1,                          /*!< PGA gain 1 */
-        .gain2 = ADC_PGA_GAIN_1,                          /*!< PGA gain 2 */
-        .chopMode = ADC_CHOP_MOD_AZ_PGA_ON,               /*!< ADC chop mode select */
-        .biasSel = ADC_BIAS_SEL_MAIN_BANDGAP,             /*!< ADC current form main bandgap or aon bandgap */
-        .vcm = ADC_PGA_VCM_1P2V,                          /*!< ADC VCM value */
-        .vref = ADC_VREF_3P2V,                            /*!< ADC voltage reference */
-        .inputMode = ADC_INPUT_SINGLE_END,                /*!< ADC input signal type */
-        .resWidth = ADC_DATA_WIDTH_16_WITH_256_AVERAGE,   /*!< ADC resolution and oversample rate */
-        .offsetCalibEn = 0,                               /*!< Offset calibration enable */
-        .offsetCalibVal = 0,                              /*!< Offset calibration value */
+    bl_adc_common_cfg_t cfg = {
+        .vbat_en = 1,
+        .tsen_en = 0,
+        .diff_en = 0,
+        .dma_en = 0,
+        .pos_ch = ADC_CHAN_VABT_HALF,
+        .neg_ch = ADC_CHAN_GND,
     };
     
-    ADC_FIFO_Cfg_Type adcFifoCfg = {
-        .fifoThreshold = ADC_FIFO_THRESHOLD_1,
-        .dmaEn = DISABLE,
-    };
-    
-    // Set ADC clock to 32M
-    GLB_Set_ADC_CLK(ENABLE, GLB_ADC_CLK_XCLK, 0);
-    
-    // Initialize VBAT
-    ADC_Disable();
-    ADC_Enable();
-    ADC_Reset();
-    ADC_Init(&adcCfg);
-    ADC_FIFO_Cfg(&adcFifoCfg);
-    ADC_Tsen_Disable();
-    ADC_Vbat_Enable();
-    ADC_Channel_Config(ADC_CHAN_VABT_HALF, ADC_CHAN_GND, 1);
+    bl_adc_common_init(&cfg);
     
     return 0;
 }
 
 float bl_adc_vbat_get_val(void)
 {
-    int i;
-    float sum;
-    uint32_t val;
-    ADC_Result_Type result;
+    float volt;
     
-    ADC_Start();
-    while(ADC_Get_FIFO_Count() < 1);
-    ADC_FIFO_Clear();
+    bl_adc_common_get_result(VBAT_SAMPLE_CNT, NULL, NULL, &volt);
     
-    sum = 0;
-    for(i=0; i<VBAT_SAMPLE_CNT; i++){
-        while(ADC_Get_FIFO_Count() == 0);
-        val = ADC_Read_FIFO();
-        ADC_Parse_Result(&val, 1, &result);
-        sum += result.volt * 2;
-    }
-    
-    ADC_Stop();
-    ADC_FIFO_Clear();
-    
-    // Avoid calling ADC_Start after ADC_Stop without at least 1us delay
-    arch_delay_us(10);
-    
-    return sum / VBAT_SAMPLE_CNT;
+    return volt * 2;
 }
 
 
 int bl_adc_tsen_init(void)
 {
-    ADC_CFG_Type adcCfg = {
-        .v18Sel = ADC_V18_SEL_1P82V,                      /*!< ADC 1.8V select */
-        .v11Sel = ADC_V11_SEL_1P1V,                       /*!< ADC 1.1V select */
-        .clkDiv = ADC_CLK_DIV_32,                         /*!< Clock divider */
-        .gain1 = ADC_PGA_GAIN_1,                          /*!< PGA gain 1 */
-        .gain2 = ADC_PGA_GAIN_1,                          /*!< PGA gain 2 */
-        .chopMode = ADC_CHOP_MOD_AZ_ON,                   /*!< ADC chop mode select */
-        .biasSel = ADC_BIAS_SEL_MAIN_BANDGAP,             /*!< ADC current form main bandgap or aon bandgap */
-        .vcm = ADC_PGA_VCM_1P2V,                          /*!< ADC VCM value */
-        .vref = ADC_VREF_2P0V,                            /*!< ADC voltage reference */
-        .inputMode = ADC_INPUT_SINGLE_END,                /*!< ADC input signal type */
-        .resWidth = ADC_DATA_WIDTH_16_WITH_256_AVERAGE,   /*!< ADC resolution and oversample rate */
-        .offsetCalibEn = 0,                               /*!< Offset calibration enable */
-        .offsetCalibVal = 0,                              /*!< Offset calibration value */
+    bl_adc_common_cfg_t cfg = {
+        .vbat_en = 0,
+        .tsen_en = 1,
+        .diff_en = 0,
+        .dma_en = 0,
+        .pos_ch = ADC_CHAN_TSEN_P,
+        .neg_ch = ADC_CHAN_GND,
     };
     
-    ADC_FIFO_Cfg_Type adcFifoCfg = {
-        .fifoThreshold = ADC_FIFO_THRESHOLD_1,
-        .dmaEn = DISABLE,
-    };
-    
-    // Set ADC clock to 32M
-    GLB_Set_ADC_CLK(ENABLE, GLB_ADC_CLK_XCLK, 0);
-    
-    // Initialize TSEN
-    ADC_Disable();
-    ADC_Enable();
-    ADC_Reset();
-    ADC_Init(&adcCfg);
-    ADC_FIFO_Cfg(&adcFifoCfg);
-    ADC_Vbat_Disable();
-    ADC_Tsen_Init(ADC_TSEN_MOD_INTERNAL_DIODE);
-    ADC_Channel_Config(ADC_CHAN_TSEN_P, ADC_CHAN_GND, 0);  // single-ended mode
-    
-    // Skip the first bad sample
-    ADC_Start();
-    while(ADC_Get_FIFO_Count() == 0);
-    ADC_Read_FIFO();
+    bl_adc_common_init(&cfg);
     
     // Get TSEN ref code
     return bl_efuse_read_tsen_refcode(&tsen_refcode);
@@ -244,36 +391,19 @@ int bl_adc_tsen_init(void)
 
 int16_t bl_adc_tsen_get_val(void)
 {
-    int i;
-    uint32_t sum;
     uint16_t v0, v1;
-    int16_t vdelta, temperature;
+    int16_t temperature;
     
     // Get V0
     ADC_SET_TSVBE_LOW();
-    sum = 0;
-    for(i=0; i<TSEN_SAMPLE_CNT; i++){
-        ADC_Start();
-        while(ADC_Get_FIFO_Count() == 0);
-        sum += (uint16_t)ADC_Read_FIFO();
-    }
-    v0 = sum / TSEN_SAMPLE_CNT;
+    bl_adc_common_get_result(TSEN_SAMPLE_CNT, &v0, NULL, NULL);
     
     // Get V1
     ADC_SET_TSVBE_HIGH();
-    sum = 0;
-    for(i=0; i<TSEN_SAMPLE_CNT; i++){
-        ADC_Start();
-        while(ADC_Get_FIFO_Count() == 0);
-        sum += (uint16_t)ADC_Read_FIFO();
-    }
-    v1 = sum / TSEN_SAMPLE_CNT;
+    bl_adc_common_get_result(TSEN_SAMPLE_CNT, &v1, NULL, NULL);
     
-    // Get Vdelta
-    vdelta = v0 - v1;
-    
-    // Calculate temperature
-    temperature = (vdelta - tsen_refcode) / 7.753;
+    // Get temperature
+    bl_adc_common_get_temperature(v0, v1, &temperature);
     
     return temperature;
 }
@@ -281,16 +411,15 @@ int16_t bl_adc_tsen_get_val(void)
 
 static int8_t tsen_dma_ch = -1;
 static bl_adc_tsen_callback_t tsen_event;
-static uint16_t tsen_buf[TSEN_SAMPLE_CNT];
+static uint16_t tsen_buf[SKIP_SAMPLE_CNT + TSEN_SAMPLE_CNT];
 static volatile int tsen_fsm = 0;
 
 static void tsen_dma_callback(void *p_arg, uint32_t flag)
 {
-    int i;
-    uint32_t sum;
     static uint16_t v0;
     uint16_t v1;
-    int16_t vdelta, temperature;
+    uint32_t sum;
+    int16_t temperature;
     
     //BL_WR_REG(DMA_BASE, DMA_INTTCCLEAR, 1U << tsen_dma_ch);
     
@@ -300,14 +429,14 @@ static void tsen_dma_callback(void *p_arg, uint32_t flag)
             ADC_Stop();
             ADC_FIFO_Clear();
             
-            // Get V0 (skip the first bad sample)
+            // Get V0
             sum = 0;
-            for(i=1; i<TSEN_SAMPLE_CNT; i++){
+            for(int i = SKIP_SAMPLE_CNT; i < SKIP_SAMPLE_CNT + TSEN_SAMPLE_CNT; i++){
                 sum += tsen_buf[i];
             }
-            v0 = sum / (TSEN_SAMPLE_CNT - 1);
+            v0 = sum / TSEN_SAMPLE_CNT;
             
-            DMA_Channel_Update_DstMemcfg(tsen_dma_ch, (uint32_t)tsen_buf, TSEN_SAMPLE_CNT);
+            DMA_Channel_Update_DstMemcfg(tsen_dma_ch, (uint32_t)tsen_buf, sizeof(tsen_buf)/sizeof(tsen_buf[0]));
             DMA_Channel_Enable(tsen_dma_ch);
             
             ADC_SET_TSVBE_HIGH();
@@ -320,18 +449,15 @@ static void tsen_dma_callback(void *p_arg, uint32_t flag)
             ADC_Stop();
             ADC_FIFO_Clear();
             
-            // Get V1 (skip the first bad sample)
+            // Get V1
             sum = 0;
-            for(i=1; i<TSEN_SAMPLE_CNT; i++){
+            for(int i = SKIP_SAMPLE_CNT; i < SKIP_SAMPLE_CNT + TSEN_SAMPLE_CNT; i++){
                 sum += tsen_buf[i];
             }
-            v1 = sum / (TSEN_SAMPLE_CNT - 1);
+            v1 = sum / TSEN_SAMPLE_CNT;
             
-            // Get Vdelta
-            vdelta = v0 - v1;
-            
-            // Calculate temperature
-            temperature = (vdelta - tsen_refcode) / 7.753;
+            // Get temperature
+            bl_adc_common_get_temperature(v0, v1, &temperature);
             
             if(tsen_event != NULL){
                 tsen_event(temperature);
@@ -347,39 +473,16 @@ static void tsen_dma_callback(void *p_arg, uint32_t flag)
 
 static void tsen_adc_init(void)
 {
-    ADC_CFG_Type adcCfg = {
-        .v18Sel = ADC_V18_SEL_1P82V,                      /*!< ADC 1.8V select */
-        .v11Sel = ADC_V11_SEL_1P1V,                       /*!< ADC 1.1V select */
-        .clkDiv = ADC_CLK_DIV_32,                         /*!< Clock divider */
-        .gain1 = ADC_PGA_GAIN_1,                          /*!< PGA gain 1 */
-        .gain2 = ADC_PGA_GAIN_1,                          /*!< PGA gain 2 */
-        .chopMode = ADC_CHOP_MOD_AZ_ON,                   /*!< ADC chop mode select */
-        .biasSel = ADC_BIAS_SEL_MAIN_BANDGAP,             /*!< ADC current form main bandgap or aon bandgap */
-        .vcm = ADC_PGA_VCM_1P2V,                          /*!< ADC VCM value */
-        .vref = ADC_VREF_2P0V,                            /*!< ADC voltage reference */
-        .inputMode = ADC_INPUT_SINGLE_END,                /*!< ADC input signal type */
-        .resWidth = ADC_DATA_WIDTH_16_WITH_256_AVERAGE,   /*!< ADC resolution and oversample rate */
-        .offsetCalibEn = 0,                               /*!< Offset calibration enable */
-        .offsetCalibVal = 0,                              /*!< Offset calibration value */
+    bl_adc_common_cfg_t cfg = {
+        .vbat_en = 0,
+        .tsen_en = 1,
+        .diff_en = 0,
+        .dma_en = 1,
+        .pos_ch = ADC_CHAN_TSEN_P,
+        .neg_ch = ADC_CHAN_GND,
     };
     
-    ADC_FIFO_Cfg_Type adcFifoCfg = {
-        .fifoThreshold = ADC_FIFO_THRESHOLD_1,
-        .dmaEn = ENABLE,
-    };
-    
-    // Set ADC clock to 32M
-    GLB_Set_ADC_CLK(ENABLE, GLB_ADC_CLK_XCLK, 0);
-    
-    // Initialize TSEN
-    ADC_Disable();
-    ADC_Enable();
-    ADC_Reset();
-    ADC_Init(&adcCfg);
-    ADC_FIFO_Cfg(&adcFifoCfg);
-    ADC_Vbat_Disable();
-    ADC_Tsen_Init(ADC_TSEN_MOD_INTERNAL_DIODE);
-    ADC_Channel_Config(ADC_CHAN_TSEN_P, ADC_CHAN_GND, 1);
+    bl_adc_common_init(&cfg);
 }
 
 static void tsen_dma_init(bl_adc_tsen_cfg_t *cfg)
@@ -445,7 +548,7 @@ int bl_adc_tsen_dma_trigger(void)
         return -1;
     }
     
-    DMA_Channel_Update_DstMemcfg(tsen_dma_ch, (uint32_t)tsen_buf, TSEN_SAMPLE_CNT);
+    DMA_Channel_Update_DstMemcfg(tsen_dma_ch, (uint32_t)tsen_buf, sizeof(tsen_buf)/sizeof(tsen_buf[0]));
     DMA_Channel_Enable(tsen_dma_ch);
     
     ADC_SET_TSVBE_LOW();
@@ -485,20 +588,8 @@ static void voice_dma_callback(void *p_arg, uint32_t flag)
 
 static void voice_gpio_init(bl_adc_voice_cfg_t *cfg)
 {
-    GLB_GPIO_Type adcPinList[] = {8, 15, 17, 11, 12, 14, 7, 9, 18, 19, 20, 21};
-    GLB_GPIO_Cfg_Type gpioCfg;
-    
-    gpioCfg.gpioFun = GPIO_FUN_ANALOG;
-    gpioCfg.gpioMode = GPIO_MODE_ANALOG;
-    gpioCfg.pullType = GPIO_PULL_NONE;
-    gpioCfg.drive = 0;
-    gpioCfg.smtCtrl = 0;
-    
-    gpioCfg.gpioPin = adcPinList[cfg->adc_pos_ch];
-    GLB_GPIO_Init(&gpioCfg);
-    
-    gpioCfg.gpioPin = adcPinList[cfg->adc_neg_ch];
-    GLB_GPIO_Init(&gpioCfg);
+    adc_gpio_init(cfg->adc_pos_ch);
+    adc_gpio_init(cfg->adc_neg_ch);
 }
 
 static void voice_adc_init(bl_adc_voice_cfg_t *cfg)
@@ -528,7 +619,7 @@ static void voice_adc_init(bl_adc_voice_cfg_t *cfg)
     // Set ADC clock to 32M
     GLB_Set_ADC_CLK(ENABLE, GLB_ADC_CLK_XCLK, 0);
     
-    // Initialize MIC
+    // Initialize ADC
     ADC_Disable();
     ADC_Enable();
     ADC_Reset();
@@ -536,7 +627,7 @@ static void voice_adc_init(bl_adc_voice_cfg_t *cfg)
     ADC_FIFO_Cfg(&adcFifoCfg);
     ADC_Vbat_Disable();
     ADC_Tsen_Disable();
-    ADC_Channel_Config(cfg->adc_pos_ch, cfg->adc_neg_ch, 1);
+    ADC_Channel_Config(cfg->adc_pos_ch, cfg->adc_neg_ch, ENABLE);
     
     // Set pga_vcmi_en = 1 for mic
     ADC_PGA_Config(1, 1);
@@ -651,10 +742,10 @@ int bl_adc_voice_stop(void)
 #if 0
 #define FRAME_SIZE 4000
 #define FRAME_NUM  4
-int16_t audio_buf[FRAME_SIZE * FRAME_NUM];
-int16_t pcm_buf[2][FRAME_SIZE];
+static int16_t audio_buf[FRAME_SIZE * FRAME_NUM];
+static int16_t pcm_buf[2][FRAME_SIZE];
 
-void audio_callback(int buf_idx)
+static void audio_callback(int buf_idx)
 {
     static uint32_t len = 0;
     
@@ -671,7 +762,7 @@ void audio_callback(int buf_idx)
 void bl_adc_audio_test(void)
 {
     bl_adc_voice_cfg_t cfg;
-    cfg.adc_pos_ch = 3;  // GPIO11;
+    cfg.adc_pos_ch = 3;  // GPIO11
     cfg.adc_neg_ch = 7;  // GPIO9
     cfg.pcm_frame_size = FRAME_SIZE;
     cfg.pcm_frame_buf[0] = pcm_buf[0];

@@ -51,6 +51,7 @@ otError otPlatRadioEnable(otInstance *aInstance)
     otPds_setDataPollCsma(CFG_DATA_POLL_CSMA);
 #endif
 
+    bl_irq_register(M154_IRQn, lmac154_get2015InterruptHandler());
     bl_irq_enable(M154_IRQn);
 
     return OT_ERROR_NONE;

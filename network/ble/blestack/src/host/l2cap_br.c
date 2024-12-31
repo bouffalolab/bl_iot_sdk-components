@@ -1007,7 +1007,7 @@ static void l2cap_br_conf_req(struct bt_l2cap_br *l2cap, uint8_t ident,
 		default:
 			if (!hint) {
 				BT_DBG("option %u not handled", opt->type);
-                result = BT_L2CAP_CONF_UNACCEPT;
+                result = BT_L2CAP_CONF_UNKNOWN_OPTIONS;
 				goto send_rsp;
 			}
 

@@ -1,4 +1,8 @@
+#if defined(CONFIG_BL_SDK)
+#include <bflb_mtimer.h>
+#else
 #include <bl_timer.h>
+#endif
 #include <lmac154.h>
 #include <zb_timer.h>
 
@@ -32,7 +36,11 @@ void ot_alarmInit(void)
 void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
 {
     BaseType_t ret;
+#if defined(CONFIG_BL_SDK)
+    uint32_t elapseTime = (uint32_t)(bflb_mtimer_get_time_us() / 1000) - aT0;
+#else
     uint32_t elapseTime = (uint32_t)(bl_timer_now_us64() / 1000) - aT0;
+#endif
 
     if (elapseTime < aDt) {
         ret = xTimerChangePeriod( otAlarm_timerHandle, OT_TIMER_MS_TO_TICKS(aDt - elapseTime), 0 );
@@ -53,12 +61,20 @@ void otPlatAlarmMilliStop(otInstance *aInstance)
 
 uint32_t otPlatAlarmMilliGetNow(void) 
 {
+#if defined(CONFIG_BL_SDK)
+    return (uint32_t)(bflb_mtimer_get_time_us() / 1000);
+#else
     return (uint32_t)(bl_timer_now_us64() / 1000);
+#endif
 }
 
 uint64_t otPlatTimeGet(void)
 {
-    return bl_timer_now_us64();
+#if defined(CONFIG_BL_SDK)
+    return bflb_mtimer_get_time_us();
+#else
+    return bl_timer_now_us64() ;
+#endif
 }
 
 static void otPlatALarm_usTimerCallback(void) 

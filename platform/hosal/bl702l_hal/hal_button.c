@@ -277,7 +277,7 @@ static int hal_button_register_handler_with_dts(gpio_ctx_t *pstgpio)
 
     level = pstnode->trig_level ? 0 : 1;
     bl_gpio_enable_input(pstnode->gpioPin, level, !level);
-    hal_gpio_register_handler(button_callback, pstnode->gpioPin, pstnode->trig_level ? GPIO_INT_TRIG_POS_LEVEL : GPIO_INT_TRIG_NEG_LEVEL, pstnode);
+    hal_gpio_register_handler(button_callback, pstnode->gpioPin, pstnode->trig_level ? GPIO_INT_TRIG_ASYNC_HIGH_LEVEL : GPIO_INT_TRIG_ASYNC_LOW_LEVEL, pstnode);
 
     return 0;
 }

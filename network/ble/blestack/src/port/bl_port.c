@@ -424,10 +424,14 @@ void k_free(void *buf)
 
 void bt_assert(void)
 {
+    BT_ERR("%s, ra = 0x%lx\r\n", __func__, (uint32_t)__builtin_return_address(0));
     #if defined(CFG_IOT_SDK) || defined(BL_MCU_SDK)
     extern void user_vAssertCalled(void);
     user_vAssertCalled();
     #else /* CFG_IOT_SDK BL_MCU_SDK */
+    #if defined (CONFIG_BL_SDK)
+    vAssertCalled();
+    #endif
 
     #endif /* CFG_IOT_SDK BL_MCU_SDK */
 }

@@ -10,6 +10,21 @@
 #include <ot_radio_trx.h>
 #include <ot_utils_ext.h>
 
+#define VERSION_STRING_HELPER(x, y, z) #x "." #y "." #z
+#define VERSION_STRING(x, y, z) VERSION_STRING_HELPER(x, y, z)
+
+#define VERSION_OT_SRC_STRING VERSION_STRING(VERSION_OT_SRC_MAJOR, VERSION_OT_SRC_MINOR, VERSION_OT_SRC_PATCH)
+#define VERSION_OT_SRC_NUMBER \
+    ((VERSION_OT_SRC_MAJOR << 16) || (VERSION_OT_SRC_MINOR << 8) || VERSION_OT_SRC_PATCH)
+
+#ifdef VERSION_OT_SRC_EXTRA_INFO
+static const char *version_ot_br __attribute__((used, section(".version.ot_src"))) = \
+    "component_version_ot_src_" VERSION_OT_SRC_STRING "_" VERSION_OT_SRC_EXTRA_INFO; 
+#else
+static const char *version_ot_utils __attribute__((used, section(".version.ot_src"))) = \
+    "component_version_ot_src_" VERSION_OT_SRC_STRING; 
+#endif
+
 static otRadio_t                otRadioVar;
 static uint8_t                  otRadio_buffPool[MAC_FRAME_SIZE * (OTRADIO_RX_FRAME_BUFFER_NUM + 1) + MAX_ACK_FRAME_SIZE * OTRADIO_ACK_FRAME_BUFFER_NUM];
 #ifdef CFG_OT_USE_ROM_CODE
@@ -57,19 +72,19 @@ void ot_radioInit(otRadio_opt_t opt)
 void ot_radioTask(ot_system_event_t trxEvent) 
 {
     otRadio_rxFrame_t   *pframe;
-    otRadioFrame        *txframe;
+    otRadioFrame        *txframe = otRadioVar_ptr->pTxFrame;
     uint32_t            tag;
 
-    if (!(OT_SYSTEM_EVENT_RADIO_ALL_MASK & trxEvent)) {
+    if (!(trxEvent & OT_SYSTEM_EVENT_RADIO_ALL_MASK)) {
         return;
     }
+    
+    if ((trxEvent & OT_SYSTEM_EVENT_RADIO_TX_ALL_MASK) && txframe) {
 
-    if (otRadioVar_ptr->pTxFrame) {
+        txframe = otRadioVar_ptr->pTxFrame;
+        otRadioVar_ptr->pTxFrame = NULL;
 
-        if ((OT_SYSTEM_EVENT_RADIO_TX_ALL_MASK & trxEvent)) {
-            txframe = otRadioVar_ptr->pTxFrame;
-            otRadioVar_ptr->pTxFrame = NULL;
-
+        if (txframe) {
             if (trxEvent & OT_SYSTEM_EVENT_RADIO_TX_DONE_NO_ACK_REQ) {
                 otPlatRadioTxDone(otRadioVar_ptr->aInstance, txframe, NULL, OT_ERROR_NONE);
             }
@@ -114,6 +129,28 @@ void ot_radioTask(ot_system_event_t trxEvent)
     else if (trxEvent & OT_SYSTEM_EVENT_RADIO_RX_NO_BUFF) {
         otPlatRadioReceiveDone(otRadioVar_ptr->aInstance, NULL, OT_ERROR_NO_BUFS);
     }
+}
+
+bool otr_isStackIdle(void)
+{
+    otRadio_rxFrame_t *pframe = NULL;
+    otRadioState radioeState = -1;
+
+    uint32_t tag = otrEnterCrit();
+    if (!utils_dlist_empty(&otRadioVar_ptr->rxFrameList)) {
+        pframe = (otRadio_rxFrame_t *)otRadioVar_ptr->rxFrameList.next;
+        utils_dlist_del(&pframe->dlist);
+    }
+    otrExitCrit(tag);
+
+    if (ot_system_event_var == 0 && NULL == pframe) {
+        radioeState = otPlatRadioGetState(otRadioVar_ptr->aInstance);
+        if ( radioeState == OT_RADIO_STATE_DISABLED || otPlatRadioGetState(otRadioVar_ptr->aInstance) == OT_RADIO_STATE_SLEEP ) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /************************************ LMAC 15.4 event function ***********************************/
@@ -181,7 +218,7 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
         
         iret = ot_radioSend(aFrame);
         if (iret) {
-            otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_ERROR);
+            otrNotifyEvent(OT_SYSTEM_EVENT_RADIO_TX_ABORT);
         }
         else {
             otPlatRadioTxStarted(aInstance, aFrame);

@@ -1770,7 +1770,7 @@ done:
 	bt_conn_unref(conn);
 }
 
-#if defined(CONFIG_BT_DATA_LEN_UPDATE)
+#if defined(CONFIG_USER_DATA_LEN_UPDATE)
 static void le_data_len_change(struct net_buf *buf)
 {
 	struct bt_hci_evt_le_data_len_change *evt = (void *)buf->data;
@@ -1795,11 +1795,13 @@ static void le_data_len_change(struct net_buf *buf)
 	BT_DBG("max. tx: %u (%uus), max. rx: %u (%uus)", max_tx_octets,
 	       max_tx_time, max_rx_octets, max_rx_time);
 
+	notify_le_datalen_updated(conn,max_tx_octets,
+	       max_tx_time, max_rx_octets, max_rx_time);
 	/* TODO use those */
 
 	bt_conn_unref(conn);
 }
-#endif /* CONFIG_BT_DATA_LEN_UPDATE */
+#endif /* CONFIG_USER_DATA_LEN_UPDATE */
 
 #if defined(CONFIG_BT_PHY_UPDATE)
 static void le_phy_update_complete(struct net_buf *buf)
@@ -4108,11 +4110,25 @@ int bt_le_scan_update(bool fast_scan)
 		//atomic_set_bit(bt_dev.flags, BT_DEV_SCAN_FILTER_DUP);
 		atomic_clear_bit(bt_dev.flags, BT_DEV_SCAN_FILTER_DUP);
 
+		#if defined(BFLB_BLE_NOT_USE_BACKGROUD_SCAN_PARAMETERS_IF_NOT_ATUO_CONN_WITHOUT_WHITELIST)
+		if (!atomic_test_bit(conn->flags, BT_CONN_AUTO_CONNECT))
+		{
+			fast_scan = true;
+		}
+		#endif
+
 		bt_conn_unref(conn);
 
 		if (fast_scan) {
+			#if defined(BFLB_BLE_SUPPORT_CUSTOMIZED_SCAN_PARAMERS_IN_GENERAL_CONN_ESTABLISH)
+			extern u16_t scan_intvl_in_general_conn_est;
+			extern u16_t scan_window_in_general_conn_est;
+			interval = scan_intvl_in_general_conn_est;
+			window = scan_window_in_general_conn_est;
+			#else
 			interval = BT_GAP_SCAN_FAST_INTERVAL;
 			window = BT_GAP_SCAN_FAST_WINDOW;
+			#endif
 		} else {
 			interval = CONFIG_BT_BACKGROUND_SCAN_INTERVAL;
 			window = CONFIG_BT_BACKGROUND_SCAN_WINDOW;
@@ -4280,10 +4296,10 @@ static const struct event_handler meta_events[] = {
 		      sizeof(struct bt_hci_evt_le_remote_feat_complete)),
 	EVENT_HANDLER(BT_HCI_EVT_LE_CONN_PARAM_REQ, le_conn_param_req,
 		      sizeof(struct bt_hci_evt_le_conn_param_req)),
-#if defined(CONFIG_BT_DATA_LEN_UPDATE)
+#if defined(CONFIG_USER_DATA_LEN_UPDATE)
 	EVENT_HANDLER(BT_HCI_EVT_LE_DATA_LEN_CHANGE, le_data_len_change,
 		      sizeof(struct bt_hci_evt_le_data_len_change)),
-#endif /* CONFIG_BT_DATA_LEN_UPDATE */
+#endif /* CONFIG_USER_DATA_LEN_UPDATE */
 #if defined(CONFIG_BT_PHY_UPDATE)
 	EVENT_HANDLER(BT_HCI_EVT_LE_PHY_UPDATE_COMPLETE,
 		      le_phy_update_complete,
@@ -4774,7 +4790,7 @@ static int le_set_event_mask(void)
 			mask |= BT_EVT_MASK_LE_CONN_PARAM_REQ;
 		}
 
-		if (IS_ENABLED(CONFIG_BT_DATA_LEN_UPDATE) &&
+		if (IS_ENABLED(CONFIG_USER_DATA_LEN_UPDATE)&&
 		    BT_FEAT_LE_DLE(bt_dev.le.features)) {
 			mask |= BT_EVT_MASK_LE_DATA_LEN_CHANGE;
 		}
@@ -6753,6 +6769,12 @@ int bt_le_adv_start_internal(const struct bt_le_adv_param *param,
 			set_param.type = BT_LE_ADV_IND;
 		}
 	} else {
+		#if defined(CONFIG_BT_MESH_V1d1) && (defined(CONFIG_BT_STACK_PTS) || defined(CONFIG_AUTO_PTS))
+		if (param->options & BT_LE_ADV_OPT_USE_NRPA) {
+			le_set_non_resolv_private_addr(param->id);
+			set_param.own_addr_type = BT_ADDR_LE_RANDOM;
+		} else
+		#endif /* CONFIG_BT_MESH_V1d1 */
 		if (param->options & BT_LE_ADV_OPT_USE_IDENTITY) {
 			if (id_addr->type == BT_ADDR_LE_RANDOM) {
 				err = set_random_address(&id_addr->a);
@@ -7709,7 +7731,37 @@ int bt_set_bd_addr(const bt_addr_t *addr)
 	return 0;
 }
 
+#if !defined(BL602) && !defined(BL702)
+int bt_get_controller_sdk_version(struct bt_controller_sdk_ver *version)
+{
+    struct net_buf *rsp;
+    struct bt_hci_rp_get_controller_sdk_ver *rp;
 
+    if(!version)
+		return -EINVAL;
+
+    /* Get controller sdk version */
+    int err = bt_hci_cmd_send_sync(BT_HCI_OP_VS_GET_CONTROLLER_SDK_VER, NULL, &rsp);
+    if (err) {
+		BT_ERR("Fail to get controller sdk ver,err=%d", err);
+		return err;
+    }
+
+    rp = (void *)rsp->data;
+
+    BT_DBG("status 0x%02x", rp->status);
+
+    version->status = rp->status;
+    version->ver_major = rp->ver_major;
+    version->ver_minor = rp->ver_minor;
+    version->ver_patch = rp->ver_patch;
+    version->sdk_commit_id = rp->sdk_commit_id[0]<<24 | rp->sdk_commit_id[1]<<16 | rp->sdk_commit_id[2]<<8 | rp->sdk_commit_id[3];
+
+    net_buf_unref(rsp);
+
+    return 0;
+}
+#endif
 
 int bt_buf_get_rx_avail_cnt(void)
 {

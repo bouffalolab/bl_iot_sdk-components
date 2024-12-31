@@ -30,6 +30,7 @@
 #include "crypto.h"
 #include "transport.h"
 #include "access.h"
+#include "beacon.h"
 #include "foundation.h"
 #include "proxy.h"
 #include "settings.h"

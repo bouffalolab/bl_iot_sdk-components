@@ -42,7 +42,11 @@ else
 				LINKER_SCRIPTS := flash.ld
 			endif
 		else
-			LINKER_SCRIPTS := flash_rom.ld
+			ifeq ($(CONFIG_USE_PSRAM),1)
+				LINKER_SCRIPTS := psram_flash_rom.ld
+			else
+				LINKER_SCRIPTS := flash_rom.ld
+			endif
 		endif
 	endif
 endif

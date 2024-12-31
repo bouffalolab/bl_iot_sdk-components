@@ -22,6 +22,7 @@
 #include <hal_boot2.h>
 #include <hal_board.h>
 #include <hal_tcal.h>
+#include <hal_sys.h>
 #include <hosal_uart.h>
 #include <hosal_dma.h>
 
@@ -68,7 +69,11 @@ static const HeapRegion_t xHeapRegionsPsram[] =
 };
 #endif
 
+#if !defined(CFG_USE_ROM_CODE)
 void __attribute__((weak)) vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
+#else
+void __attribute__((weak)) user_vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
+#endif
 {
     puts("Stack Overflow checked\r\n");
     if(pcTaskName){
@@ -79,7 +84,11 @@ void __attribute__((weak)) vApplicationStackOverflowHook( TaskHandle_t xTask, ch
     }
 }
 
+#if !defined(CFG_USE_ROM_CODE)
 void __attribute__((weak)) vApplicationMallocFailedHook(void)
+#else
+void __attribute__((weak)) user_vApplicationMallocFailedHook(void)
+#endif
 {
     printf("Memory Allocate Failed. Current left size is %d bytes\r\n",
         xPortGetFreeHeapSize()
@@ -94,29 +103,44 @@ void __attribute__((weak)) vApplicationMallocFailedHook(void)
     }
 }
 
+#if !defined(CFG_USE_ROM_CODE)
 void __attribute__((weak)) vApplicationIdleHook(void)
+#else
+void __attribute__((weak)) user_vApplicationIdleHook(void)
+#endif
 {
     __asm volatile(
             "   wfi     "
     );
-    /*empty*/
 }
 
 #if ( configUSE_TICKLESS_IDLE != 0 )
+#if !defined(CFG_USE_ROM_CODE)
 void __attribute__((weak)) vApplicationSleep( TickType_t xExpectedIdleTime )
+#else
+void __attribute__((weak)) user_vApplicationSleep( TickType_t xExpectedIdleTime )
+#endif
 {
     /*empty*/
 }
 #endif
 
 #if ( configUSE_TICK_HOOK != 0 )
+#if !defined(CFG_USE_ROM_CODE)
 void __attribute__((weak)) vApplicationTickHook( void )
+#else
+void __attribute__((weak)) user_vApplicationTickHook( void )
+#endif
 {
     /*empty*/
 }
 #endif
 
+#if !defined(CFG_USE_ROM_CODE)
 void __attribute__((weak)) vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize)
+#else
+void __attribute__((weak)) user_vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize)
+#endif
 {
     /* If the buffers to be provided to the Idle task are declared inside this
     function then they must be declared static - otherwise they will be allocated on
@@ -140,7 +164,11 @@ void __attribute__((weak)) vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleT
 /* configSUPPORT_STATIC_ALLOCATION and configUSE_TIMERS are both set to 1, so the
 application must provide an implementation of vApplicationGetTimerTaskMemory()
 to provide the memory that is used by the Timer service task. */
+#if !defined(CFG_USE_ROM_CODE)
 void __attribute__((weak)) vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
+#else
+void __attribute__((weak)) user_vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
+#endif
 {
     /* If the buffers to be provided to the Timer task are declared inside this
     function then they must be declared static - otherwise they will be allocated on
@@ -161,11 +189,24 @@ void __attribute__((weak)) vApplicationGetTimerTaskMemory(StaticTask_t **ppxTime
     *pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
 }
 
+#if !defined(CFG_USE_ROM_CODE)
 void user_vAssertCalled(void) __attribute__ ((weak, alias ("vAssertCalled")));
 void __attribute__((weak)) vAssertCalled(void)
+#else
+void __attribute__((weak)) user_vAssertCalled(void)
+#endif
 {
+#if 0
     taskDISABLE_INTERRUPTS();
     abort();
+#else
+    taskDISABLE_INTERRUPTS();
+    printf("vAssertCalled, ra = %p, taskname %s\r\n", 
+        (void *)__builtin_return_address(0), pcTaskGetName(NULL));
+    while (1) {
+        /*empty here*/
+    }
+#endif
 }
 
 void __attribute__((weak)) _cli_init(int fd_console)
@@ -265,9 +306,18 @@ static void aos_loop_proc(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-void __attribute__((weak)) _dump_lib_info(void)
+static void bl_show_component_version(void)
 {
-    /*empty*/
+    extern uint8_t _version_info_section_start;
+    extern uint8_t _version_info_section_end;
+    char **version_str_p = NULL;
+
+    puts("Version of used components:\r\n");
+    for (version_str_p = (char **)&_version_info_section_start; version_str_p < (char **)&_version_info_section_end; version_str_p++) {
+        puts("\tVersion: ");
+        puts(*version_str_p);
+        puts("\r\n");
+    }
 }
 
 static void _dump_boot_info(void)
@@ -308,14 +358,15 @@ static void _dump_boot_info(void)
     puts(BL_SDK_RF_VER); // @suppress("Symbol is not resolved")
     puts("\r\n");
 
-    _dump_lib_info();
-
     puts("Build Date: ");
     puts(__DATE__);
     puts("\r\n");
     puts("Build Time: ");
     puts(__TIME__);
     puts("\r\n");
+
+    bl_show_component_version();
+
     puts("------------------------------------------------------------\r\n");
 
 }
@@ -323,6 +374,20 @@ static void _dump_boot_info(void)
 void setup_heap()
 {
     bl_sys_em_config();
+
+#if defined(CFG_USE_ROM_CODE)
+    // Initialize rom data
+    struct romapi_freertos_map *romapi_freertos = hal_sys_romapi_get();
+    hal_sys_romapi_update(romapi_freertos);
+    romapi_freertos->vApplicationGetIdleTaskMemory = user_vApplicationGetIdleTaskMemory;
+    romapi_freertos->vApplicationGetTimerTaskMemory = user_vApplicationGetTimerTaskMemory;
+    romapi_freertos->vApplicationIdleHook = user_vApplicationIdleHook;
+    romapi_freertos->vApplicationMallocFailedHook = user_vApplicationMallocFailedHook;
+    romapi_freertos->vApplicationStackOverflowHook = user_vApplicationStackOverflowHook;
+    romapi_freertos->vAssertCalled = user_vAssertCalled;
+    romapi_freertos->vApplicationTickHook = user_vApplicationTickHook;
+    romapi_freertos->vApplicationSleep = user_vApplicationSleep;
+#endif
 
     // Invoked during system boot via start.S
     vPortDefineHeapRegions(xHeapRegions);

@@ -28,6 +28,10 @@ ifeq ("$(CONFIG_CHIP_NAME)", "BL616")
 COMPONENT_SRCS += ./debug.c ./sscanf.c ./vsscanf.c
 endif
 
+ifeq ("$(CONFIG_CHIP_NAME)", "BL602")
+COMPONENT_SRCS += ./time.c
+endif
+
 ifeq ("$(CPU_ID)", "D0")
 COMPONENT_SRCS += ./memcpy.c
 endif

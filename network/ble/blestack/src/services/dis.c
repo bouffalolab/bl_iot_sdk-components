@@ -68,6 +68,9 @@ static struct dis_pnp dis_pnp_id = {
 #endif
 
 #if defined(CONFIG_BT_GATT_DIS_SETTINGS)
+
+#define CONFIG_BT_GATT_DIS_STR_MAX 21
+
 static u8_t dis_model[CONFIG_BT_GATT_DIS_STR_MAX] = CONFIG_BT_GATT_DIS_MODEL;
 static u8_t dis_manuf[CONFIG_BT_GATT_DIS_STR_MAX] = CONFIG_BT_GATT_DIS_MANUF;
 #if defined(CONFIG_BT_GATT_DIS_SERIAL_NUMBER)
@@ -176,7 +179,60 @@ void dis_init(u8_t vid_src, u16_t vid, u16_t pid, u16_t pid_ver)
 	bt_gatt_service_register(&dis_svc);
 }
 
+void dis_deinit(void)
+{
+    bt_gatt_service_unregister(&dis_svc);
+}
+
 #if defined(CONFIG_BT_SETTINGS) && defined(CONFIG_BT_GATT_DIS_SETTINGS)
+
+#if defined(BFLB_BLE)
+int dis_settings_init(const char *name, char* setting,size_t setting_len)
+{
+	if (!strcmp(name, "manuf"))
+	{
+		memset(&dis_manuf,0,sizeof(dis_manuf));
+		strncpy(&dis_manuf,setting,setting_len);
+		return 0;
+	}
+	if (!strcmp(name, "model")) {
+
+		memset(&dis_model,0,sizeof(dis_model));
+		strncpy(&dis_model,setting,setting_len);
+	}
+	#if defined(CONFIG_BT_GATT_DIS_SERIAL_NUMBER)
+	if (!strcmp(name, "serial")) {
+
+		memset(&dis_serial_number,0,sizeof(dis_serial_number));
+		strncpy(&dis_serial_number,setting,setting_len);
+		return 0;
+	}
+	#endif
+	#if defined(CONFIG_BT_GATT_DIS_FW_REV)
+	if (!strcmp(name, "fw")) {
+		memset(&dis_fw_rev,0,sizeof(dis_fw_rev));
+		strncpy(&dis_fw_rev,setting,setting_len);
+		return 0;
+	}
+	#endif
+	#if defined(CONFIG_BT_GATT_DIS_HW_REV)
+	if (!strcmp(name, "hw")) {
+		memset(&dis_hw_rev,0,sizeof(dis_fw_rev));
+		strncpy(&dis_hw_rev,setting,setting_len);
+		return 0;
+	}
+	#endif
+	#if defined(CONFIG_BT_GATT_DIS_SW_REV)
+	if (!strcmp(name, "sw")) {
+		memset(&dis_sw_rev,0,sizeof(dis_sw_rev));
+		strncpy(&dis_sw_rev,setting,setting_len);
+		return 0;
+	}
+	#endif
+
+	return -1;
+}
+#else
 static int dis_set(const char *name, size_t len_rd,
 		   settings_read_cb read_cb, void *store)
 {
@@ -269,4 +325,6 @@ static int dis_set(const char *name, size_t len_rd,
 }
 
 SETTINGS_STATIC_HANDLER_DEFINE(bt_dis, "bt/dis", NULL, dis_set, NULL, NULL);
+#endif
+
 #endif /* CONFIG_BT_GATT_DIS_SETTINGS && CONFIG_BT_SETTINGS*/

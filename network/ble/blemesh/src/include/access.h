@@ -87,6 +87,10 @@ struct bt_mesh_elem {
 #define BT_MESH_MODEL_ID_HEALTH_SRV                0x0002
 #define BT_MESH_MODEL_ID_HEALTH_CLI                0x0003
 
+/** Private Beacon Server */
+#define BT_MESH_MODEL_ID_PRIV_BEACON_SRV           0x000a
+/** Private Beacon Client */
+#define BT_MESH_MODEL_ID_PRIV_BEACON_CLI           0x000b
 /* Models from the Mesh Model Specification */
 #define BT_MESH_MODEL_ID_GEN_ONOFF_SRV             0x1000
 #define BT_MESH_MODEL_ID_GEN_ONOFF_CLI             0x1001
@@ -212,7 +216,7 @@ struct bt_mesh_model_op {
 	const u32_t  opcode;
 
 	/** Minimum required message length */
-	const size_t min_len;
+	const int min_len;
 
 	/** @brief Handler function for this opcode.
 	 *

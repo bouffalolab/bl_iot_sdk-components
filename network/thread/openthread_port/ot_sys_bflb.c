@@ -1,8 +1,11 @@
 #include <stdio.h>
 
-#include <bl616.h>
-#include <bl616_glb.h>
+#include CHIP_HDR
+#include CHIP_GLB_HDR
+#include CHIP_SYS_HDR
 #include <bflb_sec_trng.h>
+
+#include <bl_sys.h>
 
 #include <openthread_port.h>
 
@@ -10,14 +13,31 @@
 #include <openthread/platform/entropy.h>
 #include <openthread/platform/misc.h>
 
+
 void otPlatReset(otInstance *aInstance) 
 {
-    __asm volatile( "csrc mstatus, 8" );
-    GLB_SW_POR_Reset();
+    bl_sys_reset_por();
 }
 
 otPlatResetReason otPlatGetResetReason(otInstance *aInstance)
 {
+    BL_RST_REASON_E rstinfo = bl_sys_rstinfo_get();
+
+    switch (rstinfo) {
+        case BL_RST_HARDWARE_WATCHDOG:
+        return OT_PLAT_RESET_REASON_WATCHDOG;
+        case BL_RST_BOD:
+        return OT_PLAT_RESET_REASON_OTHER;
+        case BL_RST_HBN:
+        return OT_PLAT_RESET_REASON_EXTERNAL;
+        case BL_RST_POWER_OFF:
+        return OT_PLAT_RESET_REASON_EXTERNAL;
+        case BL_RST_SOFTWARE:
+        return OT_PLAT_RESET_REASON_SOFTWARE;
+        default:
+        return OT_PLAT_RESET_REASON_UNKNOWN;
+    }
+
     return OT_PLAT_RESET_REASON_UNKNOWN;
 }
 

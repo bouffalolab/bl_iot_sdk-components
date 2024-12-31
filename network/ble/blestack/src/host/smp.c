@@ -37,6 +37,7 @@
 
 #include "hci_core.h"
 #include "ecc.h"
+#include <ecc_dh.h>
 #include "keys.h"
 #include "conn_internal.h"
 #include "l2cap_internal.h"
@@ -305,6 +306,22 @@ void bt_smp_set_sc_only(bool sc_only)
 void bt_smp_disable_pair(bool disable)
 {
     bt_dev.disable_pair = disable;
+}
+#endif
+
+#if defined(CONFIG_BT_ECC)
+static int bt_smp_public_key_check_valid(const uint8_t *peer_pub_key_x, const uint8_t *peer_pub_key_y)
+{
+    uint8_t pk[64];
+
+    sys_memcpy_swap(pk, peer_pub_key_x, 32);
+    sys_memcpy_swap(&pk[32], peer_pub_key_y, 32);
+
+    if (uECC_valid_public_key(pk, &curve_secp256r1) < 0) {
+        return BT_SMP_ERR_DHKEY_CHECK_FAILED;
+    }
+
+    return 0;
 }
 #endif
 
@@ -1408,7 +1425,7 @@ static u8_t smp_br_pairing_req(struct bt_smp_br *smp, struct net_buf *buf)
 	rsp->oob_flag = 0x00;
 	rsp->max_key_size = max_key_size;
 	rsp->init_key_dist = (req->init_key_dist & BR_RECV_KEYS_SC);
-	rsp->resp_key_dist = (req->resp_key_dist & BR_RECV_KEYS_SC);
+	rsp->resp_key_dist = (req->resp_key_dist & BR_SEND_KEYS_SC);
 
 	smp->local_dist = rsp->resp_key_dist;
 	smp->remote_dist = rsp->init_key_dist;
@@ -4173,6 +4190,11 @@ static u8_t smp_public_key(struct bt_smp *smp, struct net_buf *buf)
 	u8_t err;
 
 	BT_DBG("");
+
+	if(bt_smp_public_key_check_valid(req->x,req->y))
+	{
+          return BT_SMP_ERR_DHKEY_CHECK_FAILED;
+	}
 
 	memcpy(smp->pkey, req->x, 32);
 	memcpy(&smp->pkey[32], req->y, 32);

@@ -37,6 +37,7 @@
 #include "bl702_hbn.h"
 #include "bl702_glb.h"
 #include "bl702_xip_sflash.h"
+#include "risc-v/Core/Include/clic.h"
 
 /** @addtogroup  BL702_Peripheral_Driver
  *  @{
@@ -296,6 +297,12 @@ void ATTR_TCM_SECTION HBN_Enable_Ext(uint8_t aGPIOIeCfg, HBN_LDO_LEVEL_Type ldoL
     /* Set power on option:0 for por reset twice for robust 1 for reset only once*/
     tmpVal = BL_CLR_REG_BIT(tmpVal, HBN_PWR_ON_OPTION);
     BL_WR_REG(HBN_BASE, HBN_CTL, tmpVal);
+
+    *(volatile uint8_t *)(CLIC_HART0_ADDR + CLIC_INTIP + HBN_OUT0_IRQn) = 0;
+    *(volatile uint8_t *)(CLIC_HART0_ADDR + CLIC_INTIP + HBN_OUT1_IRQn) = 0;
+
+    BL_WR_REG(HBN_BASE, HBN_IRQ_CLR, 0xffffffff);
+    BL_WR_REG(HBN_BASE, HBN_IRQ_CLR, 0);
 
     /* Enable HBN mode */
     tmpVal = BL_RD_REG(HBN_BASE, HBN_CTL);

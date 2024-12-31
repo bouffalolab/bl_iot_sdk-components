@@ -20,8 +20,8 @@ bl702_start:
 	la sp, _sp_main
 
 	/*set em_sel to 0 before using sp*/
-	li a0, 0x4000007C
-	sw x0, (a0)
+	li a0, 0x40000000
+	sw x0, 0x7C(a0)
 
 	/*make hbnram active*/
 	li a0, 0x4000F000
@@ -35,6 +35,19 @@ bl702_start:
 #if defined(ENABLE_SMP)
 	smp_pause(t0, t1)
 #endif
+
+	/* Load hbn section */
+	la a0, _hbn_load
+	la a1, _hbn_run
+	la a2, _hbn_run_end
+	bgeu a1, a2, 2f
+1:
+	lw t0, (a0)
+	sw t0, (a1)
+	addi a0, a0, 4
+	addi a1, a1, 4
+	bltu a1, a2, 1b
+2:
 
 #ifndef RUN_IN_RAM
 	call bl_sys_cache_config
@@ -93,19 +106,6 @@ bl702_start:
 	bltu a1, a2, 1b
 2:
 #endif
-
-	/* Load hbn section */
-	la a0, _hbn_load
-	la a1, _hbn_run
-	la a2, _hbn_run_end
-	bgeu a1, a2, 2f
-1:
-	lw t0, (a0)
-	sw t0, (a1)
-	addi a0, a0, 4
-	addi a1, a1, 4
-	bltu a1, a2, 1b
-2:
 
 	/* Fill system stack with 0x5a */
 	la a0, __stack_size

@@ -279,6 +279,10 @@ void notify_le_param_updated(struct bt_conn *conn);
 
 void notify_le_phy_updated(struct bt_conn *conn, u8_t tx_phy, u8_t rx_phy);
 
+#if defined(CONFIG_USER_DATA_LEN_UPDATE)
+void notify_le_datalen_updated(struct bt_conn *conn, u16_t tx_octets, u16_t tx_time,u16_t rx_octets,u16_t rx_time);
+#endif
+
 bool le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param);
 
 #if defined(CONFIG_BT_SMP)

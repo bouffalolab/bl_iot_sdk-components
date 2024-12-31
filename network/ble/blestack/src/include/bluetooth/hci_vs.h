@@ -157,6 +157,18 @@ struct bt_hci_cp_vs_le_throughput_calc {
     bool enable;
     u8_t interval;
 }__packed;
+
+#if !defined(BL602) && !defined(BL702)
+#define BT_HCI_OP_VS_GET_CONTROLLER_SDK_VER BT_OP(BT_OGF_VS, 0x007C)
+struct bt_hci_rp_get_controller_sdk_ver{
+    uint8_t status;
+    uint8_t ver_major;
+    uint8_t ver_minor;
+    uint8_t ver_patch;
+    uint8_t sdk_commit_id[4];
+} __packed;
+#endif
+
 /* Events */
 
 struct bt_hci_evt_vs {

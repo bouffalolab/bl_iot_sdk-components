@@ -26,6 +26,8 @@ extern "C" {
 
 void bas_init(void);
 
+void bas_deinit(void);
+
 /** @brief Read battery level value.
  *
  * Read the characteristic value of the battery level

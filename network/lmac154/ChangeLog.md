@@ -1,5 +1,33 @@
 # change log on lmac154 module
 
+## 2024/12/13
+- Version: 1.6.10
+- Changes
+  - BL616: Improve large network stability
+  - BL702L: Improve large network stability and APIs to backup registers for sleep device
+
+## 2024/11/18
+- Version: 1.6.9
+- Changes
+  - BL616: Improve tx abort for ack transmition
+  - BL702L: Improve tx abort for ack transmition
+
+## 2024/10/25
+- Version: 1.6.8
+- Changes
+  - BL616: Parse recieved packets and drop packets with wrong destination for standard 2015 enabled
+  - BL702L: Parse recieved packets and drop packets with wrong destination for standard 2015 enabled
+
+## 2024/09/05
+- Version: 1.6.7
+- Changes
+  - BL616: Add more interfaces and log module
+
+## 2024/7/18
+- Version: 1.6.6
+- Changes
+  - BL616: Improve tx/rx stablity 
+
 ## 2024/6/3
 - Version: 1.6.5
 - Changes

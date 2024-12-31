@@ -15,5 +15,6 @@ int bl_efuse_read_capcode(uint8_t *capcode);
 int bl_efuse_read_pwroft(int8_t poweroffset[2]);
 int bl_efuse_read_pwroft_ex(int8_t poweroffset_zigbee[16], int8_t poweroffset_ble[40]);
 int bl_efuse_read_tsen_refcode(int16_t *refcode);
+int bl_efuse_read_adc_gain_coe(float *coe);
 
 #endif

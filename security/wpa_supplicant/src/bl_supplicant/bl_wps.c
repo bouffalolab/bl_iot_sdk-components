@@ -48,11 +48,6 @@ int wps_credential_save(u8 idx, u8 *ssid, u8 ssid_len, char *key, u8 key_len)
         return -1;
     }
 
-    // Drop credential that does not match negotiation AP
-    if (!(ssid_len == sm->ssid_neg_len && !memcmp(ssid, sm->ssid_neg, ssid_len))) {
-        return 0;
-    }
-
     memset(sm->ssid[idx], 0x00, sizeof(sm->ssid[idx]));
     memcpy(sm->ssid[idx], ssid, ssid_len);
     sm->ssid_len[idx] = ssid_len;
@@ -60,8 +55,7 @@ int wps_credential_save(u8 idx, u8 *ssid, u8 ssid_len, char *key, u8 key_len)
     memcpy(sm->key[idx], key, key_len);
     sm->key_len[idx] = key_len;
 
-    // We only save the last matched credential
-    sm->ap_cred_cnt = 1;
+    sm->ap_cred_cnt++;
 
     return 0;
 }
@@ -316,15 +310,21 @@ static void wps_task_(void *pvParameters)
                 xTimerDelete(sm->success_cb_timer, portMAX_DELAY);
                 sm->success_cb_timer = NULL;
             }
-            if (sm->wps->state == WPS_FINISHED && sm->ap_cred_cnt == 1) {
-                bl_wps_ap_credential_t *cred;
+            if (sm->wps->state == WPS_FINISHED && sm->ap_cred_cnt > 0) {
+                bl_wps_ap_credential_t *creds;
+                size_t sz = sizeof(*creds) + sm->ap_cred_cnt * sizeof(bl_wps_ap_credential_item_t);
                 prepare_stop_();
-                if ((cred = pvPortMalloc(sizeof(*cred)))) {
-                    memset(cred, 0, sizeof(*cred));
-                    memcpy(cred->bssid, sm->bssid, ETH_ALEN);
-                    memcpy(cred->ssid, sm->ssid[0], sm->ssid_len[0]);
-                    memcpy(cred->passphrase, sm->key[0], sm->key_len[0]);
-                    notify_user_(BL_WPS_EVENT_COMPLETE, cred);
+                if ((creds = pvPortMalloc(sz))) {
+                    memset(creds, 0, sz);
+                    creds->cnt = sm->ap_cred_cnt;
+                    for (size_t i = 0; i < sm->ap_cred_cnt; ++i) {
+                        bl_wps_ap_credential_item_t *cred = &creds->creds[i];
+                        memcpy(cred->bssid, sm->bssid, ETH_ALEN);
+                        memcpy(cred->ssid, sm->ssid[i], sm->ssid_len[i]);
+                        cred->ssid_len = sm->ssid_len[i];
+                        memcpy(cred->passphrase, sm->key[i], sm->key_len[i]);
+                    }
+                    notify_user_(BL_WPS_EVENT_COMPLETE, creds);
                 } else {
                     notify_user_(BL_WPS_EVENT_FAILURE, 0);
                 }
@@ -674,7 +674,7 @@ static int wps_finish(void)
         /* ets_timer_disarm(&sm->wps_timeout_timer); */
         /* ets_timer_disarm(&sm->wps_msg_timeout_timer); */
 
-        if (sm->ap_cred_cnt == 1) {
+        if (sm->ap_cred_cnt > 0) {
             wps_evq_msg_t msg = { .event = WPS_EVQ_SUCCESS };
             xQueueSend(sm->event_queue, &msg, portMAX_DELAY);
 #if 0

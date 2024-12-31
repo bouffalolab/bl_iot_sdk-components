@@ -3725,7 +3725,6 @@ static int gatt_exec_write(struct bt_conn *conn,
 	return gatt_send(conn, buf, gatt_write_rsp, params, NULL);
 }
 
-#ifdef BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC
 static int gatt_cancel_all_writes(struct bt_conn *conn,
 			   struct bt_gatt_write_params *params)
 {
@@ -3744,7 +3743,22 @@ static int gatt_cancel_all_writes(struct bt_conn *conn,
 
 	return gatt_send(conn, buf, gatt_write_rsp, params, NULL);
 }
-#endif /* BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC */
+
+int bt_gatt_cancle_prepare_writes(struct bt_conn *conn,
+			   struct bt_gatt_write_params *params)
+{
+    #if CONFIG_BT_ATT_PREPARE_COUNT == 0
+	return BT_ATT_ERR_NOT_SUPPORTED;
+    #else
+    __ASSERT(conn, "invalid parameters\n");
+    __ASSERT(params && params->func, "invalid parameters\n");
+    if (conn->state != BT_CONN_CONNECTED) {
+        return -ENOTCONN;
+    }
+
+    return gatt_cancel_all_writes(conn, params);
+    #endif /* CONFIG_BT_ATT_PREPARE_COUNT */
+}
 
 static void gatt_prepare_write_rsp(struct bt_conn *conn, u8_t err,
 				   const void *pdu, u16_t length,

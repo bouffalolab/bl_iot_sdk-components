@@ -1,4 +1,13 @@
 # Changes
+## 2024-11-13
+1.[blemesh] MESH_IOPT_BV_02_C: Reduce num of mesh model registration and support publication of Health Client. 
+
+## 2024-07-15
+1.[BleMesh]Fixed adv_send failed when executing mesh suspend and then resume.
+
+## 2024-07-15
+1. Support mesh 1.1
+
 ## 2024-06-05
 1. Add LC models to second element, PTS need this mode to pass MMDL/SR/MLTEL/BV-01-C
 

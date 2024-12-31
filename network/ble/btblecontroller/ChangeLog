@@ -1,4 +1,100 @@
 # Changes
+## 2024-12-25
+1.[BL616]Fix some issues of EBQ bt test
+
+## 2024-12-23
+1.[BL616]Fix the assert issue caused by a risk issue of conneciton update indication processing in a corner case. This issue has fixed on bl702L.
+
+## 2024-12-19
+#1.[bl702L]In libbtblecontroller_702l_uarthcilp.a, fix the issue that device enters into pds with a long time while ble activities exist because it detects that there is no ble activities unexpectedly.
+
+## 2024-12-10
+#1.[BL702L]In libbtblecontroller_702l_uarthcilp.a, support two different advertising payloads in one advertising interval.
+
+## 2024-11-22
+1.[bl702L]]Fix the timer assert issue in btblecontroller only mode because it doesn't do ble software wakeup when it receives hci command in ble sleep mode.
+
+## 2024-11-21
+1.[bl616]Fix the issue of rf radio test.
+
+## 2024-11-04
+1.[bl702L]Make btblecontroller rom code be able to used in btblecontroller only mode.
+
+## 2024-10-30
+1.[bl616]Support LE read buffer size v2 command when iso feature was disabled.
+
+## 2024-10-22
+1.[bl616][bl702L] Fix the issue that direct address type was rpa in le advertising report when rx address was public.
+
+## 2024-10-21
+1.[bl702L]For different RTOS porting, add an API to process messages for btblecontroller task.
+
+## 2024-10-18
+1.[bl702L][BL616]Fix the issue that btlecontroller doesn't respond for hci commands which are not supported.
+
+## 2024-10-16
+1.[bl702L]Upgrade the functionality of uart.c to make UART communication use DMA by default.
+
+## 2024-10-16
+1.[BL616]Update the code of getting btblecontroller software version
+2.[BL616]Add compiling flag for qualification
+
+## 2024-10-15
+1.[BL616]Fix some issues of EBQ test
+
+## 2024-10-11
+1.[bl702L][BL616]Fix btblecontroller assert issue when slave eixts latency state in advance to send data. This issue is caused by that slave updates new connection parameters before the expect instant when latency appiled.
+
+## 2024-09-24
+1.[bl616]Fix some issues of EBQ test
+
+##2024-09-24
+1.[bl702L][BL616]Implement btblecontroller_printf in bl_iot_sdk, and use btblecontroller_printf to print in btblecontroller.
+2.[bl702L][BL616]Distinguish different return value of btblecontroller sleep function.
+
+## 2024-09-13
+1.[bl702L]Relocate hci_uart_lp driver.
+
+## 2024-09-13
+1.[bl702L][BL616]Fix ble link lost issue when ble tx power is negative.
+
+## 2024-09-06
+1.[bl702L][BL616]Add a hci vendor command to get btblecontroller's sdk version. Add an API for application layer to set sdk version. This is used when btblecontroller is a single image without blestack.
+
+## 2024-09-03
+1.[BL702L]Add btblecontroller_702l_m0s4p.
+
+## 2024-08-26
+1.[bl702L]Optimize maximum throughput for bl702L
+
+##2024-08-19
+1.[bl702L][bl616]Fix link lost issue in a corner case when slave's latency is applied.
+
+## 2024-07-22
+1.[bl702L]Add btblecontroller_702l_uarthcilp.
+
+## 2024-07-22
+1.[bl702L][BL616]For controller only mode, support the hci command of system reset.
+
+## 2024-07-18
+1.[BL702L]Add btblecontroller_702l_uarthci.
+2.[bl702L][BL616]Optimize btblecontroller's os queue. Not make btblecontroller's os task post message to btblecontroller's os queue.
+
+## 2024-07-17
+1.[bl702L][BL616]Fix the assert issue caused by an unexpected handling which happens between ble llcp reqeust timeout and ble connection timeout.
+
+## 2024-07-16
+1.[bl702L][BL616]Fix the issue that controller fails to accept acl data from on-chip host because controller doesn't have available tx buffer.
+
+## 2024-07-15
+1.[BL616][BL702L]Add api to set/delelte private key.
+
+## 2024-07-09
+1.[BL616]Fix ble and wifi coex issue.
+
+## 2024-07-08
+1.[bl702L][BL616]Fix conection timeout issue caused by anchor point calculate error when doing connection parameter update.
+
 ## 2024-06-24
 1.[BL616]Add a vendor command for setting br/edr tx power.
 
@@ -46,7 +142,7 @@
 1.[BL616]Fix the issues of code scan
 
 ## 2024-01-25
-1.[BL702L][BL616]Fix the assert caused by a risk issue of conneciton update indication processing in a corner case.
+1.[BL702L]Fix the assert issue caused by a risk issue of conneciton update indication processing in a corner case.
 
 ## 2023-12-19
 1.[BL616][BL702L]Fix the issue that ble connection will be disconnected with reason 0x22(LMP response timeout) when central and peripheral devices sent connection parameter request at the same time.

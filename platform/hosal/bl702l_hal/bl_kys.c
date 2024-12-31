@@ -172,8 +172,8 @@ void bl_kys_init(uint8_t row_num, uint8_t col_num, uint8_t row_pins[], uint8_t c
     KYS_Disable();
     KYS_Init(&kysCfg);
 
-    // Enable fifo_nonempty, fifo_full, ghost interrupt
-    BL_WR_REG(KYS_BASE, KYS_KS_INT_EN, (0x1<<11)|(0x1<<8)|(0x1<<12));
+    // Enable ks_done, fifo_full, ghost interrupt
+    BL_WR_REG(KYS_BASE, KYS_KS_INT_EN, (0x1<<7)|(0x1<<8)|(0x1<<12));
 
     bl_kys_gpio_init(row_num, col_num, row_pins, col_pins);
     bl_kys_matrix_init(row_num, col_num, row_pins, col_pins, row_num);
@@ -270,8 +270,8 @@ int bl_kys_get_key_event_by_key_code(uint8_t key_code)
 
 
 #if 0
-uint8_t row_pins[] = {31, 30, 10, 25, 24, 23};
-uint8_t col_pins[] = {9, 1, 0, 28, 27, 26};
+static uint8_t row_pins[] = {31, 30, 10, 25, 24, 23};
+static uint8_t col_pins[] = {9, 1, 0, 28, 27, 26};
 
 void bl_kys_poll_test(void)
 {
@@ -297,7 +297,7 @@ void bl_kys_poll_test(void)
     }
 }
 
-void bl_kys_interrupt_callback(bl_kys_result_t *result)
+static void bl_kys_interrupt_callback(bl_kys_result_t *result)
 {
     int key_event;
 

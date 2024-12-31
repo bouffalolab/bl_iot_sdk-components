@@ -195,7 +195,7 @@ int hal_gpio_init_from_dts(uint32_t fdt, uint32_t dtb_offset)
 static gpio_ctx_t *pstgpio_head = NULL;
 int hal_gpio_register_handler(void *func, int gpioPin, int intTrgMod, void *arg)
 {
-    if (NULL == func || gpioPin > GPIO_MAX_NUM || intTrgMod > 3) {
+    if (NULL == func || gpioPin > GPIO_MAX_NUM || intTrgMod > 11) {
         printf("register paraments is not correct! \r\n");
         return -1;
     }

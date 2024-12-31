@@ -12,9 +12,9 @@ MEMORY
   flash  (rxai!w) : ORIGIN = 0x23000000, LENGTH = (2M)
   tcm       (wxa) : ORIGIN = 0x42014000, LENGTH = (32K)
   tcm_rsvd  (wxa) : ORIGIN = 0x4201C000, LENGTH = (16K)
-  ocram_1   (wxa) : ORIGIN = 0x42020000, LENGTH = (24K)  /* will not be initialized in bootrom */
-  ocram_2   (wxa) : ORIGIN = 0x42026000, LENGTH = (16K)  /* will be initialized in bootrom */
-  ocram_3   (wxa) : ORIGIN = 0x4202A000, LENGTH = (24K - __EM_SIZE)  /* will not be initialized in bootrom */
+  ocram_1   (wxa) : ORIGIN = 0x42020000, LENGTH = (27K)              /* retention memory, will not be initialized in bootrom */
+  ocram_2   (wxa) : ORIGIN = 0x42026C00, LENGTH = (13K)              /* non-retention memory, will be initialized in bootrom */
+  ocram_3   (wxa) : ORIGIN = 0x4202A000, LENGTH = (24K - __EM_SIZE)  /* retention memory, will not be initialized in bootrom */
   hbnram    (wxa) : ORIGIN = 0x40010000, LENGTH = (4K)
   bugkill   (rxai!w) : ORIGIN = 0xD0000000, LENGTH = 16M
 }
@@ -56,6 +56,13 @@ SECTIONS
     *(.sdata2.*)
     *(.gcc_except_table.*)
 
+    . = ALIGN(8);
+    *(.srodata.cst16)
+    *(.srodata.cst8)
+    *(.srodata.cst4)
+    *(.srodata.cst2)
+    *(.srodata .srodata.*)
+
     /* camera driver */
     . = ALIGN(4);
     _bl_driver_camera_start = .;
@@ -90,6 +97,12 @@ SECTIONS
     KEEP(SORT(*)(.static_blogpri_code*))
     *(.static_blogpri_code*)
     _bl_static_blogpri_code_end = .;
+
+    /* section information for components's version */
+    . = ALIGN(4);
+    _version_info_section_start = .;
+    KEEP(*(.version.*))
+    _version_info_section_end = .;
 
     *(.gnu.linkonce.r.*)
   } >flash
@@ -149,11 +162,10 @@ SECTIONS
     *(.retention_noinit)
   } >hbnram
 
-  .rsvd (NOLOAD) :
+  .tcmdata (NOLOAD) :
   {
-    *(.rsvd_data)
-    *(.ble_rsvd_mem)
-  } >hbnram
+    *(.tcm_data)
+  } >tcm
 
   .tcmcode : ALIGN(4)
   {
@@ -161,17 +173,16 @@ SECTIONS
     PROVIDE( _tcm_run = ADDR(.tcmcode) );
     PROVIDE( _tcm_run_end = ADDR(.tcmcode) + SIZEOF(.tcmcode) );
 
+    /* tcm code that should be restored after pds wakeup */
+    *(.tcm_code.*)
+    *(.sclock_rlt_code.*)
+    PROVIDE ( _pds_restore_tcm_run_end = . );
+
     *(.tcm_code.*)
     *(.tcm_const.*)
     *(.sclock_rlt_code.*)
     *(.sclock_rlt_const.*)
 
-    /* tcm code that should be restored after pds wakeup */
-    *libblecontroller*.a:rwip.o(.tcm_code.* .sclock_rlt_code.*)
-    PROVIDE ( _pds_restore_tcm_run_end = . );
-
-    *(.tcm_data)
-    *(.data.uart_stdio)
     *libblestack.a:ble_cli_cmds.o(.sdata.* .srodata.* .sbss.* .bss.* COMMON)
   } >tcm AT >flash
 
@@ -195,13 +206,6 @@ SECTIONS
     *(.sdata .sdata.*)
     *(.gnu.linkonce.s.*)
 
-    . = ALIGN(8);
-    *(.srodata.cst16)
-    *(.srodata.cst8)
-    *(.srodata.cst4)
-    *(.srodata.cst2)
-    *(.srodata .srodata.*)
-    
     . = ALIGN(8);
     *(._k_queue.static.*)
     *(._k_sem.static.*)

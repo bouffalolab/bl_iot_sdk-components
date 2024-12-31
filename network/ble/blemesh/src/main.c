@@ -243,8 +243,6 @@ static void model_suspend(struct bt_mesh_model *mod, struct bt_mesh_elem *elem,
 	}
 }
 
-static bool mesh_state_before_suspend;
-
 int bt_mesh_suspend(void)
 {
 	int err;
@@ -258,9 +256,7 @@ int bt_mesh_suspend(void)
 	}
 
 #if defined(BFLB_BLE)
-	extern bool le_check_valid_adv(void);
-	mesh_state_before_suspend = le_check_valid_adv();
-
+	bt_mesh_adv_update();
 	err = bt_le_adv_stop();
 	if (err) {
 		atomic_clear_bit(bt_mesh.flags, BT_MESH_SUSPENDED);
@@ -311,11 +307,7 @@ int bt_mesh_resume(void)
 	if (!atomic_test_and_clear_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
 		return -EALREADY;
 	}
-#if defined(BFLB_BLE)
-	if(mesh_state_before_suspend){
-		set_adv_enable(1);
-	}
-#endif /*BFLB_BLE*/
+
 	err = bt_mesh_scan_enable();
 	if (err) {
 		BT_WARN("Re-enabling scanning failed (err %d)", err);

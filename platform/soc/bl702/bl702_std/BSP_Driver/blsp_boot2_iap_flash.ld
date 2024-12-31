@@ -19,6 +19,7 @@ ENTRY(_enter)
 
 StackSize = 0x1000; /*  4KB */
 VerOffset = 0xc00;
+Boot2Size = 0xC000;
 PROVIDE(__boot2_pass_param_addr = 0x4202DC00);
 MEMORY
 {
@@ -178,6 +179,10 @@ SECTIONS
         . = ALIGN(4);
         __ram_data_end__ = .;
     } > ram_memory
+
+    /* check flash size must less 48K */
+    __etext_final__ = (__ram_load_addr + SIZEOF(.ram_data_region));
+    ASSERT(__etext_final__ <= ORIGIN(xip_memory) + Boot2Size, "xip memory overflowed")
 
     .nocache_ram_region (NOLOAD) :
     {

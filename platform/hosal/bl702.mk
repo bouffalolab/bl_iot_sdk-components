@@ -18,6 +18,7 @@ COMPONENT_SRCS := bl702_hal/bl_adc.c \
                   bl702_hal/bl_gpio.c \
                   bl702_hal/bl_hbn.c \
                   bl702_hal/bl_ir.c \
+                  bl702_hal/bl_ir_rx.c \
                   bl702_hal/bl_irq.c \
                   bl702_hal/bl_pds.c \
                   bl702_hal/bl_pwm.c \
@@ -65,6 +66,7 @@ endif
 
 ifeq ($(CONFIG_USE_PSRAM),1)
 COMPONENT_SRCS +=  bl702_hal/bl_psram.c
+COMPONENT_SRCS +=  bl702_hal/bl_psram_sp.S
 endif
 
 COMPONENT_SRCDIRS += bl702_hal sec_common

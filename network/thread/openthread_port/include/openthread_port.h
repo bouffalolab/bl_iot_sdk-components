@@ -13,6 +13,12 @@ extern "C" {
 #include <openthread/thread.h>
 #include <openthread/logging.h>
 
+#define VERSION_OT_SRC_MAJOR 1
+#define VERSION_OT_SRC_MINOR 6
+#define VERSION_OT_SRC_PATCH 16
+
+// #define VERSION_OT_SRC_EXTRA_INFO "customer-1"
+
 #ifndef OT_TASK_SIZE
 #define OT_TASK_SIZE 1024
 #endif
@@ -263,6 +269,16 @@ void otrUnlock(void);
  *
 *******************************************************************************/
 bool otrIsThreadTask(void);
+
+/****************************************************************************//**
+ * @brief  Check whether Thread stack is idle
+ *
+ * @param  None
+ *
+ * @return ture, Thread stack is idle.
+ *
+*******************************************************************************/
+bool otr_isStackIdle(void);
 
 /****************************************************************************//**
  * @brief  Turn off interrupt
