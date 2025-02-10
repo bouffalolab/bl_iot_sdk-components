@@ -292,8 +292,8 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
 #if LWIP_IPV6_AUTOCONFIG
       sobj->vnet.netif.ip6_autoconfig_enabled = 1;
 #endif
-      dhcp6_set_struct(&sobj->vnet.netif, &sobj->vnet_dhcp6);
-      dhcp6_enable_stateless(&sobj->vnet.netif);
+      // dhcp6_set_struct(&sobj->vnet.netif, &sobj->vnet_dhcp6);
+      // dhcp6_enable_stateless(&sobj->vnet.netif);
 #endif
 #if LWIP_IPV4
       netifapi_dhcp_start((struct netif *)&(sobj->vnet.netif));
