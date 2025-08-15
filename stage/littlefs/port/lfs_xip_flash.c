@@ -12,6 +12,15 @@
 #endif
 #include "lfs_port.h"
 
+#if defined(BL702) || defined(BL702L)
+#include "bl_irq.h"
+extern void L1C_Cache_Flush(void);
+extern void L1C_Cache_Flush_Ext(void);
+#elif defined (BL602)
+#include "bl_irq.h"
+#include "bl602_romdriver.h"
+#endif
+
 #if 0
 #define LOG_F(fmt, ...) printf(fmt, ##__VA_ARGS__)
 #define LOG_E(fmt, ...) printf(fmt, ##__VA_ARGS__)
@@ -61,7 +70,7 @@ static struct lfs_config cfg = {
 #endif
 
     // block device configuration
-    .read_size = 256,
+    .read_size = 512,
     .prog_size = 256,
     .lookahead_size = 256,
     .cache_size = 512,
@@ -180,9 +189,19 @@ static int lfs_xip_giant_unlock(const struct lfs_config *c)
 int lfs_xip_flash_read(const struct lfs_config *c, lfs_block_t block,
                        lfs_off_t off, void *buffer, lfs_size_t size)
 {
+#if (defined(BL702) || defined(BL702L) || defined (BL602)) && defined (CONFIG_LITTLEFS_XIP_FLASH_READ)
+    int flags = bl_irq_save();
+    struct lfs_context *ctx = c->context;
+    int iret = bl_flash_read_byxip(ctx->flash_addr + block * c->block_size + off,
+                           (uint8_t *)buffer, size);
+    bl_irq_restore(flags);
+
+    return iret;
+#else
     struct lfs_context *ctx = c->context;
     return bl_flash_read(ctx->flash_addr + block * c->block_size + off,
                            (uint8_t *)buffer, size);
+#endif
 }
 
 /*****************************************************************************
@@ -200,9 +219,28 @@ int lfs_xip_flash_read(const struct lfs_config *c, lfs_block_t block,
 int lfs_xip_flash_prog(const struct lfs_config *c, lfs_block_t block,
                        lfs_off_t off, const void *buffer, lfs_size_t size)
 {
+#if (defined(BL702) || defined(BL702L) || defined (BL602)) && defined (CONFIG_LITTLEFS_XIP_FLASH_READ)
+    int flags = bl_irq_save();
+    int ret;
+    struct lfs_context *ctx = c->context;
+
+#if defined(BL702) 
+    L1C_Cache_Flush_Ext();
+#elif defined(BL702L)
+    L1C_Cache_Flush();
+#else
+    RomDriver_SFlash_Cache_Flush();
+#endif
+    ret = bl_flash_write(ctx->flash_addr + block * c->block_size + off, (uint8_t *)buffer, size);
+
+    bl_irq_restore(flags);
+
+    return ret;
+#else
     struct lfs_context *ctx = c->context;
     return bl_flash_write(ctx->flash_addr + block * c->block_size + off,
                             (uint8_t *)buffer, size);
+#endif
 }
 
 /*****************************************************************************
@@ -217,8 +255,27 @@ int lfs_xip_flash_prog(const struct lfs_config *c, lfs_block_t block,
 *****************************************************************************/
 int lfs_xip_flash_erase(const struct lfs_config *c, lfs_block_t block)
 {
+#if (defined(BL702) || defined(BL702L) || defined (BL602)) && defined (CONFIG_LITTLEFS_XIP_FLASH_READ)
+    int flags = bl_irq_save();
+    int ret;
+    struct lfs_context *ctx = c->context;
+
+#if defined(BL702) 
+    L1C_Cache_Flush_Ext();
+#elif defined(BL702L)
+    L1C_Cache_Flush();
+#else
+    RomDriver_SFlash_Cache_Flush();
+#endif
+
+    ret = bl_flash_erase(ctx->flash_addr + block * c->block_size, c->block_size);
+    bl_irq_restore(flags);
+
+    return ret;
+#else
     struct lfs_context *ctx = c->context;
     return bl_flash_erase(ctx->flash_addr + block * c->block_size, c->block_size);
+#endif
 }
 
 /*****************************************************************************
