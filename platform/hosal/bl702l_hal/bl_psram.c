@@ -146,7 +146,7 @@ void ATTR_TCM_SECTION bl_psram_init(void)
     Psram_ReadId(&apMemory1604, psramId);
     SF_Ctrl_Select_Bank(SF_CTRL_SEL_FLASH);
 
-    Psram_Cache_Write_Set(&apMemory1604, SF_CTRL_QIO_MODE, ENABLE, DISABLE, DISABLE);
+    Psram_Cache_Write_Set(&apMemory1604, SF_CTRL_QIO_MODE, 1, 0, 1);
     //L1C_Cache_Enable_Set(L1C_WAY_DISABLE_NONE);
 }
 

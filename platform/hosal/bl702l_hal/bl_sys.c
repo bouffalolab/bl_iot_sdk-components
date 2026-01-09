@@ -174,7 +174,7 @@ int bl_sys_run_at_max_speed(void)
 
     GLB_Set_System_CLK(GLB_DLL_XTAL_32M, GLB_SYS_CLK_DLL128M);
     HBN_Set_XCLK_CLK_Sel(HBN_XCLK_CLK_XTAL);
-    GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_42P67M, 0);
+    GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_BCLK, 0);
 
     write_csr(mstatus, mstatus_tmp);
 
