@@ -8,13 +8,14 @@
 
 #define VERSION_LMAC154_MAJOR 1
 #define VERSION_LMAC154_MINOR 6
-#define VERSION_LMAC154_PATCH 10
+#define VERSION_LMAC154_PATCH 18
 
 // #define VERSION_LMAC154_SRC_EXTRA_INFO "customer-1"
 
 typedef void (*lmac154_isr_t)(void);
 
 typedef enum {
+    LMAC154_CHANNEL_NONE = -1,
     LMAC154_CHANNEL_11 = 0,
     LMAC154_CHANNEL_12,
     LMAC154_CHANNEL_13,
@@ -517,7 +518,7 @@ uint32_t lmac154_isTriggerTimeSelected(void);
 *******************************************************************************/
 void lmac154_runTxCM(void);
 
-
+#if defined(BL702) || defined(BL702L)
 /****************************************************************************//**
  * @brief  Run tx continuous wave (single tone)
  *         Call lmac154_resetTx to stop
@@ -528,6 +529,7 @@ void lmac154_runTxCM(void);
  *
 *******************************************************************************/
 void lmac154_runTxCW(void);
+#endif
 
 
 /****************************************************************************//**
@@ -615,6 +617,15 @@ uint8_t lmac154_getSFDCorrelation(void);
 *******************************************************************************/
 int lmac154_getFrequencyOffset(void);
 
+/****************************************************************************//**
+ * @brief  Set country code for tx power adjustment
+ *
+ * @param  country_code: country code, for example: CN
+ *
+ * @return true, if country code is valid.
+ *
+*******************************************************************************/
+bool lmac154_setCountryCode(const char * country_code);
 
 /****************************************************************************//**
  * @brief  Set tx power (no default value)
@@ -626,6 +637,19 @@ int lmac154_getFrequencyOffset(void);
 *******************************************************************************/
 void lmac154_setTxPower(lmac154_tx_power_t power_dbm);
 
+/****************************************************************************//**
+ * @brief  Set tx power (no default value)
+ *
+ * @param  power_dbm: tx power ranging from LMAC154_TX_POWER_0dBm to LMAC154_TX_POWER_14dBm
+ *
+ * @param  ch_ind: channel index ranging from LMAC154_CHANNEL_11 to LMAC154_CHANNEL_26
+ *
+ * @param country_code: country code, for example: CN
+ *
+ * @return None
+ *
+*******************************************************************************/
+void lmac154_setTxPowerWithPowerLimit(lmac154_tx_power_t power_dbm, lmac154_channel_t ch_ind, const char *country_code);
 
 /****************************************************************************//**
  * @brief  Get tx power
@@ -896,7 +920,7 @@ lmac154_rf_state_t lmac154_getRFState(void);
 
 
 /****************************************************************************//**
- * @brief  Enable the coexistence of zigbee and other wireless modules (default disabled)
+ * @brief  Enable the coexistence of 802.15.4 and BLE wireless modules (default disabled)
  *
  * @param  None
  *
@@ -915,6 +939,37 @@ void lmac154_enableCoex(void);
  *
 *******************************************************************************/
 void lmac154_disableCoex(void);
+
+
+/****************************************************************************//**
+ * @brief  set m154 module coexistence priority
+ *
+ * @param  is_rx_on_after_rx_abort_enable, enable RX after falling edge of RX abort if rx_abort_en is 0.
+ * @param  tx_priority, priority when TX MPDU is being transmitted. (0 ~ 15)
+ * @param  rx_unicast_priority, priority when RX unicast packet is being received. (0 ~ 15)
+ * @param  rx_sfd_priority, priority when RX SFD is detected (0 ~ 15)
+ * @param  rx_idle_priority, priority when Rx is IDLE (0 ~ 15)
+ *
+ * @return None
+ *
+*******************************************************************************/
+void lmac154_setCoexPriority(bool is_rx_on_after_rx_abort_enable, uint32_t tx_priority, 
+    uint32_t rx_unicast_priority, uint32_t rx_sfd_priority, uint32_t rx_idle_priority);
+
+/****************************************************************************//**
+ * @brief  set m154 module coexistence priority
+ *
+ * @param  is_rx_on_after_rx_abort_enable, enable RX after falling edge of RX abort if rx_abort_en is 0.
+ * @param  tx_priority, priority when TX MPDU is being transmitted. (0 ~ 15)
+ * @param  rx_unicast_priority, priority when RX unicast packet is being received. (0 ~ 15)
+ * @param  rx_sfd_priority, priority when RX SFD is detected (0 ~ 15)
+ * @param  rx_idle_priority, priority when Rx is IDLE (0 ~ 15)
+ *
+ * @return None
+ *
+*******************************************************************************/
+void lmac154_getCoexPriority(bool * is_rx_on_after_rx_abort_enable, uint32_t * tx_priority, 
+    uint32_t * rx_unicast_priority, uint32_t * rx_sfd_priority, uint32_t * rx_idle_priority);
 
 /****************************************************************************//**
  * @brief  Enable TX abort interrupt
@@ -1193,7 +1248,7 @@ void lmac154_setTxRxTransTime(uint8_t timeInUs);
 *******************************************************************************/
 uint64_t lmac154_getEventTimeUs(lmac154_eventTimeType_t type);
 
-void lmac154_fptSetMaxNum(uint8_t shortAddrNum, uint8_t longAddrNum);
+bool lmac154_fptSetMaxNum(uint32_t shortAddrNum, uint32_t longAddrNum);
 
 /****************************************************************************//**
  * @brief  Run AES CCM
@@ -1311,8 +1366,7 @@ lmac154_fpt_status_t lmac154_fptRemoveLongAddr(uint8_t *ladr);
  * @return None
  *
 *******************************************************************************/
-void lmac154_fpt_GetShortAddrList(void *list, uint8_t *entry_num);
-
+void lmac154_fptGetShortAddrList(void *list, uint8_t *entry_num);
 
 /****************************************************************************//**
  * @brief  Get long address list in the frame pending table

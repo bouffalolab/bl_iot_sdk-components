@@ -139,7 +139,7 @@ struct bt_mesh_cdb_node *bt_mesh_cdb_node_alloc(const u8_t uuid[16], u16_t addr,
  */
 void bt_mesh_cdb_node_del(struct bt_mesh_cdb_node *node, bool store);
 
-#ifdef  CFG_NODE_SEND_CFGCLI_MSG
+#ifdef  CONFIG_NODE_SEND_CFGCLI_MSG
 /* Added by bouffalo lab, to save other node's device key */
 struct bt_mesh_cdb_node *bt_mesh_cdb_node_set_fornode(u16_t addr,u8_t num_elem,
 						const u8_t devkey[16]);

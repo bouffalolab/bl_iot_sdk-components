@@ -16,7 +16,7 @@
 #include "bluetooth.h"
 #include "conn.h"
 #include "gatt.h"
-#include "uuid.h"
+#include "bt_uuid.h"
 #include "bas.h"
 
 #if !defined(BFLB_BLE)

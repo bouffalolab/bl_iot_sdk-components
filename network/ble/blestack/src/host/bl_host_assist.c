@@ -10,36 +10,44 @@
 #include "byteorder.h"
 #include "bt_log.h"
 #include <bt_errno.h>
+#if defined(CONFIG_BT_HOST_HCI_TL)
+#if defined(CONFIG_BT_HOST_HCI)
+#include "bflb_hci_tl.h"
+#else
+#include "bl_hci_tl.h"
+#include "bl_gpio.h"
+#endif
+#endif
 
-struct blhast_le_adv_data{
+struct hast_le_adv_data{
     u8_t ad[31];
 	size_t ad_len;
 };
 
-static struct bt_le_scan_param blhast_le_scan_param;
-static struct bt_le_adv_param blhast_le_adv_param;
-static struct blhast_le_adv_data blhast_le_ad;
-static struct blhast_le_adv_data blhast_le_sd;
-static bt_le_scan_cb_t *blhast_le_scan_cb;
+static struct bt_le_scan_param hast_le_scan_param;
+static struct bt_le_adv_param hast_le_adv_param;
+static struct hast_le_adv_data hast_le_ad;
+static struct hast_le_adv_data hast_le_sd;
+static bt_le_scan_cb_t *hast_le_scan_cb;
 
-static void blhast_ble_scan_assist_cb(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb);
-static void blhast_ble_adv_assist_cb(const struct bt_le_adv_param *param, const struct bt_data *ad, 
+static void hast_ble_scan_assist_cb(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb);
+static void hast_ble_adv_assist_cb(const struct bt_le_adv_param *param, const struct bt_data *ad, 
 		size_t ad_len, const struct bt_data *sd, size_t sd_len);
 
-static struct blhast_cb assist_cb = {
-    .le_scan_cb = blhast_ble_scan_assist_cb,
-	.le_adv_cb = blhast_ble_adv_assist_cb,
+static struct hast_cb assist_cb = {
+    .le_scan_cb = hast_ble_scan_assist_cb,
+	.le_adv_cb = hast_ble_adv_assist_cb,
 };
 
 extern struct bt_dev bt_dev;
 
-static void blhast_ble_scan_assist_cb(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb)
+static void hast_ble_scan_assist_cb(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb)
 {
-    memcpy(&blhast_le_scan_param, param, sizeof(struct bt_le_scan_param));
-	blhast_le_scan_cb = cb;
+    memcpy(&hast_le_scan_param, param, sizeof(struct bt_le_scan_param));
+	hast_le_scan_cb = cb;
 }
 
-static void blhast_ble_get_ad(const struct bt_data *ad, size_t ad_len,  uint8_t *output)
+static void hast_ble_get_ad(const struct bt_data *ad, size_t ad_len,  uint8_t *output)
 {
     int i;
 	uint8_t data_len = 0;
@@ -57,7 +65,7 @@ static void blhast_ble_get_ad(const struct bt_data *ad, size_t ad_len,  uint8_t 
 	}
 }
 
-static void blhast_ble_construct_ad(struct blhast_le_adv_data *adv_data, struct bt_data *output)
+static void hast_ble_construct_ad(struct hast_le_adv_data *adv_data, struct bt_data *output)
 {
      int i;
      size_t ad_len = adv_data->ad_len;
@@ -72,25 +80,25 @@ static void blhast_ble_construct_ad(struct blhast_le_adv_data *adv_data, struct 
 	 }
 }
 
-static void blhast_ble_adv_assist_cb(const struct bt_le_adv_param *param, const struct bt_data *ad, 
+static void hast_ble_adv_assist_cb(const struct bt_le_adv_param *param, const struct bt_data *ad, 
 		size_t ad_len, const struct bt_data *sd, size_t sd_len)
 {
-    memcpy(&blhast_le_adv_param, param, sizeof(struct bt_le_adv_param));
+    memcpy(&hast_le_adv_param, param, sizeof(struct bt_le_adv_param));
 
 	if(ad){	
-    	blhast_le_ad.ad_len = ad_len;
-    	memset(blhast_le_ad.ad, 0, sizeof(blhast_le_ad.ad));
-    	blhast_ble_get_ad(ad, ad_len, blhast_le_ad.ad);
+    	hast_le_ad.ad_len = ad_len;
+    	memset(hast_le_ad.ad, 0, sizeof(hast_le_ad.ad));
+    	hast_ble_get_ad(ad, ad_len, hast_le_ad.ad);
 	}
 
 	if(sd){
-    	blhast_le_sd.ad_len = sd_len;
-    	memset(blhast_le_sd.ad, 0, sizeof(blhast_le_sd.ad));
-    	blhast_ble_get_ad(sd, sd_len, blhast_le_sd.ad);
+    	hast_le_sd.ad_len = sd_len;
+    	memset(hast_le_sd.ad, 0, sizeof(hast_le_sd.ad));
+    	hast_ble_get_ad(sd, sd_len, hast_le_sd.ad);
 	}
 }
 
-static int blhast_common_reset(void)
+static int hast_common_reset(void)
 {
     
 	struct net_buf *rsp;
@@ -116,7 +124,7 @@ static int blhast_common_reset(void)
 	return 0;
 }
 
-static int blhast_ble_reset(void)
+static int hast_ble_reset(void)
 {
     struct bt_hci_cp_write_le_host_supp *cp_le;
 	struct net_buf *buf, *rsp;
@@ -185,7 +193,7 @@ static int blhast_ble_reset(void)
 }
 
 #if defined(CONFIG_BT_BREDR)
-static int blhast_br_reset(void)
+static int hast_br_reset(void)
 {  
     struct net_buf *buf;
 	struct bt_hci_cp_write_ssp_mode *ssp_cp;
@@ -274,26 +282,26 @@ static int blhast_br_reset(void)
 }
 #endif
 
-static int  blhast_host_hci_reset(void)
+static int  hast_host_hci_reset(void)
 {
     int err;
 	ATOMIC_DEFINE(old_flags, BT_DEV_NUM_FLAGS);
 	memcpy(old_flags, bt_dev.flags, sizeof(old_flags));
 
-	err = blhast_common_reset();
+	err = hast_common_reset();
 	
 	if (err) {
 		return err;
 	}
 
-	err = blhast_ble_reset();
+	err = hast_ble_reset();
 	if (err) {
 		return err;
 	}
 
     #if defined(CONFIG_BT_BREDR)
     if (BT_FEAT_BREDR(bt_dev.features)) {
-		err = blhast_br_reset();
+		err = hast_br_reset();
 		if (err) {
 			return err;
 		}
@@ -310,7 +318,7 @@ static int  blhast_host_hci_reset(void)
 	return 0;
 }
 
-static void blhast_host_state_restore(void)
+static void hast_host_state_restore(void)
 {
     struct bt_data *ad = NULL;
 	struct bt_data *sd = NULL;
@@ -318,10 +326,10 @@ static void blhast_host_state_restore(void)
     net_buf_unref(bt_dev.sent_cmd);
     bt_dev.sent_cmd = NULL;
 
-	blhast_host_hci_reset();
+	hast_host_hci_reset();
 
     #if defined(CONFIG_BT_CONN)
-	bt_notify_disconnected();
+	bt_conn_cleanup_all();
 	#endif
 
     atomic_set_bit(bt_dev.flags, BT_DEV_ASSIST_RUN);
@@ -332,26 +340,26 @@ static void blhast_host_state_restore(void)
 	     BT_WARN("Restore BLE scan\r\n");
         atomic_clear_bit(bt_dev.flags, BT_DEV_EXPLICIT_SCAN);
 	    atomic_clear_bit(bt_dev.flags, BT_DEV_SCANNING);
-		bt_le_scan_start((const struct bt_le_scan_param *)&blhast_le_scan_param, blhast_le_scan_cb);
+		bt_le_scan_start((const struct bt_le_scan_param *)&hast_le_scan_param, hast_le_scan_cb);
 	}
     #endif
 	
 	if(atomic_test_and_clear_bit(bt_dev.flags, BT_DEV_ADVERTISING))
 	{
 	     BT_WARN("Restore BLE advertising\r\n");
-	    if(blhast_le_ad.ad_len > 0)
+	    if(hast_le_ad.ad_len > 0)
 	    {
-	        ad = k_malloc(sizeof(struct bt_data) * blhast_le_ad.ad_len);
-	        blhast_ble_construct_ad(&blhast_le_ad, ad);
+	        ad = k_malloc(sizeof(struct bt_data) * hast_le_ad.ad_len);
+	        hast_ble_construct_ad(&hast_le_ad, ad);
 	    }
-		if(blhast_le_sd.ad_len > 0)
+		if(hast_le_sd.ad_len > 0)
 		{
-		    sd = k_malloc(sizeof(struct bt_data) * blhast_le_sd.ad_len);
-	        blhast_ble_construct_ad(&blhast_le_sd, sd);
+		    sd = k_malloc(sizeof(struct bt_data) * hast_le_sd.ad_len);
+	        hast_ble_construct_ad(&hast_le_sd, sd);
 		}
 			
-        bt_le_adv_start((const struct bt_le_adv_param *)&blhast_le_adv_param, ad,
-			blhast_le_ad.ad_len, sd, blhast_le_sd.ad_len);
+        bt_le_adv_start((const struct bt_le_adv_param *)&hast_le_adv_param, ad,
+			hast_le_ad.ad_len, sd, hast_le_sd.ad_len);
 
 		if(ad)
 			k_free(ad);
@@ -362,19 +370,32 @@ static void blhast_host_state_restore(void)
 	atomic_clear_bit(bt_dev.flags, BT_DEV_ASSIST_RUN);
 }
 
-void blhast_bt_reset(void)
+void hast_bt_reset(void)
 {
-    #if defined(BL602) || defined(BL702)
-    ble_controller_reset();
-    #else
-    btble_controller_reset();
-    #endif
-    blhast_host_state_restore();
+	#if defined(BL602) || defined(BL702)
+	ble_controller_reset();
+	#else
+	#if defined(CONFIG_BT_HOST_HCI_TL)
+	#if defined(CONFIG_BT_HOST_HCI)
+	bflb_hci_reset();
+	#else
+	bl_gpio_enable_output(CTRL_RESET_PIN, 0, 0);
+	bl_gpio_output_set(CTRL_RESET_PIN, 0);
+	k_sleep(10);
+	bl_gpio_output_set(CTRL_RESET_PIN, 1);
+	k_sleep(500); // wait controller ready
+	bl_hci_reset();
+	#endif
+	#else
+	btble_controller_reset();
+	#endif  
+	#endif
+	hast_host_state_restore();
 }
 
-void blhast_init(void)
+void hast_init(void)
 {
-    memset(&blhast_le_ad, 0, sizeof(struct blhast_le_adv_data));
-	memset(&blhast_le_sd, 0, sizeof(struct blhast_le_adv_data));
+    memset(&hast_le_ad, 0, sizeof(struct hast_le_adv_data));
+	memset(&hast_le_sd, 0, sizeof(struct hast_le_adv_data));
     bt_register_host_assist_cb(&assist_cb);
 }

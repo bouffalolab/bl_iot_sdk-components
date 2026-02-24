@@ -57,10 +57,10 @@
 #define SAR_CONT           0x02
 #define SAR_LAST           0x03
 
-#define CFG_FILTER_SET     0x00
-#define CFG_FILTER_ADD     0x01
-#define CFG_FILTER_REMOVE  0x02
-#define CFG_FILTER_STATUS  0x03
+#define CONFIG_FILTER_SET     0x00
+#define CONFIG_FILTER_ADD     0x01
+#define CONFIG_FILTER_REMOVE  0x02
+#define CONFIG_FILTER_STATUS  0x03
 
 #define PDU_HDR(sar, type) (sar << 6 | (type & BIT_MASK(6)))
 
@@ -265,7 +265,7 @@ static void send_filter_status(struct bt_mesh_proxy_client *client,
 	net_buf_simple_reset(buf);
 	net_buf_simple_reserve(buf, 10);
 
-	net_buf_simple_add_u8(buf, CFG_FILTER_STATUS);
+	net_buf_simple_add_u8(buf, CONFIG_FILTER_STATUS);
 
 	if (client->filter_type == WHITELIST) {
 		net_buf_simple_add_u8(buf, 0x00);
@@ -329,11 +329,11 @@ static void proxy_cfg(struct bt_mesh_proxy_client *client)
 
 	opcode = net_buf_simple_pull_u8(&buf);
 	switch (opcode) {
-	case CFG_FILTER_SET:
+	case CONFIG_FILTER_SET:
 		filter_set(client, &buf);
 		send_filter_status(client, &rx, &buf);
 		break;
-	case CFG_FILTER_ADD:
+	case CONFIG_FILTER_ADD:
 		while (buf.len >= 2) {
 			u16_t addr;
 
@@ -342,7 +342,7 @@ static void proxy_cfg(struct bt_mesh_proxy_client *client)
 		}
 		send_filter_status(client, &rx, &buf);
 		break;
-	case CFG_FILTER_REMOVE:
+	case CONFIG_FILTER_REMOVE:
 		while (buf.len >= 2) {
 			u16_t addr;
 

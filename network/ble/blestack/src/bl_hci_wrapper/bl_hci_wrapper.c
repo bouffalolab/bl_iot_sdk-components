@@ -170,10 +170,17 @@ void bl_packet_to_host(uint8_t pkt_type, uint16_t src_id, uint8_t *param, uint8_
         }
         case BT_HCI_EVT:
         {
+            /*
+            Notice: If BFLB_BLE_NOT_ALLOCATE_RX_NETBUF_FOR_NUM_OF_COMPLETED_PKTS_EVT is enabled,
+            directly handle BT_HCI_EVT_NUM_COMPLETED_PACKETS in bl_onchiphci_rx_packet_handler instead of bt_recv_prio.
+            */
+            #if !defined (BFLB_BLE_NOT_ALLOCATE_RX_NETBUF_FOR_NUM_OF_COMPLETED_PKTS_EVT)
             if(src_id != BT_HCI_EVT_NUM_COMPLETED_PACKETS)
+            #endif
             {
                 prio = false;
             }
+
             bt_buf_set_type(buf, BT_BUF_EVT);
             tlt_len = BT_HCI_EVT_LE_PARAM_OFFSET + param_len;
             *buf_data++ = src_id;
@@ -301,16 +308,26 @@ static void bl_onchiphci_rx_packet_handler(uint8_t pkt_type, uint16_t src_id, ui
     #endif /*(CONFIG_BT_OBSERVER || CONFIG_BT_CENTRAL || CONFIG_BT_ALLROLES)*/
     else
     {
-        if(pkt_type != BT_HCI_ACL_DATA){
-            /* Using the reserved buf (CONFIG_BT_RX_BUF_RSV_COUNT) firstly. */
-            buf = bt_buf_get_rx(BT_BUF_ACL_IN, K_NO_WAIT);
-            if(buf){
-                bl_packet_to_host(pkt_type, src_id, param, param_len, buf);
-                return;
+        #if defined(BFLB_BLE_NOT_ALLOCATE_RX_NETBUF_FOR_NUM_OF_COMPLETED_PKTS_EVT)
+        if(pkt_type == BT_HCI_EVT && src_id == BT_HCI_EVT_NUM_COMPLETED_PACKETS){
+            BT_ASSERT(param);
+            extern void hci_num_completed_packets(struct bt_hci_evt_num_completed_packets *evt);
+            hci_num_completed_packets((struct bt_hci_evt_num_completed_packets *)param);
+            return;
+        }else
+        #endif
+        {
+            if(pkt_type != BT_HCI_ACL_DATA){
+                /* Using the reserved buf (CONFIG_BT_RX_BUF_RSV_COUNT) firstly. */
+                buf = bt_buf_get_rx(BT_BUF_ACL_IN, K_NO_WAIT);
+                if(buf){
+                    bl_packet_to_host(pkt_type, src_id, param, param_len, buf);
+                    return;
+                }
             }
-        }
 
-        rx_msg = bl_find_valid_data_msg();
+            rx_msg = bl_find_valid_data_msg();
+        }
     }
 
     BT_ASSERT(rx_msg);

@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #ifndef BLE_LIB_API_H_
 #define BLE_LIB_API_H_
 
@@ -6,10 +35,10 @@
 
 void ble_controller_init(uint8_t task_priority);
 void ble_controller_deinit(void);
-#if !defined(CFG_FREERTOS) && !defined(CFG_AOS) && !defined(CFG_NUTTX)
+#if !defined(CONFIG_FREERTOS) && !defined(CONFIG_AOS) && !defined(CONFIG_NUTTX)
 void blecontroller_main(void);
 #endif
-#if defined(CFG_BT_RESET)
+#if defined(CONFIG_BT_RESET)
 void ble_controller_reset(void);
 #endif
 char * ble_controller_get_lib_ver(void);
@@ -30,13 +59,10 @@ void ble_rf_set_tx_channel(uint16_t tx_channel);
 void ble_controller_disable_adv_random_delay(bool disable);
 
 #if defined(CONFIG_BLE_MFG)
-enum
-{
-    BLE_TEST_TX                  = 0x00,
-    BLE_TEST_RX,
-    BLE_TEST_RXTX,
-    BLE_TEST_END
-};
+#define BLE_TEST_TX     0x00
+#define BLE_TEST_RX     0x01
+#define BLE_TEST_RXTX   0x02
+#define BLE_TEST_END    0x03
 
 ///HCI LE Receiver Test Command parameters structure
 struct le_rx_test_cmd
@@ -52,7 +78,7 @@ struct le_tx_test_cmd
     uint8_t        tx_freq;
     ///TX test data length
     uint8_t        test_data_len;
-    ///TX test payload type - see enum
+    ///TX test payload type 
     uint8_t        pk_payload_type;
 };
 
@@ -73,7 +99,7 @@ struct le_enhanced_tx_test_cmd
     uint8_t        tx_freq;
     ///TX test data length
     uint8_t        test_data_len;
-    ///TX test payload type - see enum
+    ///TX test payload type
     uint8_t        pk_payload_type;
     ///TX PHY for Rx test
     uint8_t        tx_phy;

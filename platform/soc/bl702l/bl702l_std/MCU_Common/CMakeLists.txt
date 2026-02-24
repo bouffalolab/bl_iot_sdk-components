@@ -10,7 +10,6 @@ list(APPEND ADD_INCLUDE
 "${CMAKE_CURRENT_SOURCE_DIR}/bl_math"
 "${CMAKE_CURRENT_SOURCE_DIR}/pid"
 "${CMAKE_CURRENT_SOURCE_DIR}/timestamp"
-"${CMAKE_CURRENT_SOURCE_DIR}/scaling_down"
 )
 #######################################################
 
@@ -30,7 +29,6 @@ file(GLOB_RECURSE sources
 "${CMAKE_CURRENT_SOURCE_DIR}/bl_math/*.c"
 "${CMAKE_CURRENT_SOURCE_DIR}/pid/*.c"
 "${CMAKE_CURRENT_SOURCE_DIR}/timestamp/*.c"
-"${CMAKE_CURRENT_SOURCE_DIR}/scaling_down/*.c"
 )
 
 #aux_source_directory(. sources)
@@ -52,7 +50,8 @@ list(APPEND ADD_SRCS  ${sources})
 
 ############ Add global compile option ################
 #add components denpend on this component
-# list(APPEND ADD_DEFINITIONS -Dxxx)
+string(TOUPPER ${CHIP} CHIPNAME)
+list(APPEND ADD_DEFINITIONS -D${CHIPNAME})
 #######################################################
 
 ############ Add private compile option ################

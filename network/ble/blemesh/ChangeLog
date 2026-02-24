@@ -1,4 +1,11 @@
 # Changes
+## 2025-09-24
+1. [blemesh]Use common config a macro for Bouffalo_SDK
+
+## 2025-5-15
+1. [blemesh]Fix mesh message can not be decrypt by received device, casued by bt_mesh.seq is changed during encryption using appkey.
+2. [blemesh]Fixed encryption errors that occur when encryption functions are accessed in parallel.
+
 ## 2024-11-13
 1.[blemesh] MESH_IOPT_BV_02_C: Reduce num of mesh model registration and support publication of Health Client. 
 

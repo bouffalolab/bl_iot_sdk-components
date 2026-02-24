@@ -58,11 +58,13 @@
 #if defined(CONFIG_BT_MESH_MODEL) || defined(CONFIG_AUTO_PTS)
 #define CONFIG_BT_RX_STACK_SIZE  3072
 #else
-#define CONFIG_BT_RX_STACK_SIZE  2048
+#define CONFIG_BT_RX_STACK_SIZE  2176
 #endif
 #else
 #if !defined(CONFIG_BT_CONN)
 #define CONFIG_BT_RX_STACK_SIZE  1024
+#elif defined(CONFIG_BT_NEARBY)
+#define CONFIG_BT_RX_STACK_SIZE  3072
 #else
 #define CONFIG_BT_RX_STACK_SIZE  2048//1536//1024
 #endif
@@ -86,11 +88,11 @@
 #if !defined(CONFIG_BT_CONN)
 #define CONFIG_BT_HCI_TX_STACK_SIZE  1024
 #else
-#if defined(CFG_IOT_SDK) || defined(BL_MCU_SDK)
+#if defined(CONFIG_IOT_SDK) || defined(BL_MCU_SDK)
 #define CONFIG_BT_HCI_TX_STACK_SIZE 1536//1024//200
 #else
 #define CONFIG_BT_HCI_TX_STACK_SIZE 1536+512//1024//200
-#endif /*CFG_IOT_SDK || BL_MCU_SDK*/
+#endif /*CONFIG_IOT_SDK || BL_MCU_SDK*/
 #endif
 #endif
 
@@ -147,6 +149,8 @@
 #ifndef CONFIG_BT_RX_BUF_LEN
 #if defined(CONFIG_BT_BREDR)
 #define CONFIG_BT_RX_BUF_LEN 680 //CONFIG_BT_L2CAP_RX_MTU + 4 + 4
+#elif defined(CONFIG_BT_SPP)
+#define CONFIG_BT_RX_BUF_LEN 1015
 #else
 #define CONFIG_BT_RX_BUF_LEN 255 //108 //76
 #endif
@@ -195,7 +199,7 @@
 * range 2 to 255
 */
 #ifndef CONFIG_BT_L2CAP_TX_BUF_COUNT
-#define CONFIG_BT_L2CAP_TX_BUF_COUNT CFG_BLE_TX_BUFF_DATA
+#define CONFIG_BT_L2CAP_TX_BUF_COUNT CONFIG_BLE_TX_BUFF_DATA
 #endif
 
 /**
@@ -205,13 +209,13 @@
 #ifndef CONFIG_BT_L2CAP_TX_MTU
 #ifdef CONFIG_BT_SMP
 #if defined(CONFIG_BT_A2DP_SOURCE)
-#define CONFIG_BT_L2CAP_TX_MTU 680
+#define CONFIG_BT_L2CAP_TX_MTU 672
 #else
 #define CONFIG_BT_L2CAP_TX_MTU 247 //96 //65
 #endif
 #else
 #if defined(CONFIG_BT_A2DP_SOURCE)
-#define CONFIG_BT_L2CAP_TX_MTU 680
+#define CONFIG_BT_L2CAP_TX_MTU 672
 #else
 #define CONFIG_BT_L2CAP_TX_MTU 247 //96 //65
 #endif
@@ -245,7 +249,9 @@
 #define CONFIG_BT_ATT_PREPARE_COUNT 0
 #endif
 #endif
-
+#if (CONFIG_BT_ATT_PREPARE_COUNT < 0 || CONFIG_BT_ATT_PREPARE_COUNT > 64)
+    #error "Validate CONFIG_BT_ATT_PREPARE_COUNT range (0-64)."
+#endif
 /**
 *  CONFIG_BLUETOOTH_SMP:Eable the Security Manager Protocol
 *  (SMP), making it possible to pair devices over LE
@@ -383,7 +389,7 @@
 *  range 1 to 128
 */
 #ifndef CONFIG_BT_MAX_CONN
-#define CONFIG_BT_MAX_CONN CFG_CON
+#define CONFIG_BT_MAX_CONN CONFIG_CON
 #endif
 
 /*If the application layer sends a att reqeust packet simultaneously for each ble connection, 
@@ -439,11 +445,11 @@
 */
 #ifndef CONFIG_BT_WORK_QUEUE_STACK_SIZE
 #ifndef CONFIG_BT_MESH
-#if defined(CFG_IOT_SDK) || defined(BL_MCU_SDK)
+#if defined(CONFIG_IOT_SDK) || defined(BL_MCU_SDK)
 #define CONFIG_BT_WORK_QUEUE_STACK_SIZE 1536//1280//512
 #else
 #define CONFIG_BT_WORK_QUEUE_STACK_SIZE 1536+512//1280//512
-#endif /*CFG_IOT_SDK || BL_MCU_SDK*/
+#endif /*CONFIG_IOT_SDK || BL_MCU_SDK*/
 #else
 #if !defined(CONFIG_BT_CONN)
 #define CONFIG_BT_WORK_QUEUE_STACK_SIZE 1024
@@ -477,7 +483,7 @@
 *  CONFIG_BLUETOOTH_DEBUG_LOG:Enable bluetooth debug log.
 */
 #if defined(BFLB_BLE)
-#if defined(CFG_BLE_STACK_DBG_PRINT)
+#if defined(CONFIG_BLE_STACK_DBG_PRINT)
 #undef CONFIG_BT_DEBUG
 #define CONFIG_BT_DEBUG 1
 #endif
@@ -569,7 +575,7 @@
 #endif
 
 #ifndef CONFIG_BT_DEVICE_APPEARANCE
-#define CONFIG_BT_DEVICE_APPEARANCE 833
+#define CONFIG_BT_DEVICE_APPEARANCE 0x0000
 #endif
 
 #if defined(BFLB_BLE)
@@ -583,6 +589,10 @@
 
 #ifndef CONFIG_BT_ID_MAX
 #define CONFIG_BT_ID_MAX 1
+#endif
+
+#ifndef CONFIG_BT_REMOTE_VERSION
+#define CONFIG_BT_REMOTE_VERSION 0
 #endif
 
 //#define PTS_GAP_SLAVER_CONFIG_NOTIFY_CHARC 1
@@ -612,7 +622,17 @@
 
 #if defined(CONFIG_BT_BREDR)
 #define CONFIG_BT_PAGE_TIMEOUT 0x2000 //5.12s
+#if defined(CONFIG_BT_SPP)
+/* 
+ * 1007 (L2CAP RX MTU) + 4 bytes (L2CAP basic header) = 1011 bytes,
+ * which is below the maximum user payload of a single 3-DH5 packet (1021 bytes).
+ * This guarantees that one L2CAP PDU can always fit into a single 3-DH5 packet
+ * without baseband fragmentation.
+ */
+#define CONFIG_BT_L2CAP_RX_MTU 1007
+#else
 #define CONFIG_BT_L2CAP_RX_MTU 672
+#endif
 
 #ifndef CONFIG_BT_RFCOMM_TX_STACK_SIZE
 #define CONFIG_BT_RFCOMM_TX_STACK_SIZE  1024
@@ -640,7 +660,7 @@
 #define BFLB_DYNAMIC_ALLOC_MEM
 #define BFLB_BT_LINK_KEYS_STORE
 #if defined(BL702) || defined(BL702L)
-#if defined(CFG_BLE_PDS) && defined(BFLB_BLE) && defined(BFLB_DYNAMIC_ALLOC_MEM)&& !defined(CONFIG_BT_MESH)
+#if defined(CONFIG_BLE_PDS) && defined(BFLB_BLE) && defined(BFLB_DYNAMIC_ALLOC_MEM)&& !defined(CONFIG_BT_MESH)
 #define BFLB_STATIC_ALLOC_MEM   1
 #else
 #define BFLB_STATIC_ALLOC_MEM   0
@@ -693,6 +713,9 @@ happens, which cause memory leak issue.*/
  * Then bt_conn_set_state called with parameter BT_CONN_DISCONNECT. the conn->ref shall be error.
  */
 #define BFLB_BLE_PATCH_DISCONNECT_ERROR_WHEN_TASK_YEILD
+/*Host stack check API input parameter*/
+#define BFLB_HOST_PARAMETER_CHECK
+
 #if defined(CONFIG_BT_GATT_DYNAMIC_DB)
 #define BFLB_BLE_DYNAMIC_SERVICE
 #endif
@@ -715,7 +738,7 @@ happens, which cause memory leak issue.*/
 #define BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS
 #endif
 
-#if defined(CFG_BT_RESET)
+#if defined(CONFIG_BT_RESET)
 #define BFLB_HOST_ASSISTANT
 #endif
 
@@ -789,7 +812,7 @@ then it does disconnected flow once more. This will cause hardfault issue becaus
 #define BFLB_BLE_AUTO_CLEAN_KEY_WHEN_KEY_MISSING
 #define BFLB_BLE_AUTO_CANCEL_RELIABLE_WRITE_CHARACTERISTIC
 #define BFLB_BLE_FREE_CONN_UPDATE_WORK_WHEN_DISCONNECT_IN_CONN_SCAN_STATE
-#define BFLB_BLE_REJECT_CONNECTABLE_ADV_IF_MAX_LINKS_REACH
+#define BFLB_BLE_RESTRICT_CONN_ACTION_NOT_EXCEED_MAX_CONN
 /* If there are multiple subscriptions, and host's acl tx buffer is not enough, it will block receive task to wait for host's 
  * available tx buffer with timout 30s, this make receive task cannot handle att response for last write ccc req to release tx buffer. 
  * ATT_TIMEOUT will happen because there is no available tx buffer.
@@ -811,4 +834,20 @@ then it does disconnected flow once more. This will cause hardfault issue becaus
  * Notice:If Auto conn initiated by bt_le_set_auto_conn,it doesn't create le connection from whitelist.It needs scan first.
 */
 #define BFLB_BLE_NOT_USE_BACKGROUD_SCAN_PARAMETERS_IF_NOT_ATUO_CONN_WITHOUT_WHITELIST
+#define BFLB_BLE_AVOID_WORKQ_TIMER_CANCEL_RISK
+#if !defined(CONFIG_BT_HOST_HCI_TL)
+#define BFLB_BLE_NOT_ALLOCATE_RX_NETBUF_FOR_NUM_OF_COMPLETED_PKTS_EVT
+#endif
+/*Fix the issue:hci_tx_thread blocked by other sem, not by g_poll_sem, then conn_cleanup is delayed to be handled. When conn_update_timer expires,
+ *conn_update_timeout will be called, and clean the ref,conn->ref = 0. Once hci_tx_thread runs, in bt_conn_prepare_events,it doesn't
+ *excute conn_cleanup if conn->ref is 0.This will cause memory leak issue.
+*/
+#define BFLB_BLE_PATCH_AVOID_CONN_CLEANUP_FAILED_EXCUTED_RISK
+
+/* Fix the issue that bt_conn_create_le (to the samve address) is called before hci_disconn_complete fully completed, the new ref is not start from 0.*/
+#define BFLB_BLE_PATCH_CONN_CREATE_LE_BEFORE_DISCONN_FULLY_COMPLETE_RISK
+
+/* Fix the issue that conn_new reentry before atomic_set is completed, then different connections may be use the same conns[i]*/
+#define BFLB_BLE_PATCH_CONN_NEW_REENTRY_RISK
+
 #endif /* BLE_CONFIG_H */

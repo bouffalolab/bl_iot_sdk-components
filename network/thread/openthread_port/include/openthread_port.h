@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #ifndef OPENTHREAD_PORT_H
 #define OPENTHREAD_PORT_H
 
@@ -15,7 +44,7 @@ extern "C" {
 
 #define VERSION_OT_SRC_MAJOR 1
 #define VERSION_OT_SRC_MINOR 6
-#define VERSION_OT_SRC_PATCH 16
+#define VERSION_OT_SRC_PATCH 21
 
 // #define VERSION_OT_SRC_EXTRA_INFO "customer-1"
 
@@ -413,6 +442,16 @@ void otrAppProcess(ot_system_event_t sevent);
  *
 *******************************************************************************/
 #define OT_APP_NOTIFY(ebit)                 otrNotifyEvent(ebit & OT_SYSTEM_EVENT_APP)
+
+/****************************************************************************//**
+ * @brief  An interface for nxspi to notify rxd ready.
+ *
+ * @return None
+ *
+*******************************************************************************/
+#if NXSPI_OPENTHREAD_RADIO
+void ot_nxspi_notify_rxd(void);
+#endif
 
 #if defined (BL702) || defined (BL702L)
 void ot_uartSetFd(int fd);

@@ -214,7 +214,6 @@ static void board_pin_mux_init(void)
             uint8_t uart_sig = gpio_cfg.gpioPin % 8;
             /*link to one uart sig*/
             GLB_UART_Fun_Sel((GLB_UART_SIG_Type)uart_sig, (GLB_UART_SIG_FUN_Type)uart_func);
-            GLB_UART_Fun_Sel((GLB_UART_SIG_Type)uart_func, (GLB_UART_SIG_FUN_Type)uart_sig);
         } else if (af_pin_table[i].func == GPIO_FUN_PWM) {
             /*if pwm func*/
             gpio_cfg.pullType = GPIO_PULL_DOWN;
@@ -718,6 +717,11 @@ void peripheral_clock_init(void)
     tmpVal |= (1 << BL_AHB_SLAVE1_USB);
     GLB_Set_USB_CLK(1);
 #endif
+
+#if defined(BSP_USING_DMA)
+    tmpVal |= (1 << BL_AHB_SLAVE1_DMA);
+#endif
+
     BL_WR_REG(GLB_BASE, GLB_CGEN_CFG1, tmpVal);
 }
 

@@ -171,7 +171,7 @@ struct bt_conn {
 #endif
 	};
 
-#if defined(CONFIG_BT_REMOTE_VERSION)
+#if (CONFIG_BT_REMOTE_VERSION)
 	struct bt_conn_rv {
 		u8_t  version;
 		u16_t manufacturer;

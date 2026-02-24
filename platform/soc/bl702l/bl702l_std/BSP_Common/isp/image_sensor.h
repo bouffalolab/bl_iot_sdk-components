@@ -39,6 +39,7 @@
 #include "bl808_i2c.h"
 #include "bl808_cam.h"
 #include "bl808_mjpeg.h"
+#include "sha256.h"
 
 /** @addtogroup  Image_Sensor_Driver
  *  @{
@@ -68,44 +69,10 @@
 #define IMAGE_SENSOR_GC2053 2
 #define IMAGE_SENSOR_USE    IMAGE_SENSOR_GC2053
 
-#define SEC_TO_NS(x)                    ((x) * 1000000000)
-#define NS_TO_SEC(x)                    DIV_ROUND(x, 1000000000)
-
-#define INT_TO_EXPO_TIME(x)             (BL_EXPO_TIME)(DIV_ROUND(SEC_TO_NS(1),x))
-#define EXPO_TIME_TO_INT(x)             (SEC_TO_NS(1) / (int)(x))
-#define EXPO_TIME_1_SEC                 1000000000
-#define E50
-#ifdef E50
-#define EXPO_TIME_1_25_SEC              INT_TO_EXPO_TIME(25)//40000000
-#define EXPO_TIME_1_50_SEC              INT_TO_EXPO_TIME(50)
-#define EXPO_TIME_1_100_SEC             INT_TO_EXPO_TIME(100)//10000000
-#elif defined(E60)
-#define EXPO_TIME_1_25_SEC              INT_TO_EXPO_TIME(30)//40000000
-#define EXPO_TIME_1_50_SEC              INT_TO_EXPO_TIME(60)//INT_TO_EXPO_TIME(50)
-#define EXPO_TIME_1_100_SEC             INT_TO_EXPO_TIME(120)//8333333//10000000
-#endif
-#define EXPO_TIME_1_30_SEC              INT_TO_EXPO_TIME(30)
-#define EXPO_TIME_1_60_SEC              INT_TO_EXPO_TIME(60)
-#define EXPO_TIME_1_120_SEC             8333333
-#define EXPO_TIME_MIN                   1
-
-
-#define INT_TO_GAIN_DB(x)               (BL_GAIN_DB)((x) << 8)
-#define GAIN_DB_TO_INT(x)               ((int)(x) >> 8)
-
-#define GAIN_X_TO_DB(x)                 (log2((float)(x)) * 6)
-#define GAIN_DB_FLOAT_TO_INT(x)         ((int)((float)(x) * 256 + 0.5))
-#define GAIN_DB_INT_TO_FLOAT(x)         ((float)(x) / 256)
-
-#define GAIN_6_DB                       1536    /* 6 << 8 */
-#define GAIN_0_DB                       0
-
 #if (IMAGE_SENSOR_USE == IMAGE_SENSOR_GC2053)
-#define SENSOR_MAX_EXPO_TIME            EXPO_TIME_1_25_SEC              /* 1/25 sec */
-#define SENSOR_MIN_EXPO_TIME            143282                          /* 143282 ns, 4 line */
-#define SENSOR_MAX_GAIN                 GAIN_DB_FLOAT_TO_INT(36)        /* limit max gain t0 36 dB to avoid bad noise */
-#define SENSOR_MAX_AGAIN                GAIN_DB_FLOAT_TO_INT(23.625)    /* 23.625 dB or 15.5x */
-#define SENSOR_MIN_GAIN_STEP            (GAIN_6_DB / 16)                /* 0.375 dB */
+#define SENSOR_MAX_EXPO_TIME 143282
+#define SENSOR_MIN_EXPO_TIME 40000000
+#define SENSOR_MAX_GAIN      9216
 #endif
 
 #define ROTATE_LEFT(value, n)  ((value >> (32 - n)) | (value << n))
@@ -132,6 +99,7 @@ void Image_Sensor_MJPEG_Release(void);
 void Image_Sensor_MJPEG_Open(void);
 void Image_Sensor_MJPEG_Close(void);
 void Image_Sensor_MJPEG_Deinit(void);
+void Image_Sensor_SHA256(mbedtls_sha256_context *ctx, uint8_t *addr, uint32_t len, uint8_t *result);
 
 /*@} end of group IMAGE_SENSOR_Public_Functions */
 

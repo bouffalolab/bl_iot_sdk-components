@@ -229,7 +229,7 @@ int lfs_xip_flash_prog(const struct lfs_config *c, lfs_block_t block,
 #elif defined(BL702L)
     L1C_Cache_Flush();
 #else
-    RomDriver_SFlash_Cache_Flush();
+    SFlash_Cache_Flush();
 #endif
     ret = bl_flash_write(ctx->flash_addr + block * c->block_size + off, (uint8_t *)buffer, size);
 
@@ -265,7 +265,7 @@ int lfs_xip_flash_erase(const struct lfs_config *c, lfs_block_t block)
 #elif defined(BL702L)
     L1C_Cache_Flush();
 #else
-    RomDriver_SFlash_Cache_Flush();
+    SFlash_Cache_Flush();
 #endif
 
     ret = bl_flash_erase(ctx->flash_addr + block * c->block_size, c->block_size);

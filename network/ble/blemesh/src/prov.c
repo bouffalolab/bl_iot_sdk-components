@@ -16,7 +16,7 @@
 #include <bluetooth.h>
 #include <conn.h>
 #include <include/mesh.h>
-#include "../../blestack/src/include/bluetooth/uuid.h"
+#include "../../blestack/src/include/bluetooth/bt_uuid.h"
 
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_PROV)

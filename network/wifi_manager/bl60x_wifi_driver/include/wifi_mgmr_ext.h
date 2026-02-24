@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #ifndef __WIFI_MGMR_EXT_H__
 #define __WIFI_MGMR_EXT_H__
 #include <lwip/netif.h>
@@ -7,6 +36,35 @@
 #if defined(__cplusplus)
 extern "C" {
 #endif
+
+/* WiFi event */
+#define  EV_WIFI                  0x0002
+#define  CODE_WIFI_ON_INIT_DONE   1
+#define  CODE_WIFI_ON_MGMR_DONE   2
+#define  CODE_WIFI_CMD_RECONNECT  3
+#define  CODE_WIFI_ON_CONNECTED   4
+#define  CODE_WIFI_ON_DISCONNECT  5
+#define  CODE_WIFI_ON_PRE_GOT_IP  6
+#define  CODE_WIFI_ON_GOT_IP      7
+#define  CODE_WIFI_ON_CONNECTING  8
+#define  CODE_WIFI_ON_SCAN_DONE   9
+#define  CODE_WIFI_ON_SCAN_DONE_ONJOIN  10
+#define  CODE_WIFI_ON_AP_STARTED        11
+#define  CODE_WIFI_ON_AP_STOPPED        12
+#define  CODE_WIFI_ON_PROV_SSID         13
+#define  CODE_WIFI_ON_PROV_BSSID        14
+#define  CODE_WIFI_ON_PROV_PASSWD       15
+#define  CODE_WIFI_ON_PROV_CONNECT      16
+#define  CODE_WIFI_ON_PROV_DISCONNECT   17
+#define  CODE_WIFI_ON_PROV_SCAN_START   18
+#define  CODE_WIFI_ON_PROV_STATE_GET    19
+#define  CODE_WIFI_ON_MGMR_DENOISE      20
+#define  CODE_WIFI_ON_AP_STA_ADD        21
+#define  CODE_WIFI_ON_AP_STA_DEL        22
+#define  CODE_WIFI_ON_EMERGENCY_MAC     23
+#define  CODE_WIFI_ON_EXIT_PS           24
+#define  CODE_WIFI_ON_GOT_IP6           25
+#define  CODE_WIFI_ON_SET_PS_DONE       26
 
 #define WIFI_EVENT_BEACON_IND_AUTH_OPEN            0
 #define WIFI_EVENT_BEACON_IND_AUTH_WEP             1
@@ -192,7 +250,7 @@ typedef struct wifi_conf {
 //FIXME implemented in wifi_mgmr.c
 int wifi_mgmr_psk_cal(char *password, char *ssid, int ssid_len, char *output);
 int wifi_mgmr_drv_init(wifi_conf_t *conf);
-int wifi_mgmr_init(void);
+int wifi_mgmr_init(wifi_conf_t *conf);
 void wifi_mgmr_start(void);
 void wifi_mgmr_start_background(wifi_conf_t *conf);
 void wifi_mgmr_get_wifi_channel_conf(wifi_conf_t *wifi_chan_conf);
@@ -257,6 +315,7 @@ int wifi_mgmr_scan(void *data, scan_complete_cb_t cb);
 int wifi_mgmr_scan_adv(void *data, scan_complete_cb_t cb, uint16_t *channels, uint16_t channel_num, const uint8_t bssid[6], const char *ssid, uint8_t scan_mode, uint32_t duration_scan);
 int wifi_mgmr_cfg_req(uint32_t ops, uint32_t task, uint32_t element, uint32_t type, uint32_t length, uint32_t *buf);
 int wifi_mgmr_scan_complete_callback();
+int wifi_mgmr_sta_scanlist(void);
 int wifi_mgmr_cli_scanlist(void);
 int wifi_mgmr_cli_init(void);
 int wifi_mgmr_scan_ap(char *ssid, wifi_mgmr_ap_item_t *item);

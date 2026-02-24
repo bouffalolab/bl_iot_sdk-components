@@ -1,5 +1,76 @@
 # change log on Thread module
 
+## 2026/2/10
+- openthread_utils: 1.6.18
+  - BL702/BL702L: update frame pending operation
+- openthread_br: 1.6.20
+- openthread/openthread_port/openthread_rest: 1.6.21
+
+## 2026/1/22
+- openthread_utils: 1.6.17
+- openthread_br: 1.6.20
+  - do txt replace action if mdns instance existed
+- openthread/openthread_port/openthread_rest: 1.6.21
+
+## 2026/1/20
+
+- openthread_utils: 1.6.17
+- openthread_br: 1.6.19
+  - fix to re-publish new mdns service
+- openthread/openthread_port/openthread_rest: 1.6.21
+  - fix to get active dataset with text type with otbr restful api
+
+## 2026/1/15
+
+- openthread_utils: 1.6.17
+- openthread_br: 1.6.18
+  - fix crash on mdns question without service or prot specified
+- openthread/openthread_port/openthread_rest: 1.6.20
+
+## 2025/6/9
+
+- openthread_utils: 1.6.17
+- openthread_br: 1.6.17
+- openthread/openthread_port/openthread_rest: 1.6.20
+  - ot_nxspi: try one more time to exhaust nxspi readbuf
+
+## 2025/6/6
+
+- openthread_utils: 1.6.17
+- openthread_br: 1.6.17
+- openthread/openthread_port/openthread_rest: 1.6.19
+  - Add nxspi protocol serial support
+
+## 2025/4/25
+
+- openthread_utils: 1.6.17
+  - BL702: Parse recieved packets and drop packets with wrong destination for standard 2015 enabled
+- openthread_br: 1.6.17
+- openthread/openthread_port/openthread_rest: 1.6.18
+  - enable isFtd by default to enable frame pending search function for RCP
+
+## 2025/3/12
+
+- openthread_utils: 1.6.16
+- openthread_br: 1.6.17
+- openthread/openthread_port/openthread_rest: 1.6.17
+  - BL616: update API to do system reset
+
+## 2025/2/8
+
+- openthread_utils: 1.6.16
+  - fix frame pending bit set for ack frame preparation
+- openthread_br: 1.6.17
+- openthread/openthread_port/openthread_rest: 1.6.16
+
+## 2025/1/8
+
+- openthread_br: 1.6.17
+- Changes:
+  - fix to receive multicast ICMPv6 neighbor discovery packets on infrastructure network
+
+- openthread/openthread_port/openthread_rest: 1.6.16
+
 ## 2024/12/31
 
 - openthread_br: 1.6.16

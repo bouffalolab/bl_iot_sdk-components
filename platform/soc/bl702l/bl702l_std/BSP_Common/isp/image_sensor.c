@@ -36,7 +36,6 @@
 
 #include "image_sensor.h"
 #include "bflb_platform.h"
-#include "bl808_glb.h"
 
 /** @addtogroup  Image_Sensor_Driver
  *  @{
@@ -49,7 +48,12 @@
 /** @defgroup  IMAGE_SENSOR_Private_Macros
  *  @{
  */
-
+#define BFLB_EXTPSRAM_CLK_GPIO   GLB_GPIO_PIN_27
+#define BFLB_EXTPSRAM_CS_GPIO    GLB_GPIO_PIN_17
+#define BFLB_EXTPSRAM_DATA0_GPIO GLB_GPIO_PIN_28
+#define BFLB_EXTPSRAM_DATA1_GPIO GLB_GPIO_PIN_24
+#define BFLB_EXTPSRAM_DATA2_GPIO GLB_GPIO_PIN_23
+#define BFLB_EXTPSRAM_DATA3_GPIO GLB_GPIO_PIN_26
 #if (IMAGE_SENSOR_USE == IMAGE_SENSOR_BF2013)
 #define I2C_CAMERA_ADDR   0x6E
 #define SENSOR_ID_REG_MSB 0xFC
@@ -666,8 +670,7 @@ static const uint8_t sensorRegList[][2] = {
     { 0xfe, 0x80 }, // page select
     { 0xfe, 0x80 },
     { 0xfe, 0x80 },
-    //{ 0xfe, 0x00 },
-    { 0xfe, 0x10 },
+    { 0xfe, 0x00 },
     { 0xf2, 0x00 }, // [7] OTP_clk_gate [6:4] OTP_mode_temp [1] I2C_open_ena [0]pwd_dn
     { 0xf3, 0x0f }, // [7] OTP_finish [6] OTP_busy [5] Spad_vb_hiz_mode [4] Spad_buf_mode [3] Sdata_pad_io [2:0] Ssync_pad_io
     { 0xf4, 0x36 }, // [7] reduce_power_mode, [6:4]PLL_ldo_set, [3:0]spi_clk_div
@@ -678,8 +681,7 @@ static const uint8_t sensorRegList[][2] = {
     { 0xf9, 0x40 }, // [7:3]rpllclk_div [2:1]pllmp_prediv [0]analog_pwc
     { 0xfc, 0x8e }, // [7] regf clk enable [6] sys_rclk_sel [5] sys_wclk_sel [4:3]spi_sel_mode [2] serail_clk enable [1] re_lock_pll [0] not_use_pll
     /*cisctl&analog*/
-    //{ 0xfe, 0x00 },
-    { 0xfe, 0x10 },
+    { 0xfe, 0x00 },
     { 0x87, 0x18 }, // Debug_mode disable
     { 0xee, 0x30 },
     { 0xd0, 0xb7 },
@@ -736,32 +738,25 @@ static const uint8_t sensorRegList[][2] = {
     { 0xb9, 0x2c },
     /*blk*/
     { 0x26, 0x30 },
-    //{ 0xfe, 0x01 },
-    { 0xfe, 0x11 },
+    { 0xfe, 0x01 },
     { 0x40, 0x23 }, // BLK_mode1. [7] not smooth [6:4] blk_smooth_speed [3]blk_dd_map [2]dark_sel_map [1]dark_current_en [0]offset_en
     { 0x55, 0x07 },
     { 0x60, 0x40 }, // DARK OFFSET
-    //{ 0xfe, 0x04 },
-    { 0xfe, 0x14 },
+    { 0xfe, 0x04 },
     { 0x14, 0x78 }, // Ndark_ratio_G1
     { 0x15, 0x78 }, // Ndark_ratio_R1
     { 0x16, 0x78 }, // Ndark_ratio_B2
     { 0x17, 0x78 }, // Ndark_ratio_G2
     /*window*/
-    //{ 0xfe, 0x01 },
-    { 0xfe, 0x11 },
+    { 0xfe, 0x01 },
     { 0x92, 0x01 }, // output win start y
     { 0x94, 0x02 }, // output win start x
     { 0x95, 0x04 }, // output win height 1080
     { 0x96, 0x38 },
     { 0x97, 0x07 }, // outout win width  1920
     { 0x98, 0x80 },
-    /*skip frame*/
-    {0xfe,0x11},
-    {0x87,0x50},
     /*ISP*/
-    //{ 0xfe, 0x01 },
-    { 0xfe, 0x11 },
+    { 0xfe, 0x01 },
     { 0x01, 0x05 },
     { 0x02, 0x89 },
     { 0x04, 0x01 },
@@ -774,8 +769,7 @@ static const uint8_t sensorRegList[][2] = {
     { 0x0f, 0x00 },
     { 0x50, 0x1c },
     { 0x89, 0x03 },
-    //{ 0xfe, 0x04 },
-    { 0xfe, 0x14 },
+    { 0xfe, 0x04 },
     { 0x28, 0x86 },
     { 0x29, 0x86 },
     { 0x2a, 0x86 },
@@ -801,37 +795,72 @@ static const uint8_t sensorRegList[][2] = {
     { 0x3e, 0x62 },
     { 0x3f, 0x62 },
     /****DVP & MIPI****/
-    //{ 0xfe, 0x01 },
-    { 0xfe, 0x11 },
+    { 0xfe, 0x01 },
     // {0x8c,0x01}, // test mode
     //{0x9a,0x06},    /* VSYNC low pulse */
     { 0x9a, 0x02 }, /* VSYNC high pulse */
-    //{ 0xfe, 0x00 },
-    { 0xfe, 0x10 },
+    { 0xfe, 0x00 },
     { 0x7b, 0x2b },
     { 0x23, 0x2d },
-    //{ 0xfe, 0x03 },
-    { 0xfe, 0x13 },
+    { 0xfe, 0x03 },
     { 0x01, 0x20 }, // DPHY_analog_mode1
     { 0x02, 0x56 }, // DPHY_analog_mode2
     { 0x03, 0xb2 }, // DPHY_analog_mode3
     { 0x12, 0x80 }, // LWC_set[7:0]
     { 0x13, 0x07 }, // LWC_set[15:8]
 
-    //{ 0xfe, 0x00 },
-    //{ 0x3e, 0x40 },
-    {0xfe,0x11},
-    {0x8c,0x90},
-    {0xfe,0x10},
-    {0x3e,0x00},
-    
-    {0xfe,0x01},
-    {0x8c,0x10},
-    {0xfe,0x00},
-    {0x3e,0x40},
+    { 0xfe, 0x00 },
+    { 0x3e, 0x40 },
 
 #endif
 };
+
+#if 0
+SPI_Psram_Cfg_Type apMemory1604 =
+{
+    .readIdCmd = 0x9F,
+    .readIdDmyClk = 0,
+    .burstToggleCmd = 0xC0,
+    .resetEnableCmd = 0x66,
+    .resetCmd = 0x99,
+    .enterQuadModeCmd = 0x35,
+    .exitQuadModeCmd = 0xF5,
+    .readRegCmd = 0xB5,
+    .readRegDmyClk = 1,
+    .writeRegCmd = 0xB1,
+    .readCmd = 0x03,
+    .readDmyClk = 0,
+    .fReadCmd = 0x0B,
+    .fReadDmyClk = 1,
+    .fReadQuadCmd = 0xEB,
+    .fReadQuadDmyClk = 3,
+    .writeCmd = 0x02,
+    .quadWriteCmd = 0x38,
+    .pageSize = 512,
+    .ctrlMode = PSRAM_SPI_CTRL_MODE,
+    .driveStrength = PSRAM_DRIVE_STRENGTH_50_OHMS,
+    .burstLength = PSRAM_BURST_LENGTH_512_BYTES,
+};
+#endif
+
+/*
+SF_Ctrl_Cmds_Cfg cmdsCfg = {
+    .cmdsEn=ENABLE,
+    .burstToggleEn=ENABLE,
+    .wrapModeEn=DISABLE,
+    .wrapLen=SF_CTRL_WRAP_LEN_512,
+};
+
+SF_Ctrl_Psram_Cfg sfCtrlPsramCfg = {
+    .owner=SF_CTRL_OWNER_SAHB,
+    .padSel=SF_CTRL_PAD_SEL_DUAL_CS_SF2,
+    .bankSel=SF_CTRL_SEL_PSRAM,
+    .psramRxClkInvertSrc=ENABLE,
+    .psramRxClkInvertSel=ENABLE,
+    .psramDelaySrc=ENABLE,
+    .psramClkDelay=0,
+};
+*/
 
 /*@} end of group IMAGE_SENSOR_Private_Variables */
 
@@ -867,36 +896,105 @@ static BL_Err_Type CAM_Reg_Config(void);
 *******************************************************************************/
 static void CAM_GPIO_Init(void)
 {
+#if 0
     GLB_GPIO_Cfg_Type cfg;
-    GLB_GPIO_Type gpioPins[] = {GLB_GPIO_PIN_16,GLB_GPIO_PIN_17,GLB_GPIO_PIN_18,GLB_GPIO_PIN_19,GLB_GPIO_PIN_24,GLB_GPIO_PIN_25,
-                                GLB_GPIO_PIN_26,GLB_GPIO_PIN_27,GLB_GPIO_PIN_28,GLB_GPIO_PIN_29,GLB_GPIO_PIN_30,GLB_GPIO_PIN_31,
-                                GLB_GPIO_PIN_32};
 
-    GLB_GPIO_Func_Init(GPIO_FUN_CAM,gpioPins,sizeof(gpioPins)/sizeof(gpioPins[0]));
-
-    // REFCLK
-    cfg.gpioPin=GLB_GPIO_PIN_33;
-    cfg.gpioFun=GPIO_FUN_CLOCK_OUT;
+    cfg.drive = 0;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_0;
+    cfg.gpioFun = GPIO0_FUN_PIX_CLK;
+    cfg.gpioMode = GPIO_MODE_INPUT;
+    cfg.pullType = GPIO_PULL_NONE;
     GLB_GPIO_Init(&cfg);
 
-    cfg.gpioMode=GPIO_MODE_OUTPUT;
-    cfg.pullType=GPIO_PULL_UP;
-    // PWDN
-    cfg.gpioPin=GLB_GPIO_PIN_8;
-    cfg.gpioFun=GPIO_FUN_GPIO;
+    cfg.drive = 0;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_1;
+    cfg.gpioFun = GPIO1_FUN_FRAME_VLD;
+    cfg.gpioMode = GPIO_MODE_INPUT;
+    cfg.pullType = GPIO_PULL_NONE;
     GLB_GPIO_Init(&cfg);
-    GLB_GPIO_Write(GLB_GPIO_PIN_8, 1);
-    GLB_GPIO_Output_Enable(GLB_GPIO_PIN_8);
 
-    // RESETB
-    cfg.gpioPin=GLB_GPIO_PIN_20;
-    cfg.gpioFun=GPIO_FUN_GPIO;
+    cfg.drive = 0;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_2;
+    cfg.gpioFun = GPIO2_FUN_LINE_VLD;
+    cfg.gpioMode = GPIO_MODE_INPUT;
+    cfg.pullType = GPIO_PULL_NONE;
     GLB_GPIO_Init(&cfg);
-    GLB_GPIO_Write(GLB_GPIO_PIN_20, 1);
-    GLB_GPIO_Output_Enable(GLB_GPIO_PIN_20);
 
-    //GLB_Set_ClkOutSel(1, 0); // select dvp_ref_clk pin as cam_ref_clk
-    GLB_Set_CAM_CLK(1, 1, 3); // select cam_ref_clk as 96M / 4 = 24M
+    cfg.drive = 0;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_3;
+    cfg.gpioFun = GPIO3_FUN_PIX_DAT0;
+    cfg.gpioMode = GPIO_MODE_INPUT;
+    cfg.pullType = GPIO_PULL_NONE;
+    GLB_GPIO_Init(&cfg);
+
+    cfg.drive = 0;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_4;
+    cfg.gpioFun = GPIO4_FUN_PIX_DAT1;
+    cfg.gpioMode = GPIO_MODE_INPUT;
+    cfg.pullType = GPIO_PULL_NONE;
+    GLB_GPIO_Init(&cfg);
+
+    cfg.drive = 0;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_5;
+    cfg.gpioFun = GPIO5_FUN_PIX_DAT2;
+    cfg.gpioMode = GPIO_MODE_INPUT;
+    cfg.pullType = GPIO_PULL_NONE;
+    GLB_GPIO_Init(&cfg);
+
+    cfg.drive = 0;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_6;
+    cfg.gpioFun = GPIO6_FUN_PIX_DAT3;
+    cfg.gpioMode = GPIO_MODE_INPUT;
+    cfg.pullType = GPIO_PULL_NONE;
+    GLB_GPIO_Init(&cfg);
+
+    cfg.drive = 0;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_12;
+    cfg.gpioFun = GPIO12_FUN_PIX_DAT4;
+    cfg.gpioMode = GPIO_MODE_INPUT;
+    cfg.pullType = GPIO_PULL_NONE;
+    GLB_GPIO_Init(&cfg);
+
+    cfg.drive = 0;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_29;
+    cfg.gpioFun = GPIO29_FUN_PIX_DAT5;
+    cfg.gpioMode = GPIO_MODE_INPUT;
+    cfg.pullType = GPIO_PULL_NONE;
+    GLB_GPIO_Init(&cfg);
+
+    cfg.drive = 0;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_30;
+    cfg.gpioFun = GPIO30_FUN_PIX_DAT6;
+    cfg.gpioMode = GPIO_MODE_INPUT;
+    cfg.pullType = GPIO_PULL_NONE;
+    GLB_GPIO_Init(&cfg);
+
+    cfg.drive = 0;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_31;
+    cfg.gpioFun = GPIO31_FUN_PIX_DAT7;
+    cfg.gpioMode = GPIO_MODE_INPUT;
+    cfg.pullType = GPIO_PULL_NONE;
+    GLB_GPIO_Init(&cfg);
+
+    cfg.drive = 1;
+    cfg.smtCtrl = 1;
+    cfg.gpioPin = GLB_GPIO_PIN_10;
+    cfg.gpioFun = GPIO10_FUN_CAM_REF_CLK;
+    cfg.gpioMode = GPIO_MODE_OUTPUT;
+    cfg.pullType = GPIO_PULL_NONE;
+    GLB_GPIO_Init(&cfg);
+#endif
 }
 
 /****************************************************************************/ /**
@@ -926,10 +1024,84 @@ void Image_Sensor_Dump_Register(void)
 *******************************************************************************/
 static void I2C_GPIO_Init(void)
 {
-    GLB_GPIO_Type gpioPins[] = {GLB_GPIO_PIN_22,GLB_GPIO_PIN_23};
+#if 0
+    uint8_t i;
+    GLB_GPIO_Cfg_Type cfg;
+    uint8_t gpiopins[2];
+    uint8_t gpiofuns[2];
+    uint8_t gpioMode[2];
 
-    GLB_GPIO_Func_Init(GPIO_FUN_I2C2,gpioPins,sizeof(gpioPins)/sizeof(gpioPins[0]));
+    cfg.gpioMode = GPIO_MODE_AF;
+    cfg.pullType = GPIO_PULL_UP;
+    cfg.drive = 1;
+    cfg.smtCtrl = 1;
+    cfg.gpioMode = GPIO_MODE_OUTPUT;
+
+    gpiopins[0] = GLB_GPIO_PIN_16;
+    gpiopins[1] = GLB_GPIO_PIN_11;
+    gpiofuns[0] = GPIO16_FUN_I2C0_SCL;
+    gpiofuns[1] = GPIO11_FUN_I2C0_SDA;
+    gpioMode[0] = GPIO_MODE_AF;
+    gpioMode[1] = GPIO_MODE_AF;
+
+    for(i = 0; i < sizeof(gpiopins) / sizeof(gpiopins[0]); i++)
+    {
+        cfg.gpioPin = gpiopins[i];
+        cfg.gpioFun = gpiofuns[i];
+        cfg.gpioMode = gpioMode[i];
+        GLB_GPIO_Init(&cfg);
+    }
+
+#endif
 }
+
+/****************************************************************************/ /**
+ * @brief  PSRAM GPIO Initialization
+ *
+ * @param  None
+ *
+ * @return None
+ *
+*******************************************************************************/
+#if 0
+static void SF_Cfg_Init_Ext_Psram_Gpio(void)
+{
+    GLB_GPIO_Cfg_Type cfg;
+    uint8_t gpiopins[6];
+    uint8_t i = 0;
+
+    cfg.gpioMode = GPIO_MODE_AF;
+    cfg.pullType = GPIO_PULL_UP;
+    cfg.drive = 1;
+    cfg.smtCtrl = 1;
+    cfg.gpioFun = GPIO_FUN_FLASH_PSRAM;
+
+    gpiopins[0] = BFLB_EXTPSRAM_CLK_GPIO;
+    gpiopins[1] = BFLB_EXTPSRAM_CS_GPIO;
+    gpiopins[2] = BFLB_EXTPSRAM_DATA0_GPIO;
+    gpiopins[3] = BFLB_EXTPSRAM_DATA1_GPIO;
+    gpiopins[4] = BFLB_EXTPSRAM_DATA2_GPIO;
+    gpiopins[5] = BFLB_EXTPSRAM_DATA3_GPIO;
+
+    for(i = 0; i < sizeof(gpiopins); i++)
+    {
+        cfg.gpioPin = gpiopins[i];
+
+        if(i == 0 || i == 1)
+        {
+            /*flash clk and cs is output*/
+            cfg.gpioMode = GPIO_MODE_OUTPUT;
+        }
+        else
+        {
+            /*data are bidir*/
+            cfg.gpioMode = GPIO_MODE_AF;
+        }
+
+        GLB_GPIO_Init(&cfg);
+    }
+}
+#endif
 
 /****************************************************************************/ /**
  * @brief  I2C CAMERA Write 8 bits
@@ -952,7 +1124,7 @@ static BL_Err_Type CAM_Write_Byte8(uint8_t cmd, uint8_t data)
     tranCfg.subAddr = cmd;
     tranCfg.dataSize = 1;
     tranCfg.data = &temp;
-    return I2C_MasterSendBlocking(I2C0_MM_ID, &tranCfg);
+    return I2C_MasterSendBlocking(I2C2_ID, &tranCfg);
 }
 
 /****************************************************************************/ /**
@@ -975,7 +1147,7 @@ static uint8_t CAM_Read_Byte8(uint8_t cmd)
     tranCfg.subAddr = cmd;
     tranCfg.dataSize = 1;
     tranCfg.data = &temp;
-    I2C_MasterReceiveBlocking(I2C0_MM_ID, &tranCfg);
+    I2C_MasterReceiveBlocking(I2C2_ID, &tranCfg);
 
     return temp;
 }
@@ -1048,6 +1220,32 @@ static BL_Err_Type CAM_Reg_Config(void)
  */
 
 /****************************************************************************/ /**
+ * @brief  PSRAM Config Initialization
+ *
+ * @param  None
+ *
+ * @return None
+ *
+*******************************************************************************/
+void Image_Sensor_PSRAM_Init(void)
+{
+#if 0
+    uint8_t psramId[8] = {0};
+
+    GLB_Set_SF_CLK(1, GLB_SFLASH_CLK_72M, 1);
+    SF_Cfg_Init_Ext_Psram_Gpio();
+
+    Psram_Init(&apMemory1604, &cmdsCfg, &sfCtrlPsramCfg);
+    Psram_ReadId(&apMemory1604, psramId);
+    MSG("PSRAM ID: %02X %02X %02X %02X %02X %02X %02X %02X.\r\n",
+        psramId[0], psramId[1], psramId[2], psramId[3], psramId[4], psramId[5], psramId[6], psramId[7]);
+
+    Psram_Cache_Write_Set(&apMemory1604, SF_CTRL_QIO_MODE, DISABLE, ENABLE, ENABLE);
+    L1C_Cache_Enable_Set(0x0f);
+#endif
+}
+
+/****************************************************************************/ /**
  * @brief  Image sensor initialization
  *
  * @param  camId: DVP2BUS ID
@@ -1064,7 +1262,13 @@ BL_Err_Type Image_Sensor_Init(CAM_ID_Type camId, BL_Fun_Type mjpegEn, CAM_CFG_Ty
     CAM_GPIO_Init();
     I2C_GPIO_Init();
 
-    bflb_platform_delay_ms(1);
+    /* Set clock */
+    //GLB_AHB_Slave1_Clock_Gate(DISABLE,BL_AHB_SLAVE1_I2C);
+    //GLB_AHB_Slave1_Clock_Gate(DISABLE,BL_AHB_SLAVE1_CAM);
+    //GLB_AHB_Slave1_Clock_Gate(DISABLE,BL_AHB_SLAVE1_MJPEG);
+    //GLB_Set_I2C_CLK(1,0);
+    //GLB_Set_CAM_CLK(ENABLE,GLB_CAM_CLK_DLL96M,3);
+    //GLB_SWAP_EMAC_CAM_Pin(GLB_EMAC_CAM_PIN_CAM);
 
     if (CAM_Read_ID() != SUCCESS) {
         return ERROR;
@@ -1084,6 +1288,8 @@ BL_Err_Type Image_Sensor_Init(CAM_ID_Type camId, BL_Fun_Type mjpegEn, CAM_CFG_Ty
     } else {
         CAM_Init(camId, camCfg);
     }
+
+    //CAM_Enable(camId);
 
     return SUCCESS;
 }
@@ -1269,6 +1475,25 @@ void Image_Sensor_MJPEG_Close(void)
 void Image_Sensor_MJPEG_Deinit(void)
 {
     MJPEG_Deinit();
+}
+
+/****************************************************************************/ /**
+ * @brief  SHA256
+ *
+ * @param  SHA256 context pointer
+ * @param  Text start address
+ * @param  Text length
+ * @param  Result of SHA256
+ *
+ * @return None
+ *
+*******************************************************************************/
+void Image_Sensor_SHA256(mbedtls_sha256_context *ctx, uint8_t *addr, uint32_t len, uint8_t *result)
+{
+    mbedtls_sha256_init(ctx);
+    mbedtls_sha256_starts_ret(ctx, 0);
+    mbedtls_sha256_update_ret(ctx, addr, len);
+    mbedtls_sha256_finish_ret(ctx, result);
 }
 
 /*@} end of group IMAGE_SENSOR_Public_Functions */

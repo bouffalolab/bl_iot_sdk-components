@@ -1,7 +1,6 @@
 #include <string.h>
 #include "hal_emac.h"
 #include "ethernet_phy.h"
-#include "bflb_platform.h"
 
 /* LAN8720 PHY Address*/
 #define EMAC_PHY_ADDRESS          0x00U
@@ -118,16 +117,13 @@ int phy_8720_auto_negotiate(emac_phy_cfg_t *cfg)
     uint32_t timeout = 100; //10s,in 100ms
 
     if (0 != emac_phy_reg_read(PHY_PHYID1, &phyid1)) {
-        MSG("read emac phy id 1 error\r\n");
         return -1;
     }
 
     if (0 != emac_phy_reg_read(PHY_PHYID2, &phyid2)) {
-        MSG("read emac phy id 2 error\r\n");
         return -1;
     }
-    MSG("emac phy id 1 =%08x\r\n",(unsigned int )phyid1);
-    MSG("emac phy id 2 =%08x\r\n",(unsigned int )phyid2);
+
     if (cfg->phy_id != (((phyid1 << 16) | phyid2) & 0x000FFFF0)) {
         /* ID error */
         return -1;

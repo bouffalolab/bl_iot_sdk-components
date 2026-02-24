@@ -45,7 +45,7 @@
 #endif
 
 /* Added by bouffalolab for mesh sequence compensate, when power up */
-#define BT_MESH_SEQ_PWRON_COMPENSATE (100) 
+#define BT_MESH_SEQ_PWRON_COMPENSATE (100)
 
 /* Added by bouffalo */
 static int settings_name_next(const char *name, const char **next);
@@ -1900,7 +1900,7 @@ static void store_pending_mod_bind(struct bt_mesh_model *mod, bool vnd)
     #if defined(BFLB_BLE)
     memset(keys, 0, sizeof(keys));
     #endif
-    
+
 	for (i = 0, count = 0; i < ARRAY_SIZE(mod->keys); i++) {
 		if (mod->keys[i] != BT_MESH_KEY_UNUSED) {
 			keys[count++] = mod->keys[i];
@@ -1935,7 +1935,7 @@ static void store_pending_mod_sub(struct bt_mesh_model *mod, bool vnd)
     #if defined(BFLB_BLE)
     memset(groups, 0, sizeof(groups));
     #endif
-    
+
 	for (i = 0, count = 0; i < CONFIG_BT_MESH_MODEL_GROUP_COUNT; i++) {
 		if (mod->groups[i] != BT_MESH_ADDR_UNASSIGNED) {
 			groups[count++] = mod->groups[i];
@@ -1966,7 +1966,7 @@ static void store_pending_mod_pub(struct bt_mesh_model *mod, bool vnd)
 	struct mod_pub_val pub;
 	char path[20];
 	int err = 0;/* Init by bouffalo */
-    
+
 	encode_mod_path(mod, vnd, "pub", path, sizeof(path));
 
 	if (!mod->pub || mod->pub->addr == BT_MESH_ADDR_UNASSIGNED) {
@@ -2592,85 +2592,84 @@ void bt_mesh_settings_init(void)
 /* Added by bouffalo */
 static ssize_t mesh_settings_read_cb(void *cb_arg, void *data, size_t data_len)
 {
-	env_node_obj_t env = (env_node_obj_t)cb_arg;
+	const char *key_name = (const char *)cb_arg;
+	size_t read_len, tot_len;
 
-	if (!env->crc_is_ok || env->status != ENV_WRITE) {
-		BT_ERR("Flash status error");
-		return 0;
-	}
-
-	BT_DBG("Env[%.*s] Data len[%ld]\n", env->name_len, env->name, env->value_len);
-	if (env->value_len < EF_STR_ENV_VALUE_MAX_SIZE ) {
-        if(EF_NO_ERR != ef_port_read(env->addr.value, (uint32_t *) data, data_len)){
-			BT_ERR("Flash read fail");
-			return 0;
-		};//EF_WG_ALIGN(size));
+	read_len = ef_get_env_blob(key_name, data, data_len, &tot_len);
+	if (read_len == tot_len) {
 		BT_DBG("read data[%s]", bt_hex(data, data_len));
-        return data_len;
-	} 
+		return read_len;
+	}
 
 	BT_ERR("Invalid value length");
 	return 0;
 }
 
-
-
 /* Added by bouffalo */
+#if defined(CONFIG_IOT_SDK)
 static bool setting_env_cb(env_node_obj_t env, void *arg1, void *arg2)
+#else
+static EfErrCode setting_env_cb(const char *key_name, void *arg)
+#endif /* CONFIG_IOT_SDK */
 {
-    if (env->crc_is_ok) {
-        /* check ENV */
-        if (env->status == ENV_WRITE) {
-			BT_WARN("Env[%.*s] Data len[%lu]", env->name_len, env->name, env->value_len);
-			#if 1
-			char *pname, name[EF_ENV_NAME_MAX+1];
-			const char* next;
-			pname = name;
-			memcpy(pname, env->name, env->name_len);
-			pname[env->name_len] = 0;
-			BT_DBG("len[%d] env:[%s]", env->name_len, pname);
+#if defined(CONFIG_IOT_SDK)
+    if (!(env->crc_is_ok && env->status == ENV_WRITE)) {
+		 return false;
+	}
+	const char *key_name = env->name;
+	int key_name_len = env->name_len;
+	BT_WARN("Env[%.*s] Data len[%lu]", env->name_len, env->name, env->value_len);
+#else
+	int key_name_len = strlen(key_name);
+#endif /* CONFIG_IOT_SDK */
+	
+	char *pname, name[EF_ENV_NAME_MAX+1];
+	const char* next;
 
-			/* Check mesh index*/
-			if(0 != memcmp(pname, MESH_SETTINGS_DIR, strlen(MESH_SETTINGS_DIR))){
-				return false;
-			}
-			pname += strlen(MESH_SETTINGS_DIR);
+	pname = name;
+	memcpy(pname, key_name, key_name_len);
+	pname[key_name_len] = 0;
+	BT_DBG("len[%d] env:[%s]", key_name_len, pname);
 
+	/* Check mesh index*/
+	if(0 != memcmp(pname, MESH_SETTINGS_DIR, strlen(MESH_SETTINGS_DIR))){
+		return EF_NO_ERR;
+	}
+	pname += strlen(MESH_SETTINGS_DIR);
+	if(*pname != '/'){
+		return EF_NO_ERR;
+	}
+	pname += 1;
+
+	for(int i = 0; i < ARRAY_SIZE(settings); i++){
+		int str_len = strlen(settings[i].name);
+		if(0 == strncmp(pname, settings[i].name, str_len)
+			&& str_len == settings_name_next(pname, &next) ){
+			pname += str_len;
+			BT_DBG("Total name[%s]", name);
 			if(*pname != '/'){
-				return false;
+				BT_DBG("current name[NULL]");
+				settings[i].func(NULL, key_name_len, mesh_settings_read_cb, (void*)name);
 			}
-			pname += 1;
-			
-			for(int i = 0; i < ARRAY_SIZE(settings); i++){
-				int str_len = strlen(settings[i].name);
-				if(0 == strncmp(pname, settings[i].name, str_len)
-					&& str_len == settings_name_next(pname, &next) ){
-					pname += str_len;
-					BT_DBG("Total name[%s]", name);
-					if(*pname != '/'){
-						BT_DBG("current name[NULL]");
-						settings[i].func(NULL, env->name_len, mesh_settings_read_cb, (void*)env);
-					}
-					else{
-						BT_DBG("current name[%s]", pname+1);
-						settings[i].func(pname+1, env->name_len, mesh_settings_read_cb, (void*)env);
-					}
-					break;
-				}
-				
+			else{
+				BT_DBG("current name[%s]", pname+1);
+				settings[i].func(pname+1, key_name_len, mesh_settings_read_cb, (void*)name);
 			}
-			#endif
-        }
-    }
-
-    return false;
+			break;
+		}
+	}
+	return EF_NO_ERR;
 }
+
 
 /* Added by bouffalo */
 void load_mesh_setting(void)
 {
-	//ef_print_env();
+#if defined(CONFIG_IOT_SDK)
 	ef_print_env_cb(setting_env_cb);
+#else
+	ef_foreach_env(setting_env_cb, NULL);
+#endif /* CONFIG_IOT_SDK */
 }
 #endif /* CONFIG_BT_SETTINGS */
 

@@ -875,7 +875,7 @@ static bool update_keys_check(struct bt_smp *smp, struct bt_keys *keys)
 
 	return true;
 }
-
+#if defined(CONFIG_BT_ECC)
 static bool update_debug_keys_check(struct bt_smp *smp)
 {
 	struct bt_conn *conn = smp->chan.chan.conn;
@@ -895,7 +895,7 @@ static bool update_debug_keys_check(struct bt_smp *smp)
 
 	return true;
 }
-
+#endif
 #if defined(CONFIG_BT_PRIVACY) || defined(CONFIG_BT_SIGNING) || \
 	!defined(CONFIG_BT_SMP_SC_PAIR_ONLY)
 /* For TX callbacks */
@@ -3511,7 +3511,7 @@ static u8_t compute_and_check_and_send_slave_dhcheck(struct bt_smp *smp)
 	return 0;
 }
 #endif /* CONFIG_BT_PERIPHERAL */
-
+#if defined(CONFIG_BT_ECC)
 static void bt_smp_dhkey_ready(const u8_t *dhkey)
 {
 	struct bt_smp *smp = NULL;
@@ -3572,7 +3572,7 @@ static void bt_smp_dhkey_ready(const u8_t *dhkey)
 #endif /* CONFIG_BT_PERIPHERAL */
 	}
 }
-
+#endif
 static u8_t sc_smp_check_confirm(struct bt_smp *smp)
 {
 	u8_t cfm[16];
@@ -4087,7 +4087,7 @@ static u8_t smp_security_request(struct bt_smp *smp, struct net_buf *buf)
 	return BT_SMP_ERR_CMD_NOTSUPP;
 }
 #endif /* CONFIG_BT_CENTRAL */
-
+#if defined(CONFIG_BT_ECC)
 static u8_t generate_dhkey(struct bt_smp *smp)
 {
 	if (bt_dh_key_gen(smp->pkey, bt_smp_dhkey_ready)) {
@@ -4097,7 +4097,8 @@ static u8_t generate_dhkey(struct bt_smp *smp)
 	atomic_set_bit(smp->flags, SMP_FLAG_DHKEY_PENDING);
 	return 0;
 }
-
+#endif
+#if defined(CONFIG_BT_ECC)
 static u8_t display_passkey(struct bt_smp *smp)
 {
 	if (IS_ENABLED(CONFIG_BT_FIXED_PASSKEY) &&
@@ -4122,7 +4123,7 @@ static u8_t display_passkey(struct bt_smp *smp)
 
 	return 0;
 }
-
+#endif
 #if defined(CONFIG_BT_ECC)
 #if defined(CONFIG_BT_PERIPHERAL)
 static u8_t smp_public_key_slave(struct bt_smp *smp)

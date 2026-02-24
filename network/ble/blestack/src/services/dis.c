@@ -21,7 +21,7 @@
 #include "bluetooth.h"
 #include "hci_host.h"
 #include "conn.h"
-#include "uuid.h"
+#include "bt_uuid.h"
 #include "gatt.h"
 #include "dis.h"
 
@@ -71,22 +71,22 @@ static struct dis_pnp dis_pnp_id = {
 
 #define CONFIG_BT_GATT_DIS_STR_MAX 21
 
-static u8_t dis_model[CONFIG_BT_GATT_DIS_STR_MAX] = CONFIG_BT_GATT_DIS_MODEL;
-static u8_t dis_manuf[CONFIG_BT_GATT_DIS_STR_MAX] = CONFIG_BT_GATT_DIS_MANUF;
+static u8_t dis_model[CONFIG_BT_GATT_DIS_STR_MAX + 1] = CONFIG_BT_GATT_DIS_MODEL;
+static u8_t dis_manuf[CONFIG_BT_GATT_DIS_STR_MAX + 1] = CONFIG_BT_GATT_DIS_MANUF;
 #if defined(CONFIG_BT_GATT_DIS_SERIAL_NUMBER)
-static u8_t dis_serial_number[CONFIG_BT_GATT_DIS_STR_MAX] =
+static u8_t dis_serial_number[CONFIG_BT_GATT_DIS_STR_MAX + 1] =
 	CONFIG_BT_GATT_DIS_SERIAL_NUMBER_STR;
 #endif
 #if defined(CONFIG_BT_GATT_DIS_FW_REV)
-static u8_t dis_fw_rev[CONFIG_BT_GATT_DIS_STR_MAX] =
+static u8_t dis_fw_rev[CONFIG_BT_GATT_DIS_STR_MAX + 1] =
 	CONFIG_BT_GATT_DIS_FW_REV_STR;
 #endif
 #if defined(CONFIG_BT_GATT_DIS_HW_REV)
-static u8_t dis_hw_rev[CONFIG_BT_GATT_DIS_STR_MAX] =
+static u8_t dis_hw_rev[CONFIG_BT_GATT_DIS_STR_MAX + 1] =
 	CONFIG_BT_GATT_DIS_HW_REV_STR;
 #endif
 #if defined(CONFIG_BT_GATT_DIS_SW_REV)
-static u8_t dis_sw_rev[CONFIG_BT_GATT_DIS_STR_MAX] =
+static u8_t dis_sw_rev[CONFIG_BT_GATT_DIS_STR_MAX + 1] =
 	CONFIG_BT_GATT_DIS_SW_REV_STR;
 #endif
 
@@ -189,6 +189,9 @@ void dis_deinit(void)
 #if defined(BFLB_BLE)
 int dis_settings_init(const char *name, char* setting,size_t setting_len)
 {
+	if(name == NULL || setting == NULL || (strlen(setting) != setting_len) || (setting_len > CONFIG_BT_GATT_DIS_STR_MAX )){
+		return -EINVAL;
+	}
 	if (!strcmp(name, "manuf"))
 	{
 		memset(&dis_manuf,0,sizeof(dis_manuf));
@@ -199,6 +202,7 @@ int dis_settings_init(const char *name, char* setting,size_t setting_len)
 
 		memset(&dis_model,0,sizeof(dis_model));
 		strncpy(&dis_model,setting,setting_len);
+		return 0;
 	}
 	#if defined(CONFIG_BT_GATT_DIS_SERIAL_NUMBER)
 	if (!strcmp(name, "serial")) {
@@ -230,7 +234,7 @@ int dis_settings_init(const char *name, char* setting,size_t setting_len)
 	}
 	#endif
 
-	return -1;
+	return -EINVAL;
 }
 #else
 static int dis_set(const char *name, size_t len_rd,

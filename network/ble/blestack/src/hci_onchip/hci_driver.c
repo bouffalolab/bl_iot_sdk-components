@@ -40,7 +40,16 @@
 //#include "init.h"
 //#include "hal/debug.h"
 #if defined(BFLB_BLE)
+#if defined(CONFIG_BT_HOST_HCI_TL)
+#if defined(CONFIG_BT_HOST_HCI)
+#include "bflb_hci_tl.h"
+#else
+#include "bl_hci_tl.h"
+#include "bl_gpio.h"
+#endif
+#else
 #include "bl_hci_wrapper.h"
+#endif
 #endif
 
 #define NODE_RX(_node) CONTAINER_OF(_node, struct radio_pdu_node_rx, \
@@ -409,8 +418,16 @@ static int hci_driver_send(struct net_buf *buf)
 	}
 
 #if defined(BFLB_BLE)
-    err = bl_onchiphci_send_2_controller(buf);
-    net_buf_unref(buf);
+	#if defined (CONFIG_BT_HOST_HCI_TL)
+	#if defined(CONFIG_BT_HOST_HCI)
+	err = bflb_hci_send(buf);
+	#else
+	err = bl_hci_send(buf);
+	#endif
+	#else
+	err = bl_onchiphci_send_2_controller(buf);
+	#endif
+	net_buf_unref(buf);
 #else
 	type = bt_buf_get_type(buf);
 	switch (type) {
@@ -438,7 +455,9 @@ static int hci_driver_send(struct net_buf *buf)
 #endif
 	return err;
 }
-
+#if defined(CONFIG_BT_HOST_HCI_TL)
+char hci_port[14];
+#endif
 static int hci_driver_open(void)
 {
 #if !defined(BFLB_BLE) 
@@ -473,6 +492,21 @@ static int hci_driver_open(void)
 			K_THREAD_STACK_SIZEOF(prio_recv_thread_stack),
 			prio_recv_thread, NULL, NULL, NULL,
 			K_PRIO_COOP(CONFIG_BT_CTLR_RX_PRIO), 0, K_NO_WAIT);
+#endif
+
+#if defined(BFLB_BLE)
+    #if defined(CONFIG_BT_HOST_HCI_TL)
+    #if defined(CONFIG_BT_HOST_HCI)
+	bflb_hci_init(hci_port);
+	#else
+	bl_gpio_enable_output(CTRL_RESET_PIN, 0, 0);
+	bl_gpio_output_set(CTRL_RESET_PIN, 0);
+	k_sleep(10);
+	bl_gpio_output_set(CTRL_RESET_PIN, 1);
+	k_sleep(500); // wait controller ready
+	return bl_hci_init(hci_port);
+	#endif
+    #endif
 #endif
 
 	BT_DBG("Success.");

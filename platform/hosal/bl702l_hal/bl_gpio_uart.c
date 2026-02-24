@@ -1,9 +1,35 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include "bl_gpio_uart.h"
-#include "bl_gpio.h"
 #include "bl_irq.h"
 #include "bl702l_glb.h"
-#include "bl702l_timer.h"
-#include "hosal_gpio.h"
 
 
 static uint8_t uart_tx_ok[GPIO_UART_TX_NUM] = {0};
@@ -31,9 +57,18 @@ int bl_gpio_uart_tx_init(uint8_t id, uint8_t tx_pin, uint32_t baudrate)
     uart_tx_pin[id] = tx_pin;
     uart_tx_bit_dur[id] = (2000000 * 10 / baudrate + 5) / 10;
     
+    GLB_GPIO_Cfg_Type cfg = {
+        .gpioPin = tx_pin,
+        .gpioFun = GPIO_FUN_GPIO,
+        .gpioMode = GPIO_MODE_OUTPUT,
+        .pullType = GPIO_PULL_NONE,
+        .drive = 0,
+        .smtCtrl = 1,
+    };
+    
     // here must set output level before output enable, otherwise will output low by default when output enable, which causes a start bit
-    bl_gpio_output_set(tx_pin, 1);
-    bl_gpio_enable_output(tx_pin, 0, 0);
+    GLB_GPIO_Write(tx_pin, 1);
+    GLB_GPIO_Init(&cfg);
     
     return 0;
 }
@@ -113,147 +148,4 @@ int bl_gpio_uart_send_data(uint8_t id, uint8_t *data, uint32_t len)
     }
     
     return 0;
-}
-
-
-static uint8_t uart_rx_pin = 0;
-static uint32_t uart_rx_bit_dur = 0;  // unit: 0.5us
-static uint8_t *uart_rx_fifo = NULL;
-static uint32_t uart_rx_fifo_size = 0;
-static uint32_t uart_rx_fifo_wptr = 0;
-static uint32_t uart_rx_fifo_rptr = 0;
-static uint8_t uart_rx_fifo_wloop = 0;
-static uint8_t uart_rx_fifo_rloop = 0;
-
-
-//run this function in ram to avoid execution speed variation due to cache
-//ATTR_TCM_SECTION
-static void bl_gpio_uart_recv_byte(void *arg)
-{
-    volatile uint32_t *current_time = (volatile uint32_t *)(TIMER_BASE + 0x2C);
-    uint32_t start_time = *(volatile uint32_t *)(TIMER_BASE + 0xC4);
-    uint32_t sample_time = start_time + uart_rx_bit_dur + uart_rx_bit_dur / 2;
-    uint8_t sample_value;
-    uint8_t rx_data;
-    int i;
-    
-    rx_data = 0;
-    for(i=0; i<8; i++){
-        if(*current_time > sample_time){
-            return;
-        }
-        
-        while(*current_time < sample_time);
-        sample_value = (BL_RD_WORD(GLB_BASE + GLB_GPIO_INPUT_OFFSET) >> uart_rx_pin) & 0x01;
-        rx_data |= sample_value << i;
-        
-        sample_time += uart_rx_bit_dur;
-    }
-    
-    if(!(uart_rx_fifo_wptr == uart_rx_fifo_rptr && uart_rx_fifo_wloop != uart_rx_fifo_rloop)){
-        uart_rx_fifo[uart_rx_fifo_wptr++] = rx_data;
-        if(uart_rx_fifo_wptr == uart_rx_fifo_size){
-            uart_rx_fifo_wptr = 0;
-            uart_rx_fifo_wloop++;
-        }
-    }
-}
-
-int bl_gpio_uart_rx_init(uint8_t rx_pin_1, uint8_t rx_pin_2, uint32_t baudrate, uint8_t *rx_fifo, uint32_t fifo_size)
-{
-    if(rx_pin_1 > 31 || rx_pin_2 > 31 || rx_pin_1 == rx_pin_2){
-        return -1;
-    }
-    
-    if(baudrate == 0 || baudrate > 2000000){
-        return -2;
-    }
-    
-    if(fifo_size == 0){
-        return -3;
-    }
-    
-    uart_rx_pin = rx_pin_1;
-    uart_rx_bit_dur = (2000000 * 10 / baudrate + 5) / 10;
-    
-    uart_rx_fifo = rx_fifo;
-    uart_rx_fifo_size = fifo_size;
-    uart_rx_fifo_wptr = 0;
-    uart_rx_fifo_rptr = 0;
-    uart_rx_fifo_wloop = 0;
-    uart_rx_fifo_rloop = 0;
-    
-    GLB_GPIO_Type pinList[1] = {rx_pin_2};
-    GLB_GPIO_Func_Init(GPIO_FUN_CLK_OUT, pinList, sizeof(pinList)/sizeof(GLB_GPIO_Type));
-    GLB_Sel_TMR_GPIO_Clock(pinList[0]);
-    
-    TIMER_CFG_Type timerCfg = {
-        TIMER_CH0,
-        TIMER_CLKSRC_XTAL,
-        TIMER_PRELOAD_TRIG_NONE,
-        TIMER_COUNT_FREERUN,
-        15,
-        0,
-        0,
-        0,
-        0,
-    };
-    
-    TIMER_Disable(TIMER0_ID, TIMER_CH0);
-    TIMER_IntMask(TIMER0_ID, TIMER_CH0, TIMER_INT_ALL, MASK);
-    TIMER_Init(TIMER0_ID, &timerCfg);
-    TIMER_Enable(TIMER0_ID, TIMER_CH0);
-    TIMER_GPIOSetPolarity(TIMER0_ID, TIMER_CH0, TIMER_GPIO_NEG);
-    TIMER_CH0_SetMeasurePulseWidth(TIMER0_ID, ENABLE);
-    
-    hosal_gpio_dev_t gpio = {
-        uart_rx_pin,
-        INPUT_PULL_UP,
-        NULL,
-    };
-    
-    hosal_gpio_init(&gpio);
-    hosal_gpio_irq_set(&gpio, (hosal_gpio_irq_trigger_t)GLB_GPIO_INT_TRIG_ASYNC_FALLING_EDGE, bl_gpio_uart_recv_byte, NULL);
-    
-    return 0;
-}
-
-uint32_t bl_gpio_uart_get_rx_length(void)
-{
-    uint32_t cnt;
-    
-    unsigned long mstatus_tmp;
-    mstatus_tmp = read_csr(mstatus);
-    clear_csr(mstatus, MSTATUS_MIE);
-    
-    if(uart_rx_fifo_wloop == uart_rx_fifo_rloop){
-        cnt = uart_rx_fifo_wptr - uart_rx_fifo_rptr;
-    }else{
-        cnt = uart_rx_fifo_size + uart_rx_fifo_wptr - uart_rx_fifo_rptr;
-    }
-    
-    write_csr(mstatus, mstatus_tmp);
-    
-    return cnt;
-}
-
-uint32_t bl_gpio_uart_read_data(uint8_t *data, uint32_t len)
-{
-    uint32_t cnt;
-    
-    cnt = bl_gpio_uart_get_rx_length();
-    if(cnt > len){
-        cnt = len;
-    }
-    
-    len = cnt;
-    while(len--){
-        *data++ = uart_rx_fifo[uart_rx_fifo_rptr++];
-        if(uart_rx_fifo_rptr == uart_rx_fifo_size){
-            uart_rx_fifo_rptr = 0;
-            uart_rx_fifo_rloop++;
-        }
-    }
-    
-    return cnt;
 }

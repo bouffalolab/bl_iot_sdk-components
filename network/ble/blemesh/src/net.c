@@ -974,9 +974,13 @@ static int loopback(const struct bt_mesh_net_tx *tx, const u8_t *data,
 
 	return 0;
 }
-
+#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+int bt_mesh_net_send(struct bt_mesh_net_tx *tx, struct net_buf *buf,
+		     const struct bt_mesh_send_cb *cb, void *cb_data, reencrypt_appdata_cb recb, struct net_buf_simple *sdu)
+#else
 int bt_mesh_net_send(struct bt_mesh_net_tx *tx, struct net_buf *buf,
 		     const struct bt_mesh_send_cb *cb, void *cb_data)
+#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 {
 	const u8_t *enc, *priv;
 	u8_t nid;
@@ -993,7 +997,16 @@ int bt_mesh_net_send(struct bt_mesh_net_tx *tx, struct net_buf *buf,
 	}
 
 	net_tx_cred_get(tx, &nid, &enc, &priv);
+	#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+	unsigned int key = irq_lock();
+	if(recb && bt_mesh.seq != tx->seq){
+		recb(tx, sdu, buf);
+	}
 	err = net_header_encode(tx, nid, &buf->b);
+	irq_unlock(key);
+	#else
+	err = net_header_encode(tx, nid, &buf->b);
+	#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 	if (err) {
 		goto done;
 	}

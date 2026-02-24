@@ -1,15 +1,16 @@
 #ifndef BTBLECONTROLLER_PORT_OS_API_H_
 #define BTBLECONTROLLER_PORT_OS_API_H_
 
+#if defined(CONFIG_FREERTOS)
 #include "FreeRTOS.h"
 #include "queue.h"
-
-#if defined(CFG_FREERTOS)
 typedef QueueHandle_t btblecontroller_QueueHandle_t;
-#elif defined(CFG_OPENHARMONY)
+#elif defined(CONFIG_OPENHARMONY)
 typedef rtos_queue btblecontroller_QueueHandle_t;
-#elif defined(CFG_AOS)
+#elif defined(CONFIG_AOS)
 typedef aos_queue_t btblecontroller_QueueHandle_t;
+#elif defined(CONFIG_ZEPHYR)
+typedef struct k_msgq* btblecontroller_QueueHandle_t;
 #endif
 
 typedef void (*btblecontroller_TaskFunction_t)(void *);

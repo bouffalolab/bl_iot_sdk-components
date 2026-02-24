@@ -16,6 +16,7 @@ COMPONENT_SRCS := bl702l_hal/bl_adc.c \
                   bl702l_hal/bl_efuse.c \
                   bl702l_hal/bl_flash.c \
                   bl702l_hal/bl_gpio.c \
+                  bl702l_hal/bl_gpio_i2c.c \
                   bl702l_hal/bl_gpio_ir.c \
                   bl702l_hal/bl_gpio_uart.c \
                   bl702l_hal/bl_hbn.c \
@@ -25,6 +26,7 @@ COMPONENT_SRCS := bl702l_hal/bl_adc.c \
                   bl702l_hal/bl_os_port.c \
                   bl702l_hal/bl_pwm.c \
                   bl702l_hal/bl_pwm_ir.c \
+                  bl702l_hal/bl_pwm_mc.c \
                   bl702l_hal/bl_rtc.c \
                   bl702l_hal/bl_sec.c \
                   bl702l_hal/bl_sec_aes.c \

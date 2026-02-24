@@ -1,8 +1,31 @@
-/**
- * Copyright (c) 2016-2021 Bouffalolab Co., Ltd.
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
  *
- * Contact information:
- * web site:    https://www.bouffalolab.com/
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <bl702_uart.h>
@@ -14,6 +37,23 @@
 #include "blog.h"
 
 static const uint32_t g_uart_addr[2] = {UART0_BASE, UART1_BASE};
+
+static uint8_t uart_sig(uint8_t pin)
+{
+    uint32_t tmpVal = BL_RD_REG(GLB_BASE, GLB_PARM);
+    uint8_t swapSet = BL_GET_REG_BITS_VAL(tmpVal, GLB_UART_SWAP_SET);
+    uint8_t sig = pin % 8;
+
+    if (swapSet & (1 << pin / 8)) {
+        if (sig < 4) {
+            sig += 4;
+        } else {
+            sig -= 4;
+        }
+    }
+
+    return sig;
+}
 
 static void gpio_init(uint8_t id, uint8_t tx_pin, uint8_t rx_pin, uint8_t cts_pin, uint8_t rts_pin)
 {
@@ -46,8 +86,8 @@ static void gpio_init(uint8_t id, uint8_t tx_pin, uint8_t rx_pin, uint8_t cts_pi
     // clk
     //GLB_Set_UART_CLK(1, HBN_UART_CLK_FCLK, 0);
 
-    GLB_UART_Fun_Sel(tx_pin%8, tx_sigfun);
-    GLB_UART_Fun_Sel(rx_pin%8, rx_sigfun);
+    GLB_UART_Fun_Sel(uart_sig(tx_pin), tx_sigfun);
+    GLB_UART_Fun_Sel(uart_sig(rx_pin), rx_sigfun);
 }
 
 static void __uart_rx_irq(void *p_arg)

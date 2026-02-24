@@ -90,6 +90,10 @@ SECTIONS
   {
     PROVIDE( __wifi_bss_start = ADDR(.wifibss) );
     PROVIDE( __wifi_bss_end = ADDR(.wifibss) + SIZEOF(.wifibss) );
+    _sshram = . ;
+    *(SHAREDRAMIPC)
+    *(SHAREDRAM)
+    _eshram = . ;
     *ipc_shared.o(COMMON)
     *sdu_shared.o(COMMON)
     *hal_desc.o(COMMON)

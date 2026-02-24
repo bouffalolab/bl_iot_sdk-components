@@ -1,10 +1,31 @@
-/**
- ****************************************************************************************
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
  *
- * @file bl_utils.c
- * Copyright (C) Bouffalo Lab 2016-2018
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
  *
- ****************************************************************************************
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <string.h>
@@ -23,6 +44,7 @@
 #include "bl_rx.h"
 #include "bl_tx.h"
 #include "bl_cmds.h"
+#include "bl_defs.h"  /* For BL_VIF_AP, struct mac_addr */
 
 #ifdef CFG_NETBUS_WIFI_ENABLE
 #include <netbus_mgmr.h>
@@ -32,6 +54,9 @@
 
 #undef os_printf
 #define os_printf(...) do {} while(0)
+
+/* Macro to check if MAC address is broadcast/multicast */
+#define IS_BC_MC(byte)             ((byte) & 0x01)
 
 extern struct bl_hw wifi_hw;
 
@@ -62,7 +87,7 @@ static void my_pbuf_free_custom(struct pbuf *p)
     bl_custom_pbuf_t* my_pbuf = (bl_custom_pbuf_t*)p;
 
 void bl60x_firmwre_mpdu_free(void *swdesc);
-    //bl_os_printf("--- cb free@%p\r\n", my_pbuf->swdesc);
+    //bflb_os_printf("--- cb free@%p\r\n", my_pbuf->swdesc);
     bl60x_firmwre_mpdu_free(my_pbuf->swdesc);
 }
 
@@ -112,7 +137,7 @@ static void bl_rx_mgmt(uint32_t *skb,  struct hw_rxhdr *hw_rxhdr, int len, bl_rx
          (0x01 == mgmt->da[0] && 0x00 == mgmt->da[1]) ||
          (0x01 == mgmt->bssid[0] && 0x00 == mgmt->bssid[1])) {
 
-        bl_os_printf("[RX] %d, %08X %04X, DATA addr1: %02X:%02X:%02X:%02X:%02X:%02X addr2: %02X:%02X:%02X:%02X:%02X:%02X, addr3: %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+        bflb_os_printf("[RX] %d, %08X %04X, DATA addr1: %02X:%02X:%02X:%02X:%02X:%02X addr2: %02X:%02X:%02X:%02X:%02X:%02X, addr3: %02X:%02X:%02X:%02X:%02X:%02X\r\n",
                 len,
                 (unsigned int)counter++,
                 mgmt->frame_control,
@@ -177,7 +202,7 @@ static void bl_rx_mgmt(uint32_t *skb,  struct hw_rxhdr *hw_rxhdr, int len, bl_rx
                 mgmt->da[5]
         );
     } else if (ieee80211_is_data_qos(mgmt->frame_control)){
-        bl_os_printf("[RX] %04X QOS DATA %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+        bflb_os_printf("[RX] %04X QOS DATA %02X:%02X:%02X:%02X:%02X:%02X\r\n",
                 mgmt->frame_control,
                 mgmt->da[0],
                 mgmt->da[1],
@@ -208,18 +233,18 @@ static void dump_pkt_infor(struct hw_rxhdr *hw_rxhdr)
 
     gain_status = ((uint16_t)(hw_rxhdr->hwvect.rssi3)) | (((uint16_t)hw_rxhdr->hwvect.rssi4) << 8);
 
-    if ((int32_t)bl_os_get_tick() - (int32_t)packets_lasttime > PACKET_TEST_INTERVAL) {
+    if ((int32_t)bflb_os_get_tick() - (int32_t)packets_lasttime > PACKET_TEST_INTERVAL) {
         packets_num = 0;
         freq_offset_all = 0;
     }
     packets_num++;
-    packets_lasttime = bl_os_get_tick();
+    packets_lasttime = bflb_os_get_tick();
 
     if (hw_rxhdr->hwvect.format_mod >=2) {
         /*11n mode*/
         freq_offset = (((uint32_t) hw_rxhdr->hwvect.evm3) | (((uint32_t)hw_rxhdr->hwvect.evm4) << 8));
         freq_offset_all += ((int)(freq_offset * 20 / 2440));
-        bl_os_printf("[11n] %04d bytes[%03lu], rssi %d, %04x, lna %02u, rbb %02u, dg %02d; evm3_4 %03d, freq_offset %d, ppm %f\r\n",
+        bflb_os_printf("[11n] %04d bytes[%03lu], rssi %d, %04x, lna %02u, rbb %02u, dg %02d; evm3_4 %03d, freq_offset %d, ppm %f\r\n",
                 hw_rxhdr->hwvect.len,
                 packets_num,
                 hw_rxhdr->hwvect.rssi1,
@@ -235,7 +260,7 @@ static void dump_pkt_infor(struct hw_rxhdr *hw_rxhdr)
         /*11g mode*/
         freq_offset = (((uint32_t) hw_rxhdr->hwvect.evm3) | (((uint32_t)hw_rxhdr->hwvect.evm4) << 8));
         freq_offset_all += ((int)(freq_offset * 20 / 2440));
-        bl_os_printf("[11g] %04d bytes[%03lu], rssi %d, %04x, lna %02u, rbb %02u, dg %02d; evm3_4 %03d, freq_offset %d, ppm %f\r\n",
+        bflb_os_printf("[11g] %04d bytes[%03lu], rssi %d, %04x, lna %02u, rbb %02u, dg %02d; evm3_4 %03d, freq_offset %d, ppm %f\r\n",
                 hw_rxhdr->hwvect.len,
                 packets_num,
                 hw_rxhdr->hwvect.rssi1,
@@ -251,7 +276,7 @@ static void dump_pkt_infor(struct hw_rxhdr *hw_rxhdr)
         /*11b mode*/
         freq_offset = ((int32_t)0) - (((int32_t)(hw_rxhdr->hwvect.evm3 << 24)) >> 24);
         freq_offset_all += ((int)(freq_offset * 0.7));
-        bl_os_printf("[11b] %04d bytes[%03lu], fcs_err %d, rssi %d, %04x, lna %02u, rbb %02u, dg %02d; evm3 %04u:%03d, freq_offset %d, ppm %f\r\n",
+        bflb_os_printf("[11b] %04d bytes[%03lu], fcs_err %d, rssi %d, %04x, lna %02u, rbb %02u, dg %02d; evm3 %04u:%03d, freq_offset %d, ppm %f\r\n",
                 hw_rxhdr->hwvect.len,
                 packets_num,
                 hw_rxhdr->hwvect.fcs_err,
@@ -396,7 +421,7 @@ int tcpip_stack_input(void *swdesc, uint8_t status, void *hwhdr, unsigned int ms
 
         if (hw_rxhdr->flags_sta_idx != 0xff) {
             if (hw_rxhdr->flags_is_4addr) {
-                bl_os_printf("[RX] Trigger 4addr unexpected frame\r\n");
+                bflb_os_printf("[RX] Trigger 4addr unexpected frame\r\n");
             }
         }
         os_printf("********************ETH Start******************************\r\n");
@@ -410,7 +435,7 @@ int tcpip_stack_input(void *swdesc, uint8_t status, void *hwhdr, unsigned int ms
     }
 
     if (!sniffer && !bl_vif) {
-        bl_os_printf("------ Frame received but no active vif (%d)\r\n", hw_rxhdr->flags_vif_idx);
+        bflb_os_printf("------ Frame received but no active vif (%d)\r\n", hw_rxhdr->flags_vif_idx);
         goto end;
     }
 
@@ -441,6 +466,40 @@ int tcpip_stack_input(void *swdesc, uint8_t status, void *hwhdr, unsigned int ms
         bl_rx_mgmt(skb_payload, hw_rxhdr, hw_rxhdr->hwvect.len, &info);
         pbuf_free(h);
     } else {
+        /*
+         * Intra-BSS forwarding for AP mode:
+         * When AP receives a frame from STA1 destined to STA2, we need to
+         * forward it at L2 layer before passing to lwIP stack.
+         */
+        struct ethhdr *eth_hdr = (struct ethhdr *)(h->payload);
+
+        /* Check if this is AP mode by comparing netif with AP netif */
+        struct netif *ap_netif = wifi_mgmr_ap_netif_get();
+        bool is_ap_mode = (bl_vif->dev == ap_netif);
+
+        if (is_ap_mode) {
+            /* Get the correct vif_idx from source STA's entry */
+            uint8_t sta_vif_idx = wifi_hw.sta_table[hw_rxhdr->flags_sta_idx].vif_idx;
+
+            if (IS_BC_MC(eth_hdr->h_dest[0])) {
+                /* Broadcast/Multicast: forward to all other STAs, then continue to lwIP */
+                bl_tx_intra_bss_broadcast(h, hw_rxhdr->flags_sta_idx);
+                /* Continue to send to lwIP for local processing (e.g., ARP for AP itself) */
+            } else {
+                /* Unicast: check if destination is another associated STA */
+                int dst_sta_idx = bl_tx_find_sta_by_mac(sta_vif_idx, (struct mac_addr *)eth_hdr->h_dest);
+                if (dst_sta_idx >= 0 && dst_sta_idx != hw_rxhdr->flags_sta_idx) {
+                    /* Destination is another STA, forward directly without going through lwIP */
+                    bl_tx_intra_bss_forward(h, dst_sta_idx);
+                    /* Don't send to lwIP, skip to free */
+                    pbuf_free(h);
+                    goto free;
+                }
+                /* Destination is AP itself or unknown, continue to lwIP */
+            }
+        } else {
+        }
+
 #ifdef PKT_INPUT_HOOK
         if (bl_wifi_pkt_eth_input_hook) {
             bool is_sta = bl_vif->dev == wifi_mgmr_sta_netif_get();
@@ -566,7 +625,7 @@ int bl_ipc_init(struct bl_hw *bl_hw, struct ipc_shared_env_tag *ipc_shared_mem)
     cb.sec_tbtt_ind    = bl_sec_tbtt_ind;
 
     /* set the IPC environment */
-    bl_hw->ipc_env = (struct ipc_host_env_tag *) bl_os_malloc(sizeof(struct ipc_host_env_tag));
+    bl_hw->ipc_env = (struct ipc_host_env_tag *) bflb_os_malloc(sizeof(struct ipc_host_env_tag));
     ipc_env = bl_hw->ipc_env;
 
     /* call the initialization of the IPC */
@@ -582,22 +641,22 @@ void bl_utils_dump(void)
     struct pbuf *p;
     struct bl_txhdr *txhdr;
 
-    bl_os_puts("---------- bl_utils_dump -----------\r\n");
+    bflb_os_puts("---------- bl_utils_dump -----------\r\n");
 
-    bl_os_printf("txdesc_free_idx: %lu(%lu)\r\n",
+    bflb_os_printf("txdesc_free_idx: %lu(%lu)\r\n",
             ipc_env->txdesc_free_idx,
             ipc_env->txdesc_free_idx & (NX_TXDESC_CNT0 - 1)
     );
-    bl_os_printf("txdesc_used_idx: %lu(%lu)\r\n",
+    bflb_os_printf("txdesc_used_idx: %lu(%lu)\r\n",
             ipc_env->txdesc_used_idx,
             ipc_env->txdesc_used_idx & (NX_TXDESC_CNT0 - 1)
     );
     cnt = sizeof(ipc_env->tx_host_id0)/sizeof(ipc_env->tx_host_id0[0]);
-    bl_os_printf("tx_host_id0 cnt: %d(used %ld)\r\n",
+    bflb_os_printf("tx_host_id0 cnt: %d(used %ld)\r\n",
             cnt,
             (int32_t)ipc_env->txdesc_free_idx - (int32_t)ipc_env->txdesc_used_idx
     );
-    bl_os_puts(  "  list:   pbuf    status ptr  status\r\n");
+    bflb_os_puts(  "  list:   pbuf    status ptr  status\r\n");
     for (i = 0; i < cnt; i++) {
         if (ipc_env->txdesc_used_idx + i == ipc_env->txdesc_free_idx) {
             /*break on empty*/
@@ -605,12 +664,12 @@ void bl_utils_dump(void)
         }
         p = (struct pbuf*)(ipc_env->tx_host_id0[(ipc_env->txdesc_used_idx + i) & (NX_TXDESC_CNT0 - 1)]);
         txhdr = (struct bl_txhdr*)(((uint32_t)p->payload) + RWNX_HWTXHDR_ALIGN_PADS((uint32_t)p->payload));
-        bl_os_printf("    [%lu]%p(%p:%08lX)\r\n",
+        bflb_os_printf("    [%lu]%p(%p:%08lX)\r\n",
                 (ipc_env->txdesc_used_idx + i) & (NX_TXDESC_CNT0 - 1),
                 p,
                 0,
                 p ? txhdr->status.value : 0
         );
     }
-    bl_os_puts("========== bl_utils_dump End =======\r\n");
+    bflb_os_puts("========== bl_utils_dump End =======\r\n");
 }

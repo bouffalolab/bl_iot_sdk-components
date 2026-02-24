@@ -153,10 +153,15 @@ void bt_mesh_set_hb_sub_dst(u16_t addr)
 {
 	hb_sub_dst = addr;
 }
-
+#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+static int send_unseg(struct bt_mesh_net_tx *tx, struct net_buf_simple *sdu,
+		      const struct bt_mesh_send_cb *cb, void *cb_data,
+		      const u8_t *ctl_op, reencrypt_appdata_cb recb)
+#else
 static int send_unseg(struct bt_mesh_net_tx *tx, struct net_buf_simple *sdu,
 		      const struct bt_mesh_send_cb *cb, void *cb_data,
 		      const u8_t *ctl_op)
+#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 {
 	struct net_buf *buf;
 
@@ -205,7 +210,11 @@ static int send_unseg(struct bt_mesh_net_tx *tx, struct net_buf_simple *sdu,
 	}
 
 send:
+#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+	return bt_mesh_net_send(tx, buf, cb, cb_data, recb, sdu);
+#else
 	return bt_mesh_net_send(tx, buf, cb, cb_data);
+#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 }
 
 static inline u8_t seg_len(bool ctl)
@@ -442,8 +451,11 @@ static void seg_tx_send_unacked(struct seg_tx *tx)
 		tx->seg_pending++;
 
 		BT_DBG("Sending %u/%u", tx->seg_o, tx->seg_n);
-
+		#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+		err = bt_mesh_net_send(&net_tx, seg, &seg_sent_cb, tx, NULL, NULL);
+		#else
 		err = bt_mesh_net_send(&net_tx, seg, &seg_sent_cb, tx);
+		#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 		if (err) {
 			BT_DBG("Sending segment failed");
 			tx->seg_pending--;
@@ -511,7 +523,11 @@ static int send_seg(struct bt_mesh_net_tx *net_tx, struct net_buf_simple *sdu,
 	tx->seg_o = 0;
 	tx->len = sdu->len;
 	tx->nack_count = tx->seg_n + 1;
+	#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+	tx->seq_auth = SEQ_AUTH(BT_MESH_NET_IVI_TX, net_tx->seq);
+	#else
 	tx->seq_auth = SEQ_AUTH(BT_MESH_NET_IVI_TX, bt_mesh.seq);
+	#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 	tx->sub = net_tx->sub;
 	tx->cb = cb;
 	tx->cb_data = cb_data;
@@ -710,7 +726,63 @@ struct bt_mesh_app_key *bt_mesh_app_key_find(u16_t app_idx)
 
 	return NULL;
 }
+#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+static int reencrypt_appdata(struct bt_mesh_net_tx *tx, struct net_buf_simple *msg, struct net_buf *buf)
+{
+	const u8_t *key;
+	u8_t *ad;
+	u8_t aid;
+	int err;
 
+	BT_DBG("len %u: %s", buf->b.len, bt_hex(buf->b.data, buf->b.len));
+
+	err = bt_mesh_app_key_get(tx->sub, tx->ctx->app_idx,
+				  tx->ctx->addr, &key, &aid);
+	if (err) {
+		BT_ERR("err:%d", err);
+		return err;
+	}
+
+	if(tx->aid != aid){
+		BT_ERR("Aid not match");
+	}
+
+	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
+		ad = bt_mesh_label_uuid_get(tx->ctx->addr);
+	} else {
+		ad = NULL;
+	}
+
+	int reservelen = net_buf_simple_headroom(&buf->b);
+	uint8_t hdr = net_buf_pull_u8(buf);
+
+	buf->b.len -= APP_MIC_LEN(0);
+	net_buf_simple_reset(msg);
+	err = bt_mesh_app_decrypt(key, BT_MESH_IS_DEV_KEY(tx->ctx->app_idx), tx->aszmic,
+		&buf->b, msg,
+		ad, tx->src, tx->ctx->addr, tx->seq,
+		BT_MESH_NET_IVI_TX);
+	if (err) {
+		BT_ERR("Unable to decrypt with node DevKey");
+		return -EINVAL;
+	}
+	BT_DBG("Decrypt: %u: %s", msg->len, bt_hex(msg->data, msg->len));
+
+	net_buf_reset(buf);
+	net_buf_reserve(buf, reservelen);
+	net_buf_add_u8(buf, hdr);
+	err = bt_mesh_app_encrypt(key, BT_MESH_IS_DEV_KEY(tx->ctx->app_idx),
+				  tx->aszmic, msg, ad, tx->src, tx->ctx->addr,
+				  bt_mesh.seq, BT_MESH_NET_IVI_TX);
+	net_buf_add_mem(buf, msg->data, msg->len);
+	BT_DBG("reencrypt data %u: %s", buf->b.len, bt_hex(buf->b.data, buf->b.len));
+	if (err) {
+		BT_ERR("err:%d", err);
+		return err;
+	}
+	return 0;
+}
+#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 int bt_mesh_trans_send(struct bt_mesh_net_tx *tx, struct net_buf_simple *msg,
 		       const struct bt_mesh_send_cb *cb, void *cb_data)
 {
@@ -761,10 +833,16 @@ int bt_mesh_trans_send(struct bt_mesh_net_tx *tx, struct net_buf_simple *msg,
 	} else {
 		ad = NULL;
 	}
-
+	#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+	tx->seq = bt_mesh.seq;
+	err = bt_mesh_app_encrypt(key, BT_MESH_IS_DEV_KEY(tx->ctx->app_idx),
+				  tx->aszmic, msg, ad, tx->src, tx->ctx->addr,
+				  tx->seq, BT_MESH_NET_IVI_TX);
+	#else
 	err = bt_mesh_app_encrypt(key, BT_MESH_IS_DEV_KEY(tx->ctx->app_idx),
 				  tx->aszmic, msg, ad, tx->src, tx->ctx->addr,
 				  bt_mesh.seq, BT_MESH_NET_IVI_TX);
+	#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 	if (err) {
 		return err;
 	}
@@ -772,7 +850,11 @@ int bt_mesh_trans_send(struct bt_mesh_net_tx *tx, struct net_buf_simple *msg,
 	if (tx->ctx->send_rel) {
 		err = send_seg(tx, msg, cb, cb_data, NULL);
 	} else {
+		#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+		err = send_unseg(tx, msg, cb, cb_data, NULL, reencrypt_appdata);
+		#else
 		err = send_unseg(tx, msg, cb, cb_data, NULL);
+		#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 	}
 
 	return err;
@@ -1417,10 +1499,17 @@ int bt_mesh_ctl_send(struct bt_mesh_net_tx *tx, u8_t ctl_op, void *data,
 	       tx->ctx->addr, tx->ctx->send_ttl, ctl_op);
 	BT_DBG("len %zu: %s", data_len, bt_hex(data, data_len));
 
+	#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+	tx->seq = bt_mesh.seq;
+	#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 	if (tx->ctx->send_rel) {
 		return send_seg(tx, &buf, cb, cb_data, &ctl_op);
 	} else {
+		#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+		return send_unseg(tx, &buf, cb, cb_data, &ctl_op, NULL);
+		#else
 		return send_unseg(tx, &buf, cb, cb_data, &ctl_op);
+		#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 	}
 }
 

@@ -1,16 +1,43 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include <string.h>
 #include <bl60x_fw_api.h>
 #include <lwip/tcpip.h>
 #include <lwip/netifapi.h>
 #include <lwip/dns.h>
-#include <ethernetif.h>
-#include <bl_wifi.h>
+//#include <ethernetif.h>
+//#include <bl_wifi.h>
 #include <utils_hex.h>
 #include <semphr.h>
-#include <aos/kernel.h>
-#include <aos/yloop.h>
 
-#include <bl_os_private.h>
+#include <bflb_os_private.h>
 #include "bl_main.h"
 #include "bl_rx.h"
 #include "wifi_mgmr.h"
@@ -36,6 +63,7 @@
 
 BL_Sem_t scan_sig = NULL;
 
+extern int wifi_mgmr_internel_init(void);
 extern int bl606a0_wifi_init(wifi_conf_t *conf);
 err_t bl606a0_wifi_netif_init(struct netif *netif);
 static scan_complete_cb_t scan_cb;
@@ -45,10 +73,10 @@ static void cb_scan_complete(void *data, void *param)
 {
     wifi_mgmr_ap_item_t *ap_ary_ptr = (wifi_mgmr_ap_item_t *)data;
     int status = *((int *)param);
-    bl_os_printf("scan complete status: %d, ssid_len = %lu\r\n", status, ap_ary_ptr->ssid_len);
+    bflb_os_printf("scan complete status: %d, ssid_len = %lu\r\n", status, ap_ary_ptr->ssid_len);
 
     if (scan_sig != NULL){
-        bl_os_sem_give(scan_sig);
+        bflb_os_sem_give(scan_sig);
     }
 }
 
@@ -104,7 +132,7 @@ static int mac_is_unvalid(uint8_t mac[6])
 #ifdef CONFIG_ENABLE_IPV6_ADDR_CALLBACK
 static void netif_nd6_callback(struct netif *netif, uint8_t ip_index)
 {
-    aos_post_event(EV_WIFI, CODE_WIFI_ON_GOT_IP6, 0);
+    platform_post_event(EV_WIFI, CODE_WIFI_ON_GOT_IP6, 0);
 }
 
 void nd6_set_cb(struct netif *netif, void (*cb)(struct netif *netif, u8_t ip_index))
@@ -134,7 +162,7 @@ static void wifi_eth_sta_enable(struct netif *netif, uint8_t mac[6])
     memcpy(netif->hwaddr, mac, 6);//overwrite mac addressin netif
     if (mac_is_unvalid(netif->hwaddr)) {
         /* set netif MAC hardware address */
-        bl_wifi_mac_addr_get(netif->hwaddr);
+        wifi_hosal_efuse_read_mac(netif->hwaddr);
         if (mac_is_unvalid(netif->hwaddr)) {
             /*Make sure we have a default valid MAC address*/
             //TODO generate a random mac address
@@ -205,7 +233,7 @@ int wifi_mgmr_drv_init(wifi_conf_t *conf)
     if (ret != 0) {
         goto err;
     }
-    wifi_mgmr_init();
+    wifi_mgmr_internel_init();
     ret = wifi_mgmr_api_ifaceup();
 err:
     return ret;
@@ -225,12 +253,12 @@ wifi_interface_t wifi_mgmr_sta_enable(void)
     static int done = 0;
 
     if (1 == done) {
-        bl_os_printf("----- STA has already been enable\r\n");
+        bflb_os_printf("----- STA has already been enable\r\n");
         return &(wifiMgmr.wlan_sta);
     }
     done = 1;
 
-    bl_os_printf("---------STA enable\r\n");
+    bflb_os_printf("---------STA enable\r\n");
     wifiMgmr.wlan_sta.mode = 0;//sta mode
     //TODO check wifiMgmr.wlan_sta status
     wifi_eth_sta_enable(&(wifiMgmr.wlan_sta.netif), wifiMgmr.wlan_sta.mac);
@@ -269,7 +297,7 @@ int wifi_mgmr_sta_mac_get(uint8_t mac[6])
     /*should we set default mac address/get efuse address here?*/
     //TODO use unified mac address init
     if (mac_is_unvalid(wifiMgmr.wlan_sta.mac)) {
-        bl_wifi_mac_addr_get(wifiMgmr.wlan_sta.mac);
+        wifi_hosal_efuse_read_mac(wifiMgmr.wlan_sta.mac);
         if (mac_is_unvalid(wifiMgmr.wlan_sta.mac)) {
             /*Make sure we have a default valid MAC address*/
             //TODO generate a random mac address
@@ -329,7 +357,7 @@ int wifi_mgmr_sta_dns_get(uint32_t *dns1, uint32_t *dns2)
 
 int wifi_mgmr_sta_ip_set(uint32_t ip, uint32_t mask, uint32_t gw, uint32_t dns1, uint32_t dns2)
 {
-    bl_os_enter_critical();
+    bflb_os_enter_critical();
 
     wifiMgmr.wlan_sta.ipv4.ip = ip;
     wifiMgmr.wlan_sta.ipv4.mask = mask;
@@ -337,7 +365,7 @@ int wifi_mgmr_sta_ip_set(uint32_t ip, uint32_t mask, uint32_t gw, uint32_t dns1,
     wifiMgmr.wlan_sta.ipv4.dns1 = dns1;
     wifiMgmr.wlan_sta.ipv4.dns2 = dns2;
 
-    bl_os_exit_critical();
+    bflb_os_exit_critical();
 
     return wifi_mgmr_api_ip_update();
 }
@@ -467,7 +495,7 @@ int wifi_mgmr_sta_ps_enter(uint32_t ps_level)
     if (!wifi_hosal_pm_capacity_set(ps_level)) {
         retval = wifi_hosal_pm_post_event(WLAN_PM_EVENT_CONTROL, WLAN_CODE_PM_NOTIFY_START, NULL);
     } else {
-        bl_os_printf("----- Error PS Mode\r\n");
+        bflb_os_printf("----- Error PS Mode\r\n");
     }
 
     return retval;
@@ -518,14 +546,14 @@ void wifi_mgmr_sta_connect_ind_stat_get(wifi_mgmr_sta_connect_ind_stat_info_t *w
     wifi_mgmr_ind_stat->chan_id = phy_freq_to_channel(wifiMgmr.wifi_mgmr_stat_info.chan_band, wifiMgmr.wifi_mgmr_stat_info.chan_freq);
     wifi_mgmr_ind_stat->type_ind = wifiMgmr.wifi_mgmr_stat_info.type_ind;
 
-    bl_os_printf("wifi mgmr ind status code = %d\r\n",  wifi_mgmr_ind_stat->status_code);
-    bl_os_printf("ssid: %s, passphr: %s, band: %d, chan_id: %d, type_ind: %d\r\n",
+    bflb_os_printf("wifi mgmr ind status code = %d\r\n",  wifi_mgmr_ind_stat->status_code);
+    bflb_os_printf("ssid: %s, passphr: %s, band: %d, chan_id: %d, type_ind: %d\r\n",
             wifi_mgmr_ind_stat->ssid,
             wifi_mgmr_ind_stat->passphr,
             wifi_mgmr_ind_stat->chan_band,
             wifi_mgmr_ind_stat->chan_id,
             wifi_mgmr_ind_stat->type_ind);
-    bl_os_printf("bssid: %02x%02x%02x%02x%02x%02x\r\n",
+    bflb_os_printf("bssid: %02x%02x%02x%02x%02x%02x\r\n",
                 wifi_mgmr_ind_stat->bssid[0],
                 wifi_mgmr_ind_stat->bssid[1],
                 wifi_mgmr_ind_stat->bssid[2],
@@ -581,7 +609,7 @@ static void wifi_eth_ap_enable(struct netif *netif, uint8_t mac[6])
     memcpy(netif->hwaddr, mac, 6);//overwrite mac addressin netif
     if (mac_is_unvalid(netif->hwaddr)) {
         /* set netif MAC hardware address */
-        bl_wifi_mac_addr_get(netif->hwaddr);
+        wifi_hosal_efuse_read_mac(netif->hwaddr);
         if (mac_is_unvalid(netif->hwaddr)) {
             /*Make sure we have a default valid MAC address*/
             //TODO generate a random mac address
@@ -611,12 +639,12 @@ wifi_interface_t wifi_mgmr_ap_enable()
     static int done = 0;                                                                                                             
                                                                                                                                     
     if (1 == done) {                                                                                                                 
-        bl_os_printf("----- AP has already been enable\r\n");                                                                        
+        bflb_os_printf("----- AP has already been enable\r\n");                                                                        
         return &(wifiMgmr.wlan_ap);                                                                                                  
     }
     done = 1;                                                                                                                        
                                                                                                                                     
-    bl_os_printf("---------AP enable\r\n");                                                                                          
+    bflb_os_printf("---------AP enable\r\n");                                                                                          
                                                                                                                                     
     wifiMgmr.wlan_ap.mode = 1;//ap mode                                                                                              
     wifi_eth_ap_enable(&(wifiMgmr.wlan_ap.netif), wifiMgmr.wlan_ap.mac);
@@ -822,7 +850,7 @@ int wifi_mgmr_channel_set(int channel, int use_40Mhz)
     int ret;
     wifiMgmr.channel = channel;
     ret = wifi_mgmr_api_channel_set(channel, use_40Mhz);
-    bl_os_printf("set channel %d, 40Mhz %d\r\n", channel, use_40Mhz);
+    bflb_os_printf("set channel %d, 40Mhz %d\r\n", channel, use_40Mhz);
     return ret;
 }
 
@@ -844,21 +872,21 @@ int wifi_mgmr_all_ap_scan(wifi_mgmr_ap_item_t **ap_ary, uint32_t *num)
         return -1;
     }
 
-    ap_ary_p = (wifi_mgmr_ap_item_t *)bl_os_malloc(sizeof(wifi_mgmr_ap_item_t) * WIFI_SCAN_MAX_AP);
+    ap_ary_p = (wifi_mgmr_ap_item_t *)bflb_os_malloc(sizeof(wifi_mgmr_ap_item_t) * WIFI_SCAN_MAX_AP);
     if(NULL == ap_ary_p) {
         return -1;
     }
     memset(ap_ary_p, 0, sizeof(wifi_mgmr_ap_item_t) * WIFI_SCAN_MAX_AP);
 
-    if(NULL == (scan_sig = bl_os_sem_create(0))){
-        bl_os_free(ap_ary_p);
+    if(NULL == (scan_sig = bflb_os_sem_create(0))){
+        bflb_os_free(ap_ary_p);
         return -1;
     }
 
     wifi_mgmr_scan(ap_ary_p, cb_scan_complete);//trigger the scan
 
-    if ((0 == bl_os_sem_take(scan_sig, BL_OS_WAITING_FOREVER))) {
-        bl_os_printf("wifi scan Done\r\n");
+    if ((0 == bflb_os_sem_take(scan_sig, BL_OS_WAITING_FOREVER))) {
+        bflb_os_printf("wifi scan Done\r\n");
     }
 
     wifi_mgmr_cli_scanlist();
@@ -868,7 +896,7 @@ int wifi_mgmr_all_ap_scan(wifi_mgmr_ap_item_t **ap_ary, uint32_t *num)
     *num = counter;
     *ap_ary = ap_ary_p;
 
-    bl_os_sem_delete(scan_sig);
+    bflb_os_sem_delete(scan_sig);
 
     return 0;
 }
@@ -877,9 +905,9 @@ int wifi_mgmr_scan(void *data, scan_complete_cb_t cb)
 {
     wifi_mgmr_scan_params_t *scan_params = NULL;
 
-    scan_params = (wifi_mgmr_scan_params_t *)bl_os_zalloc(sizeof(wifi_mgmr_scan_params_t));
+    scan_params = (wifi_mgmr_scan_params_t *)bflb_os_zalloc(sizeof(wifi_mgmr_scan_params_t));
     if (!scan_params) {
-        bl_os_printf("%s malloc scan_params failed!\r\n", __FUNCTION__);
+        bflb_os_printf("%s malloc scan_params failed!\r\n", __FUNCTION__);
         return -1;
     }
 
@@ -902,18 +930,18 @@ int wifi_mgmr_scan_adv(void *data, scan_complete_cb_t cb, uint16_t *channels, ui
     wifi_mgmr_scan_params_t* scan_params = NULL;
 
     if (0 != channel_num && NULL == channels) {
-        bl_os_printf("%s channels is NULL while has channel_num!\r\n", __FUNCTION__);
+        bflb_os_printf("%s channels is NULL while has channel_num!\r\n", __FUNCTION__);
         return -1;
     }
 
     if (channel_num > MAX_FIXED_CHANNELS_LIMIT) {
-        bl_os_printf("%s exceed max channel number!\r\n", __FUNCTION__);
+        bflb_os_printf("%s exceed max channel number!\r\n", __FUNCTION__);
         return -1;
     }
 
-    scan_params = (wifi_mgmr_scan_params_t *)bl_os_zalloc(sizeof(wifi_mgmr_scan_params_t) + sizeof(uint16_t)*channel_num);
+    scan_params = (wifi_mgmr_scan_params_t *)bflb_os_zalloc(sizeof(wifi_mgmr_scan_params_t) + sizeof(uint16_t)*channel_num);
     if (!scan_params) {
-        bl_os_printf("%s malloc scan_params failed!\r\n", __FUNCTION__);
+        bflb_os_printf("%s malloc scan_params failed!\r\n", __FUNCTION__);
         return -1;
     }
 
@@ -959,13 +987,13 @@ int wifi_mgmr_beacon_interval_set(uint16_t beacon_int)
 
 int wifi_mgmr_scan_filter_hidden_ssid(int filter)
 {
-    bl_os_enter_critical();
+    bflb_os_enter_critical();
     if (filter) {
         wifiMgmr.features &= (~WIFI_MGMR_FEATURES_SCAN_SAVE_HIDDEN_SSID);
     } else {
         wifiMgmr.features |= WIFI_MGMR_FEATURES_SCAN_SAVE_HIDDEN_SSID;
     }
-    bl_os_exit_critical();
+    bflb_os_exit_critical();
     return 0;
 }
 
@@ -973,7 +1001,7 @@ int wifi_mgmr_scan_complete_callback()
 {
     int status = 0;
 
-    bl_os_printf("%s: scan complete\r\n", __func__);
+    bflb_os_printf("%s: scan complete\r\n", __func__);
     if (scan_cb != NULL){
         status = 1;
         scan_cb(scan_data, &status);
@@ -1065,14 +1093,14 @@ int wifi_mgmr_set_country_code(char *country_code)
     if (NULL == country_code) {
         return -1;
     }
-    bl_os_printf("%s:code = %s\r\n", __func__, country_code);
+    bflb_os_printf("%s:code = %s\r\n", __func__, country_code);
     return wifi_mgmr_api_set_country_code(country_code);
 }
 
 int wifi_mgmr_set_wifi_active_time(uint32_t ms)
 {
     if (ms < 10 || ms > 80) {
-        bl_os_printf("Wrong, MUST set wifi ps acitve [10, 80] ms\r\n");
+        bflb_os_printf("Wrong, MUST set wifi ps acitve [10, 80] ms\r\n");
         return -1;
     }
 
@@ -1120,7 +1148,7 @@ void wifi_mgmr_diagnose_tlv_free(struct sm_tlv_list* list)
         current = next;
         next = next->next;
         /* XXX NO container_of here and next is the head, so just free! */
-        bl_os_free(current);
+        bflb_os_free(current);
     }
 }
 
@@ -1130,19 +1158,19 @@ struct sm_connect_tlv_desc* wifi_mgmr_diagnose_tlv_get_ele(void)
     static struct sm_tlv_list_hdr *next = NULL;
     struct sm_tlv_list_hdr *current = NULL;
 
-    bl_os_mutex_lock(wifiMgmr.wifi_mgmr_stat_info.diagnose_get_lock);
+    bflb_os_mutex_lock(wifiMgmr.wifi_mgmr_stat_info.diagnose_get_lock);
     if (!list.first)
     {
-        bl_os_mutex_lock(wifiMgmr.wifi_mgmr_stat_info.diagnose_lock);
+        bflb_os_mutex_lock(wifiMgmr.wifi_mgmr_stat_info.diagnose_lock);
         list = wifiMgmr.wifi_mgmr_stat_info.connect_diagnose;
         wifiMgmr.wifi_mgmr_stat_info.connect_diagnose.first = NULL;
         wifiMgmr.wifi_mgmr_stat_info.connect_diagnose.last = NULL;
-        bl_os_mutex_unlock(wifiMgmr.wifi_mgmr_stat_info.diagnose_lock);
+        bflb_os_mutex_unlock(wifiMgmr.wifi_mgmr_stat_info.diagnose_lock);
 
         current = list.first;
         next = (list.first) ? list.first->next : NULL;
 
-        bl_os_mutex_unlock(wifiMgmr.wifi_mgmr_stat_info.diagnose_get_lock);
+        bflb_os_mutex_unlock(wifiMgmr.wifi_mgmr_stat_info.diagnose_get_lock);
         return (struct sm_connect_tlv_desc *)(current);
     }
 
@@ -1159,7 +1187,7 @@ struct sm_connect_tlv_desc* wifi_mgmr_diagnose_tlv_get_ele(void)
         list.last = NULL;
     }
 
-    bl_os_mutex_unlock(wifiMgmr.wifi_mgmr_stat_info.diagnose_get_lock);
+    bflb_os_mutex_unlock(wifiMgmr.wifi_mgmr_stat_info.diagnose_get_lock);
     return (struct sm_connect_tlv_desc *)(current);
 }
 
@@ -1170,5 +1198,5 @@ void wifi_mgmr_diagnose_tlv_free_ele(struct sm_connect_tlv_desc *ele)
         return;
     }
 
-    bl_os_free(ele);
+    bflb_os_free(ele);
 }

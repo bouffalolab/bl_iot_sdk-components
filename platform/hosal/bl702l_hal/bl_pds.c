@@ -1,6 +1,96 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include "bl_pds.h"
 #include "bl_flash.h"
 #include "bl_irq.h"
+#include "bl_gpio_uart.h"
+
+
+#define PDS_LOG_ENABLE             0
+#define PDS_LOG_TX_PIN             14
+#define PDS_LOG_BAUDRATE           2000000
+
+#if PDS_LOG_ENABLE == 0
+#define PDS_LOG_INIT()
+#define PDS_LOG_PUTCHAR(C)
+#define PDS_LOG_PUTS(S)
+#else
+ATTR_PDS_SECTION
+static void uart_tx_init(uint8_t uart_id, uint8_t tx_pin, uint32_t baudrate)
+{
+    UART_CFG_Type uartCfg = {
+        .uartClk = 32000000,
+        .baudRate = baudrate,
+        .dataBits = UART_DATABITS_8,
+        .stopBits = UART_STOPBITS_1,
+        .parity = UART_PARITY_NONE,
+        .ctsFlowControl = DISABLE,
+        .rxDeglitch = DISABLE,
+        .rtsSoftwareControl = DISABLE,
+        .txSoftwareControl = DISABLE,
+        .txLinMode = DISABLE,
+        .rxLinMode = DISABLE,
+        .txBreakBitCnt = 0,
+        .byteBitInverse = UART_LSB_FIRST,
+    };
+    
+    GLB_GPIO_Type pinList[] = {tx_pin};
+    RomDriver_GLB_GPIO_Func_Init(GPIO_FUN_UART, pinList, sizeof(pinList)/sizeof(pinList[0]));
+    
+    RomDriver_GLB_UART_Fun_Sel(tx_pin % 4, GLB_UART_SIG_FUN_UART0_TXD + 4 * uart_id);
+    
+    RomDriver_GLB_Trim_RC32M();
+    RomDriver_GLB_Set_UART_CLK(1, HBN_UART_CLK_XCLK, 0);
+    
+    RomDriver_UART_DeInit(uart_id);
+    RomDriver_UART_Init(uart_id, &uartCfg);
+    RomDriver_UART_TxFreeRun(uart_id, ENABLE);
+    RomDriver_UART_Enable(uart_id, UART_TX);
+}
+
+ATTR_PDS_SECTION
+static void uart_send_byte(uint8_t uart_id, uint8_t data)
+{
+    RomDriver_UART_SendDataBlock(uart_id, &data, 1);
+}
+
+ATTR_PDS_SECTION
+static void uart_send_data(uint8_t uart_id, uint8_t *data, uint32_t len)
+{
+    RomDriver_UART_SendDataBlock(uart_id, data, len);
+}
+
+#define PDS_LOG_INIT()             uart_tx_init(0, PDS_LOG_TX_PIN, PDS_LOG_BAUDRATE)
+#define PDS_LOG_PUTCHAR(C)         uart_send_byte(0, (uint8_t)(C))
+#define PDS_LOG_PUTS(S)            uart_send_data(0, (uint8_t *)(S), strlen(S))
+#endif
 
 
 uint16_t bl_rtc_frequency = 32768;
@@ -149,6 +239,8 @@ int bl_pds_pre_process(uint32_t pdsLevel, uint32_t pdsSleepCycles, uint32_t *sto
 ATTR_PDS_SECTION
 int bl_pds_start(uint32_t pdsLevel, uint32_t pdsSleepCycles)
 {
+    PDS_LOG_INIT();
+    
     // Power down flash
     flash_powerdown();
     
@@ -174,6 +266,15 @@ int bl_pds_start(uint32_t pdsLevel, uint32_t pdsSleepCycles)
     // Clear HBN_IRQ status
     BL_WR_REG(HBN_BASE, HBN_IRQ_CLR, 0xFFFFFFFF);
     
+    // Use PDS_LOG_PUTCHAR when flash is power down
+    // PDS In
+    PDS_LOG_PUTCHAR(0x0D);
+    PDS_LOG_PUTCHAR(0x0A);
+    PDS_LOG_PUTCHAR('P');
+    PDS_LOG_PUTCHAR('I');
+    PDS_LOG_PUTCHAR(0x0D);
+    PDS_LOG_PUTCHAR(0x0A);
+    
     // Clear PDS_GPIO status
     void bl_pds_gpio_clear_int_status(void);
     bl_pds_gpio_clear_int_status();
@@ -186,6 +287,13 @@ int bl_pds_start(uint32_t pdsLevel, uint32_t pdsSleepCycles)
     RomDriver_HBN_Set_Status_Flag(HBN_STATUS_ENTER_FLAG);
     RomDriver_PDS_Default_Level_Config(bl_pds_misc.pdsCfgPtr, pdsSleepCycles);
     __WFI();
+    
+    // Use PDS_LOG_PUTCHAR when flash is power down
+    // PDS Abort
+    PDS_LOG_PUTCHAR('P');
+    PDS_LOG_PUTCHAR('A');
+    PDS_LOG_PUTCHAR(0x0D);
+    PDS_LOG_PUTCHAR(0x0A);
     
     // Fail to enter PDS mode due to interrupt pending, so disable PDS
     BL_WR_REG(PDS_BASE, PDS_CTL, (0x1<<10)|(0x1<<27));
@@ -209,6 +317,11 @@ int bl_pds_start(uint32_t pdsLevel, uint32_t pdsSleepCycles)
 ATTR_PDS_SECTION
 int bl_pds_post_process(uint32_t pdsLevel, uint32_t pdsSleepCycles, uint32_t reset, uint32_t arg[])
 {
+#if defined(CFG_USE_PSRAM)
+    extern void bl_psram_init(void);
+    bl_psram_init();
+#endif
+    
     __enable_irq();
     
     return 0;
@@ -515,6 +628,15 @@ void bl_pds_restore_cpu_reg(void)
 ATTR_PDS_SECTION
 void bl_pds_restore(void)
 {
+    PDS_LOG_INIT();
+    
+    // Use PDS_LOG_PUTCHAR when flash is power down
+    // PDS Out
+    PDS_LOG_PUTCHAR('P');
+    PDS_LOG_PUTCHAR('O');
+    PDS_LOG_PUTCHAR(0x0D);
+    PDS_LOG_PUTCHAR(0x0A);
+    
 #if 0
     GLB_GPIO_Type pinList[4];
     
@@ -571,8 +693,19 @@ void bl_pds_restore(void)
         *(volatile uint32_t *)(CLIC_HART0_ADDR + CLIC_INTIP + n) = 0;
     }
     
+    // Use PDS_LOG_PUTCHAR when flash is power down
+    // Flash Restore Begin
+    PDS_LOG_PUTCHAR('F');
+    PDS_LOG_PUTCHAR('B');
+    PDS_LOG_PUTCHAR(0x0D);
+    PDS_LOG_PUTCHAR(0x0A);
+    
     // Configure flash (must use rom driver, since tcm code is lost and flash is power down)
     flash_restore();
+    
+    // Use PDS_LOG_PUTS when flash is restored
+    // Flash Restore End
+    PDS_LOG_PUTS("FE\r\n");
     
     // Set cpuRegStored flag
     bl_pds_misc.cpuRegStored = 1;
@@ -584,6 +717,10 @@ void bl_pds_restore(void)
     
     // Clear cpuRegStored flag
     bl_pds_misc.cpuRegStored = 0;
+    
+    // Use PDS_LOG_PUTS when flash is restored
+    // Jump to App
+    PDS_LOG_PUTS("JA\r\n");
     
     // Restore cpu registers
     bl_pds_restore_cpu_reg();

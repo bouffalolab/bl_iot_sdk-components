@@ -690,8 +690,47 @@ int bt_br_discovery_start(const struct bt_br_discovery_param *param,
  */
 int bt_br_discovery_stop(void);
 
+/**
+ * @brief Disable Bluetooth
+ *
+ * Disable Bluetooth. Can't be called before bt_enable has completed and shall exit the Connection State/ Advertising State/Scanning State and transition to the Standby State.
+ *
+ * This API will clear all configured identities and keys that are not persistently
+ * stored with @kconfig{CONFIG_BT_SETTINGS}. These can be restored
+ * with settings_load() before reenabling the stack.
+ *
+ * This API does _not_ clear previously registered callbacks
+ * like @ref bt_le_scan_cb_register, @ref bt_conn_cb_register
+ * AND @ref bt_br_discovery_cb_register.
+ * That is, the application shall not re-register them when
+ * the Bluetooth subsystem is re-enabled later.
+ *
+ * Close and release HCI resources. Result is architecture dependent.
+ *
+ * @return Zero on success or (negative) error code otherwise.
+ */
 int bt_disable(void);
-
+/**
+ * @brief Force Disable Bluetooth
+ *
+ * Force Disable Bluetooth. This API will call HCI Reset command and force exit the Connection State/ Advertising State/Scanning State and transition to the Standby State.
+ * This API will clear all configured identities and keys that are not persistently
+ * stored with @kconfig{CONFIG_BT_SETTINGS}. These can be restored
+ * with settings_load() before reenabling the stack.
+ *
+ * This API does _not_ clear previously registered callbacks
+ * like @ref bt_le_scan_cb_register, @ref bt_conn_cb_register
+ * AND @ref bt_br_discovery_cb_register.
+ * That is, the application shall not re-register them when
+ * the Bluetooth subsystem is re-enabled later.
+ *
+ * If call this API at Connection state, it will clear all connection related resource, Disconnection err code: BT_HCI_ERR_UNSPECIFIED.
+ *
+ * Close and release HCI resources. Result is architecture dependent.
+ *
+ * @return Zero on success or (negative) error code otherwise.
+ */
+int bt_force_disable(void);
 
 struct bt_br_oob {
 	/** BR/EDR address. */
@@ -846,7 +885,14 @@ struct bt_bond_info {
 	bt_addr_le_t addr;
 };
 
-/** Iterate through all existing bonds.
+/** Information about a bond with a bredr remote device. */
+struct bt_br_bond_info {
+    const bt_addr_t *addr;   // 
+    const u8_t *link_key;    // Link Key
+    size_t link_key_size;    // Link Key size
+};
+
+/** Iterate through all existing LE bonds.
   *
   * @param id         Local identity (mostly just BT_ID_DEFAULT).
   * @param func       Function to call for each bond.
@@ -854,6 +900,18 @@ struct bt_bond_info {
   */
 void bt_foreach_bond(u8_t id, void (*func)(const struct bt_bond_info *info, void *user_data),
 		     void *user_data);
+
+#if defined(CONFIG_BT_BREDR)
+/** Iterate through all existing BR/EDR bonds.
+  *
+  * @param id         Local identity (mostly just BT_ID_DEFAULT).
+  * @param func       Function to call for each bond.
+  * @param user_data  Data to pass to the callback function.
+  */
+void bt_br_foreach_bond(void (*func)(const struct bt_br_bond_info *info, 
+                                     void *user_data),
+                        void *user_data);
+#endif
 
 /**
   * write local name.

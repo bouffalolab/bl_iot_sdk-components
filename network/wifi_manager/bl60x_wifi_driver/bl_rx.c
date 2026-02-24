@@ -1,11 +1,32 @@
 
-/**
- ****************************************************************************************
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
  *
- * @file bl_rx.c
- * Copyright (C) Bouffalo Lab 2016-2018
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
  *
- ****************************************************************************************
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <stdio.h>
@@ -13,7 +34,6 @@
 
 #include <lwip/inet.h>
 #include <lwip/netifapi.h>
-#include <aos/yloop.h>
 #include "bl_main.h"
 #include "bl_defs.h"
 #include "bl_cmds.h"
@@ -28,7 +48,7 @@
 #include <lwip/dhcp6.h>
 #endif
 
-#include <bl_os_private.h>
+#include <bflb_os_private.h>
 #define USER_UNUSED(a) ((void)(a))
 void  bl_tx_cntrl_link_up(struct bl_sta *sta);
 void  bl_tx_cntrl_link_down(struct bl_sta *sta);
@@ -290,7 +310,7 @@ static int bl_rx_rssi_status_ind(struct bl_hw *bl_hw,
 
     RWNX_DBG(RWNX_FN_ENTRY_STR);
 
-    //bl_os_printf("------> rssi_status %u:%u:%d\r\n", ind->vif_index, ind->rssi_status, ind->rssi);
+    //bflb_os_printf("------> rssi_status %u:%u:%d\r\n", ind->vif_index, ind->rssi_status, ind->rssi);
     if (cb_rssi) {
         cb_rssi(cb_rssi_env, ind->rssi);
     }
@@ -561,7 +581,7 @@ static int bl_rx_scanu_result_ind(struct bl_hw *bl_hw, struct bl_cmd *cmd, struc
     } else if (ieee80211_is_probe_resp(mgmt->frame_control)) {
         _rx_handle_probersp(ind, mgmt);
     } else {
-        bl_os_printf("Bug Scan IND?\r\n");
+        bflb_os_printf("Bug Scan IND?\r\n");
     }
 
     return 0;
@@ -615,11 +635,11 @@ static int bl_rx_sm_connect_ind(struct bl_hw *bl_hw,
     USER_UNUSED(index);
     RWNX_DBG(RWNX_FN_ENTRY_STR);
 
-    bl_os_printf("[RX] Connection Status\r\n");
-    bl_os_printf("[RX]   status_code %u\r\n", ind->status_code);
-    bl_os_printf("[RX]   reason_code %u\r\n", ind->reason_code);
-    bl_os_printf("[RX]   connect result: %s\r\n", wifi_mgmr_get_sm_status_code_str(ind->status_code));
-    bl_os_printf("[RX]   MAC %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+    bflb_os_printf("[RX] Connection Status\r\n");
+    bflb_os_printf("[RX]   status_code %u\r\n", ind->status_code);
+    bflb_os_printf("[RX]   reason_code %u\r\n", ind->reason_code);
+    bflb_os_printf("[RX]   connect result: %s\r\n", wifi_mgmr_get_sm_status_code_str(ind->status_code));
+    bflb_os_printf("[RX]   MAC %02X:%02X:%02X:%02X:%02X:%02X\r\n",
             ind->bssid.array[0],
             ind->bssid.array[1],
             ind->bssid.array[2],
@@ -627,20 +647,20 @@ static int bl_rx_sm_connect_ind(struct bl_hw *bl_hw,
             ind->bssid.array[4],
             ind->bssid.array[5]
     );
-    bl_os_printf("[RX]   vif_idx %u\r\n", BL_VIF_STA);
-    bl_os_printf("[RX]   ap_idx %u\r\n", ind->ap_idx);
-    bl_os_printf("[RX]   ch_idx %u\r\n", ind->ch_idx);
-    bl_os_printf("[RX]   qos %u\r\n", ind->qos);
-    bl_os_printf("[RX]   acm %u\r\n", ind->acm);
-    bl_os_printf("[RX]   assoc_req_ie_len %u\r\n", ind->assoc_req_ie_len);
-    bl_os_printf("[RX]   assoc_rsp_ie_len %u\r\n", ind->assoc_rsp_ie_len);
-    bl_os_printf("[RX]   aid %u\r\n", ind->aid);
-    bl_os_printf("[RX]   band %u\r\n", ind->band);
-    bl_os_printf("[RX]   center_freq %u\r\n", ind->center_freq);
-    bl_os_printf("[RX]   width %u\r\n", ind->width);
-    bl_os_printf("[RX]   center_freq1 %u\r\n", (unsigned int)ind->center_freq1);
-    bl_os_printf("[RX]   center_freq2 %u\r\n", (unsigned int)ind->center_freq2);
-    bl_os_printf("[RX]   tlv_ptr first %p\r\n", ind->connect_diagnose.first);
+    bflb_os_printf("[RX]   vif_idx %u\r\n", BL_VIF_STA);
+    bflb_os_printf("[RX]   ap_idx %u\r\n", ind->ap_idx);
+    bflb_os_printf("[RX]   ch_idx %u\r\n", ind->ch_idx);
+    bflb_os_printf("[RX]   qos %u\r\n", ind->qos);
+    bflb_os_printf("[RX]   acm %u\r\n", ind->acm);
+    bflb_os_printf("[RX]   assoc_req_ie_len %u\r\n", ind->assoc_req_ie_len);
+    bflb_os_printf("[RX]   assoc_rsp_ie_len %u\r\n", ind->assoc_rsp_ie_len);
+    bflb_os_printf("[RX]   aid %u\r\n", ind->aid);
+    bflb_os_printf("[RX]   band %u\r\n", ind->band);
+    bflb_os_printf("[RX]   center_freq %u\r\n", ind->center_freq);
+    bflb_os_printf("[RX]   width %u\r\n", ind->width);
+    bflb_os_printf("[RX]   center_freq1 %u\r\n", (unsigned int)ind->center_freq1);
+    bflb_os_printf("[RX]   center_freq2 %u\r\n", (unsigned int)ind->center_freq2);
+    bflb_os_printf("[RX]   tlv_ptr first %p\r\n", ind->connect_diagnose.first);
     RWNX_DBG(RWNX_FN_LEAVE_STR);
 
     memset(&ind_new, 0, sizeof(ind_new));
@@ -693,7 +713,7 @@ static int bl_rx_sm_connect_ind(struct bl_hw *bl_hw,
             bl_vif->dev->ip6_autoconfig_enabled = 1;
 #endif
         } else {
-            bl_os_printf("[RX]  -------- CRITICAL when check netif. ptr is %p:%p\r\n",
+            bflb_os_printf("[RX]  -------- CRITICAL when check netif. ptr is %p:%p\r\n",
                     bl_vif,
                     bl_vif ? bl_vif->dev : NULL
             );
@@ -715,17 +735,17 @@ static int bl_rx_sm_disconnect_ind(struct bl_hw *bl_hw,
     RWNX_DBG(RWNX_FN_ENTRY_STR);
 
     addr_any.addr = inet_addr("0.0.0.0");
-    bl_os_printf("[RX]   sm_disconnect_ind\r\n"
+    bflb_os_printf("[RX]   sm_disconnect_ind\r\n"
               "       status_code %u\r\n"
               "       802.11 reason_code %u\r\n", ind->status_code, ind->reason_code);
-    bl_os_printf("[RX]   disconnect reason: %s\r\n", wifi_mgmr_get_sm_status_code_str(ind->status_code));
-    bl_os_printf("[RX]   vif_idx %u\r\n", BL_VIF_STA);
-    bl_os_printf("[RX]   ft_over_ds %u\r\n", ind->ft_over_ds);
-    bl_os_printf("[RX]   tlv_ptr first %p\r\n", ind->connect_diagnose.first);
+    bflb_os_printf("[RX]   disconnect reason: %s\r\n", wifi_mgmr_get_sm_status_code_str(ind->status_code));
+    bflb_os_printf("[RX]   vif_idx %u\r\n", BL_VIF_STA);
+    bflb_os_printf("[RX]   ft_over_ds %u\r\n", ind->ft_over_ds);
+    bflb_os_printf("[RX]   tlv_ptr first %p\r\n", ind->connect_diagnose.first);
 
     if (bl_hw->vif_table[BL_VIF_STA].links_num == 0)
     {
-        bl_os_printf("[WF] Error: illegal sm_sta_del, links_num is 0!\r\n");
+        bflb_os_printf("[WF] Error: illegal sm_sta_del, links_num is 0!\r\n");
         return -1;
     }
 
@@ -769,7 +789,7 @@ static int bl_rx_sm_sta_add_ind(struct bl_hw *bl_hw,
 
     if (bl_hw->vif_table[BL_VIF_STA].links_num > 0)
     {
-        bl_os_printf("[WF] Error: illegal sm_sta_add, sta_idx: %d\r\n", ind->ap_idx);
+        bflb_os_printf("[WF] Error: illegal sm_sta_add, sta_idx: %d\r\n", ind->ap_idx);
         return -1;
     }
 
@@ -799,9 +819,9 @@ static int bl_rx_apm_sta_add_ind(struct bl_hw *bl_hw, struct bl_cmd *cmd, struct
     struct apm_sta_add_ind *ind = (struct apm_sta_add_ind*)msg->param;
     struct bl_sta *sta;
 
-    bl_os_printf("[WF] APM_STA_ADD_IND\r\n");
-    bl_os_printf("[WF]    flags %08X\r\n", (unsigned int)ind->flags);
-    bl_os_printf("[WF]    MAC %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+    bflb_os_printf("[WF] APM_STA_ADD_IND\r\n");
+    bflb_os_printf("[WF]    flags %08X\r\n", (unsigned int)ind->flags);
+    bflb_os_printf("[WF]    MAC %02X:%02X:%02X:%02X:%02X:%02X\r\n",
             ind->sta_addr.array[0] & 0xFF,
             ind->sta_addr.array[1] & 0xFF,
             ind->sta_addr.array[2] & 0xFF,
@@ -809,22 +829,22 @@ static int bl_rx_apm_sta_add_ind(struct bl_hw *bl_hw, struct bl_cmd *cmd, struct
             ind->sta_addr.array[4] & 0xFF,
             ind->sta_addr.array[5] & 0xFF
     );
-    bl_os_printf("[WF]    vif_idx %u\r\n", BL_VIF_AP);
-    bl_os_printf("[WF]    sta_idx %u\r\n", ind->sta_idx);
-    bl_os_log_info("[WF]    tsflo: 0x%lx\r\n", ind->tsflo);
-    bl_os_log_info("[WF]    tsfhi: 0x%lx\r\n", ind->tsfhi);
-    bl_os_log_info("[WF]    rssi: %d\r\n", ind->rssi);
-    bl_os_log_info("[WF]    data rate: 0x%x\r\n", ind->data_rate);
+    bflb_os_printf("[WF]    vif_idx %u\r\n", BL_VIF_AP);
+    bflb_os_printf("[WF]    sta_idx %u\r\n", ind->sta_idx);
+    bflb_os_log_info("[WF]    tsflo: 0x%lx\r\n", ind->tsflo);
+    bflb_os_log_info("[WF]    tsfhi: 0x%lx\r\n", ind->tsfhi);
+    bflb_os_log_info("[WF]    rssi: %d\r\n", ind->rssi);
+    bflb_os_log_info("[WF]    data rate: 0x%x\r\n", ind->data_rate);
 
     if (ind->sta_idx >= NX_REMOTE_STA_STORE_MAX)
     {
-        bl_os_printf("[WF]    Error: Potential illegal sta_idx: %d\r\n", ind->sta_idx);
+        bflb_os_printf("[WF]    Error: Potential illegal sta_idx: %d\r\n", ind->sta_idx);
         return -1;
     }
 
     sta = &(bl_hw->sta_table[ind->sta_idx]);
     if (sta->is_used) {
-        bl_os_log_info("[WF]    Warning: sta_idx already used: %d\r\n", ind->sta_idx);
+        bflb_os_log_info("[WF]    Warning: sta_idx already used: %d\r\n", ind->sta_idx);
     }
     memcpy(sta->sta_addr.array, ind->sta_addr.array, 6);
     sta->qos       = !!(ind->flags & STA_QOS_CAPA);
@@ -863,7 +883,7 @@ static int bl_rx_apm_sta_add_ind(struct bl_hw *bl_hw, struct bl_cmd *cmd, struct
         bl_hw->vif_table[BL_VIF_AP].links_num++;
     }
 
-    aos_post_event(EV_WIFI, CODE_WIFI_ON_AP_STA_ADD, ind->sta_idx);
+    platform_post_event(EV_WIFI, CODE_WIFI_ON_AP_STA_ADD, ind->sta_idx);
 
     return 0;
 }
@@ -873,29 +893,29 @@ static int bl_rx_apm_sta_del_ind(struct bl_hw *bl_hw, struct bl_cmd *cmd, struct
     struct apm_sta_del_ind *ind = (struct apm_sta_del_ind*)msg->param;
     struct bl_sta *sta;
 
-    bl_os_printf("[WF] APM_STA_DEL_IND\r\n");
-    bl_os_printf("[WF]    sta_idx %u\r\n", ind->sta_idx);
-    bl_os_printf("[WF]    statuts_code %u\r\n", ind->status_code);
-    bl_os_printf("[WF]    reason_code %u\r\n", ind->reason_code);
-    bl_os_printf("[RX]    disconnect reason: %s\r\n", wifi_mgmr_get_apm_status_code_str(ind->status_code));
+    bflb_os_printf("[WF] APM_STA_DEL_IND\r\n");
+    bflb_os_printf("[WF]    sta_idx %u\r\n", ind->sta_idx);
+    bflb_os_printf("[WF]    statuts_code %u\r\n", ind->status_code);
+    bflb_os_printf("[WF]    reason_code %u\r\n", ind->reason_code);
+    bflb_os_printf("[RX]    disconnect reason: %s\r\n", wifi_mgmr_get_apm_status_code_str(ind->status_code));
 
     if ((ind->sta_idx >= NX_REMOTE_STA_STORE_MAX) ||
         (bl_hw->vif_table[BL_VIF_AP].links_num == 0))
     {
-        bl_os_printf("[WF]    Error: Potential illegal sta_idx: %d, or no link_num\r\n", ind->sta_idx);
+        bflb_os_printf("[WF]    Error: Potential illegal sta_idx: %d, or no link_num\r\n", ind->sta_idx);
         return -1;
     }
 
     sta = &(bl_hw->sta_table[ind->sta_idx]);
     if (0 == sta->is_used) {
-        bl_os_log_info("[WF]    Warning: sta_idx already empty: %d\r\n", ind->sta_idx);
+        bflb_os_log_info("[WF]    Warning: sta_idx already empty: %d\r\n", ind->sta_idx);
     }
     sta->is_used = 0;
     bl_tx_cntrl_link_down(sta);
 
     /* APM last link */
     bl_hw->vif_table[BL_VIF_AP].links_num--;
-    bl_os_printf("[WF]    links_num %u\r\n", bl_hw->vif_table[BL_VIF_AP].links_num);
+    bflb_os_printf("[WF]    links_num %u\r\n", bl_hw->vif_table[BL_VIF_AP].links_num);
     if (!bl_hw->vif_table[BL_VIF_AP].links_num)
     {
         bl_hw->vif_table[BL_VIF_AP].fc_chan = 0;
@@ -911,7 +931,7 @@ static int bl_rx_apm_sta_del_ind(struct bl_hw *bl_hw, struct bl_cmd *cmd, struct
         }
     }
 
-    aos_post_event(EV_WIFI, CODE_WIFI_ON_AP_STA_DEL, ind->sta_idx);
+    platform_post_event(EV_WIFI, CODE_WIFI_ON_AP_STA_DEL, ind->sta_idx);
 
     return 0;
 }

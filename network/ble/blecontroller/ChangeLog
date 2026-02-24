@@ -1,4 +1,42 @@
+
 # Changes
+## 2025-10-31
+1.[BL602]Make bluetooth get mac address from efuse.
+
+## 2025-09-24
+1.[bl602]Use common config a macro for Bouffalo_SDK
+
+## 2025-08-29
+1.[bl602]Feature: Add support for Bouffalo_SDK.
+
+## 2025-06-09
+1.[bl702]Fix the issue that initiator fails to establish ble link sometimes when rx threshold is 1.
+
+## 2025-03-27
+1.[bl702][bl602]Not support privacy related commands in the response for HCI_RD_LOCAL_SUPP_CMDS_CMD if privacy is disabled.
+
+## 2025-03-21
+1.[bl702] Add blecontroller_702_uarthci library.
+
+## 2025-03-20
+1.[bl702] Use system clock to configure uart clock
+
+# Changes
+## 2025-02-21
+1.[bl702]Fix no packet response in slave mode, when connection interval is 7.5ms.
+
+## 2025-02-20
+[bl702] Fix compilation errors when compiling 702 salve.
+
+## 2025-02-08
+1.[bl702][bl602]Optimise channel map assessment.
+
+## 2025-02-08
+1.[bl702]Fix ble connection failure issue that occurs after disconnection from 2M PHY.
+
+## 2025-01-16
+1.[bl702][bl602]Fix the crash issue occurred because one global variable was not allocated in time when ble connection was established in some corner case.
+
 ## 2024-12-24
 1.[bl602][bl702]Fix the issue that blecontroller reports HCI_NB_CMP_PKTS_EVT_CODE event with wrong value of Num_Completed_Packets if there are pending acl packets that are not sent out while le link is disconnected.
 

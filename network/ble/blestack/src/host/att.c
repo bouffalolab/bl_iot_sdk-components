@@ -16,7 +16,7 @@
 
 #include <hci_host.h>
 #include <bluetooth.h>
-#include <uuid.h>
+#include <bt_uuid.h>
 #include <gatt.h>
 #include <hci_driver.h>
 
@@ -1339,6 +1339,12 @@ static u8_t att_write_rsp(struct bt_conn *conn, u8_t req, u8_t rsp,
 {
 	struct write_data data;
 
+	#if defined(BFLB_HOST_PARAMETER_CHECK)
+	if(value == NULL||len <= 0)
+	{
+		return BT_ATT_ERR_VALUE_NOT_ALLOWED;
+	}
+	#endif
 	if (!bt_gatt_change_aware(conn, req ? true : false)) {
 		return BT_ATT_ERR_DB_OUT_OF_SYNC;
 	}
@@ -1461,6 +1467,13 @@ static u8_t att_prep_write_rsp(struct bt_att *att, u16_t handle, u16_t offset,
 	struct prep_data data;
 	struct bt_att_prepare_write_rsp *rsp;
 
+	#if defined(BFLB_HOST_PARAMETER_CHECK)
+	if(value == NULL||len <= 0)
+	{
+		return BT_ATT_ERR_VALUE_NOT_ALLOWED;
+	}
+	#endif
+	
 	if (!bt_gatt_change_aware(conn, true)) {
 		return BT_ATT_ERR_DB_OUT_OF_SYNC;
 	}

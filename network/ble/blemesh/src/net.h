@@ -348,6 +348,9 @@ struct bt_mesh_net_rx {
 struct bt_mesh_net_tx {
 	struct bt_mesh_subnet *sub;
 	struct bt_mesh_msg_ctx *ctx;
+	#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+	u32_t seq;
+	#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 	u16_t src;
 	u8_t  xmit;
 	u8_t  friend_cred:1,
@@ -364,6 +367,9 @@ extern struct bt_mesh_net bt_mesh;
 
 #define BT_MESH_NET_HDR_LEN 9
 
+#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+typedef int (*reencrypt_appdata_cb)(struct bt_mesh_net_tx *tx, struct net_buf_simple *msg, struct net_buf *buf);
+#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 int bt_mesh_net_keys_create(struct bt_mesh_subnet_keys *keys,
 			    const u8_t key[16]);
 
@@ -404,9 +410,13 @@ size_t bt_mesh_subnet_foreach(void (*cb)(struct bt_mesh_subnet *sub));
 int bt_mesh_net_encode(struct bt_mesh_net_tx *tx, struct net_buf_simple *buf,
 		       bool proxy);
 
+#if defined(BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY)
+int bt_mesh_net_send(struct bt_mesh_net_tx *tx, struct net_buf *buf,
+		     const struct bt_mesh_send_cb *cb, void *cb_data, reencrypt_appdata_cb recb, struct net_buf_simple *sdu);
+#else
 int bt_mesh_net_send(struct bt_mesh_net_tx *tx, struct net_buf *buf,
 		     const struct bt_mesh_send_cb *cb, void *cb_data);
-
+#endif /* BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY */
 int bt_mesh_net_decode(struct net_buf_simple *data, enum bt_mesh_net_if net_if,
 		       struct bt_mesh_net_rx *rx, struct net_buf_simple *buf);
 

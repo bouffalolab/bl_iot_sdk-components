@@ -50,7 +50,7 @@ static int img_param_get_index(int value, int min, int max)
 
     if (!is_param_valid(index, min, max)) {
         clip_param_range(&index, min, max);
-        // //MSG("img_param_get_index: invalid param idx %d, clip to %d\r\n", value, index);
+        // MSG("img_param_get_index: invalid param idx %d, clip to %d\r\n", value, index);
     }
 
     return index;
@@ -70,7 +70,7 @@ int img_param_load(const char *sensor_name)
     end = &_ld_bl_img_param_desc_end;
 
     while (start < end) {
-        //MSG("try matching the img param desc [%s]\r\n", start->name);
+        MSG("try matching the img param desc [%s]\r\n", start->name);
 
         if (0 == strcmp(sensor_name, start->name)) {
             img_param = start;
@@ -86,7 +86,7 @@ int img_param_load(const char *sensor_name)
 int img_param_get_module(const BL_IMG_PARAM_DESC_T **module)
 {
     if (NULL == img_param) {
-        //MSG("img_param not init!");
+        MSG("img_param not init!");
         return -1;
     }
 
@@ -103,7 +103,7 @@ int img_param_get_states(const BL_Fun_Type **state)
 
 int img_param_get_default_blc(const black_lvl_corr_t **blcCfg)
 {
-    *blcCfg = &img_param->blc_tbl->black_lvl_corr[0];
+    *blcCfg = &img_param->blc_tbl->black_lvl_corr;
 
     return 0;
 }
@@ -128,7 +128,7 @@ int img_param_get_wdr_config(int param_idx, const wdr_fw_config_t **wdr_fw_confi
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, img_param->wdr_fw_config_tbl->num_wdr_fw_config - 1);
     *wdr_fw_config = &img_param->wdr_fw_config_tbl->wdr_fw_config[index];
 
-    //MSG("img_param_get_wdr_config: idx %d\r\n", index);
+    MSG("img_param_get_wdr_config: idx %d\r\n", index);
 
     return 0;
 }
@@ -140,7 +140,7 @@ int img_param_get_num_wdr_config(void)
 
 int img_param_get_bnr_config(const bnr_fw_config_t **bnr_fw_config)
 {
-    *bnr_fw_config = &img_param->bnr_fw_config_tbl->bnr_fw_config[0];
+    *bnr_fw_config = &img_param->bnr_fw_config_tbl->bnr_fw_config;
 
     return 0;
 }
@@ -150,7 +150,7 @@ int img_param_get_edge_enhance(int param_idx, const edge_enhance_t **edge_enhanc
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, PARAM_EDGE_ENHANCE_IDX_MAX);
     *edge_enhance = &img_param->edge_enhance_tbl->edgeEnhance[index];
 
-    //MSG("img_param_get_edge_enhance: idx %d\r\n", index);
+    MSG("img_param_get_edge_enhance: idx %d\r\n", index);
 
     return 0;
 }
@@ -160,21 +160,21 @@ int img_param_get_noise_reduction(int param_idx, const noise_reduction_t **noise
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, PARAM_NR_IDX_MAX);
     *noise_reduct = &img_param->noise_reduction_tbl->noise_reduction[index];
 
-    //MSG("img_param_get_noise_reduction: idx %d\r\n", index);
+    MSG("img_param_get_noise_reduction: idx %d\r\n", index);
 
     return 0;
 }
 
 int img_param_get_default_2DNR_str(uint8_t *nr2d_str)
 {
-    *nr2d_str = 2;
+    *nr2d_str = img_param->noise_reduction_tbl->filt_str_2d;
 
     return 0;
 }
 
 int img_param_get_default_3DNR_str(uint8_t *nr3d_str)
 {
-    *nr3d_str = 4;
+    *nr3d_str = img_param->noise_reduction_tbl->filt_str_3d;
 
     return 0;
 }
@@ -184,7 +184,7 @@ int img_param_get_manual_wb_info(int param_idx, const wb_info_t **wb_info)
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, img_param->wb_info_tbl->num_wb_info - 1);
     *wb_info = &img_param->wb_info_tbl->wb_info[index];
 
-    //MSG("img_param_get_manual_wb_info: idx %d\r\n", index);
+    MSG("img_param_get_manual_wb_info: idx %d\r\n", index);
 
     return 0;
 }
@@ -199,7 +199,7 @@ int img_param_get_wb_bias(int param_idx, const wb_bais_t **wb_bias)
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, img_param->wb_bias_tbl->num_wb_bias - 1);
     *wb_bias = &img_param->wb_bias_tbl->wb_bias[index];
 
-    //MSG("img_param_get_wb_bias: idx %d\r\n", index);
+    MSG("img_param_get_wb_bias: idx %d\r\n", index);
 
     return 0;
 }
@@ -214,7 +214,7 @@ int img_param_get_lsc(int param_idx, const lens_shade_corr_t **ls_corr)
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, img_param->lens_shading_corr_tbl->num_lsc - 1);
     *ls_corr = &img_param->lens_shading_corr_tbl->lens_shading_corr[index];
 
-    //MSG("img_param_get_noise_reduction: idx %d\r\n", index);
+    MSG("img_param_get_noise_reduction: idx %d\r\n", index);
 
     return 0;
 }
@@ -229,7 +229,7 @@ int img_param_get_gamma_corr(int param_idx, const gamma_corr_t **gamma_corr)
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, img_param->gamma_corr_tbl->num_gamma_corr - 1);
     *gamma_corr = &img_param->gamma_corr_tbl->gamma_corr[index];
 
-    //MSG("img_param_get_gamma_corr: idx %d\r\n", index);
+    MSG("img_param_get_gamma_corr: idx %d\r\n", index);
 
     return 0;
 }
@@ -244,7 +244,7 @@ int img_param_get_defect_corr(int param_idx, const defect_corr_t **defect_corr)
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, PARAM_DEFECT_CORR_IDX_MAX);
     *defect_corr = &img_param->defect_corr_tbl->defect_corr[index];
 
-    //MSG("img_param_get_defect_corr: idx %d\r\n", index);
+    MSG("img_param_get_defect_corr: idx %d\r\n", index);
 
     return 0;
 }
@@ -254,7 +254,7 @@ int img_param_get_color_corr(int param_idx, const color_corr_t **color_corr)
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, img_param->color_corr_tbl->num_color_corr - 1);
     *color_corr = &img_param->color_corr_tbl->color_corr[index];
 
-    //MSG("img_param_get_color_corr: idx %d\r\n", index);
+    MSG("img_param_get_color_corr: idx %d\r\n", index);
 
     return 0;
 }
@@ -269,7 +269,7 @@ int img_param_get_saturation(int param_idx, const saturation_t **saturation)
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, PARAM_SATURATION_IDX_MAX);
     *saturation = &img_param->saturation_tbl->saturation[index];
 
-    //MSG("img_param_get_saturation: idx %d\r\n", index);
+    MSG("img_param_get_saturation: idx %d\r\n", index);
 
     return 0;
 }
@@ -279,7 +279,7 @@ int img_param_get_white_region(int param_idx, const white_region_t **region)
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, img_param->awb_white_region_tbl->num_white_region - 1);
     *region = &img_param->awb_white_region_tbl->white_region[index];
 
-    //MSG("img_param_get_white_region: idx %d\r\n", index);
+    MSG("img_param_get_white_region: idx %d\r\n", index);
 
     return 0;
 }
@@ -293,9 +293,9 @@ int img_param_get_ae_target(int param_idx, int *ae_target)
 {
     int index = img_param_get_index(param_idx, PARAM_IDX_MIN, PARAM_AE_TARGET_IDX_MAX);
 
-    *ae_target = img_param->ae_tbl->ae_fw[index].ae_target;
+    *ae_target = img_param->ae_target_tbl->ae_target[index];
 
-    //MSG("img_param_get_ae_target: idx %d\r\n", index);
+    MSG("img_param_get_ae_target: idx %d\r\n", index);
 
     return 0;
 }

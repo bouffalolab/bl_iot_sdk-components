@@ -2,7 +2,6 @@
 #include "awb_algo.h"
 #include "awb1_algo.h"
 #include "awb2_algo.h"
-#include "awb3_algo.h"
 
 static awb_func_t awb_func;
 
@@ -15,7 +14,7 @@ int awb_init(AWB_ALGO algo)
 
     ISP_Set_AWB_Gain(&rgb_gain);
     ISP_Set_AWB2_Gain(&rgb_gain);
-    ISP_Set_AWB2_Stats_State(DISABLE);
+    ISP_Set_AWB2_State(DISABLE);
     ISP_Set_AWB_State(DISABLE);
     ISP_Set_AWB2_Gain_State(DISABLE);
 
@@ -23,15 +22,10 @@ int awb_init(AWB_ALGO algo)
 
     if (AWB_ALGO_1 == algo) {
         awb1_init(&awb_func);
-    }
-    else if (AWB_ALGO_2 == algo) {
+    } else if (AWB_ALGO_2 == algo) {
         awb2_init(&awb_func);
-    }
-    else if (AWB_ALGO_3 == algo) {
-        awb3_init(&awb_func);
-    }
-    else {
-        printf("awb algo %d not support!\r\n", (int)algo);
+    } else {
+        MSG("awb algo %d not support!\r\n", (int)algo);
         return -1;
     }
 
@@ -40,7 +34,7 @@ int awb_init(AWB_ALGO algo)
 
 int awb_config(awb_config_t *config, bool is_virtual_sensor)
 {
-    if ( NULL == awb_func.config) {
+    if (NULL == awb_func.config) {
         return -1;
     }
 
@@ -49,7 +43,7 @@ int awb_config(awb_config_t *config, bool is_virtual_sensor)
 
 int awb_control(void)
 {
-    if ( NULL == awb_func.control) {
+    if (NULL == awb_func.control) {
         return -1;
     }
 
@@ -58,7 +52,7 @@ int awb_control(void)
 
 int awb_get_info(awb_info_t **awb_info)
 {
-    if ( NULL == awb_func.get_info) {
+    if (NULL == awb_func.get_info) {
         return -1;
     }
 
@@ -67,7 +61,7 @@ int awb_get_info(awb_info_t **awb_info)
 
 int awb_set_mode(AWB_MODE mode)
 {
-    if ( NULL == awb_func.set_mode) {
+    if (NULL == awb_func.set_mode) {
         return -1;
     }
 
@@ -76,7 +70,7 @@ int awb_set_mode(AWB_MODE mode)
 
 int awb_get_mode(AWB_MODE *mode)
 {
-    if ( NULL == awb_func.get_mode) {
+    if (NULL == awb_func.get_mode) {
         return -1;
     }
 
@@ -85,7 +79,7 @@ int awb_get_mode(AWB_MODE *mode)
 
 int awb_set_gain(ISP_RGB_Gain_Type *rgb_gain)
 {
-    if ( NULL == awb_func.set_gain) {
+    if (NULL == awb_func.set_gain) {
         return -1;
     }
 
@@ -94,7 +88,7 @@ int awb_set_gain(ISP_RGB_Gain_Type *rgb_gain)
 
 int awb_get_gain(ISP_RGB_Gain_Type *rgb_gain)
 {
-    if ( NULL == awb_func.get_gain) {
+    if (NULL == awb_func.get_gain) {
         return -1;
     }
 
@@ -103,7 +97,7 @@ int awb_get_gain(ISP_RGB_Gain_Type *rgb_gain)
 
 int awb_set_color_temp(BL_COLOR_TEMP color_temp)
 {
-    if ( NULL == awb_func.set_color_temp) {
+    if (NULL == awb_func.set_color_temp) {
         return -1;
     }
 
@@ -112,38 +106,9 @@ int awb_set_color_temp(BL_COLOR_TEMP color_temp)
 
 int awb_get_color_temp(BL_COLOR_TEMP *color_temp)
 {
-    if ( NULL == awb_func.get_color_temp) {
+    if (NULL == awb_func.get_color_temp) {
         return -1;
     }
 
     return awb_func.get_color_temp(color_temp);
 }
-
-int awb_set_speed_level(int level)
-{
-    if ( NULL == awb_func.set_speed_level) {
-        return -1;
-    }
-
-    return awb_func.set_speed_level(level);
-}
-
-int awb_get_speed_level(int *level)
-{
-    if ( NULL == awb_func.get_speed_level) {
-        return -1;
-    }
-
-    return awb_func.get_speed_level(level);
-}
-
-int awb_set_sys_gain(BL_GAIN_DB sys_gain)
-{
-    if ( NULL == awb_func.set_sys_gain) {
-        return -1;
-    }
-
-    return awb_func.set_sys_gain(sys_gain);
-}
-
-

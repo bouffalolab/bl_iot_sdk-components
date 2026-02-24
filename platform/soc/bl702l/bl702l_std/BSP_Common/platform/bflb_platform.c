@@ -52,19 +52,6 @@ __WEAK__ enum uart_index_type board_get_debug_uart_index(void)
     return 0;
 }
 
-#ifdef CONFIG_SHELL_ENABLE
-#include "shell.h"
-static void shell_irq_callback(struct device *dev, void *args, uint32_t size, uint32_t state)
-{
-    uint8_t data;
-    if (state == UART_EVENT_RX_FIFO) {
-        for (size_t i = 0; i < size; i++) {
-            data = *(uint8_t *)(args + i);
-            shell_handler(data);
-        }
-    }
-}
-#endif
 void bl_show_flashinfo(void)
 {
     SPI_Flash_Cfg_Type flashCfg;
@@ -79,8 +66,8 @@ void bl_show_flashinfo(void)
     MSG("jedec id   0x%06X\r\n", flashJedecId);
     MSG("mid            0x%02X\r\n", flashCfg.mid);
     MSG("iomode         0x%02X\r\n", flashCfg.ioMode);
-    MSG("clk delay      0x%02X\r\n", flashCfg.clkDelay);
-    MSG("clk invert     0x%02X\r\n", flashCfg.clkInvert);
+    MSG("clkDelay       0x%02X\r\n", flashCfg.clkDelay);
+    MSG("clkInvert      0x%02X\r\n", flashCfg.clkInvert);
     MSG("read reg cmd0  0x%02X\r\n", flashCfg.readRegCmd[0]);
     MSG("read reg cmd1  0x%02X\r\n", flashCfg.readRegCmd[1]);
     MSG("write reg cmd0 0x%02X\r\n", flashCfg.writeRegCmd[0]);
@@ -95,13 +82,11 @@ void bl_show_flashinfo(void)
 void bflb_platform_init(uint32_t baudrate)
 {
     static uint8_t initialized = 0;
+    BL_Err_Type ret = ERROR;
 
     cpu_global_irq_disable();
 
-#ifdef CONFIG_BL_FLASH_INIT
-    BL_Err_Type ret = ERROR;
     ret = flash_init();
-#endif
 
     board_init();
 
@@ -111,14 +96,11 @@ void bflb_platform_init(uint32_t baudrate)
 
         if (uart) {
             device_open(uart, DEVICE_OFLAG_STREAM_TX | DEVICE_OFLAG_INT_RX);
-#ifdef CONFIG_SHELL_ENABLE
-            device_set_callback(uart, shell_irq_callback);
-            device_control(uart, DEVICE_CTRL_SET_INT, (void *)(UART_RX_FIFO_IT));
-#endif
+            device_set_callback(uart, NULL);
+            device_control(uart, DEVICE_CTRL_CLR_INT, (void *)(UART_RX_FIFO_IT));
         }
-#ifdef CONFIG_BL_SHOW_INFO
+
         bl_show_info();
-#endif
     }
 
     if (!initialized) {
@@ -131,15 +113,10 @@ void bflb_platform_init(uint32_t baudrate)
 
         MSG("dynamic memory init success,heap size = %d Kbyte \r\n", system_mmheap[0].mem_size / 1024);
         initialized = 1;
-#ifdef CONFIG_BL_FLASH_INIT
         if (ret != SUCCESS) {
             MSG("flash init fail!!!\r\n");
         }
         bl_show_flashinfo();
-#endif
-#ifdef CONFIG_SHELL_ENABLE
-        shell_init();
-#endif
     }
 
     cpu_global_irq_enable();
@@ -158,8 +135,7 @@ uint32_t bflb_platform_get_log(uint8_t *data, uint32_t maxlen)
     return len;
 }
 #endif
-int puts(const char *fmt) __attribute__((alias("bflb_platform_printf")));
-int printf(const char *fmt, ...) __attribute__((alias("bflb_platform_printf")));
+
 void bflb_platform_printf(char *fmt, ...)
 {
     struct device *uart;
@@ -222,7 +198,7 @@ void bflb_platform_dump(uint8_t *data, uint32_t len)
 
 void bflb_platform_reg_dump(uint32_t addr)
 {
-    bflb_platform_printf("%08x[31:0]=%08x\r\n", addr, *(volatile uint32_t *)(uintptr_t)(addr));
+    bflb_platform_printf("%08x[31:0]=%08x\r\n", addr, *(volatile uint32_t *)(addr));
 }
 
 void bflb_platform_init_time()

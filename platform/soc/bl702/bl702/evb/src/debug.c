@@ -16,6 +16,7 @@
 extern int usb_cdc_is_port_open(void);
 extern int usb_cdc_data_send(const uint8_t *data, uint32_t len);
 extern int UART_SendData(uint8_t uartId, uint8_t *data, uint32_t len);
+extern int bl_gpio_uart_send_data(uint8_t id, uint8_t *data, uint32_t len);
 
 enum flag {
 	FL_ZERO		= 0x01,	/* Zero modifier */
@@ -822,14 +823,17 @@ void debug_print(uint8_t *data, uint32_t len)
 {
 #if !defined(DISABLE_PRINT)
     if (sys_log_all_enable) {
+#if !defined(GPIO_SIM_PRINT)
 #if defined(CFG_USB_CDC_ENABLE)
         if(usb_cdc_is_port_open()){
             usb_cdc_data_send(data, len);
             return;
         }
 #endif
-
         UART_SendData(DEFAULT_DEBUG_UART_ID, data, len);
+#else
+        bl_gpio_uart_send_data(0, data, len);
+#endif
     }
 #endif
 }

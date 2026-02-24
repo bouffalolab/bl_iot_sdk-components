@@ -248,4 +248,8 @@
 #define BFLB_BLE_MESH_PATCH_HEARTBEAT_SUB_GET
 #define BFLB_BLE_MESH_PATCH_HEARTBEAT_SUB_SET
 #define BFLB_BLE_MESH_PATCH_PROV_NODE_CFM_RECVED_BEFORE_DH
+/* Fix mesh message can not be decrypt by received device,
+ * casued by bt_mesh.seq is changed during encryption using appkey.
+ */
+#define BFLB_BLE_MESH_FIX_MESH_ENCRYPT_ERR_DURING_ENCRYPT_USING_APPKEY
 #endif

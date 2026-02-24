@@ -35,7 +35,6 @@
   */
 
 #include "ili9488.h"
-#include "bflb_platform.h"
 
 /** @addtogroup  ILI9488_Driver
  *  @{
@@ -48,7 +47,7 @@
 /** @defgroup  ILI9488_Private_Macros
  *  @{
  */
-#define DBI_DMA_USE DMA2_ID
+#define DBI_DMA_USE DMA1_ID
 
 /*@} end of group ILI9488_Private_Macros */
 

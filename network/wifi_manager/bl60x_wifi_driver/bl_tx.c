@@ -1,16 +1,37 @@
-/**
- ****************************************************************************************
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
  *
- * @file bl_tx.c
- * Copyright (C) Bouffalo Lab 2016-2018
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
  *
- ****************************************************************************************
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <string.h>
 #include <stdio.h>
 #include <netif/etharp.h>
-#include <bl_os_private.h>
+#include <bflb_os_private.h>
 
 #include "bl_tx.h"
 #include "bl_irqs.h"
@@ -47,15 +68,15 @@ static void bl_tx_cntrl_purge_check(struct bl_sta *sta, uint8_t only_check)
         if (only_check)
         {
             /* Only check */
-            bl_os_printf("[TX] Have remaining packets when checking!\n\r");
+            bflb_os_printf("[TX] Have remaining packets when checking!\n\r");
         }
         else
         {
             /* Purging, trigger tx and let fw cfm to handle packets */
-            bl_os_enter_critical();
+            bflb_os_enter_critical();
             bl_irq_handler();
             tx_cntrl_sta_trigger |= BIT_STA(sta->sta_idx);
-            bl_os_exit_critical();
+            bflb_os_exit_critical();
         }
     }
 }
@@ -220,7 +241,7 @@ static void bl_tx_push(struct bl_sta* sta, struct txdesc_host *txdesc_host, void
     host->packet_addr = (uint32_t)(0x11111111); // FIXME we use this magic for unvaild packet_addr
     host->flags       = 0;
 
-    /* 
+    /*
      * Buffer transfer and descriptor tranform
      */
 #if defined(CFG_CHIP_BL808) || defined(CFG_CHIP_BL606P)
@@ -297,12 +318,12 @@ static void bl_tx_push(struct bl_sta* sta, struct txdesc_host *txdesc_host, void
     if (loop >= 4)
     {
         /* exceed the limit for pbuf chained */
-        bl_os_log_warn("[TX] [PBUF] Please fix for bigger chained pbuf, total_len %d\r\n",
+        bflb_os_log_warn("[TX] [PBUF] Please fix for bigger chained pbuf, total_len %d\r\n",
                         p->tot_len);
     }
     else if (loop > 2)
     {
-        bl_os_log_warn("[TX] [LOOP] Chain Used %d\r\n", loop);
+        bflb_os_log_warn("[TX] [LOOP] Chain Used %d\r\n", loop);
     }
     host->status_addr = (uint32_t)(&(txhdr->status));
 
@@ -352,7 +373,7 @@ int bl_tx_cfm(void *pthis, void *host_id)
     /* Read status in the TX control header */
     value = txhdr->status.value;
     if (value == 0) {
-        bl_os_printf("[TX] FW return status is NULL!!!\n\r");
+        bflb_os_printf("[TX] FW return status is NULL!!!\n\r");
     }
 
     /* Get tx result */
@@ -435,10 +456,10 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
     /* Get trigger flags and clear */
     sta_trigger |= tx_cntrl_sta_trigger_pending;
     tx_cntrl_sta_trigger_pending = 0;
-    bl_os_enter_critical();
+    bflb_os_enter_critical();
     sta_trigger |= tx_cntrl_sta_trigger;
     tx_cntrl_sta_trigger = 0;
-    bl_os_exit_critical();
+    bflb_os_exit_critical();
 
     // TX: Walking through all STAs
     for (uint8_t i = 0; i < NX_REMOTE_STA_STORE_MAX; i++)
@@ -464,7 +485,7 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
                 txdesc_host = (struct txdesc_host *)ipc_host_txdesc_get(wifi_hw.ipc_env);
                 if (!txdesc_host)
                 {
-                    bl_os_log_warn("[TX] no more txdesc, wait!\n\r");
+                    bflb_os_log_warn("[TX] no more txdesc, wait!\n\r");
                     tx_cntrl_sta_trigger_pending |= BIT_STA(i);
                     break;
                 }
@@ -490,7 +511,7 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
                 txdesc_host = (struct txdesc_host *)ipc_host_txdesc_get(wifi_hw.ipc_env);
                 if (!txdesc_host)
                 {
-                    bl_os_log_warn("[TX] no more txdesc, wait!\n\r");
+                    bflb_os_log_warn("[TX] no more txdesc, wait!\n\r");
                     tx_cntrl_sta_trigger_pending |= BIT_STA(i);
                     break;
                 }
@@ -500,15 +521,15 @@ void bl_tx_try_flush(int param, struct ke_tx_fc *tx_fc_field)
                 txbuf = (struct txbuf_host *)ipc_host_txbuf_get(wifi_hw.ipc_env);
                 if (!txbuf)
                 {
-                    bl_os_log_warn("[TX] no more txbuf, wait!\n\r");
+                    bflb_os_log_warn("[TX] no more txbuf, wait!\n\r");
                     tx_cntrl_sta_trigger_pending |= BIT_STA(i);
                     break;
                 }
 #endif
                 /* Get packet */
-                bl_os_enter_critical();
+                bflb_os_enter_critical();
                 txhdr = (struct bl_txhdr *)utils_list_pop_front(&sta->waiting_list);
-                bl_os_exit_critical();
+                bflb_os_exit_critical();
                 if (!txhdr)
                 {
 #if defined(CFG_CHIP_BL808) || defined(CFG_CHIP_BL606P)
@@ -541,7 +562,7 @@ err_t bl_output(struct bl_hw *bl_hw, int is_sta, struct pbuf *p, struct bl_tx_cf
     /* NULL protection */
     if (!bl_hw || !p)
     {
-        bl_os_printf("[TX] NULL parameters!\r\n");
+        bflb_os_printf("[TX] NULL parameters!\r\n");
         return ERR_CONN;
     }
 
@@ -552,7 +573,7 @@ err_t bl_output(struct bl_hw *bl_hw, int is_sta, struct pbuf *p, struct bl_tx_cf
     sta_id = bl_tx_cntrl_get_sta_id(is_sta, IS_BC_MC(ethhdr->h_dest[0]), (struct mac_addr*)ethhdr->h_dest);
     if (sta_id < 0)
     {
-        bl_os_printf("[TX] Cant find valid sta_id, drop! (is_sta: %d, is_bc_mc: %d, proto: %04x)\r\n",
+        bflb_os_printf("[TX] Cant find valid sta_id, drop! (is_sta: %d, is_bc_mc: %d, proto: %04x)\r\n",
                      is_sta, IS_BC_MC(ethhdr->h_dest[0]), ethhdr->h_proto);
         return ERR_IF;
     }
@@ -560,18 +581,18 @@ err_t bl_output(struct bl_hw *bl_hw, int is_sta, struct pbuf *p, struct bl_tx_cf
 
     /* Make room in the header for tx */
     if (pbuf_header(p, PBUF_LINK_ENCAPSULATION_HLEN)) {
-        bl_os_printf("[TX] Reserve room failed for header\r\n");
+        bflb_os_printf("[TX] Reserve room failed for header\r\n");
         return ERR_IF;
     }
 
-    /* Check reserved len for link 
+    /* Check reserved len for link
      *           PBUF_LINK_ENCAPSULATION_HLEN (48)
      * | align (8) | struct bl_txhdr (24) | reserved (16) |
      */
     align_offset = RWNX_HWTXHDR_ALIGN_PADS((uint32_t)p->payload);
     link_desc_len = align_offset + sizeof(struct bl_txhdr) + 16;
     if (link_desc_len > PBUF_LINK_ENCAPSULATION_HLEN) {
-        bl_os_printf("[TX] link_header size is %ld vs header %u\r\n",
+        bflb_os_printf("[TX] link_header size is %ld vs header %u\r\n",
                      link_desc_len, PBUF_LINK_ENCAPSULATION_HLEN);
         return ERR_BUF;
     }
@@ -599,7 +620,7 @@ err_t bl_output(struct bl_hw *bl_hw, int is_sta, struct pbuf *p, struct bl_tx_cf
 #endif
 
     /* Push packet into waiting_list */
-    bl_os_enter_critical();
+    bflb_os_enter_critical();
     utils_list_push_back(&sta->waiting_list, &(txhdr->item));
     tx_cntrl_sta_trigger |= BIT_STA(sta_id);
     /* Whether trigger irq */
@@ -607,7 +628,7 @@ err_t bl_output(struct bl_hw *bl_hw, int is_sta, struct pbuf *p, struct bl_tx_cf
     {
         bl_irq_handler();
     }
-    bl_os_exit_critical();
+    bflb_os_exit_critical();
 
     return ERR_OK;
 }
@@ -622,4 +643,125 @@ void bl_tx_cntrl_link_down(struct bl_sta *sta)
 {
     /* Purge pending_list and waiting_list */
     bl_tx_cntrl_purge_check(sta, 0);
+}
+
+/**
+ * @brief Find STA index by MAC address in the given VIF
+ */
+int bl_tx_find_sta_by_mac(uint8_t vif_idx, struct mac_addr *mac)
+{
+    struct bl_sta *sta;
+    int i;
+
+    for (i = 0; i < NX_REMOTE_STA_STORE_MAX; i++)
+    {
+        sta = &wifi_hw.sta_table[i];
+        if (sta->is_used && sta->vif_idx == vif_idx &&
+            memcmp(&sta->sta_addr, mac, sizeof(struct mac_addr)) == 0)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/**
+ * @brief Forward a unicast frame to a specific STA (intra-BSS forwarding)
+ */
+err_t bl_tx_intra_bss_forward(struct pbuf *p, int dst_sta_idx)
+{
+    struct bl_sta *sta;
+    struct pbuf *q;
+    err_t ret;
+
+    if (dst_sta_idx < 0 || dst_sta_idx >= NX_REMOTE_STA_STORE_MAX)
+    {
+        return ERR_ARG;
+    }
+
+    sta = &wifi_hw.sta_table[dst_sta_idx];
+    if (!sta->is_used)
+    {
+        return ERR_CONN;
+    }
+
+    /* Allocate new pbuf with enough headroom for WiFi TX header */
+    q = pbuf_alloc(PBUF_RAW, PBUF_LINK_ENCAPSULATION_HLEN + p->tot_len, PBUF_RAM);
+    if (!q)
+    {
+        return ERR_MEM;
+    }
+
+    /* Reserve space for WiFi TX header */
+    pbuf_header(q, -PBUF_LINK_ENCAPSULATION_HLEN);
+    /* Copy the original data */
+    pbuf_copy(q, p);
+
+    /* Use bl_output to send the packet, is_sta=0 for AP mode */
+#ifdef CFG_NETBUS_WIFI_ENABLE
+    ret = bl_output(&wifi_hw, 0, q, NULL, 1);
+#else
+    ret = bl_output(&wifi_hw, 0, q, NULL);
+#endif
+    pbuf_free(q);
+    return ret;
+}
+
+/**
+ * @brief Forward a broadcast/multicast frame to all other STAs (excluding sender)
+ */
+err_t bl_tx_intra_bss_broadcast(struct pbuf *p, int src_sta_idx)
+{
+    struct bl_sta *sta;
+    struct pbuf *q;
+    int i;
+    int fwd_count = 0;
+
+    /* Get vif_idx from the source STA's entry in sta_table */
+    uint8_t vif_idx = wifi_hw.sta_table[src_sta_idx].vif_idx;
+
+    for (i = 0; i < NX_REMOTE_STA_STORE_MAX; i++)
+    {
+        /* Skip the source STA */
+        if (i == src_sta_idx)
+        {
+            continue;
+        }
+
+        sta = &wifi_hw.sta_table[i];
+        /* Only forward to STAs belonging to the same VIF */
+        if (sta->is_used && sta->vif_idx == vif_idx)
+        {
+            if (sta->sta_addr.array[0] == 0 && sta->sta_addr.array[1] == 0 &&
+                sta->sta_addr.array[2] == 0 && sta->sta_addr.array[3] == 0 &&
+                sta->sta_addr.array[4] == 0 && sta->sta_addr.array[5] == 0)
+            {
+                continue;
+            }
+
+            /* Allocate new pbuf with enough headroom for WiFi TX header */
+            q = pbuf_alloc(PBUF_RAW, PBUF_LINK_ENCAPSULATION_HLEN + p->tot_len, PBUF_RAM);
+            if (q)
+            {
+                /* Reserve space for WiFi TX header */
+                pbuf_header(q, -PBUF_LINK_ENCAPSULATION_HLEN);
+                /* Copy the original data */
+                pbuf_copy(q, p);
+
+#ifdef CFG_NETBUS_WIFI_ENABLE
+                err_t ret = bl_output(&wifi_hw, 0, q, NULL, 1);
+#else
+                err_t ret = bl_output(&wifi_hw, 0, q, NULL);
+#endif
+                /* bl_output refs the pbuf, we need to free our reference */
+                pbuf_free(q);
+                fwd_count++;
+            }
+            else
+            {
+            }
+        }
+    }
+
+    return ERR_OK;
 }

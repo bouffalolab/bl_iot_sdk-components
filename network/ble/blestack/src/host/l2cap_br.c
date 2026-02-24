@@ -800,20 +800,18 @@ static void l2cap_br_conf_rsp(struct bt_l2cap_br *l2cap, uint8_t ident,
 	struct bt_conn *conn = l2cap->chan.chan.conn;
 	struct bt_l2cap_chan *chan;
 	struct bt_l2cap_conf_rsp *rsp = (void *)buf->data;
-	uint16_t flags, scid, result, opt_len;
+	uint16_t scid, result;
 
 	if (buf->len < sizeof(*rsp)) {
 		BT_ERR("Too small L2CAP conf rsp packet size");
 		return;
 	}
 
-	flags = sys_le16_to_cpu(rsp->flags);
 	scid = sys_le16_to_cpu(rsp->scid);
 	result = sys_le16_to_cpu(rsp->result);
-	opt_len = len - sizeof(*rsp);
 
-	BT_DBG("scid 0x%04x flags 0x%02x result 0x%02x len %u", scid, flags,
-	       result, opt_len);
+	BT_DBG("scid 0x%04x flags 0x%02x result 0x%02x len %u", scid, sys_le16_to_cpu(rsp->flags),
+		result, (len - sizeof(*rsp)));
 
 	chan = bt_l2cap_br_lookup_rx_cid(conn, scid);
 	if (!chan) {
@@ -1099,17 +1097,15 @@ static void l2cap_br_disconn_req(struct bt_l2cap_br *l2cap, uint8_t ident,
 	struct bt_l2cap_disconn_req *req = (void *)buf->data;
 	struct bt_l2cap_disconn_rsp *rsp;
 	struct bt_l2cap_sig_hdr *hdr;
-	uint16_t scid, dcid;
-
+	uint16_t scid;
 	if (buf->len < sizeof(*req)) {
 		BT_ERR("Too small disconn req packet size");
 		return;
 	}
 
-	dcid = sys_le16_to_cpu(req->dcid);
 	scid = sys_le16_to_cpu(req->scid);
 
-	BT_DBG("scid 0x%04x dcid 0x%04x", dcid, scid);
+	BT_DBG("scid 0x%04x dcid 0x%04x", scid,sys_le16_to_cpu(req->dcid));
 
 	chan = l2cap_br_remove_tx_cid(conn, scid);
 	if (!chan) {
@@ -1221,7 +1217,7 @@ static void l2cap_br_disconn_rsp(struct bt_l2cap_br *l2cap, uint8_t ident,
 	struct bt_conn *conn = l2cap->chan.chan.conn;
 	struct bt_l2cap_br_chan *chan;
 	struct bt_l2cap_disconn_rsp *rsp = (void *)buf->data;
-	uint16_t dcid, scid;
+	uint16_t dcid;
 
 	if (buf->len < sizeof(*rsp)) {
 		BT_ERR("Too small disconn rsp packet size");
@@ -1229,9 +1225,8 @@ static void l2cap_br_disconn_rsp(struct bt_l2cap_br *l2cap, uint8_t ident,
 	}
 
 	dcid = sys_le16_to_cpu(rsp->dcid);
-	scid = sys_le16_to_cpu(rsp->scid);
 
-	BT_DBG("dcid 0x%04x scid 0x%04x", dcid, scid);
+	BT_DBG("dcid 0x%04x scid 0x%04x", dcid, sys_le16_to_cpu(rsp->scid));
 
 	chan = l2cap_br_remove_tx_cid(conn, dcid);
 	if (!chan) {
@@ -1328,7 +1323,7 @@ static void l2cap_br_conn_rsp(struct bt_l2cap_br *l2cap, uint8_t ident,
 	struct bt_conn *conn = l2cap->chan.chan.conn;
 	struct bt_l2cap_chan *chan;
 	struct bt_l2cap_conn_rsp *rsp = (void *)buf->data;
-	uint16_t dcid, scid, result, status;
+	uint16_t dcid, scid, result;
 
 	if (buf->len < sizeof(*rsp)) {
 		BT_ERR("Too small L2CAP conn rsp packet size");
@@ -1338,10 +1333,9 @@ static void l2cap_br_conn_rsp(struct bt_l2cap_br *l2cap, uint8_t ident,
 	dcid = sys_le16_to_cpu(rsp->dcid);
 	scid = sys_le16_to_cpu(rsp->scid);
 	result = sys_le16_to_cpu(rsp->result);
-	status = sys_le16_to_cpu(rsp->status);
 
 	BT_DBG("dcid 0x%04x scid 0x%04x result %u status %u", dcid, scid,
-	       result, status);
+	       result, sys_le16_to_cpu(rsp->status));
 
 	chan = bt_l2cap_br_lookup_rx_cid(conn, scid);
 	if (!chan) {
@@ -1650,6 +1644,14 @@ void bt_l2cap_br_init(void)
 	}
 
 	if (IS_ENABLED(CONFIG_BT_A2DP)) {
+
+		#if defined(CONFIG_BT_A2DP_SOURCE)
+		bt_dev.br.a2dp_role = BT_A2DP_SOURCE_ROLE;
+		#endif
+		#if defined(CONFIG_BT_A2DP_SINK)
+		bt_dev.br.a2dp_role = BT_A2DP_SINK_ROLE;
+		#endif
+		
 		bt_avdtp_init();
 		bt_a2dp_init();
 	}

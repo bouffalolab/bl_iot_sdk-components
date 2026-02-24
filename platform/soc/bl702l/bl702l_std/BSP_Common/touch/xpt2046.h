@@ -25,7 +25,7 @@
 
 #include "bflb_platform.h"
 
-#define TOUCH_PIN_CS GPIO_PIN_6
+#define TOUCH_PIN_CS GPIO_PIN_11
 //#define TOUCH_PIN_PEN GPIO_PIN_11
 
 #define XPT2046_TOUCH_THRESHOLD 500 // Threshold for touch detection

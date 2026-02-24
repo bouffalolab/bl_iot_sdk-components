@@ -30,10 +30,6 @@
 #include "bl808_common.h"
 #include "bl808_glb.h"
 #include "bl808_sdh.h"
-#elif defined(BL606P)
-#include "bl606p_common.h"
-#include "bl606p_glb.h"
-#include "bl606p_sdh.h"
 #elif defined(BL616)
 #include "bl616_common.h"
 #include "bl616_glb.h"
@@ -496,7 +492,7 @@ typedef enum _sd_switch_mode {
     SDH_SwitchCheck = 0U, /*!< SD switch mode 0: check function */
     SDH_SwitchSet = 1U,   /*!< SD switch mode 1: set function */
 } sd_switch_mode_t;
-// #define SDH_DEBUG
+//#define SDH_DEBUG
 #ifdef SDH_DEBUG
 #define SDH_MSG(a, ...) bflb_platform_printf(a, ##__VA_ARGS__)
 #else
@@ -506,7 +502,6 @@ typedef enum _sd_switch_mode {
 /*
 bus_wide shoud be SDH_DATA_BUS_WIDTH_1BIT/SDH_DATA_BUS_WIDTH_4BITS/SDH_DATA_BUS_WIDTH_8BITS
 */
-status_t SDH_ClockSet(uint32_t clockInit, uint32_t clockSrc, uint32_t clockTransfer);
 status_t SDH_Init(uint32_t bus_wide, sd_card_t *pOutCardInfo);
 status_t SD_Erase(uint32_t startaddr, uint32_t endaddr);
 status_t SDH_BlockReadMultiBlocks(uint8_t *readbuff, uint32_t ReadAddr, uint16_t BlockSize, uint32_t NumberOfBlocks);

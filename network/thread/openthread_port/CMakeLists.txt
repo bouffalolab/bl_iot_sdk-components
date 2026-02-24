@@ -1,3 +1,32 @@
+#[[
+Copyright (c) 2016-2026 Bouffalolab.
+
+This file is part of
+    *** Bouffalolab Software Dev Kit ***
+     (see www.bouffalolab.com).
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+  3. Neither the name of Bouffalo Lab nor the names of its contributors
+     may be used to endorse or promote products derived from this software
+     without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+]]
 sdk_generate_library()
 
 string(TOUPPER "${CHIP}" upper_case_chip)
@@ -19,11 +48,8 @@ sdk_add_include_directories(./include)
 
 if (CONFIG_LITTLEFS)
   sdk_library_add_sources(./ot_settings_littlefs.c)
-elseif (CONFIG_EASYFLASH4)
-  sdk_library_add_sources(./ot_settings_easyflash.c)
-  message(WARNING "Easyflash is deprecated. Better to use littlefs/CONFIG_LITTLEFS for faster storage access.")
 else ()
-  message(FATAL_ERROR "Please select one of CONFIG_LITTLEFS and CONFIG_EASYFLASH4 for OpenThread setting storage.")
+  message(FATAL_ERROR "Please select one of CONFIG_LITTLEFS for OpenThread setting storage.")
 endif()
 
 if (NOT CONFIG_MATTER)
@@ -46,16 +72,24 @@ endif()
 
 if ("${OT_SERIAL}" STREQUAL "SYS_CLI")
   sdk_library_add_sources(./ot_shell.c)
-elseif ("${OT_SERIAL}" STREQUAL "UART") 
+elseif ("${OT_SERIAL}" STREQUAL "UART")
   sdk_library_add_sources(./ot_uart_bflb.c)
-  if ($(OT_SERIAL_BUFFER_SIZE)) 
+  if ($(OT_SERIAL_BUFFER_SIZE))
     sdk_add_private_compile_definitions(-DOT_SERIAL_BUFFER_SIZE=${OT_SERIAL_BUFFER_SIZE})
   endif()
-  if ($(OT_SERIAL_LINE_SIZE)) 
+  if ($(OT_SERIAL_LINE_SIZE))
     sdk_add_private_compile_definitions(-DOT_SERIAL_LINE_SIZE=${OT_SERIAL_LINE_SIZE})
   endif()
+elseif ("${OT_SERIAL}" STREQUAL "NXSPI")
+  sdk_library_add_sources(./ot_nxspi.c)
 else ()
   message (FATAL_ERROR "openthread_port: ${OT_SERIAL} is not available for OT_SERIAL.")
+endif()
+
+if (DEFINED OT_NCP AND NOT OT_NCP)
+  sdk_add_compile_definitions(-DNXSPI_OPENTHREAD_RADIO=1)
+else()
+  sdk_add_compile_definitions(-DNXSPI_OPENTHREAD_RADIO=0)
 endif()
 
 # disable undef warning

@@ -214,55 +214,57 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
     err_t errval = ERR_OK;
     struct pbuf *q;
 
-    if (!emac_bd_fragment_support()){
+#if (EMAC_OUTPUT == BL702_EMAC)
 
-        uint32_t byteslefttocopy = 0;
-        // uint32_t payloadoffset = 0;
-        // uint32_t bufferoffset = 0;
-        uint32_t framelength = 0;
-        uint32_t flags = (EMAC_NORMAL_PACKET);
+    uint32_t byteslefttocopy = 0;
+    // uint32_t payloadoffset = 0;
+    // uint32_t bufferoffset = 0;
+    uint32_t framelength = 0;
+    uint32_t flags = (FULL_PACKET);
 
-        for (q = p; q != NULL; q = q->next) {
-            // MSG("p->tot_len:%d,q->len:%d, q->next:%d,f:%d\r\n", q->tot_len, q->len, q->next, framelength);
+    for (q = p; q != NULL; q = q->next) {
+        // MSG("p->tot_len:%d,q->len:%d, q->next:%d,f:%d\r\n", q->tot_len, q->len, q->next, framelength);
 
-            byteslefttocopy = q->len;
-            // payloadoffset = 0;
+        byteslefttocopy = q->len;
+        // payloadoffset = 0;
 
-            // check is copy data is larger than emac tx buf
-            while ((byteslefttocopy + framelength) > ETH_TX_BUFFER_SIZE) {
-                // copy data to tx buf
-                MSG("tx buf is too larger!\r\n");
-                flags = EMAC_FRAGMENT_PACKET;
-                // ARCH_MemCpy_Fast(&emac_send_buf[framelength + bufferoffset], q->payload + payloadoffset, (ETH_TX_BUFFER_SIZE - bufferoffset));
-            }
-            ARCH_MemCpy_Fast(&emac_send_buf[framelength], q->payload, byteslefttocopy);
-            // bufferoffset = bufferoffset + byteslefttocopy;
-            framelength = framelength + byteslefttocopy;
+        // check is copy data is larger than emac tx buf
+        while ((byteslefttocopy + framelength) > ETH_TX_BUFFER_SIZE) {
+            // copy data to tx buf
+            MSG("tx buf is too larger!\r\n");
+            flags = NOFULL_PACKET;
+            // ARCH_MemCpy_Fast(&emac_send_buf[framelength + bufferoffset], q->payload + payloadoffset, (ETH_TX_BUFFER_SIZE - bufferoffset));
         }
+        ARCH_MemCpy_Fast(&emac_send_buf[framelength], q->payload, byteslefttocopy);
+        // bufferoffset = bufferoffset + byteslefttocopy;
+        framelength = framelength + byteslefttocopy;
+    }
 
-        if (0 != emac_bd_tx_enqueue(flags, framelength, emac_send_buf)) {
-            MSG("emac_bd_tx_enqueue error!\r\n");
-            return ERR_IF;
-        }
+    if (0 != emac_bd_tx_enqueue(flags, framelength, emac_send_buf)) {
+        MSG("emac_bd_tx_enqueue error!\r\n");
+        return ERR_IF;
+    }
 
-    }else{
-        for (q = p; q != NULL; q = q->next) {
-            //MSG("p->tot_len:%d,q->len:%d, q->next:%d\r\n", q->tot_len, q->len, q->next);
-            if (q->len == q->tot_len) {
-                if (0 != emac_bd_tx_enqueue(EMAC_NORMAL_PACKET, q->len, q->payload)) {
-                    MSG("emac_bd_tx_enqueue error!\r\n");
-                    return ERR_IF;
-                }
-            } else if (q->len < q->tot_len) {
-                if (0 != emac_bd_tx_enqueue(EMAC_FRAGMENT_PACKET, q->len, q->payload)) {
-                    MSG("emac_bd_tx_enqueue error!\r\n");
-                    return ERR_IF;
-                }
-            } else {
-                MSG("low_level_output error! Wrong packet!\r\n");
+#else
+
+    for (q = p; q != NULL; q = q->next) {
+        MSG("p->tot_len:%d,q->len:%d, q->next:%d\r\n", q->tot_len, q->len, q->next);
+        if (q->len == q->tot_len) {
+            if (0 != emac_bd_tx_enqueue(FULL_PACKET, q->len, q->payload)) {
+                MSG("emac_bd_tx_enqueue error!\r\n");
+                return ERR_IF;
             }
+        } else if (q->len < q->tot_len) {
+            if (0 != emac_bd_tx_enqueue(NOFULL_PACKET, q->len, q->payload)) {
+                MSG("emac_bd_tx_enqueue error!\r\n");
+                return ERR_IF;
+            }
+        } else {
+            MSG("low_level_output error! Wrong packet!\r\n");
         }
     }
+
+#endif
 
     return errval;
 }

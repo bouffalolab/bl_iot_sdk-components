@@ -2,7 +2,7 @@
 #define __BLE_SPP_H_
 
 #include <stdio.h>
-#include "uuid.h"
+#include "bt_uuid.h"
 
 
 struct attr_val {

@@ -3,15 +3,11 @@
 
 #include "bl_comm_aaa.h"
 
-#define AE_STATS_GRID_NUM_X   (12)
-#define AE_STATS_GRID_NUM_Y   (8)
-#define AE_STATS_GRID_NUM     ((AE_STATS_GRID_NUM_X)*(AE_STATS_GRID_NUM_Y))
-
 typedef enum {
     AE_MODE_AUTO = 0,
     AE_MODE_LOCK,
-    AE_MODE_SHUTTER_PRIORITY,       /* iso locked */
-    AE_MODE_GAIN_PRIORITY,          /* shutter locked */
+    AE_MODE_SHUTTER_PRIORITY, /* iso locked */
+    AE_MODE_GAIN_PRIORITY,    /* shutter locked */
     AE_MODE_AUTO_LOW_SPEED,
     AE_MODE_DBG_VIRTUAL,
     AE_MODE_INVALID,
@@ -32,29 +28,23 @@ typedef enum {
     AE_METERING_NUM,
 } AE_METERING;
 
-typedef struct {
+typedef struct
+{
     aaa_stats_cfg_t stats_cfg;
 } ae_config_t;
 
-typedef struct {
-    AE_MODE       ae_mode;
-    AE_METERING   ae_metering;
-    uint32_t      expo_time_update;
-    uint32_t      iso_update;
-    uint32_t      sys_gain_update;
-    BL_EXPO_TIME  expo_time;
-    BL_GAIN_DB    iso;
-    BL_GAIN_DB    sys_gain;
-    int           luma_target;
-    int           hist_weight_mode;
+typedef struct
+{
+    AE_MODE ae_mode;
+    AE_METERING ae_metering;
+    uint32_t expo_time_update;
+    uint32_t iso_update;
+    uint32_t sys_gain_update;
+    BL_EXPO_TIME expo_time;
+    BL_GAIN_DB iso;
+    BL_GAIN_DB sys_gain;
+    int luma_target;
 } ae_info_t;
-
-typedef struct {
-    BL_EXPO_TIME  expo_time;
-    BL_GAIN_DB    iso;
-    BL_GAIN_DB    sys_gain;
-    int           luma_target;
-} ae_history_info_t;
 
 int ae_init(void);
 int ae_config(ae_config_t *ae_config, bool is_virtual_sensor);
@@ -76,17 +66,8 @@ int ae_get_luma_target(int *target);
 int ae_get_metering_mode(AE_METERING *mode);
 int ae_set_metering_mode(AE_METERING mode);
 
-/* set/get ae hist weight mode */
-int ae_get_hist_weight_mode(int *mode);
-int ae_set_hist_weight_mode(int mode);
-
 /* Speed value ranges from 0~16 */
 int ae_set_speed(int speed);
-int ae_get_speed(int *speed);
-
-/* Speed value ranges from 0~5 */
-int ae_set_speed_level(int level);
-int ae_get_speed_level(int *level);
 
 /* Luma value ranges from 0~255 */
 int ae_get_luma(void);
@@ -112,6 +93,5 @@ int ae_set_sensor_gain(float gain_f);
 
 /* Misc */
 void ae_force_refresh(void);
-
 
 #endif //__AE_ALGO_H__

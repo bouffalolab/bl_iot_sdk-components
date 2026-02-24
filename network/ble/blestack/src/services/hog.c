@@ -17,7 +17,7 @@
 
 #include <bluetooth.h>
 #include <conn.h>
-#include <uuid.h>
+#include <bt_uuid.h>
 #include <gatt.h>
 #include "hog.h"
 #include "bt_log.h"

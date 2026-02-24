@@ -244,9 +244,9 @@ static lv_coord_t touchpad_get_xy(lv_coord_t *x, lv_coord_t *y)
 
     uint32_t spi_clock = SPI_DEV(touch_spi)->clk;
 
-    device_control(touch_spi, DEVICE_CTRL_SPI_CONFIG_CLOCK, (void *)(uintptr_t)360000);
+    device_control(touch_spi, DEVICE_CTRL_SPI_CONFIG_CLOCK, (void *)360000);
     res = touch_read(x, y);
-    device_control(touch_spi, DEVICE_CTRL_SPI_CONFIG_CLOCK, (void *)(uintptr_t)spi_clock);
+    device_control(touch_spi, DEVICE_CTRL_SPI_CONFIG_CLOCK, (void *)spi_clock);
     return res;
 }
 

@@ -55,7 +55,6 @@ sdk_add_include_directories(
 	# src/common/include/toolchain
 	src/common/tinycrypt/include/tinycrypt
 	src/hci_onchip
-	src/bl_hci_wrapper
 	src/host
 	src/include/bluetooth
 	src/include/drivers/bluetooth
@@ -139,7 +138,6 @@ sdk_library_add_sources(
 	src/common/tinycrypt/source/hmac_prng.c
 	src/common/tinycrypt/source/sha256.c
 	src/common/tinycrypt/source/utils.c
-	src/bl_hci_wrapper/bl_hci_wrapper.c
 	src/hci_onchip/hci_driver.c
 	src/host/crypto.c
 	src/host/hci_core.c
@@ -147,7 +145,27 @@ sdk_library_add_sources(
 	src/host/l2cap.c
 	src/host/uuid.c
 )
+#ifeq ($(CONFIG_BT_HOST_HCI_TL),1)
+#CFLAGS += -DCONFIG_BT_HOST_HCI_TL
+#ble_stack_srcs_dirs+= src/bl_hci_tl
+#else
+#ble_stack_srcs_dirs+= src/bl_hci_wrapper
+#endif
 
+if(CONFIG_BT_HOST_HCI_TL)
+    sdk_library_add_sources(
+        src/hci_tl/bflb_hci_tl.c
+        src/hci_tl/bflb_hci_uart_dma.c
+    )
+	sdk_add_include_directories(src/hci_tl)
+else()
+    sdk_library_add_sources(
+        src/bl_hci_wrapper/bl_hci_wrapper.c
+    )
+	sdk_add_include_directories(src/bl_hci_wrapper)
+endif()
+sdk_add_compile_definitions_ifdef(CONFIG_BT_HOST_HCI_TL -DCONFIG_BT_HOST_HCI_TL)
+sdk_add_compile_definitions_ifdef(CONFIG_BT_HOST_HCI -DCONFIG_BT_HOST_HCI)
 sdk_library_add_sources(
 	../version_btble_component.c
 )
@@ -212,6 +230,9 @@ sdk_library_add_sources_ifdef(CONFIG_BT_SPP_SERVER
 # ifeq ($(CONFIG_BT_BREDR),1)
 # ble_stack_srcs   += src/cli_cmds/bredr_cli_cmds.c
 # endif
+#ifeq ($(CONFIG_BT_TP_CLI),1)
+#ble_stack_srcs   += src/cli_cmds/ble_tp_cli_cmd.c
+#endif
 # ifeq ($(CONFIG_BT_STACK_PTS),1)
 # ble_stack_srcs   += src/cli_cmds/pts_cli_cmds.c
 # endif
@@ -220,6 +241,7 @@ if(CONFIG_BT_STACK_CLI)
 	sdk_library_add_sources(src/cli_cmds/ble_cli_cmds.c)
 	sdk_library_add_sources_ifdef(CONFIG_BT_BREDR src/cli_cmds/bredr_cli_cmds.c)
 	sdk_library_add_sources_ifdef(CONFIG_BT_STACK_PTS src/cli_cmds/pts_cli_cmds.c)
+	sdk_library_add_sources_ifdef(CONFIG_BT_TP_CLI src/cli_cmds/ble_tp_cli_cmd.c)
 endif()
 # 
 # ifeq ($(CONFIG_BT_BAS_SERVER),1)
@@ -350,3 +372,18 @@ sdk_add_include_directories_ifdef(CONFIG_BT_BREDR
 # 
 # COMPONENT_SRCDIRS := $(ble_stack_srcs_dirs)
 # 
+
+# ifdef CONFIG_BT_RX_STACK_SIZE
+# CPPFLAGS += -DCONFIG_BT_RX_STACK_SIZE=$(CONFIG_BT_RX_STACK_SIZE)
+# endif
+sdk_add_compile_definitions_ifdef(CONFIG_BT_RX_STACK_SIZE -DCONFIG_BT_RX_STACK_SIZE=${CONFIG_BT_RX_STACK_SIZE})
+
+# ifdef CONFIG_BT_WORK_QUEUE_STACK_SIZE
+# CPPFLAGS += -DCONFIG_BT_WORK_QUEUE_STACK_SIZE=$(CONFIG_BT_WORK_QUEUE_STACK_SIZE)
+# endif
+sdk_add_compile_definitions_ifdef(CONFIG_BT_WORK_QUEUE_STACK_SIZE -DCONFIG_BT_WORK_QUEUE_STACK_SIZE=${CONFIG_BT_WORK_QUEUE_STACK_SIZE})
+
+# ifeq ($(CONFIG_BLE_ADV_TWO_PAYLOAD_IN_ONE_ADV_INTERVAL_WITH_ROME_CODE),1)
+#     CFLAGS += -DCFG_BLE_ADV_TWO_PAYLOAD_IN_ONE_ADV_INTERVAL_WITH_ROME_CODE
+# endif
+sdk_add_compile_definitions_ifdef(CONFIG_BLE_ADV_TWO_PAYLOAD_IN_ONE_ADV_INTERVAL_WITH_ROME_CODE -DCFG_BLE_ADV_TWO_PAYLOAD_IN_ONE_ADV_INTERVAL_WITH_ROME_CODE)

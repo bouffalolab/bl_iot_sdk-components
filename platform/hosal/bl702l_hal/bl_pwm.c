@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include "bl702l_glb.h"
 #include "bl702l_glb_gpio.h"
 #include "bl702l_pwm.h"
@@ -29,7 +58,11 @@ static void pwm_sc_init(uint16_t div, uint16_t period)
         .ch = PWM_SC0,
         .clk = PWM_SC_CLK_BCLK,
         .stopMode = PWM_SC_STOP_ABRUPT,
+#if !defined(CFG_PWM_OUTPUT_INVERT)
         .pol = PWM_SC_POL_NORMAL,
+#else
+        .pol = PWM_SC_POL_INVERT,
+#endif
         .clkDiv = div,
         .period = period,
         .threshold1 = 0,
@@ -38,18 +71,21 @@ static void pwm_sc_init(uint16_t div, uint16_t period)
         .stpInt = DISABLE,
     };
 
-    PWM_SC_Channel_Disable(PWM_SC0);
     PWM_SC_Channel_Init(&pwmCfg);
+    PWM_SC_SW_Force_Value(PWM_SC0, pwmCfg.pol);
+    PWM_SC_SW_Mode(PWM_SC0, ENABLE);
 }
 
 static void pwm_sc_start(void)
 {
     PWM_SC_Channel_Enable(PWM_SC0);
+    PWM_SC_SW_Mode(PWM_SC0, DISABLE);
 }
 
 static void pwm_sc_stop(void)
 {
     PWM_SC_Channel_Disable(PWM_SC0);
+    PWM_SC_SW_Mode(PWM_SC0, ENABLE);
 }
 
 static void pwm_sc_set_duty(float duty, uint16_t *threshold1, uint16_t *threshold2)
@@ -98,8 +134,13 @@ static void pwm_mc_init(uint16_t div, uint16_t period)
     PWM_CHx_CFG_Type chxCfg = {
         .modP = PWM_MODE_DISABLE,
         .modN = PWM_MODE_DISABLE,
+#if !defined(CFG_PWM_OUTPUT_INVERT)
         .polP = PWM_POL_ACTIVE_HIGH,
         .polN = PWM_POL_ACTIVE_HIGH,
+#else
+        .polP = PWM_POL_ACTIVE_LOW,
+        .polN = PWM_POL_ACTIVE_LOW,
+#endif
         .idlP = PWM_IDLE_STATE_INACTIVE,
         .idlN = PWM_IDLE_STATE_INACTIVE,
         .brkP = PWM_BREAK_STATE_INACTIVE,

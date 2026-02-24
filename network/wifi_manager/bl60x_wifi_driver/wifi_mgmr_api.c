@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include <string.h>
 #include <stdio.h>
 
@@ -18,7 +47,7 @@ static int wifi_mgmr_api_common(WIFI_MGMR_EVENT_T ev, void *data1, void *data2, 
 
     if (0 != wifi_mgmr_event_notify(&msg, 0)) {
         if (data_in_heap) {
-            bl_os_free(data_in_heap);
+            bflb_os_free(data_in_heap);
         }
         return -1;
     }
@@ -35,7 +64,7 @@ int wifi_mgmr_api_connect(char *ssid, char *passphr, const ap_connect_adv_t *ext
 {
     wifi_mgmr_profile_msg_t *profile = NULL;
 
-    profile = (wifi_mgmr_profile_msg_t *)bl_os_zalloc(sizeof(wifi_mgmr_profile_msg_t));
+    profile = (wifi_mgmr_profile_msg_t *)bflb_os_zalloc(sizeof(wifi_mgmr_profile_msg_t));
     if (!profile) {
         goto failed;
     }
@@ -74,7 +103,7 @@ int wifi_mgmr_api_connect(char *ssid, char *passphr, const ap_connect_adv_t *ext
         //define the freq
         profile->band = ext_param->ap_info.band;
         profile->freq = ext_param->ap_info.freq;
-        bl_os_printf("wifi mgmr band:%d freq: %d\r\n", profile->band, profile->freq);
+        bflb_os_printf("wifi mgmr band:%d freq: %d\r\n", profile->band, profile->freq);
     }
 
     if (ext_param->ap_info.type == AP_INFO_TYPE_PRESIST) {
@@ -83,7 +112,7 @@ int wifi_mgmr_api_connect(char *ssid, char *passphr, const ap_connect_adv_t *ext
         profile->ap_info_ttl = ext_param->ap_info.time_to_live;
     } else {
         profile->ap_info_ttl = -1;
-        bl_os_printf("invalid ap info type or time_to_live value!\r\n");
+        bflb_os_printf("invalid ap info type or time_to_live value!\r\n");
     }
 
     profile->dhcp_use = ext_param->ap_info.use_dhcp;
@@ -98,10 +127,10 @@ int wifi_mgmr_api_connect(char *ssid, char *passphr, const ap_connect_adv_t *ext
 
 failed:
     if (profile) {
-        bl_os_printf("%s malloc profile failed!\r\n", __FUNCTION__);
-        bl_os_free(profile);
+        bflb_os_printf("%s malloc profile failed!\r\n", __FUNCTION__);
+        bflb_os_free(profile);
     } else {
-        bl_os_printf("%s send profile failed!\r\n", __FUNCTION__);
+        bflb_os_printf("%s send profile failed!\r\n", __FUNCTION__);
     }
     return -1;
 }
@@ -113,9 +142,9 @@ int wifi_mgmr_api_cfg_req(uint32_t ops, uint32_t task, uint32_t element, uint32_
     }
 
     wifi_mgmr_cfg_element_msg_t *cfg_req = NULL;
-    cfg_req = (wifi_mgmr_cfg_element_msg_t *)bl_os_zalloc(sizeof(wifi_mgmr_cfg_element_msg_t) + length);
+    cfg_req = (wifi_mgmr_cfg_element_msg_t *)bflb_os_zalloc(sizeof(wifi_mgmr_cfg_element_msg_t) + length);
     if (!cfg_req) {
-        bl_os_printf("%s malloc cfg_req failed!\r\n", __FUNCTION__);
+        bflb_os_printf("%s malloc cfg_req failed!\r\n", __FUNCTION__);
         return -1;
     }
 
@@ -242,13 +271,13 @@ int wifi_mgmr_api_ap_start(char *ssid, char *passwd, int channel, uint8_t hidden
     int psk_len = passwd ? strlen(passwd) : 0;
 
     if (!ssid || ssid_len > MAX_SSID_LEN_CHECK || (passwd && (psk_len < 8 || psk_len >= MAX_PSK_LEN_CHECK))) {
-        bl_os_printf("%s error start ap with wrong paramters!\r\n", __FUNCTION__);
+        bflb_os_printf("%s error start ap with wrong paramters!\r\n", __FUNCTION__);
         return -1;
     }
 
-    ap = (wifi_mgmr_ap_msg_t *)bl_os_zalloc(sizeof(wifi_mgmr_ap_msg_t));
+    ap = (wifi_mgmr_ap_msg_t *)bflb_os_zalloc(sizeof(wifi_mgmr_ap_msg_t));
     if (!ap) {
-        bl_os_printf("%s malloc ap failed!\r\n", __FUNCTION__);
+        bflb_os_printf("%s malloc ap failed!\r\n", __FUNCTION__);
         goto failed;
     }
 
@@ -275,10 +304,10 @@ int wifi_mgmr_api_ap_start(char *ssid, char *passwd, int channel, uint8_t hidden
 
 failed:
     if (ap) {
-        bl_os_printf("%s malloc ap failed!\r\n", __FUNCTION__);
-        bl_os_free(ap);
+        bflb_os_printf("%s malloc ap failed!\r\n", __FUNCTION__);
+        bflb_os_free(ap);
     } else {
-        bl_os_printf("%s send ap failed!\r\n", __FUNCTION__);
+        bflb_os_printf("%s send ap failed!\r\n", __FUNCTION__);
     }
     return -1;
 }

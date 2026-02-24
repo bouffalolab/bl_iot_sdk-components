@@ -21,11 +21,11 @@ NOTES
 #include "conn_internal.h"
 #include "gatt.h"
 #include "hci_core.h"
-#include "uuid.h"
+#include "bt_uuid.h"
 #include "ble_tp_svc.h"
 #include "bt_log.h"
 
-#define TP_PRIO configMAX_PRIORITIES - 5
+#define TP_PRIO (CONFIG_BT_RX_PRIO - 1)
 #if defined(CONFIG_BLE_TP_SVC_COMPATIBILITY_TEST)
 uint32_t m_index_send=1;
 uint32_t m_index_receive=1;

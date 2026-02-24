@@ -20,8 +20,8 @@
  * under the License.
  *
  */
-#ifndef __BSP_IMAGE_SENSOR_H__
-#define __BSP_IMAGE_SENSOR_H__
+#ifndef _IMAGE_SENSOR_H_
+#define _IMAGE_SENSOR_H_
 
 #include "bflb_platform.h"
 #include "bl702_cam.h"

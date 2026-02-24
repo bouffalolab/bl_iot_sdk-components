@@ -28,6 +28,7 @@ typedef union {
 
 } lmac154_fptSearchResult_t;
 
+void lmac154_setFramePendingSourceMatch(bool isEnable);
 
 /****************************************************************************//**
  * @brief  Set frame pending table mode

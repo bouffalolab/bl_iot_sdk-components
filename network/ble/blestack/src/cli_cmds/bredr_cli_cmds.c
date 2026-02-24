@@ -14,19 +14,19 @@
 #include <hci_core.h>
 #include <l2cap.h>
 #include <l2cap_internal.h>
-#if CONFIG_BT_A2DP
+#if defined(CONFIG_BT_A2DP)
 #include <a2dp.h>
 #endif
-#if CONFIG_BT_AVRCP
+#if defined(CONFIG_BT_AVRCP)
 #include <avrcp.h>
 #endif
-#if CONFIG_BT_AVRCP
+#if defined(CONFIG_BT_AVRCP)
 //#include <rfcomm.h>
 #endif
-#if CONFIG_BT_HFP
+#if defined(CONFIG_BT_HFP)
 #include <hfp_hf.h>
 #endif
-#if CONFIG_BT_SPP
+#if defined(CONFIG_BT_SPP)
 #include <spp.h>
 #endif
 #if defined(CONFIG_SHELL)
@@ -56,6 +56,7 @@
 #define BT_A2DP_CLI(func) static void a2dp_##func(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 #define BT_AVRCP_CLI(func) static void avrcp_##func(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 #define BT_HFP_CLI(func) static void hfp_##func(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+#define BT_SPP_CLI(func) static void spp_##func(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 #endif
 #define 		PASSKEY_MAX  		0xF423F
 struct bt_br_discovery_result result[10] = { 0 };
@@ -71,7 +72,7 @@ static struct bt_conn_cb conn_callbacks = {
     .connected = bredr_connected,
     .disconnected = bredr_disconnected,
 };
-#if CONFIG_BT_SPP
+#if defined(CONFIG_BT_SPP)
 
 static void bt_recv_callback(u8_t *data, u16_t length)
 {
@@ -92,35 +93,34 @@ struct spp_callback_t spp_conn_callbacks={
     .bt_spp_recv=bt_recv_callback,
 };
 #endif
-#if CONFIG_BT_A2DP
-struct k_thread media_transport;
+#if defined(CONFIG_BT_A2DP)
 static void a2dp_chain(struct bt_conn *conn, uint8_t state);
 static void a2dp_stream(uint8_t state);
+#if defined(CONFIG_BT_A2DP_SOURCE)
+struct k_thread media_transport;
 static void a2dp_start_cfm(void);
-static bool media_task_create = false;
-
+#endif
 static struct a2dp_callback a2dp_callbacks =
 {
     .chain = a2dp_chain,
     .stream = a2dp_stream,
-#if CONFIG_BT_A2DP_SOURCE
+#if defined(CONFIG_BT_A2DP_SOURCE)
     .start_cfm = a2dp_start_cfm,
 #endif
 };
 #endif
 
-#if CONFIG_BT_AVRCP
+#if defined(CONFIG_BT_AVRCP)
 static void avrcp_chain(struct bt_conn *conn, uint8_t state);
 static void avrcp_absvol(uint8_t vol);
 static void avrcp_play_status(uint32_t song_len, uint32_t song_pos, uint8_t status);
-static void avrcp_passthrough_response(bool released, u8_t option_id);
-static void avrcp_passthrough_handler(bool released, u8_t option_id);
+static void avrcp_passthrough_handler(uint8_t released, u8_t option_id);
 static void avrcp_handle_play(void);
 static void avrcp_handle_stop(void);
 static void avrcp_handle_pause(void);
 static void avrcp_handle_next(void);
 static void avrcp_handle_previous(void);
-static bool steam_pause = false;
+static bool stream_pause = false;
 
 struct avrcp_pth_handler {
 	uint8_t op;
@@ -139,8 +139,8 @@ static struct avrcp_callback avrcp_callbacks =
     .chain = avrcp_chain,
     .abs_vol = avrcp_absvol,
     .play_status = avrcp_play_status,
-    .rp_passthrough = NULL,//avrcp_passthrough_response,
-    .passthrough_handler=avrcp_passthrough_handler,
+    .rp_passthrough = NULL,
+    .passthrough_handler = avrcp_passthrough_handler,
 };
 #endif
 
@@ -171,17 +171,19 @@ BT_CLI(stop_inquiry);
 BT_CLI(set_min_enc_key_size);
 BT_CLI(set_tx_pwr);
 
-#if BR_EDR_PTS_TEST
+#if defined(BR_EDR_PTS_TEST)
 BT_CLI(sdp_client_connect);
 BT_AVDTP_CLI(set_conf_reject);
 #endif
 
-#if CONFIG_BT_A2DP
+#if defined(CONFIG_BT_A2DP)
 BT_A2DP_CLI(connect);
+#if defined(CONFIG_BT_A2DP_SOURCE)
 BT_A2DP_CLI(discovery);
 BT_A2DP_CLI(suspend);
 BT_A2DP_CLI(resume);
-#if BR_EDR_PTS_TEST
+#endif
+#if defined(BR_EDR_PTS_TEST)
 BT_A2DP_CLI(disconnect);
 BT_A2DP_CLI(start_discovery);
 BT_A2DP_CLI(get_cap);
@@ -195,7 +197,7 @@ BT_A2DP_CLI(set_conf_reject);
 #endif
 #endif
 
-#if CONFIG_BT_AVRCP
+#if defined(CONFIG_BT_AVRCP)
 BT_AVRCP_CLI(connect);
 BT_AVRCP_CLI(pth_key);
 BT_AVRCP_CLI(pth_key_act);
@@ -207,8 +209,8 @@ BT_AVRCP_CLI(send_play_status);
 
 #endif
 
-#if CONFIG_BT_HFP
-#if BR_EDR_PTS_TEST
+#if defined(CONFIG_BT_HFP)
+#if defined(BR_EDR_PTS_TEST)
 BT_CLI(rfcomm_test_mode);
 #endif
 BT_HFP_CLI(connect);
@@ -232,7 +234,7 @@ BT_HFP_CLI(hf_send_indicator);
 BT_HFP_CLI(hf_update_indicator);
 #endif
 
-#if CONFIG_BT_SPP
+#if defined(CONFIG_BT_SPP)
 BT_SPP_CLI(send);
 BT_SPP_CLI(disconnect);
 BT_SPP_CLI(connect);
@@ -267,17 +269,17 @@ BT_SPP_CLI(connect);
     SHELL_CMD_EXPORT_ALIAS(bredr_auth_pairing_confirm, bredr_auth_pairing_confirm, Confirm pairing in secure connection Parameter:[Null]);
     SHELL_CMD_EXPORT_ALIAS(bredr_auth_passkey, bredr_auth_passkey, Input passkey Parameter:[Passkey: 00000000-000F423F]);
     SHELL_CMD_EXPORT_ALIAS(bredr_get_bond_list, bredr_get_bond_list, BT get Bond List);
-    #if BR_EDR_PTS_TEST
+    #if defined(BR_EDR_PTS_TEST)
     SHELL_CMD_EXPORT_ALIAS(bredr_sdp_client_connect,bredr_sdp_client_connect,"");
     #endif
-    #if CONFIG_BT_A2DP
+    #if defined(CONFIG_BT_A2DP)
     SHELL_CMD_EXPORT_ALIAS(a2dp_connect,a2dp_connect,"");
-    #if CONFIG_BT_A2DP_SOURCE
+    #if defined(CONFIG_BT_A2DP_SOURCE)
     SHELL_CMD_EXPORT_ALIAS(a2dp_discovery,a2dp_start_disc, "");
     SHELL_CMD_EXPORT_ALIAS(a2dp_suspend,a2dp_source_suspend, "");
     SHELL_CMD_EXPORT_ALIAS(a2dp_resume, a2dp_source_resume, "");
     #endif
-    #if BR_EDR_PTS_TEST
+    #if defined(BR_EDR_PTS_TEST)
     SHELL_CMD_EXPORT_ALIAS(a2dp_disconnect,a2dp_disconnect,"");
     SHELL_CMD_EXPORT_ALIAS(a2dp_start_discovery,a2dp_start_discovery,"");
     SHELL_CMD_EXPORT_ALIAS(a2dp_get_cap,a2dp_get_cap,"");
@@ -291,7 +293,7 @@ BT_SPP_CLI(connect);
     #endif
     #endif
 
-    #if CONFIG_BT_AVRCP
+    #if defined(CONFIG_BT_AVRCP)
     SHELL_CMD_EXPORT_ALIAS(avrcp_connect,avrcp_connect,"");
     SHELL_CMD_EXPORT_ALIAS(avrcp_pth_key,avrcp_pth_key,"");
     SHELL_CMD_EXPORT_ALIAS(avrcp_pth_key_act,avrcp_pth_key_act,"");
@@ -302,8 +304,8 @@ BT_SPP_CLI(connect);
     SHELL_CMD_EXPORT_ALIAS(avrcp_send_play_status,avrcp_send_play_status,"");
     #endif
 
-    #if CONFIG_BT_HFP
-    #if BR_EDR_PTS_TEST
+    #if defined(CONFIG_BT_HFP)
+    #if defined(BR_EDR_PTS_TEST)
     SHELL_CMD_EXPORT_ALIAS(bredr_rfcomm_test_mode,bredr_rfcomm_test_mode,"");
     #endif
     SHELL_CMD_EXPORT_ALIAS(hfp_connect,hfp_connect,"");
@@ -326,7 +328,7 @@ BT_SPP_CLI(connect);
     SHELL_CMD_EXPORT_ALIAS(hfp_hf_send_indicator,hfp_hf_send_indicator,"");
     SHELL_CMD_EXPORT_ALIAS(hfp_hf_update_indicator,hfp_hf_update_indicator,"");
     #endif
-    #if CONFIG_BT_SPP
+    #if defined(CONFIG_BT_SPP)
     SHELL_CMD_EXPORT_ALIAS(spp_send,spp_send,"");
     SHELL_CMD_EXPORT_ALIAS(spp_connect,spp_connect,"");
     SHELL_CMD_EXPORT_ALIAS(spp_disconnect,spp_disconnect,"");
@@ -360,18 +362,18 @@ const struct cli_command bredr_cmd_set[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"bredr_get_bond_list","",bredr_get_bond_list},
     {"bredr_start_inquiry", "", bredr_start_inquiry},
     {"bredr_set_tx_pwr","",bredr_set_tx_pwr},
-    #if BR_EDR_PTS_TEST
+    #if defined(BR_EDR_PTS_TEST)
     {"bredr_sdp_client_connect", "", bredr_sdp_client_connect},
     #endif
         
-    #if CONFIG_BT_A2DP
+    #if defined(CONFIG_BT_A2DP)
     {"a2dp_connect", "", a2dp_connect},
-	#if CONFIG_BT_A2DP_SOURCE
+	#if defined(CONFIG_BT_A2DP_SOURCE)
     {"a2dp_start_disc", "", a2dp_discovery},
     {"a2dp_source_suspend", "", a2dp_suspend},
     {"a2dp_source_resume", "", a2dp_resume},
 	#endif
-    #if BR_EDR_PTS_TEST
+    #if defined(BR_EDR_PTS_TEST)
     {"a2dp_disconnect", "", a2dp_disconnect},
     {"a2dp_start_disc", "", a2dp_start_discovery},
     {"a2dp_get_cap", "", a2dp_get_cap},
@@ -384,7 +386,7 @@ const struct cli_command bredr_cmd_set[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"avdtp_set_conf_reject", "", avdtp_set_conf_reject},
     #endif
     #endif
-    #if CONFIG_BT_AVRCP
+    #if defined(CONFIG_BT_AVRCP)
     {"avrcp_connect", "", avrcp_connect},
     {"avrcp_pth_key", "", avrcp_pth_key},
     {"avrcp_pth_key_act", "", avrcp_pth_key_act},
@@ -394,7 +396,7 @@ const struct cli_command bredr_cmd_set[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"avrcp_set_vol", "", avrcp_set_vol},
     #endif
 
-    #if CONFIG_BT_HFP
+    #if defined(CONFIG_BT_HFP)
     {"hfp_connect", "", hfp_connect},
     {"hfp_diconnect","",hfp_hf_disconnect},
     {"sco_connect", "", hfp_sco_connect},
@@ -415,7 +417,7 @@ const struct cli_command bredr_cmd_set[] STATIC_CLI_CMD_ATTRIBUTE = {
     {"hfp_hf_send_ind","",hfp_hf_send_indicator},
     {"hfp_hf_update_ind","",hfp_hf_update_indicator},
     #endif
-    #if CONFIG_BT_SPP
+    #if defined(CONFIG_BT_SPP)
     {"spp_send","",spp_send},
     {"spp_connect","",spp_connect},
     {"spp_disconnect","",spp_disconnect},
@@ -457,13 +459,13 @@ BT_CLI(init)
 
     default_conn = NULL;
     bt_conn_cb_register(&conn_callbacks);
-#if CONFIG_BT_A2DP
+#if defined(CONFIG_BT_A2DP)
     a2dp_cb_register(&a2dp_callbacks);
 #endif
-#if CONFIG_BT_AVRCP
+#if defined(CONFIG_BT_AVRCP)
     avrcp_cb_register(&avrcp_callbacks);
 #endif
-#if CONFIG_BT_SPP
+#if defined(CONFIG_BT_SPP)
     spp_cb_register(&spp_conn_callbacks);
 #endif
     init = true;
@@ -776,7 +778,7 @@ typedef struct {
     uint8_t *data;
 } eir_data_t;
 
-static void bredr_parse_eir_data(const uint8_t *eir, size_t eir_len)
+static void bredr_parse_eir_data(u8_t *eir, size_t eir_len)
 {
     size_t pos = 0;
     while (pos < eir_len) {
@@ -817,7 +819,7 @@ void bt_br_discv_cb(struct bt_br_discovery_result *results,
         bt_addr_to_str(&results[i].addr, addr_str, sizeof(addr_str));
         printf("addr %s,class 0x%lx,rssi %d\r\n",addr_str,
                      dev_class,results[i].rssi);
-        bredr_parse_eir_data(&results[i].eir,240);
+        bredr_parse_eir_data((u8_t*)results[i].eir, 240);
     }
 }
 
@@ -897,7 +899,7 @@ BT_CLI(set_tx_pwr)
 
 }
 
-#if BR_EDR_PTS_TEST
+#if defined(BR_EDR_PTS_TEST)
 BT_CLI(sdp_client_connect)
 {
     extern int bt_sdp_client_connect(struct bt_conn *conn);
@@ -905,15 +907,17 @@ BT_CLI(sdp_client_connect)
 }
 #endif
 
-#if CONFIG_BT_A2DP
+#if defined(CONFIG_BT_A2DP)
 static void a2dp_chain(struct bt_conn *conn, uint8_t state)
 {
     printf("%s, conn: %p \n", __func__, conn);
 
     if (state == BT_A2DP_CHAIN_CONNECTED) {
         printf("a2dp connected. \n");
+        stream_pause = false;
     } else if (state == BT_A2DP_CHAIN_DISCONNECTED) {
         printf("a2dp disconnected. \n");
+        stream_pause = true;
     }
 }
 
@@ -928,12 +932,13 @@ static void a2dp_stream(uint8_t state)
     }
 }
 
-#if CONFIG_BT_A2DP_SOURCE
+#if defined(CONFIG_BT_A2DP_SOURCE)
+static bool media_task_create = false;
 static void media_thread(void *args)
 {
    while (1) 
    {
-        if(steam_pause == false)
+        if(stream_pause == false)
         {
             int err;
             err = bt_a2dp_send_media(audio_buf, audio_buf_size);
@@ -990,7 +995,7 @@ BT_A2DP_CLI(connect)
     }
 }
 
-#if CONFIG_BT_A2DP_SOURCE
+#if defined(CONFIG_BT_A2DP_SOURCE)
 BT_A2DP_CLI(discovery)
 {
     int ret;
@@ -1043,7 +1048,7 @@ BT_A2DP_CLI(resume)
 }
 #endif
 
-#if BR_EDR_PTS_TEST
+#if defined(BR_EDR_PTS_TEST)
 BT_A2DP_CLI(disconnect)
 {
     int ret;
@@ -1210,14 +1215,17 @@ BT_AVDTP_CLI(set_conf_reject)
 #endif
 #endif
 
-#if CONFIG_BT_AVRCP
+#if defined(CONFIG_BT_AVRCP)
 static void avrcp_chain(struct bt_conn *conn, uint8_t state)
 {
     printf("%s, conn: %p \n", __func__, conn);
 
     if (state == BT_AVRCP_CHAIN_CONNECTED) {
-        #if CONFIG_BT_A2DP_SOURCE
+        #if defined(CONFIG_BT_A2DP_SOURCE)
         avrcp_send_volume_notification(NULL);
+        #endif
+        #if defined(CONFIG_BT_A2DP_SINK)
+        avrcp_reg_play_status_notification(NULL);
         #endif
         printf("avrcp connected. \n");
     } else if (state == BT_AVRCP_CHAIN_DISCONNECTED) {
@@ -1235,18 +1243,7 @@ static void avrcp_play_status(uint32_t song_len, uint32_t song_pos, uint8_t stat
     printf("%s, song length: %lu, song position: %lu, play status: %u \n", __func__, song_len, song_pos, status);
 }
 
-static void avrcp_passthrough_response(bool released, u8_t option_id)
-{
-	BT_WARN("released: %d option id: 0x%x \n",released, option_id);
-
-	if(released == 0)
-	{
-		//user todo 
-
-	}
-}
-
-static void avrcp_passthrough_handler(bool released, u8_t option_id)
+static void avrcp_passthrough_handler(uint8_t released, u8_t option_id)
 {
     BT_WARN("released: %d option id: 0x%x \n",released, option_id);
     if(released==PASTHR_STATE_RELEASED)
@@ -1266,7 +1263,7 @@ static void avrcp_passthrough_handler(bool released, u8_t option_id)
 static void avrcp_handle_play(void)
 {
     printf("%s\r\n",__func__);
-    steam_pause = false;
+    stream_pause = false;
 }
 
 static void avrcp_handle_stop(void)
@@ -1277,7 +1274,7 @@ static void avrcp_handle_stop(void)
 static void avrcp_handle_pause(void)
 {
     printf("%s\r\n",__func__);
-    steam_pause = true;
+    stream_pause = true;
 }
 
 static void avrcp_handle_next(void)
@@ -1456,7 +1453,7 @@ BT_AVRCP_CLI(send_play_status)
 
 #endif
 
-#if CONFIG_BT_HFP
+#if defined(CONFIG_BT_HFP)
 #if 0
 static void rfcomm_recv(struct bt_rfcomm_dlc *dlci, struct net_buf *buf)
 {
@@ -1485,7 +1482,7 @@ static struct bt_rfcomm_dlc rfcomm_dlc = {
 };
 #endif
 
-#if BR_EDR_PTS_TEST
+#if defined(BR_EDR_PTS_TEST)
 extern uint8_t rfcomm_test_enable;
 BT_CLI(rfcomm_test_mode)
 {
@@ -1868,17 +1865,30 @@ BT_HFP_CLI(hf_disconnect)
 }
 
 #endif
-#if CONFIG_BT_SPP
+#if defined(CONFIG_BT_SPP)
+static uint8_t spp_test_buffer[1024];
 BT_SPP_CLI(send)
 {
     int err = 0;
-    uint8_t test_data[10] = {0x01, 0x02, 0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a};
+    uint16_t len = 0;
+
+    get_uint16_from_string(&argv[1], &len);
+
+    if (len == 0 || len > 1024) {
+        printf("Invalid length. Must be 1-1024.\n");
+        return;
+    }
+
+    for (uint16_t i = 0; i < len; i++) {
+        spp_test_buffer[i] = (i + 1) & 0xFF;
+    }
+
     if(!default_conn){
         printf("Not connected.\n");
         return;
     }
     
-    err=bt_spp_send(test_data,10);
+    err=bt_spp_send(spp_test_buffer,len);
     if(err)
         printf("bt spp send err:%d\r\n", err);
     else
@@ -1984,18 +1994,23 @@ static struct bt_conn_auth_cb auth_cb_display = {
 	.pairing_complete = auth_pairing_complete,
 };
 
-static void bt_foreach_bond_info_cb(const struct bt_bond_info *info, void *user_data)
+void print_br_bond_info(const struct bt_br_bond_info *info, void *user_data)
 {
-    /**************bond info dump *************/
-    char addr[BT_ADDR_LE_STR_LEN];
-    struct bt_keys *keys=NULL;
-    if(user_data)
-        (*(u8_t *)user_data)++;
-
-    bt_addr_le_to_str(&info->addr, addr, sizeof(addr));
-    keys = bt_keys_find(BT_KEYS_ALL, 0, &info->addr);
-    printf("BTADDR:%s LTK:%s\r\n",addr,bt_hex(keys->ltk.val,16));
+    char addr_str[BT_ADDR_STR_LEN];
+    char key_str[33];
+    
+    bt_addr_to_str(info->addr, addr_str, sizeof(addr_str));
+    
+    for (size_t i = 0; i < info->link_key_size; i++) {
+        sprintf(&key_str[i*2], "%02X", info->link_key[i]);
+    }
+    key_str[32] = '\0';
+    
+    printf("BR/EDR Bonded Device:\n");
+    printf("  Address: %s\n", addr_str);
+    printf("  Link Key: %s\n", key_str);
 }
+
 
 BT_CLI(auth)
 {
@@ -2072,7 +2087,7 @@ BT_CLI(auth_passkey)
 
 BT_CLI(get_bond_list)
 {
-    bt_foreach_bond(0, bt_foreach_bond_info_cb, NULL);
+    bt_br_foreach_bond(print_br_bond_info, NULL);
 }
 
 int bredr_cli_register(void)

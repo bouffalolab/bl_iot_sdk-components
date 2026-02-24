@@ -7,7 +7,9 @@
 #define BL616_A1              1
 
 #if defined(BL702L)
-#include "misc.h"
+#define ATTR_STRINGIFY(x)          #x
+#define ATTR_TOSTRING(x)           ATTR_STRINGIFY(x)
+#define ATTR_UNI_SYMBOL            __FILE__ ATTR_TOSTRING(__LINE__)
 #ifndef ATTR_PDS_SECTION
 #define ATTR_PDS_SECTION           __attribute__((section(".pds_code." ATTR_UNI_SYMBOL), noinline))
 #endif
@@ -30,7 +32,7 @@ void btblecontroller_software_btdm_reset();
 void btblecontroller_software_pds_reset();
 void btblecontroller_pds_trim_rc32m();
 uint8_t btblecontrolller_get_chip_version();
-#if defined(BL702L) || defined(BL616)
+#if defined(BL702L) || defined(BL616) || defined(BL616D)
 void btblecontroller_sys_reset(void);
 #endif
 #if defined(CONFIG_BT_MFG_HCI_CMD) || defined(CONFIG_BLE_MFG_HCI_CMD)

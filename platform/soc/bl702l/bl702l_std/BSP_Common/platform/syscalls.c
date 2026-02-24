@@ -4,11 +4,6 @@
 #include "drv_mmheap.h"
 #include "drv_device.h"
 
-#ifdef CONFIG_MEM_USE_FREERTOS
-#include "FreeRTOS.h"
-#include "task.h"
-#endif
-
 extern struct heap_info mmheap_root;
 
 #ifdef CONF_VFS_ENABLE
@@ -220,24 +215,20 @@ _ssize_t _write_r(struct _reent *ptr, int fd, const void *buf, size_t nbytes)
 void *_malloc_r(struct _reent *ptr, size_t size)
 {
     void *result;
-#ifdef CONFIG_MEM_USE_FREERTOS
-    result = pvPortMalloc(size);
-#else
+
     result = (void *)mmheap_alloc(&mmheap_root, size);
     if (result == NULL) {
         ptr->_errno = -ENOMEM;
     }
-#endif
+
     return result;
 }
 
 void *_realloc_r(struct _reent *ptr, void *old, size_t newlen)
 {
     void *result;
-#ifdef CONFIG_MEM_USE_FREERTOS
-#else
+
     result = (void *)mmheap_realloc(&mmheap_root, old, newlen);
-#endif
     if (result == NULL) {
         ptr->_errno = -ENOMEM;
     }
@@ -247,27 +238,20 @@ void *_realloc_r(struct _reent *ptr, void *old, size_t newlen)
 void *_calloc_r(struct _reent *ptr, size_t size, size_t len)
 {
     void *result;
-#ifdef CONFIG_MEM_USE_FREERTOS
-    result = pvPortMalloc(size * len);
-    if (result) {
-        memset(result, 0, size * len);
-    }
-#else
+
     result = (void *)mmheap_calloc(&mmheap_root, size, len);
     if (result == NULL) {
         ptr->_errno = -ENOMEM;
     }
-#endif
+
     return result;
 }
 
 void *_memalign_r(struct _reent *ptr, size_t align, size_t size)
 {
     void *result;
-#ifdef CONFIG_MEM_USE_FREERTOS
-#else
+
     result = (void *)mmheap_align_alloc(&mmheap_root, align, size);
-#endif
     if (result == NULL) {
         ptr->_errno = -ENOMEM;
     }
@@ -277,11 +261,7 @@ void *_memalign_r(struct _reent *ptr, size_t align, size_t size)
 
 void _free_r(struct _reent *ptr, void *addr)
 {
-#ifdef CONFIG_MEM_USE_FREERTOS
-    vPortFree(addr);
-#else
     mmheap_free(&mmheap_root, addr);
-#endif
 }
 
 void *_sbrk_r(struct _reent *ptr, ptrdiff_t incr)

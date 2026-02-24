@@ -5,4 +5,4 @@
 
 int awb1_init(awb_func_t *func);
 
-#endif  //__AWB1_ALGO_H__
+#endif //__AWB1_ALGO_H__

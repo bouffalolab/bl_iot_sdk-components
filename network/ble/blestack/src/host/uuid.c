@@ -11,7 +11,7 @@
 #include <misc/byteorder.h>
 #include <misc/printk.h>
 
-#include <uuid.h>
+#include <bt_uuid.h>
 
 #define UUID_16_BASE_OFFSET 12
 

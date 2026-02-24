@@ -107,9 +107,10 @@ struct bt_conn *bt_conn_lookup_addr_le(u8_t id, const bt_addr_le_t *peer);
 #if defined(BFLB_BLE)
 bool le_check_valid_conn(void);
 void notify_disconnected(struct bt_conn *conn);
-#if defined(BFLB_HOST_ASSISTANT)
-void bt_notify_disconnected(void);
-#endif
+#if (CONFIG_BT_REMOTE_VERSION)
+void notify_remote_version(struct bt_conn *conn);
+#endif /* CONFIG_BT_REMOTE_VERSION */
+void bt_conn_cleanup_all(void);
 #endif
 
 /** @brief Get destination (peer) address of a connection.
@@ -535,6 +536,10 @@ struct bt_conn_cb {
 	void (*security_changed)(struct bt_conn *conn, bt_security_t level,
 				 enum bt_security_err err);
 #endif /* defined(CONFIG_BT_SMP) || defined(CONFIG_BT_BREDR) */
+#if (CONFIG_BT_REMOTE_VERSION)
+	void (*remote_version)(struct bt_conn *conn, u8_t version,
+		u16_t manufacturer, u16_t subversion);
+#endif /* CONFIG_BT_REMOTE_VERSION */
 	struct bt_conn_cb *_next;
 };
 

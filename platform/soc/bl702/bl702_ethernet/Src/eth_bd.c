@@ -26,11 +26,9 @@
 #include <task.h>
 
 #include "eth_bd.h"
+#include "eth_phy.h"
+#include "ephy_general.h"
 
-#if defined(log_info)
-#undef log_info
-#define log_info(...) do {}while(0)
-#endif
 #define printf(...)  do {}while(0)
 #define MSG(...)     do {}while(0)
 
@@ -52,6 +50,18 @@ uint8_t rx_buf[ETH_RXNB][ETH_MAX_BUFFER_SIZE + 64] __ALIGNED__(4)={0}; /* Ethern
 
 static eth_callback p_eth_callback = NULL;
 static bool is_link_up = false;
+
+static eth_phy_ctrl_t phy_ctrl;
+static eth_phy_init_cfg_t phy_cfg = {
+    .speed_mode = EPHY_SPEED_MODE_AUTO_NEGOTIATION,
+    .local_auto_negotiation_ability = EPHY_ABILITY_100M_TX | EPHY_ABILITY_100M_FULL_DUPLEX,
+};
+static ETHPHY_CFG_Type phyCfg = {
+    .autoNegotiation = ENABLE,                  /*!< Speed and mode auto negotiation */
+    .duplex = EMAC_MODE_FULLDUPLEX,             /*!< Duplex mode */
+    .speed = EMAC_SPEED_100M,                   /*!< Speed mode */
+    .phyAddress = 0x1,                          /*!< PHY address */
+};
 
 int EMAC_DMABDListInit(EMAC_Handle_Type *handle,uint8_t *txBuff, uint32_t txBuffCount,uint8_t *rxBuff, uint32_t rxBuffCount)
 {
@@ -232,14 +242,14 @@ static struct pbuf *low_level_input(struct netif *netif)
                 BL_GET_REG_BITS_VAL(temval, EMAC_MINFL), pkt_len);
         //check length
         if (pkt_len > max_len) {
-            MSG("pkt is too huge %d\r\n", pkt_len);
+            printf("pkt is too huge %d\r\n", pkt_len);
             return NULL;
         }
         if (bd->C_S_L & 0xFF) {
-            MSG("RX bd %x\r\n", bd->C_S_L & 0xFF);
+            printf("RX bd %x\r\n", bd->C_S_L & 0xFF);
         }
         if ((bd->C_S_L >>16) == ETH_MAX_BUFFER_SIZE) {
-            MSG("Bug now...\r\n");
+            printf("Bug now...\r\n");
         }
 #if 0
         //TODO more check
@@ -433,13 +443,11 @@ void emac_irq_process(void)
 
 void EMAC_Interrupt_Init(void)
 {
-    log_info("EMAC_Interrupt_Init.\r\n");
     bl_irq_register(EMAC_IRQn, emac_irq_process);
     bl_irq_enable(EMAC_IRQn);
 
     emac_clrintstatus(EMAC_INT_ALL);
     emac_intmask(EMAC_INT_ALL, UNMASK);
-    log_info("emac_intmask.\r\n");
 }
 
 //FIXME ugly extern functions
@@ -610,7 +618,7 @@ static int _emac_phy_setNegotiationConfig(ETHPHY_CFG_Type *cfg)
 
 static int _emac_phy_linkup(ETHPHY_CFG_Type *cfg)
 {
-    emac_phy_linkup(cfg);
+    //emac_phy_linkup(cfg);
 
     return SUCCESS;
 }
@@ -634,7 +642,6 @@ static int _emac_phy_linkstatus(void)
 {
     uint16_t phy_bsr = 0;
 
-    //MSG("Read link\r\n");
     if (SUCCESS != emac_phy_read(PHY_BSR, &phy_bsr)) {
         printf("%s:%d\r\n", __func__, __LINE__);
         return ERROR;
@@ -667,21 +674,15 @@ static void _emac_phy_if_init(void)
 #define EMAC_PHY_INIT_STEP_LINKUP               (3)
 #define EMAC_PHY_INIT_STEP_SERCIVE_START        (4)
 #define EMAC_PHY_INIT_STEP_LINKMAINTAIN         (5)
-    static int internal_status = 0;
+    static int internal_status = EMAC_PHY_INIT_STEP_CONFIG;
 
     int err = SUCCESS;
-    static ETHPHY_CFG_Type phyCfg={
-        .autoNegotiation=ENABLE,                    /*!< Speed and mode auto negotiation */
-        .duplex=EMAC_MODE_FULLDUPLEX,             /*!< Duplex mode */
-        .speed=EMAC_SPEED_100M,                   /*!< Speed mode */
-        .phyAddress=0x1,                            /*!< PHY address */
-    };
 
-    //log_info("_emac_phy_if_init.\r\n");
+    //MSG("_emac_phy_if_init.\r\n");
     switch (internal_status) {
         case EMAC_PHY_INIT_STEP_RESET:
         {
-            log_info("EMAC_PHY_INIT_STEP_RESET.\r\n");
+            MSG("EMAC_PHY_INIT_STEP_RESET.\r\n");
             {
 #if 0
                 bl_gpio_enable_output(9, 1, 0);
@@ -700,7 +701,7 @@ static void _emac_phy_if_init(void)
             err = emac_phyinit(&phyCfg);
             if(err != SUCCESS)
             {
-                log_info("emac_phyinit init err[%d].\r\n", err);
+                MSG("emac_phyinit init err[%d].\r\n", err);
             }
             phyCfg.autoNegotiation = isAutoNegotiation;
             internal_status++;
@@ -708,11 +709,11 @@ static void _emac_phy_if_init(void)
         break;
         case EMAC_PHY_INIT_STEP_NEGOTIATION:
         {
-            log_info("EMAC_PHY_INIT_STEP_NEGOTIATION.\r\n");
+            MSG("EMAC_PHY_INIT_STEP_NEGOTIATION.\r\n");
             err = _emac_phy_autonegotiation(&phyCfg);
             if(err != SUCCESS)
             {
-                log_info("EMAC_PHY_INIT_STEP_NEGOTIATION err[%d].\r\n", err);
+                MSG("EMAC_PHY_INIT_STEP_NEGOTIATION err[%d].\r\n", err);
                 return;
             }
             internal_status++;
@@ -720,19 +721,19 @@ static void _emac_phy_if_init(void)
         break;
         case EMAC_PHY_INIT_STEP_CONFIG:
         {
-            log_info("EMAC_PHY_INIT_STEP_CONFIG.\r\n");
+            MSG("EMAC_PHY_INIT_STEP_CONFIG.\r\n");
             err = _emac_phy_setNegotiationConfig(&phyCfg);
             if(err != SUCCESS){
-                log_info("EMAC_PHY_INIT_STEP_CONFIG err[%d].\r\n", err);
+                MSG("EMAC_PHY_INIT_STEP_CONFIG err[%d].\r\n", err);
             }
             internal_status++;
         }
         break;
         case EMAC_PHY_INIT_STEP_LINKUP:
         {
-            log_info("EMAC_PHY_INIT_STEP_LINKUP.\r\n");
+            MSG("EMAC_PHY_INIT_STEP_LINKUP.\r\n");
             err = _emac_phy_linkup(&phyCfg);
-            log_info("speed %d\r\n", phyCfg.speed);
+            MSG("speed %d\r\n", phyCfg.speed);
             if(TIMEOUT==err){
                 MSG("PHY Init timeout\r\n");
                 while(1);
@@ -742,16 +743,16 @@ static void _emac_phy_if_init(void)
                 while(1);
             }
             if(phyCfg.duplex==EMAC_MODE_FULLDUPLEX){
-                MSG("EMAC_MODE_FULLDUPLEX\r\n");
+                log_info("EMAC_MODE_FULLDUPLEX\r\n");
             }else{
-                MSG("EMAC_MODE_HALFDUPLEX\r\n");
+                log_info("EMAC_MODE_HALFDUPLEX\r\n");
             }
             if(phyCfg.speed==EMAC_SPEED_100M){
-                MSG("EMAC_SPEED_100M\r\n");
+                log_info("EMAC_SPEED_100M\r\n");
             }else{
-                MSG("EMAC_SPEED_50M\r\n");
+                log_info("EMAC_SPEED_50M\r\n");
             }
-            MSG("PHY Init done\r\n");
+            log_info("PHY Init done\r\n");
             if(p_eth_callback){
                 p_eth_callback(ETH_INIT_STEP_LINKUP);
             }
@@ -760,7 +761,7 @@ static void _emac_phy_if_init(void)
         break;
         case EMAC_PHY_INIT_STEP_SERCIVE_START:
         {
-            log_info("EMAC_PHY_INIT_STEP_SERCIVE_START start dhcp...\r\n");
+            MSG("EMAC_PHY_INIT_STEP_SERCIVE_START start dhcp...\r\n");
             if(p_eth_callback){
                 p_eth_callback(ETH_INIT_STEP_READY);
             }
@@ -769,13 +770,13 @@ static void _emac_phy_if_init(void)
         break;
         case EMAC_PHY_INIT_STEP_LINKMAINTAIN:
         {
-            //log_info("EMAC_PHY_INIT_STEP_LINKMAINTAIN.\r\n");
+            //MSG("EMAC_PHY_INIT_STEP_LINKMAINTAIN.\r\n");
             _emac_phy_linkstatus();
         }
         break;
         default:
         {
-            log_info("emac unkonwn internal status\r\n");
+            MSG("emac unkonwn internal status\r\n");
         }
     }
 }
@@ -814,11 +815,8 @@ void borad_eth_init(uint8_t*addr)
     GLB_AHB_Slave1_Clock_Gate(0,BL_AHB_SLAVE1_EMAC);
     EMAC_Interrupt_Init();
     emac_init(&emacCfg);
-    MSG("emac_init sucess\r\n");
     EMAC_BD_Init();
     emac_enable();
-    //bflb_platform_init_time();
-    //bflb_platform_start_time();
 }
 
 void __attribute__((weak)) eth_user_init(struct netif *netif) 
@@ -843,8 +841,10 @@ void __attribute__((weak)) eth_user_init(struct netif *netif)
  *        for this ethernetif
  */
 
-static void low_level_init(struct netif *netif)
+static err_t low_level_init(struct netif *netif)
 {
+    int ret = 0;
+
     netif->hwaddr_len = ETHARP_HWADDR_LEN;
     netif->mtu = 1500;
     netif->flags = NETIF_FLAG_BROADCAST|NETIF_FLAG_ETHARP|NETIF_FLAG_LINK_UP|NETIF_FLAG_IGMP;
@@ -852,10 +852,57 @@ static void low_level_init(struct netif *netif)
 
     printf("low level init\r\n");
 
+    borad_eth_init(netif->hwaddr);
+
+    /* scan eth_phy */
+    ret = eth_phy_scan(&phy_ctrl, EPHY_ADDR_MIN, EPHY_ADDR_MAX);
+    if (ret < 0) {
+        log_error("eth_phy_scan failed\r\n");
+        return -ERR_IF;
+    }
+
+    /* eth_phy init */
+    ret = eth_phy_init(&phy_ctrl, &phy_cfg);
+    if (ret < 0) {
+        log_error("eth_phy_init failed\r\n");
+        return -ERR_IF;
+    }
+
+    /* update phy address */
+    phyCfg.phyAddress = phy_ctrl.phy_addr;
+
+    /* wait link up */
+    log_info("waiting link_up...\r\n");
+    while (eth_phy_ctrl(&phy_ctrl, EPHY_CMD_GET_LINK_STA, 0) != EPHY_LINK_STA_UP) {
+        arch_delay_ms(10);
+    }
+    log_info("EPHY LINK UP\r\n");
+
+    /* dump registers */
+    eth_phy_dump_registers(&phy_ctrl);
+
+    /* update speed mode */
+    int speed_mode = eth_phy_ctrl(&phy_ctrl, EPHY_CMD_GET_SPEED_MODE, 0);
+    if (speed_mode == EPHY_SPEED_MODE_10M_HALF_DUPLEX) {
+        phyCfg.speed = EMAC_SPEED_10M;
+        phyCfg.duplex = EMAC_MODE_HALFDUPLEX;
+    } else if (speed_mode == EPHY_SPEED_MODE_10M_FULL_DUPLEX) {
+        phyCfg.speed = EMAC_SPEED_10M;
+        phyCfg.duplex = EMAC_MODE_FULLDUPLEX;
+    } else if (speed_mode == EPHY_SPEED_MODE_100M_HALF_DUPLEX) {
+        phyCfg.speed = EMAC_SPEED_100M;
+        phyCfg.duplex = EMAC_MODE_HALFDUPLEX;
+    } else if (speed_mode == EPHY_SPEED_MODE_100M_FULL_DUPLEX) {
+        phyCfg.speed = EMAC_SPEED_100M;
+        phyCfg.duplex = EMAC_MODE_FULLDUPLEX;
+    }
+
 #if LWIP_IPV6
     netif->flags |= (NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6);
     netif->output_ip6 = ethip6_output;
 #endif
+
+    return ERR_OK;
 }
 
 static inline void bl702ethernetif_output(struct netif *netif)
@@ -908,9 +955,6 @@ void unsent_recv_task(void *pvParameters)
     BaseType_t recv;
     struct netif *netif = (struct netif *)pvParameters;
 
-    borad_eth_init(netif->hwaddr);
-
-    log_info("unsent_recv_task.\r\n");
     while(1) {
         NotifyValue = 0;
         recv = xTaskNotifyWait(0, ULONG_MAX, &NotifyValue, 200);
@@ -957,7 +1001,6 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
 }
 
 err_t eth_init(struct netif *netif)
-
 {
     LWIP_ASSERT("netif != NULL", (netif != NULL));
 
@@ -966,8 +1009,12 @@ err_t eth_init(struct netif *netif)
     netif->hostname = "702";
     netif->output = etharp_output;
     netif->linkoutput = low_level_output;
-    log_info("eth_init.\r\n");
-    low_level_init(netif);
+
+    int err = low_level_init(netif);
+    if (err != ERR_OK) {
+        return err;
+    }
+
     xTaskCreate(unsent_recv_task, (const char *)"Ontput_Unsent_queue", 1024, netif, 29, &DequeueTaskHandle);
 
     return ERR_OK;

@@ -24,12 +24,11 @@
 #include "bsp_sdio_sdcard.h"
 #include "bflb_platform.h"
 
-#define SDIO_CMDTIMEOUT  ((uint32_t)0x08000000)
+#define SDH_CLK_SRC      (32000000ul)
+#define SDH_CLK_INIT     (400000ul)
+#define SDH_CLK_TRANSFER (16000000ul)
+#define SDIO_CMDTIMEOUT  ((uint32_t)0x00020000)
 /* Private variables ---------------------------------------------------------*/
-
-static uint32_t sdhClockInit = 400000ul;
-static uint32_t sdhClockSrc = 96000000ul;
-static uint32_t sdhClockTransfer = 48000000ul;
 
 static sd_card_t *pSDCardInfo = NULL;
 
@@ -247,10 +246,9 @@ static status_t SDH_SendCardCommand(SDH_CMD_Cfg_Type *cmd)
     status_t errorstatus = Status_Success;
 
     uint32_t timeout = SDIO_CMDTIMEOUT;
+    SDH_CMDWaitStatus = SD_WAITING;
 
     SDH_SendCommand(cmd);
-
-    SDH_CMDWaitStatus = SD_WAITING;
 
     SDH_ITConfig(SDH_INT_CMD_COMPLETED | SDH_INT_CMD_ERRORS, ENABLE);
 
@@ -291,8 +289,8 @@ static void SDH_HostInit(void)
     SDH_Cfg_Type_Instance.highSpeed = ENABLE;
     SDH_Cfg_Type_Instance.dataWidth = SDH_DATA_BUS_WIDTH_1BIT;
     SDH_Cfg_Type_Instance.volt = SDH_VOLTAGE_3P3V;
-    SDH_Cfg_Type_Instance.srcClock = sdhClockSrc;
-    SDH_Cfg_Type_Instance.busClock = sdhClockInit;
+    SDH_Cfg_Type_Instance.srcClock = SDH_CLK_SRC;
+    SDH_Cfg_Type_Instance.busClock = SDH_CLK_INIT;
     SDH_Ctrl_Init(&SDH_Cfg_Type_Instance);
 
     /*setup timeout counter*/
@@ -715,8 +713,8 @@ static status_t SD_SetDataBusWidth(sd_card_t *card, SDH_Data_Bus_Width_Type widt
     SDH_Cfg_Type_Instance.highSpeed = ENABLE;
     SDH_Cfg_Type_Instance.dataWidth = width;
     SDH_Cfg_Type_Instance.volt = SDH_VOLTAGE_3P3V;
-    SDH_Cfg_Type_Instance.srcClock = sdhClockSrc;
-    SDH_Cfg_Type_Instance.busClock = sdhClockTransfer;
+    SDH_Cfg_Type_Instance.srcClock = SDH_CLK_SRC;
+    SDH_Cfg_Type_Instance.busClock = SDH_CLK_TRANSFER;
     SDH_Ctrl_Init(&SDH_Cfg_Type_Instance);
 
 out:
@@ -900,8 +898,6 @@ static status_t SDH_SDCardInit(uint32_t bus_wide, sd_card_t *card)
 
     SDH_MSG("Go idle in...\r\n");
     errorstatus = SDH_GoIdle();
-    bflb_platform_delay_ms(10);
-    errorstatus = SDH_GoIdle();
 
     if (errorstatus != SD_OK) {
         return Status_SDH_GoIdleFailed;
@@ -909,23 +905,18 @@ static status_t SDH_SDCardInit(uint32_t bus_wide, sd_card_t *card)
 
     SDH_MSG("Go idle out...\r\n");
 
-    for(uint16_t i=0; i<10; i++){
-        /* send CMD8 */
-        errorstatus = SD_SendInterfaceCondition();
-        /* check response */
-        if(errorstatus == Status_Success){
-            /* SDHC or SDXC card */
-            applicationCommand41Argument |= SD_OcrHostCapacitySupportFlag;
-            card->flags |= SD_SupportSdhcFlag;
-            break;
-        }else{
-            /* Try sending CMD8 again */
-            SDH_MSG("Try sending CMD8 again:%d\n",i+1);
-            errorstatus = SDH_GoIdle();
-            if (errorstatus != Status_Success) {
-                return Status_SDH_GoIdleFailed;
-            }
-            continue;
+    errorstatus = SD_SendInterfaceCondition();
+
+    if (errorstatus == Status_Success) {
+        /* SDHC or SDXC card */
+        applicationCommand41Argument |= SD_OcrHostCapacitySupportFlag;
+        card->flags |= SD_SupportSdhcFlag;
+    } else {
+        /* SDSC card */
+        errorstatus = SDH_GoIdle();
+
+        if (errorstatus != Status_Success) {
+            return Status_SDH_GoIdleFailed;
         }
     }
 
@@ -1020,20 +1011,6 @@ static status_t SDH_SDCardInit(uint32_t bus_wide, sd_card_t *card)
 
     return errorstatus;
 }
-
-/**
-  * @brief  Initializes SD Card clock.
-  * @retval SD status
-  */
-status_t SDH_ClockSet(uint32_t clockInit, uint32_t clockSrc, uint32_t clockTransfer)
-{
-    sdhClockInit = clockInit;
-    sdhClockSrc = clockSrc;
-    sdhClockTransfer = clockTransfer;
-
-    return Status_Success;
-}
-
 /**
   * @brief  Initializes the SD card device.
   * @retval SD status
@@ -1136,7 +1113,7 @@ static status_t WaitInProgramming(void)
     uint8_t cardstate = 0;
     status_t errorstatus = Status_Success;
     //uint32_t maxdelay = 0;
-    //maxdelay = 120000/(sdhClockSrc/sdhClockTransfer);
+    //maxdelay = 120000/(SDH_CLK_SRC/SDH_CLK_TRANSFER);
 
     //while(maxdelay--){}
     /*!< Wait till the card is in programming state */
@@ -1498,7 +1475,6 @@ status_t SDH_WriteMultiBlocks(uint8_t *writebuff, uint32_t WriteAddr, uint16_t B
     errorstatus = SDH_CardTransferNonBlocking(&SDH_DMA_Cfg_TypeInstance, &SDH_Trans_Cfg_TypeInstance);
 
     if (errorstatus != Status_Success) {
-        SDH_MSG("SDH Transfer err:%d\r\n",errorstatus);
         return errorstatus;
     }
 

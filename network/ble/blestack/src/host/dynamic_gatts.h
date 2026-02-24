@@ -4,9 +4,9 @@
 #include <bluetooth.h>
 #include <conn.h>
 #include <gatt.h>
-#include "uuid.h"
-typedef void (*dynamic_gatt_wr_callbck_func_t)(const struct bt_gatt_attr* attr,u8_t *data, int * length);
-typedef void (*dynamic_gatt_rd_callbck_func_t)(const struct bt_gatt_attr* attr ,u8_t *data, u16_t length);
+#include "bt_uuid.h"
+typedef void (*dynamic_gatt_wr_callbck_func_t)(struct bt_conn *conn,const struct bt_gatt_attr* attr,u8_t *data, u16_t length);
+typedef void (*dynamic_gatt_rd_callbck_func_t)(struct bt_conn *conn,const struct bt_gatt_attr* attr ,u8_t *data, u16_t* length);
 typedef void (*dynamic_gatt_noti_callbck_func_t)(const struct bt_gatt_attr* attr ,u8_t data);
 
 #define GATT_SERVICE_PRIMARY		0x00

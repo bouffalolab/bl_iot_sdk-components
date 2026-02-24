@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Bouffalolab.
+ * Copyright (c) 2016-2026 Bouffalolab.
  *
  * This file is part of
  *     *** Bouffalolab Software Dev Kit ***

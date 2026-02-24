@@ -29,15 +29,15 @@ extern int bl_rand();
 
  int  ble_rand()
 {
-    #if defined(CFG_IOT_SDK) || defined(BL_MCU_SDK)
+    #if defined(CONFIG_IOT_SDK) || defined(BL_MCU_SDK)
     #if defined(CONFIG_HW_SEC_ENG_DISABLE)
     return random();
     #else /* CONFIG_HW_SEC_ENG_DISABLE */
     return bl_rand();
     #endif /* CONFIG_HW_SEC_ENG_DISABLE */
-    #else /* CFG_IOT_SDK BL_MCU_SDK */
+    #else /* CONFIG_IOT_SDK BL_MCU_SDK */
     return random();
-    #endif /* CFG_IOT_SDK BL_MCU_SDK */
+    #endif /* CONFIG_IOT_SDK BL_MCU_SDK */
 }
 
 
@@ -66,11 +66,10 @@ void k_queue_init(struct k_queue *queue, int size)
     //int size = 20;
     uint8_t blk_size = sizeof(void *);
 
-
+    sys_dlist_init(&queue->poll_events);
     queue->hdl = xQueueCreate(size, blk_size);
     BT_ASSERT(queue->hdl != NULL);
 
-    sys_dlist_init(&queue->poll_events);
 }
 
 void k_queue_insert(struct k_queue *queue, void *prev, void *data)
@@ -285,6 +284,16 @@ bool k_is_current_thread(struct k_thread *thread)
         return false;
 }
 
+bool k_thread_check_by_name(const char *name)
+{
+    TaskHandle_t current_task_handle = xTaskGetCurrentTaskHandle();
+    char *current_task_name = pcTaskGetName(current_task_handle);
+    if((strlen(current_task_name) == strlen(name)) && (!memcmp(current_task_name, name, strlen(name))))
+        return true;
+
+    return false;
+}
+
 int k_yield(void)
 {
     taskYIELD();
@@ -425,13 +434,13 @@ void k_free(void *buf)
 void bt_assert(void)
 {
     BT_ERR("%s, ra = 0x%lx\r\n", __func__, (uint32_t)__builtin_return_address(0));
-    #if defined(CFG_IOT_SDK) || defined(BL_MCU_SDK)
+    #if defined(CONFIG_IOT_SDK) || defined(BL_MCU_SDK)
     extern void user_vAssertCalled(void);
     user_vAssertCalled();
-    #else /* CFG_IOT_SDK BL_MCU_SDK */
+    #else /* CONFIG_IOT_SDK BL_MCU_SDK */
     #if defined (CONFIG_BL_SDK)
     vAssertCalled();
     #endif
 
-    #endif /* CFG_IOT_SDK BL_MCU_SDK */
+    #endif /* CONFIG_IOT_SDK BL_MCU_SDK */
 }

@@ -3,160 +3,45 @@
 
 #include <stdbool.h>
 #include <stdint.h> 
+#include "btble_test_cmd.h"
 
 
-#if defined(CONFIG_BLE_MFG)
-#define MAX_SWITCHING_PATTERN_LEN  (0x4B)
-
-/// HCI command structure for the LE receiver test v3 command
-/*@TRACE*/
-struct hci_le_rx_test_v3_cmd
-{
-    /// RX channel, range: 0x00 to 0x27
-    uint8_t     rx_channel;
-    /// PHY (@enum le_phy_value)
-    uint8_t     phy;
-    /// Modulation index (0: standard | 1: stable)
-    uint8_t     mod_idx;
-    /// Expected CTE length in 8us units, range: 0x02 to 0x14
-    uint8_t     exp_cte_len;
-    /// Expected CTE type (0: AOA | 1: AOD-1us | 2: AOD-2us)
-    uint8_t     exp_cte_type;
-    /// Slot durations (1: 1 us | 2: 2 us)
-    uint8_t     slot_dur;
-    /// Length of switching pattern (number of antenna IDs in the pattern), range: 0x02 to 0x4B
-    uint8_t     switching_pattern_len;
-    /// Antenna IDs
-    uint8_t     antenna_id[MAX_SWITCHING_PATTERN_LEN];
+struct btblecontroller_resource_conf{
+    //The size of bluetooth EM area
+    uint32_t em_size;
+    //If allocate resource for ble observer. If CONFIG_BT_OBSERVER is enabled, shall allocate this resource.
+    //Otherwise, not allocate.
+    //1:allocate, 0:not allocate.
+    uint8_t ble_observer;
+    //If allocate resource for ble central. If CONFIG_BT_CENTRAL is enabled, shall allocate this resource.
+    //Otherwise, not allocate.
+    //1:allocate, 0:not allocate.
+    uint8_t ble_central;
+    //If allocate resource for ble extended adv.  If CONFIG_ADV_EXTENSION is enabled, shall allocate this resource.
+    //Otherwise, not allocate.
+    //1:allocate, 0:not allocate.
+    uint8_t ble_ext_adv;
+    //Number of max activities
+    uint8_t ble_activity_max;
+    //Number of max ble links
+    uint8_t ble_conn_max;
+    //Maximum number of devices in resolving address list
+    uint8_t ble_ral_max;
+    //Number of RX descriptors
+    uint8_t ble_rx_desc_nb;
+    //Number of TX data buffer
+    uint8_t ble_acl_buf_nb_tx;
 };
 
-struct hci_le_rx_test_v2_cmd
-{
-    uint8_t     rx_channel;
-    uint8_t     phy;
-    uint8_t     mod_idx;
-};
-
-struct hci_le_rx_test_v1_cmd
-{
-    /// RX channel, range: 0x00 to 0x27
-    uint8_t     rx_channel;
-};
-
-struct hci_le_tx_test_v4_cmd
-{
-    uint8_t     tx_channel;
-    uint8_t     test_data_len;
-    uint8_t     pkt_payl;
-    uint8_t     phy;
-    uint8_t     cte_len;
-    uint8_t     cte_type;
-    uint8_t     switching_pattern_len;
-    uint8_t     antenna_id[MAX_SWITCHING_PATTERN_LEN];
-    int8_t     tx_pwr_lvl;
-};
-
-/// HCI command structure for the LE transmitter test v3 command
-/*@TRACE*/
-struct hci_le_tx_test_v3_cmd
-{
-    /// TX channel, range: 0x00 to 0x27
-    uint8_t     tx_channel;
-    /// Length of test data in bytes, range: 0x00 to 0xFF
-    uint8_t     test_data_len;
-    /**
-     * Packet payload
-     * 0x00 PRBS9 sequence "11111111100000111101" (in transmission order) as described in [Vol 6] Part F, Section 4.1.5
-     * 0x01 Repeated "11110000" (in transmission order) sequence as described in [Vol 6] Part F, Section 4.1.5
-     * 0x02 Repeated "10101010" (in transmission order) sequence as described in [Vol 6] Part F, Section 4.1.5
-     * 0x03 PRBS15 sequence as described in [Vol 6] Part F, Section 4.1.5
-     * 0x04 Repeated "11111111" (in transmission order) sequence
-     * 0x05 Repeated "00000000" (in transmission order) sequence
-     * 0x06 Repeated "00001111" (in transmission order) sequence
-     * 0x07 Repeated "01010101" (in transmission order) sequence
-     * 0x08-0xFF Reserved for future use
-     */
-    uint8_t     pkt_payl;
-    /// PHY (@enum le_phy_value)
-    uint8_t     phy;
-    /// CTE length (in 8us unit)
-    uint8_t     cte_len;
-    /// CTE type (0: AOA | 1: AOD-1us | 2: AOD-2us)
-    uint8_t     cte_type;
-    /// Length of switching pattern (number of antenna IDs in the pattern)
-    uint8_t     switching_pattern_len;
-    /// Antenna IDs
-    uint8_t     antenna_id[MAX_SWITCHING_PATTERN_LEN];
-};
-
-struct hci_le_tx_test_v2_cmd
-{
-    /// TX channel, range: 0x00 to 0x27
-    uint8_t     tx_channel;
-    /// Length of test data in bytes, range: 0x00 to 0xFF
-    uint8_t     test_data_len;
-    /**
-     * Packet payload
-     * 0x00 PRBS9 sequence "11111111100000111101" (in transmission order) as described in [Vol 6] Part F, Section 4.1.5
-     * 0x01 Repeated "11110000" (in transmission order) sequence as described in [Vol 6] Part F, Section 4.1.5
-     * 0x02 Repeated "10101010" (in transmission order) sequence as described in [Vol 6] Part F, Section 4.1.5
-     * 0x03 PRBS15 sequence as described in [Vol 6] Part F, Section 4.1.5
-     * 0x04 Repeated "11111111" (in transmission order) sequence
-     * 0x05 Repeated "00000000" (in transmission order) sequence
-     * 0x06 Repeated "00001111" (in transmission order) sequence
-     * 0x07 Repeated "01010101" (in transmission order) sequence
-     * 0x08-0xFF Reserved for future use
-     */
-    uint8_t     pkt_payl;
-    /// PHY (@enum le_phy_value)
-    uint8_t     phy;
-
-};
-
-struct hci_le_tx_test_v1_cmd
-{
-    /// TX channel, range: 0x00 to 0x27
-    uint8_t     tx_channel;
-    /// Length of test data in bytes, range: 0x00 to 0xFF
-    uint8_t     test_data_len;
-    /**
-     * Packet payload
-     * 0x00 PRBS9 sequence "11111111100000111101" (in transmission order) as described in [Vol 6] Part F, Section 4.1.5
-     * 0x01 Repeated "11110000" (in transmission order) sequence as described in [Vol 6] Part F, Section 4.1.5
-     * 0x02 Repeated "10101010" (in transmission order) sequence as described in [Vol 6] Part F, Section 4.1.5
-     * 0x03 PRBS15 sequence as described in [Vol 6] Part F, Section 4.1.5
-     * 0x04 Repeated "11111111" (in transmission order) sequence
-     * 0x05 Repeated "00000000" (in transmission order) sequence
-     * 0x06 Repeated "00001111" (in transmission order) sequence
-     * 0x07 Repeated "01010101" (in transmission order) sequence
-     * 0x08-0xFF Reserved for future use
-     */
-    uint8_t     pkt_payl;
-};
-
-#endif
-
-#if defined(CONFIG_BT_MFG)
-struct hci_vs_rx_test_cmd
-{
-    uint8_t     rx_channel;
-    uint8_t     pkt_type;
-};
-struct hci_vs_tx_test_cmd
-{
-    uint8_t     tx_channel;
-    uint16_t     test_data_len;
-    uint8_t     pkt_payl;
-    uint8_t     pkt_type;
-    int8_t     tx_pwr_lvl;
-};
-#endif
+//This API is only used in ble only mode without iso/cte to configure ble resource when CONFIG_BLE_RES_DYNAMIC_CONF is enabled
+//and shall be called before btble_controller_init.
+void btble_controller_resource_config(struct btblecontroller_resource_conf *conf);
 
 //Set stack size of btblecontroller task before btble_controller_init if upper layer wants to modify the stack size.
 //The default stack size of btblecontroller task is 2k in ble only mode and 4k in bt/ble mode.
 void btble_controller_set_task_stack_size(uint16_t stack_size);
 void btble_controller_init(uint8_t task_priority);
-#if defined(CFG_NUTTX)
+#if defined(CONFIG_NUTTX)
 void btblecontroller_main( void *pvParameters );
 #endif
 //API for different RTOS porting to handle btbelcontroller task's messages.
@@ -165,14 +50,61 @@ void btblecontroller_proc(void *data);
 void btble_controller_deinit(void);
 int32_t btble_controller_sleep(int32_t max_sleep_cycles);
 void btble_controller_sleep_restore();
-#if defined(CFG_BT_RESET)
+
+#define BTBLE_IN_ACTIVE_STATE 0
+#define BTBLE_IN_SLEEP_STATE 1
+#define BTBLE_IN_WAKEUP_ONGOING_STATE 2
+//The return value is an instantaneous state that may change rapidly.
+uint8_t btble_controller_get_state(void);
+
 void btble_controller_reset(void);
-#endif
+
+/**
+ * @brief BLE event priority configuration limits
+ */
+#define BLE_EVENT_PRIORITY_MIN        0    /**< Minimum priority value */
+#define BLE_EVENT_PRIORITY_MAX        15   /**< Maximum priority value */
+#define BLE_EVENT_PRIORITY_INVALID    0xFFFFFFFF /**< Invalid priority return value */
+/**
+ * @brief BLE event types for priority configuration
+ */
+#define BLE_EVENT_CONNECT_IND_TX_RX   0   /**< Connection indication transmission/reception on primary advertising channels */
+#define BLE_EVENT_LLCP_MESSAGE        1   /**< LLCP BLE messages */
+#define BLE_EVENT_DATA_CHANNEL_TX     2   /**< Data channel transmission BLE messages */
+#define BLE_EVENT_INITIATING_SCANNING 3   /**< Initiating/Extended initiating (scanning) on primary advertising channels */
+#define BLE_EVENT_ACTIVE_SCANNING     4   /**< Active scanning/Extended active scanning on primary advertising channels */
+#define BLE_EVENT_CONNECTABLE_ADV     5   /**< Connectable advertising/Extended advertising on primary advertising channels */
+#define BLE_EVENT_NON_CONNECTABLE_ADV 6   /**< Non-connectable advertising/Extended advertising on primary advertising channels */
+#define BLE_EVENT_PASSIVE_SCANNING    7   /**< Passive scanning/Extended passive scanning on primary advertising channels */
+/**
+ * @brief Get the priority of a specific BLE event
+ * 
+ * @param event The BLE event type to get priority for
+ * @return uint32_t Event priority value (0-15) or 0xFFFFFFFF if event is invalid
+ * 
+ * @note This function returns the current real-time priority value for the specified event type.
+ *       The returned value may differ from the previously set priority due to the controller's 
+ *       internal scheduling mechanism. Higher values indicate higher priority.
+*/
+uint32_t btble_controller_get_event_priority(uint8_t event);
+/**
+ * @brief Set the priority for a specific BLE event
+ * 
+ * @param event The BLE event type to set priority for
+ * @param priority Priority value to set (0-15, where 15 is highest priority)
+ * @return int 0 on success, -1 if event or priority is invalid
+ * 
+ * @note This function configures the priority for the specified event type in the controller.
+ *       The set priority value may be modified by the controller's internal scheduling mechanism
+ *       to optimize overall system performance.
+ */
+int btble_controller_set_event_priority(uint8_t event, uint8_t priority);
+
 
 /* key: 32 bytes ecdh private key. This key shall be malloced and passed to btblecontroller_set_private_key api,
  * and when encrypt is done shall call btblecontroller_del_private_key to delete key and then free malloced key.*/
 void btblecontroller_set_private_key(uint8_t* key);
-void btblecontroller_del_private_key(void);
+uint8_t* btblecontroller_del_private_key(void);
 
 char *btble_controller_get_lib_ver(void);
 
@@ -190,7 +122,6 @@ typedef void (*btble_sleep_aborted_cb_t)(void);
 int8_t btble_controller_get_tx_pwr(void);
 void btble_set_before_sleep_callback(btble_before_sleep_cb_t cb);
 void btble_set_after_sleep_callback(btble_after_sleep_cb_t cb);
-#if !defined(CONFIG_BLE_MFG)
 /*
   If ble sleep preparation is aborted before sleep, this callback will be trigerred. Please be noticed, 
   this callback is triggerd after before_sleep_callback.
@@ -198,26 +129,17 @@ void btble_set_after_sleep_callback(btble_after_sleep_cb_t cb);
 */
 void btble_set_sleep_aborted_callback(btble_sleep_aborted_cb_t cb);
 #endif
-#endif
 
-#if defined (CONFIG_BLE_MFG) || defined (CONFIG_BT_MFG) 
-int bt_mfg_cli_register(void);
-int reset_cmd_handler(void);
-int rd_bd_addr_cmd_handler(void);
+//sco/esco callback to codec
+typedef void (*bt_sco_codec_cb_t) (uint16_t   interval_halfslot,
+                                uint32_t   tx_buffer_0,
+                                uint32_t   tx_buffer_1,
+                                uint32_t   rx_buffer_0,
+                                uint32_t   rx_buffer_1,
+                                uint32_t   tx_buffer_size,
+                                uint32_t   rx_buffer_size,
+                                uint32_t   start_time_halfslot,
+                                uint8_t    buffer_index);
+void btble_controller_sco_codec_callback_register(bt_sco_codec_cb_t cb);
 
-#if defined (CONFIG_BLE_MFG)
-int hci_le_tx_test_v1_cmd_handler(struct hci_le_tx_test_v1_cmd const *param, uint16_t opcode, bool from_hci);
-int hci_le_rx_test_v1_cmd_handler(struct hci_le_rx_test_v1_cmd const *param, uint16_t opcode, bool from_hci);
-int hci_le_tx_test_v2_cmd_handler(struct hci_le_tx_test_v2_cmd const *param, uint16_t opcode, bool from_hci);
-int hci_le_tx_test_v4_cmd_handler(struct hci_le_tx_test_v4_cmd const *param, uint16_t opcode,bool from_hci);
-int hci_le_rx_test_v2_cmd_handler(struct hci_le_rx_test_v2_cmd const *param, uint16_t opcode, bool from_hci);
-int hci_le_test_end_cmd_handler(void const *param, uint16_t opcode, bool from_hci);
-bool ble_check_test_ongoing(void);
-#endif
-#if defined (CONFIG_BT_MFG)
-int hci_vs_rx_test_cmd_handler(struct hci_vs_rx_test_cmd const *param, uint16_t opcode, bool from_hci);
-int hci_vs_tx_test_cmd_handler(struct hci_vs_tx_test_cmd const *param, uint16_t opcode, bool from_hci);
-int hci_vs_test_end_cmd_handler(void const *param, uint16_t opcode, bool from_hci);
-#endif
-#endif
 #endif

@@ -90,7 +90,6 @@ COMPONENT_SRCS += MCU_Common/partition/partition.c
 COMPONENT_SRCS += BSP_Board/board.c
 HAL_DRV_SRCS := $(notdir $(wildcard $(BL60X_SDK_PATH)/components/platform/soc/bl702/bl702_std/BSP_Driver/hal_drv/src/*.c))
 COMPONENT_SRCS += $(addprefix BSP_Driver/hal_drv/src/, $(HAL_DRV_SRCS))
-CPPFLAGS += -Dbl706_iot
 endif
 
 ifeq ($(CONFIG_BL702_USE_LHAL),1)

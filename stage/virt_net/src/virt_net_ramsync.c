@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -218,10 +247,13 @@ static err_t __link_output(struct netif *netif, struct pbuf *p)
   }
 
   pkg_header->type = PKG_DATA_FRAME;
-  pkg_header->length = p->tot_len + 2 + sizeof(struct pkg_protocol);
+  /**netbus: 
+   * 1. handle_eth_wifi_frame_recv passes (pkg_header->length - 2) to pbuf_take
+   * 2. pbuf has 1514 tot_len limitation*/
+  pkg_header->length = p->tot_len + 2;
 
   uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-                          pkg_header->length + 4, URAMSYNC_FOREVER);
+                          pkg_header->length + 4 + sizeof(struct pkg_protocol), URAMSYNC_FOREVER);
   blog_info("__link_output pkg_header->len:%d type:0x%x\r\n", pkg_header->length, pkg_header->type);
 
   return ERR_OK;
@@ -687,7 +719,7 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
         return -1;
       }
       pkg_header->type = PKG_CMD_FRAME;
-      pkg_header->length = sizeof(struct pkg_protocol_cmd) + sizeof(struct pkg_protocol_cmd);
+      pkg_header->length = sizeof(struct pkg_protocol_cmd);
 
       pkg_cmd->cmd = VIRT_NET_CTRL_GET_LINK_STATUS;
       pkg_cmd->msg_id = msg_id;

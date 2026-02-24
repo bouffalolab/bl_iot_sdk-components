@@ -14,7 +14,7 @@
 #include <bluetooth.h>
 #include <conn.h>
 #include <hci_core.h>
-#include "../../blestack/src/include/bluetooth/uuid.h"
+#include "../../blestack/src/include/bluetooth/bt_uuid.h"
 
 #include <include/mesh.h>
 

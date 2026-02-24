@@ -24,6 +24,5 @@ void imgproc_control_init(void);
 void imgproc_night_mode_enable(bool enable);
 void imgproc_dbg_set_awb_algo(AWB_ALGO algo);
 void ir_cut_switch(bool enable);
-void imgproc_complete_init(void);
 
 #endif /* __IMG_PROC_H__ */

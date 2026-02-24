@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include <stdio.h>
 #include <string.h>
 
@@ -6,8 +35,6 @@
 #include <lwip/mem.h>
 #include <lwip/pbuf.h>
 #include <netif/etharp.h>
-#include <ethernetif.h>
-#include <bl_wifi.h>
 
 #include "bl_main.h"
 #include "bl_defs.h"
@@ -17,10 +44,10 @@
 #include "bl_irqs.h"
 #include "bl_tx.h"
 
-#include <bl_os_private.h>
+#include <bflb_os_private.h>
 #define USER_UNUSED(a) ((void)(a))
 #define RWNX_PRINT_CFM_ERR(req) \
-        bl_os_printf("%s: Status Error(%d)\n", #req, (&req##_cfm)->status)
+        bflb_os_printf("%s: Status Error(%d)\n", #req, (&req##_cfm)->status)
 
 struct bl_hw wifi_hw;
 
@@ -33,17 +60,17 @@ static void bl_set_vers(struct mm_version_cfm *version_cfm_ptr)
     USER_UNUSED(vers);
     RWNX_DBG(RWNX_FN_ENTRY_STR);
 
-    bl_os_printf("[version] lmac %u.%u.%u.%u\r\n",
+    bflb_os_printf("[version] lmac %u.%u.%u.%u\r\n",
         (unsigned int)((vers >> 24) & 0xFF),
         (unsigned int)((vers >> 16) & 0xFF),
         (unsigned int)((vers >>  8) & 0xFF),
         (unsigned int)((vers >>  0) & 0xFF)
     );
-    bl_os_printf("[version] version_machw_1 %08X\r\n", (unsigned int)version_cfm_ptr->version_machw_1);
-    bl_os_printf("[version] version_machw_2 %08X\r\n", (unsigned int)version_cfm_ptr->version_machw_2);
-    bl_os_printf("[version] version_phy_1 %08X\r\n", (unsigned int)version_cfm_ptr->version_phy_1);
-    bl_os_printf("[version] version_phy_2 %08X\r\n", (unsigned int)version_cfm_ptr->version_phy_2);
-    bl_os_printf("[version] features %08X\r\n", (unsigned int)version_cfm_ptr->features);
+    bflb_os_printf("[version] version_machw_1 %08X\r\n", (unsigned int)version_cfm_ptr->version_machw_1);
+    bflb_os_printf("[version] version_machw_2 %08X\r\n", (unsigned int)version_cfm_ptr->version_machw_2);
+    bflb_os_printf("[version] version_phy_1 %08X\r\n", (unsigned int)version_cfm_ptr->version_phy_1);
+    bflb_os_printf("[version] version_phy_2 %08X\r\n", (unsigned int)version_cfm_ptr->version_phy_2);
+    bflb_os_printf("[version] features %08X\r\n", (unsigned int)version_cfm_ptr->features);
 
     RWNX_DBG(RWNX_FN_LEAVE_STR);
 }
@@ -278,12 +305,12 @@ int bl_main_beacon_interval_set(uint16_t beacon_int)
 
 int bl_main_if_remove(uint8_t vif_index)
 {
-    bl_os_printf("[WF] MM_REMOVE_IF_REQ Sending with vif_index %u...\r\n", vif_index);
+    bflb_os_printf("[WF] MM_REMOVE_IF_REQ Sending with vif_index %u...\r\n", vif_index);
     bl_send_remove_if(&wifi_hw, wifi_hw.vif_table[vif_index].vif_idx);
 
     /* TODO: Dont care wifi_hw.vifs */
     memset(&wifi_hw.vif_table[vif_index], 0, sizeof(struct bl_vif));
-    bl_os_printf("[WF] MM_REMOVE_IF_REQ Done\r\n");
+    bflb_os_printf("[WF] MM_REMOVE_IF_REQ Done\r\n");
     return 0;
 }
 
@@ -299,7 +326,7 @@ int bl_main_rate_config(uint8_t sta_idx, uint16_t fixed_rate_cfg)
 
 int bl_main_set_country_code(char *country_code)
 {
-    bl_os_log_info("%s: country code: %s\r\n", __func__, country_code);
+    bflb_os_log_info("%s: country code: %s\r\n", __func__, country_code);
     bl_msg_update_channel_cfg((const char *)country_code);
     return bl_send_me_chan_config_req(&wifi_hw);
 }
@@ -314,7 +341,7 @@ int bl_main_if_add(int is_sta, struct netif *netif, uint8_t *vif_index)
     struct mm_add_if_cfm add_if_cfm;
     int error, vif_id;
 
-    bl_os_printf("[WF] MM_ADD_IF_REQ Sending: %s\r\n", is_sta ? "STA" : "AP");
+    bflb_os_printf("[WF] MM_ADD_IF_REQ Sending: %s\r\n", is_sta ? "STA" : "AP");
     error = bl_send_add_if(
             &wifi_hw,
             netif->hwaddr,
@@ -322,7 +349,7 @@ int bl_main_if_add(int is_sta, struct netif *netif, uint8_t *vif_index)
             false,
             &add_if_cfm
     );
-    bl_os_printf("[WF] MM_ADD_IF_REQ Done\r\n");
+    bflb_os_printf("[WF] MM_ADD_IF_REQ Done\r\n");
     if (error) {
         return error;
     }
@@ -341,7 +368,7 @@ int bl_main_if_add(int is_sta, struct netif *netif, uint8_t *vif_index)
     wifi_hw.vif_table[vif_id].links_num = 0;
 
     *vif_index = vif_id;
-    bl_os_printf("[WF] vif_index from LAMC is %d, vif_id: %d\r\n", add_if_cfm.inst_nbr, vif_id);
+    bflb_os_printf("[WF] vif_index from LAMC is %d, vif_id: %d\r\n", add_if_cfm.inst_nbr, vif_id);
 
     return error;
 }
@@ -356,13 +383,13 @@ int bl_main_apm_start(char *ssid, char *password, int channel, uint8_t hidden_ss
     memset(&start_ap_cfm, 0, sizeof(start_ap_cfm));
     vif = &(wifi_hw.vif_table[BL_VIF_AP]);
 
-    bl_os_printf("[WF] APM_START_REQ Sending with vif_index %u\r\n", BL_VIF_AP);
+    bflb_os_printf("[WF] APM_START_REQ Sending with vif_index %u\r\n", BL_VIF_AP);
     error = bl_send_apm_start_req(&wifi_hw, &start_ap_cfm, ssid, password, channel, vif->vif_idx, hidden_ssid, bcn_int);
-    bl_os_printf("[WF] APM_START_REQ Done\r\n");
-    bl_os_printf("[WF] status is %02X\r\n", start_ap_cfm.status);
-    bl_os_printf("[WF] vif_idx is %02X\r\n", BL_VIF_AP);
-    bl_os_printf("[WF] ch_idx is %02X\r\n", start_ap_cfm.ch_idx);
-    bl_os_printf("[WF] bcmc_idx is %02X\r\n", start_ap_cfm.bcmc_idx);
+    bflb_os_printf("[WF] APM_START_REQ Done\r\n");
+    bflb_os_printf("[WF] status is %02X\r\n", start_ap_cfm.status);
+    bflb_os_printf("[WF] vif_idx is %02X\r\n", BL_VIF_AP);
+    bflb_os_printf("[WF] ch_idx is %02X\r\n", start_ap_cfm.ch_idx);
+    bflb_os_printf("[WF] bcmc_idx is %02X\r\n", start_ap_cfm.bcmc_idx);
 
     /* Set some default value for bcmc_sta */
     wifi_hw.vif_table[BL_VIF_AP].fixed_sta_idx = start_ap_cfm.bcmc_idx;
@@ -381,9 +408,9 @@ int bl_main_apm_stop(void)
 
     vif = &(wifi_hw.vif_table[BL_VIF_AP]);
 
-    bl_os_printf("[WF] APM_STOP_REQ Sending with vif_index %u\r\n", BL_VIF_AP);
+    bflb_os_printf("[WF] APM_STOP_REQ Sending with vif_index %u\r\n", BL_VIF_AP);
     error = bl_send_apm_stop_req(&wifi_hw, vif->vif_idx);
-    bl_os_printf("[WF] APM_STOP_REQ Done\r\n");
+    bflb_os_printf("[WF] APM_STOP_REQ Done\r\n");
 
     return error;
 }
@@ -404,7 +431,7 @@ int bl_main_apm_sta_cnt_get(uint8_t *sta_cnt)
         cnt++;
     }
     (*sta_cnt) = total_sta_cnt;
-    bl_os_log_info("Max limit sta cnt = %u, valid sta cnt = %u\r\n", total_sta_cnt, cnt);
+    bflb_os_log_info("Max limit sta cnt = %u, valid sta cnt = %u\r\n", total_sta_cnt, cnt);
     return 0;
 }
 
@@ -442,11 +469,11 @@ int bl_main_apm_sta_delete(uint8_t sta_idx)
 
     memset(&sta_del_cfm, 0, sizeof(struct apm_sta_del_cfm));
     vif = &bl_hw->vif_table[sta->vif_idx];
-    bl_os_printf("[WF] APM_STA_DEL_REQ: sta_idx = %u, vif_idx = %u\r\n", sta_idx, BL_VIF_AP);
+    bflb_os_printf("[WF] APM_STA_DEL_REQ: sta_idx = %u, vif_idx = %u\r\n", sta_idx, BL_VIF_AP);
 
     bl_send_apm_sta_del_req(bl_hw, &sta_del_cfm, sta_idx, vif->vif_idx);
     if (sta_del_cfm.status != 0) {
-        bl_os_log_info("del sta failure, cfm status = 0x%x\r\n", sta_del_cfm.status);
+        bflb_os_log_info("del sta failure, cfm status = 0x%x\r\n", sta_del_cfm.status);
         return -1;
     }
 
@@ -464,7 +491,7 @@ int bl_main_apm_remove_all_sta()
     for (i = 0; i < total_sta_cnt; i++) {
         sta = &(bl_hw->sta_table[i]);
         if (1 == sta->is_used) {
-            bl_os_log_info("del sta[%u]\r\n", i);
+            bflb_os_log_info("del sta[%u]\r\n", i);
             bl_main_apm_sta_delete(i);
         }
     }
@@ -509,7 +536,7 @@ int bl_main_scan(struct netif *netif, uint16_t *fixed_channels, uint16_t channel
         if (bl_get_fixed_channels_is_valid(fixed_channels, channel_num)) {
             bl_send_scanu_req(&wifi_hw, &scanu_para);
         } else {
-            bl_os_printf("---->unvalid channel");
+            bflb_os_printf("---->unvalid channel");
         }
     }
     return 0;
@@ -522,6 +549,7 @@ int bl_main_connect_abort(uint8_t *status)
     *status = connect_abort_cfm.status;
     return 0;
 }
+
 
 static int cfg80211_init(struct bl_hw *bl_hw)
 {
@@ -536,20 +564,20 @@ static int cfg80211_init(struct bl_hw *bl_hw)
 
     ret = bl_platform_on(bl_hw);
     if (ret) {
-        bl_os_printf("bl_platform_on Error\r\n");
+        bflb_os_printf("bl_platform_on Error\r\n");
         goto err_out;
     }
 
     ipc_host_enable_irq(bl_hw->ipc_env, IPC_IRQ_E2A_ALL);
-    bl_wifi_enable_irq();
+    platform_wifi_enable_irq();
 
     /* Reset FW */
     ret = bl_send_reset(bl_hw);
     if (ret) {
-        bl_os_printf("bl_send_reset Error\r\n");
+        bflb_os_printf("bl_send_reset Error\r\n");
         goto err_out;
     }
-    bl_os_msleep(5);
+    bflb_os_msleep(5);
     ret = bl_send_version_req(bl_hw, &version_cfm);
     if (ret) {
         goto err_out;
@@ -557,7 +585,7 @@ static int cfg80211_init(struct bl_hw *bl_hw)
     bl_set_vers(&version_cfm);
     ret = bl_handle_dynparams(bl_hw);
     if (ret) {
-        bl_os_printf("bl_handle_dynparams Error\r\n");
+        bflb_os_printf("bl_handle_dynparams Error\r\n");
         goto err_out;
     }
 

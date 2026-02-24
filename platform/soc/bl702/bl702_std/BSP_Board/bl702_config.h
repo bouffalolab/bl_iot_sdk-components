@@ -24,46 +24,8 @@
 #ifndef __BL702_CONFIG_H__
 #define __BL702_CONFIG_H__
 
-#if defined(bl706_avb)
-#include "bl706_avb/peripheral_config.h"
-#include "bl706_avb/clock_config.h"
-#include "bl706_avb/pinmux_config.h"
-#elif defined(bl706_iot)
 #include "bl706_iot/peripheral_config.h"
 #include "bl706_iot/clock_config.h"
 #include "bl706_iot/pinmux_config.h"
-#elif defined(bl706_lp)
-#include "bl706_lp/peripheral_config.h"
-#include "bl706_lp/clock_config.h"
-#include "bl706_lp/pinmux_config.h"
-#elif defined(bl706_emac)
-#include "bl706_emac/peripheral_config.h"
-#include "bl706_emac/clock_config.h"
-#include "bl706_emac/pinmux_config.h"
-#elif defined(bl706_lp_gpio_wakeup)
-#include "bl706_lp_gpio_wakeup/peripheral_config.h"
-#include "bl706_lp_gpio_wakeup/clock_config.h"
-#include "bl706_lp_gpio_wakeup/pinmux_config.h"
-#elif defined(bl702_evb)
-#include "bl702_evb/peripheral_config.h"
-#include "bl702_evb/clock_config.h"
-#include "bl702_evb/pinmux_config.h"
-#elif defined(bl702_debugger)
-#include "bl702_debugger/peripheral_config.h"
-#include "bl702_debugger/clock_config.h"
-#include "bl702_debugger/pinmux_config.h"
-#elif defined(bl706_hwc)
-#include "bl706_hwc/peripheral_config.h"
-#include "bl706_hwc/clock_config.h"
-#include "bl706_hwc/pinmux_config.h"
-#elif defined(bl702_boot2)
-#include "bl702_boot2/peripheral_config.h"
-#include "bl702_boot2/clock_config.h"
-#include "bl702_boot2/pinmux_config.h"
-#else
-#include "bl702_custom/peripheral_config.h"
-#include "bl702_custom/clock_config.h"
-#include "bl702_custom/pinmux_config.h"
-#endif
 
 #endif

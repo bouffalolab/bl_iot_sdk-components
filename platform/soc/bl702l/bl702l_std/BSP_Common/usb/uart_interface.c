@@ -41,8 +41,6 @@ struct device *dma_ch2;
 Ring_Buffer_Type usb_rx_rb;
 Ring_Buffer_Type uart1_rx_rb;
 
-volatile uint32_t dma_send_complete_len = 0;
-
 void uart_irq_callback(struct device *dev, void *args, uint32_t size, uint32_t state)
 {
     if (state == UART_EVENT_RX_FIFO) {
@@ -61,17 +59,6 @@ void uart_irq_callback(struct device *dev, void *args, uint32_t size, uint32_t s
         MSG("RX ERR\r\n");
     }
 }
-
-void dma_irq_callback(struct device *dev, void *args, uint32_t size, uint32_t state)
-{
-    if (dma_send_complete_len & (1 << 31)) {
-        usb_rx_rb.readIndex = 0;
-        usb_rx_rb.readMirror = ~usb_rx_rb.readMirror;
-    } else {
-        usb_rx_rb.readIndex += dma_send_complete_len;
-    }
-}
-
 void uart1_init(void)
 {
     uart_register(UART1_INDEX, "uart1");
@@ -93,22 +80,19 @@ void uart1_init(void)
         DMA_DEV(dma_ch2)->dst_req = DMA_REQUEST_UART1_TX;
         DMA_DEV(dma_ch2)->src_addr_inc = DMA_ADDR_INCREMENT_ENABLE;
         DMA_DEV(dma_ch2)->dst_addr_inc = DMA_ADDR_INCREMENT_DISABLE;
-        DMA_DEV(dma_ch2)->src_burst_size = DMA_BURST_INCR1;
-        DMA_DEV(dma_ch2)->dst_burst_size = DMA_BURST_INCR1;
+        DMA_DEV(dma_ch2)->src_burst_size = DMA_BURST_1BYTE;
+        DMA_DEV(dma_ch2)->dst_burst_size = DMA_BURST_1BYTE;
         DMA_DEV(dma_ch2)->src_width = DMA_TRANSFER_WIDTH_8BIT;
         DMA_DEV(dma_ch2)->dst_width = DMA_TRANSFER_WIDTH_8BIT;
         device_open(dma_ch2, 0);
-        device_set_callback(dma_ch2, dma_irq_callback);
-        device_control(dma_ch2, DEVICE_CTRL_SET_INT, NULL);
     }
-    device_control(uart1, DEVICE_CTRL_ATTACH_TX_DMA, dma_ch2);
 }
 
 void uart1_config(uint32_t baudrate, uart_databits_t databits, uart_parity_t parity, uart_stopbits_t stopbits)
 {
     device_close(uart1);
     UART_DEV(uart1)->baudrate = baudrate;
-    UART_DEV(uart1)->stopbits = stopbits + 1;
+    UART_DEV(uart1)->stopbits = stopbits;
     UART_DEV(uart1)->parity = parity;
     UART_DEV(uart1)->databits = (databits - 5);
     device_open(uart1, DEVICE_OFLAG_DMA_TX | DEVICE_OFLAG_INT_RX);
@@ -171,30 +155,38 @@ void uart_ringbuffer_init(void)
     Ring_Buffer_Init(&uart1_rx_rb, uart_rx_mem, UART_RX_RINGBUFFER_SIZE, ringbuffer_lock, ringbuffer_unlock);
 }
 
-void uart_dma_send_from_ringbuffer(Ring_Buffer_Type *rbType, uint32_t len)
-{
-    uint32_t size;
-
-    /* Get size of space remained in current mirror */
-    size = rbType->size - rbType->readIndex;
-
-    if (size > len) {
-        dma_send_complete_len = len;
-        device_write(uart1, 0, &rbType->pointer[rbType->readIndex], len);
-    } else {
-        dma_send_complete_len = size | (1 << 31);
-        device_write(uart1, 0, &rbType->pointer[rbType->readIndex], size);
-    }
-}
+static dma_control_data_t uart_dma_ctrl_cfg = {
+    .bits.fix_cnt = 0,
+    .bits.dst_min_mode = 0,
+    .bits.dst_add_mode = 0,
+    .bits.SI = 1,
+    .bits.DI = 0,
+    .bits.SWidth = DMA_TRANSFER_WIDTH_8BIT,
+    .bits.DWidth = DMA_TRANSFER_WIDTH_8BIT,
+    .bits.SBSize = 0,
+    .bits.DBSize = 0,
+    .bits.I = 0,
+    .bits.TransferSize = 4095
+};
+static dma_lli_ctrl_t uart_lli_list = {
+    .src_addr = (uint32_t)src_buffer,
+    .dst_addr = DMA_ADDR_UART1_TDR,
+    .nextlli = 0
+};
 
 void uart_send_from_ringbuffer(void)
 {
-    if (!dma_channel_check_busy(dma_ch2)) {
-        uint32_t avalibleCnt = Ring_Buffer_Get_Length(&usb_rx_rb);
-        if (avalibleCnt) {
-            cpu_global_irq_disable();
-            uart_dma_send_from_ringbuffer(&usb_rx_rb, avalibleCnt);
-            cpu_global_irq_enable();
+    if (Ring_Buffer_Get_Length(&usb_rx_rb)) {
+        if (!device_control(dma_ch2, DMA_CHANNEL_GET_STATUS, NULL)) {
+            uint32_t avalibleCnt = Ring_Buffer_Read(&usb_rx_rb, src_buffer, UART_TX_DMA_SIZE);
+
+            if (avalibleCnt) {
+                dma_channel_stop(dma_ch2);
+                uart_dma_ctrl_cfg.bits.TransferSize = avalibleCnt;
+                memcpy(&uart_lli_list.cfg, &uart_dma_ctrl_cfg, sizeof(dma_control_data_t));
+                device_control(dma_ch2, DMA_CHANNEL_UPDATE, (void *)((uint32_t)&uart_lli_list));
+                dma_channel_start(dma_ch2);
+            }
         }
     }
 }

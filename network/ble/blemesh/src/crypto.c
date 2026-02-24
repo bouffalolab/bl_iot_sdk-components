@@ -280,7 +280,9 @@ static int bt_mesh_ccm_decrypt(const u8_t key[16], u8_t nonce[13],
 {
 #ifdef BFLB_CRYPT_HARDWARE
     int err;
+    int i_key = irq_lock();
     err = bl_sec_ccm_auth_decrypt(key, 16, msg_len, nonce, 13, aad, aad_len, enc_msg, out_msg, enc_msg + msg_len, mic_size);
+    irq_unlock(i_key);
 	if(err)
     {
 		return err;
@@ -447,7 +449,9 @@ static int bt_mesh_ccm_encrypt(const u8_t key[16], u8_t nonce[13],
 #ifdef BFLB_CRYPT_HARDWARE
     u8_t mic[16];
     int err;
+	unsigned int i_key = irq_lock();
 	err = bl_sec_ccm_encrypt_and_tag(key, 16, msg_len,nonce, 13, aad, aad_len, msg, out_msg, mic, mic_size);
+	irq_unlock(i_key);
 	if(err)
 	{
 		return err;

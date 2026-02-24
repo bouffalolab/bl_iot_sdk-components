@@ -6,8 +6,8 @@
  * Copyright (c) bouffalo lab
  *
  */
-#ifndef __BFL_VENDOR_DEFS__
-#define __BFL_VENDOR_DEFS__
+#ifndef __BFLB_VENDOR_DEFS__
+#define __BFLB_VENDOR_DEFS__
 
 #include "include/access.h"
 
@@ -39,4 +39,4 @@
 
 
 
-#endif /* __BFL_VENDOR_DEFS__ */
+#endif /* __BFLB_VENDOR_DEFS__ */

@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include <bl_gpio.h>
 #include <bl702l_glb.h>
 #include <bl702l_gpio.h>
@@ -103,9 +132,13 @@ int hosal_gpio_input_get(hosal_gpio_dev_t *gpio, uint8_t *value)
     return 0;
 }
 
-static int check_gpio_is_interrupt(GLB_GPIO_Type gpioPin)
+static int check_gpio_is_interrupt(hosal_gpio_ctx_t *node)
 {
-    return GLB_Get_GPIO_IntStatus(gpioPin) == SET ? 0 : -1;
+    if (GLB_Get_GPIO_IntStatus(node->pin) == SET) {
+        return 0;
+    }
+
+    return -1;
 }
 
 static void exec_gpio_handler(hosal_gpio_ctx_t *node)
@@ -125,7 +158,7 @@ static void gpio_interrupt_entry(hosal_gpio_ctx_t **pstnode)
     hosal_gpio_ctx_t *node = *pstnode;
 
     while (node) {
-        ret = check_gpio_is_interrupt(node->pin);
+        ret = check_gpio_is_interrupt(node);
         if (ret == 0) {
             exec_gpio_handler(node);
         }
@@ -147,24 +180,32 @@ int hosal_gpio_irq_set(hosal_gpio_dev_t *gpio, hosal_gpio_irq_trigger_t trigger_
         return -1;
     }
 
+    node->intTrigMod = trigger_type;
     node->handle = handler;
     node->arg = arg;
 
     bl_gpio_intmask(gpio->port, 1);
     bl_set_gpio_intmod(gpio->port, trigger_type);
-    bl_irq_register_with_ctx(GPIO_INT0_IRQn, gpio_interrupt_entry, &gpio_head);
     bl_gpio_intmask(gpio->port, 0);
+
+    bl_irq_register_with_ctx(GPIO_INT0_IRQn, gpio_interrupt_entry, &gpio_head);
     bl_irq_enable(GPIO_INT0_IRQn);
     return 0;
 }
 
 int hosal_gpio_irq_mask(hosal_gpio_dev_t *gpio, uint8_t mask)
 {
-    if (gpio  == NULL) {
+    if (gpio == NULL) {
         return -1;
     }
 
-    bl_gpio_intmask(gpio->port, mask ? 1 : 0);
+    hosal_gpio_ctx_t *node = hosal_gpio_find_node(gpio);
+    if (node == NULL) {
+        blog_error("please hosal_gpio_init for gpio%d!\r\n", gpio->port);
+        return -1;
+    }
+
+    bl_gpio_intmask(gpio->port, mask);
     return 0;
 }
 
@@ -176,10 +217,10 @@ int hosal_gpio_finalize(hosal_gpio_dev_t *gpio)
 
     hosal_gpio_ctx_t *node = hosal_gpio_find_node(gpio);
     if (node != NULL) {
+        bl_gpio_intmask(gpio->port, 1);
         hosal_gpio_delete_node(node);
         free(node);
     }
 
-    bl_gpio_intmask(gpio->port, 1);
     return 0;
 }

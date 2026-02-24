@@ -1,4 +1,207 @@
 # Changes
+## 2026-02-02
+1.[BL616L/BL616]Bound __EM_SIZE in ld file to CONFIG_EM_SIZE
+
+## 2026-01-23
+1.[BL616L]Add ble m2s1 and m0s1 libs for BL616L.
+
+## 2026-01-21
+1.Fix EBQ issue: Fix end isr not generated caused by commit(bfe34725).
+2.Fix EBQ issue: T_IFS + 1us for 125k Coded phy rx2tx.
+3.Fix EBQ issue: Fix the probabilistic failure to update connection parameters.
+4.Fix EBQ issue: Change the max tx power to 0x14 when do EBQ tests.
+5.Fix EBQ issue: Optimise scan rssi.
+
+## 2026-01-21
+1.[BL616L]Add ble mfg lib for BL616L.
+
+## 2026-01-20
+1.Fix EBQ issue: Correct the way to calculate time_offset in iso framed seg.
+2.Fix EBQ issue: Correct the way to approximates the duration of the periodic advertising chain.
+
+## 2026-01-08
+1.Fix issue of no adv report in some corner case during ble scan.
+
+## 2026-01-07
+1.Resolving the issue of inoperative CTS Flow Control in HCI UART.
+2.Configure uart pin if hci dma uart is disabled.
+
+## 2025-12-03
+1. dynamically boosts BLE M2 priority to 0xF when approaching connection timeout to prevent connection disconnection in WLAN coexistence scenarios.
+
+## 2025-11-28
+1.Optimize connection parameter update handling for multi-connection scenarios.
+
+## 2025-11-24
+1.[BL616][BL616D][BL702L]Fix the crash issue when the remaining EM is not used by ke memory.
+
+## 2025-11-20
+1. Send voice data over hci also for qualification test.
+2. Rejects the HCI read OOB extended data command when both the Secure Connections (Host Support) and Secure Simple Pairing (Host Support) bits are not set.
+3. Set BR/EDR's tx power to the max value for qualification test.
+
+## 2025-11-19
+1.[BL616D]Write and read the deepsleep related registers based on 40MHz cycles.
+
+## 2025-11-18
+1.[BL616D]Set combo path as default setting.
+
+## 2025-11-12
+1.[BL616D]Correct ble T_IFS over 1M PHY on fpga.
+
+## 2025-11-04
+1. Ensure the minimum tx power set to br/edr is 0 dbm when decreasing tx power.
+
+## 2025-10-31
+1.[BL616D]Make bluetooth get mac address from efuse.
+
+## 2025-10-21
+1. Added new BLE event priority configuration APIs for controller.
+
+## 2025-10-20
+1. Fix the CONFIG_BLE_ACT_MAX number of ble1m10s1bredr0 lib  to resolve resource insufficiency issues.
+
+## 2025-10-16
+1.[BL616L][BL616D]Fix issue found in EBQ test:btblecontroller doesn't report hci number of complete packet event when it rejects the hci iso tx data because tx path from host to controller is not set up.
+2.[BL616L]Fix issue found in EBQ test:BIS receiver triggers a synchronization timeout window widening value has reached its limit.
+3.[BL616L][BL616D]Fix issue found in EBQ test:The count of hci number of complete packet event reported by cis is less than expected in some corner case.
+
+## 2025-10-15
+1.[BL616D]Fix an error when receive disconnect command during send cis req, and cis req is reject.
+2.[BL616D]T_IFS + 1us for 1M rx2tx
+
+## 2025-10-15
+1.[BL616D]Fix the issue that BIS receiver fails to receive the second BIS event's packet.
+2.[BL616L][FPGA]Fix issue found in EBQ test: A crash occurred when the hci layer was retrieving the length of the returned event.
+3.[BL616L][FPGA]Fix issue found in EBQ test: T_IFS is small (about 147us) when rx is on 500k coded phy.
+
+## 2025-09-24
+1.[BL616][BL616D]Use common config a macro for Bouffalo_SDK
+
+## 2025-09-11
+1. [BL616D]Use HZ32M to calculate sleep time.
+
+## 2025-09-09
+1.Enhance btble controller port layer.
+
+## 2025-09-05
+1.[BL616D]Fix rx2tx T_IFS < 148us when using coded 500k phy;
+2.[BL616D]Change access address error register address.
+
+## 2025-09-04
+1.[BL616] calling specified phyrf configuration API
+
+## 2025-08-26
+1.[BL616]Only do sw pds reset during btblecontroller initialization if PDS is enabled to avoid USB disconnection in wlan&ble transparent transmission firmware.
+
+## 2025-08-06
+1. [BL616D]Change the ble rx rssi conversion.
+
+## 2025-07-23
+1.[BL702L]Create a rom patch to fix the assert issue in end isr because et status is 0 which is unexpected.
+
+## 2025-07-18
+1.Unify chip-specific directory naming to use full chip names.
+
+## 2025-07-17
+1.[BL616D]Add tmp rf_force_switch to enable bluetooth RF 2G Path.
+
+## 2025-07-10
+1.[BL616D]Change the hci uart pin config.
+
+## 2025-07-03
+1.[bl616][BL616L][BL616D]Support entering long-term sleep when there is no BLE activity.
+
+## 2025-07-02
+1. [BL616D] Add BL616D support BT feature.
+
+## 2025-06-16
+1. Integrate DTM HCI CMD header files to prevent inconsistencies between MFG and standard HCI CMD header files.
+
+## 2025-06-11
+1. [BL616D] Add BL616D support (under verfication).
+
+## 2025-06-10
+1.[bl702L][bl616]To avoid sleep problems, it is forbidden to do software wakeup when the remaining sleep time is less than or equal to 1ms.
+
+## 2025-06-03
+1.[BL616]Support HCI over SPI interface.
+
+## 2025-05-27
+1.[BL702L]Fix the issue that it fails to establish ble link when using ble rom code becuase of one mismatched structure.
+
+## 2025-05-12
+1.[BL616]Fix the order error of SET_MIN_ENC_KEY_SIZE command.
+2.[BL616]Send the command status event before the synchronous connection complete event.
+
+## 2025-05-06
+1.[BL616]Revert the conversion of BT RSSI.
+2.[BL616]Fix the default setting issues for esco remote loopback mode.
+3.Fix compilation warnings in btblecontroller.
+
+## 2025-04-30
+1.[bl702L][bl616]Add an API to return btblecontroller's state,which includes Active, Sleep, and Wakeup Ongoing states.
+
+## 2025-04-23
+1.[BL616]Create BLE only uarthci lib.
+
+## 2025-04-17
+1.[BL702L][BL616]Elaborate the return values of btble_controller_sleep.
+2.[BL702L]Create a rom patch to fix the assert issue in end isr because et status is 0 which is unexpected.
+
+## 2025-04-15
+1.[BL616]Reschedule AFH timer if master is in STOP mode.
+2.[BL616]Fix the wrong conversion of BT rssi.
+
+## 2025-04-11
+1.[BL616]Fix an issue that BLE init will stuck if PDS is enabled before BLE init.
+
+## 2025-04-10
+1.[BL616] [BL702L]Enabled IRQ protection during the Software Wakeup configuration process.
+2.[BL616] Fixed rwip_delta_sleep_time calculation failure in Software Wakeup mode.
+
+## 2025-04-09
+1.[bl616L]Support bl616L and test on fpga.
+
+## 2025-03-31
+1.[bl702L]Create a rom patch to fix the assert issue which occurs when the event's start instant is passed in btblecontroller rom code.
+
+## 2025-03-14
+1.[BL616]Report the HCI_Encryption_Change V2 event if the HCI_Set_Min_Encryption_Key_Size command is supported and 
+the Min_Encryption_Key_Size is set. 
+
+## 2025-03-11
+1.[BL616]Fix the issue that cisPayloadCounter is wrong in cis tx test mode in EBQ test.
+2.[BL616]Support bredr hci_set_min_enc_key_size in supported commands to avoid issue in EBQ test.
+
+## 2025-03-07
+1.[BL616]Enable btblecontroller privacy feature to avoid assert issue in co time.
+
+## 2025-03-05
+1.[BL616]Fix iso bugs found in EBQ test.
+
+## 2025-02-24
+1. Fix two issues for BR/EDR EBQ test cases HCI/CCO/BI-35-C and HCI/SCO/BV-09-C.
+
+## 2025-02-17
+1.[BL616][BL702l] Avoid conflict when slave and master using using the last resouce at the same time.
+
+## 2025-02-10
+1.[BL616] Add uarthci library.
+
+## 2025-02-06
+1.[BL616]ble1m0s1sbredr0 Support DTM.
+
+## 2025-01-14
+1.[bl702L][BL616]Fix assert issue because the order of events in wait list is wrong in some corner case.
+2.[bl702L][BL616]Fix the assert issue in the case that conneciton update indication processing is interrupted by isr in some corner case.
+
+## 2025-01-03
+1.[BL616]Add sco/esco API used by audio codec.
+
+## 2024-12-31
+1.[BL702L]Correct CONFIG_EM_SIZE in libbtblecontroller_702l_m4s1p.a.
+
 ## 2024-12-25
 1.[BL616]Fix some issues of EBQ bt test
 

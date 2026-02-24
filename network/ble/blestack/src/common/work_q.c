@@ -26,6 +26,10 @@ struct k_work_q g_work_queue_main;
 static void k_work_submit_to_queue(struct k_work_q *work_q,
                                    struct k_work *work)
 {
+    #if defined(BFLB_BLE_AVOID_WORKQ_TIMER_CANCEL_RISK)
+    if(atomic_test_bit(work->flags, K_WORK_STATE_CANCLE_ONGOING))
+        return;
+    #endif
     if (!atomic_test_and_set_bit(work->flags, K_WORK_STATE_PENDING)) {
         k_fifo_put(&work_q->fifo, work);
     }
@@ -166,15 +170,29 @@ int k_delayed_work_cancel(struct k_delayed_work *work)
         goto exit;
     }
 
+    #if defined(BFLB_BLE_AVOID_WORKQ_TIMER_CANCEL_RISK)
+    unsigned int key = irq_lock();
+    #endif
     if (!work->work_q) {
         err = -EINVAL;
+        #if defined(BFLB_BLE_AVOID_WORKQ_TIMER_CANCEL_RISK)
+        irq_unlock(key);
+        #endif
         goto exit;
     }
 
+    #if defined(BFLB_BLE_AVOID_WORKQ_TIMER_CANCEL_RISK)
+    atomic_set_bit(work->work.flags, K_WORK_STATE_CANCLE_ONGOING);
+    irq_unlock(key);
+    #endif
+    
     k_timer_stop(&work->timer);
     work->work_q = NULL;
     work->timer.timeout = 0;
     work->timer.start_ms = 0;
+    #if defined(BFLB_BLE_AVOID_WORKQ_TIMER_CANCEL_RISK)
+    atomic_clear_bit(work->work.flags, K_WORK_STATE_CANCLE_ONGOING);
+    #endif
 
 exit:
     return err;

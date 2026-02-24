@@ -13,9 +13,9 @@ typedef enum {
     SENSOR_UID_NUM = 3,
 } BL_SENSOR_UID_E;
 
-typedef unsigned int BL_EXPO_TIME;    /* exposure time type */
+typedef unsigned int BL_EXPO_TIME; /* exposure time type */
 
-#define ENUM_VALUE_INVALID  0xFFFF
+#define ENUM_VALUE_INVALID 0xFFFF
 
 typedef enum {
     VIDEO_MODE_720P_5 = 0,
@@ -41,34 +41,36 @@ typedef enum {
     BL_NIGHT_MODE = 1,
 } BL_ISP_DAY_NIGHT_MODE_T;
 
-typedef struct {
+typedef struct
+{
     float r_gain;
     float b_gain;
 } rb_gain_fp_t;
 
-typedef struct {
+typedef struct
+{
     int position;
     int value;
 } intpl_point_t;
 
-typedef struct {
+typedef struct
+{
     uint16_t width;
     uint16_t height;
 } res_config_t;
 
-typedef int BL_COLOR_TEMP;                   /* ct value in K */
+typedef int BL_COLOR_TEMP; /* ct value in K */
 
 /**************************** helper functions ***********************************/
 
-#define INIT_OBJ(obj)   \
-    do {    \
-        memset(&obj, 0, sizeof(obj));   \
+#define INIT_OBJ(obj)                 \
+    do {                              \
+        memset(&obj, 0, sizeof(obj)); \
     } while (0)
 
 bool is_param_valid(int value, int min, int max);
 void clip_param_range(int *value, int min, int max);
 intpl_point_t create_intpl_point(int position, int value);
 int linear_interpolate(intpl_point_t *point_L, intpl_point_t *point_H, int pos, int *value);
-void table_linear_interpolate(int *input_tbl, int* output_tbl, int tbl_num, int input_val, int *output_val);
 
 #endif /* __BL_COMM_SNS_H__ */

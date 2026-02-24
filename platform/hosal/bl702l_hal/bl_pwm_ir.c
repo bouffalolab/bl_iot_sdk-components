@@ -1,4 +1,34 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include "bl_pwm_ir.h"
+#include "bl_pwm_mc.h"
 #include "bl_irq.h"
 
 
@@ -6,47 +36,34 @@ static uint8_t pwm_ch = 0;
 static uint16_t pwm_threshold = 0;
 
 
-static void pwm_mc_init(uint16_t div, uint16_t period)
+static void PWM_Period_Count_Set(uint16_t cnt)
 {
-    PWMx_CFG_Type pwmxCfg = {
-        .clk = PWM_CLK_BCLK,
-        .stopMode = PWM_STOP_GRACEFUL,
-        .clkDiv = div,
-        .period = period,
-        .intPulseCnt = 0,
-        .extPol = PWM_BREAK_Polarity_LOW,
-        .stpRept = ENABLE,
-        .adcSrc = PWM_TRIGADC_SOURCE_NONE,
-    };
+    uint32_t tmpVal;
 
-    PWM_CHx_CFG_Type chxCfg = {
-        .modP = PWM_MODE_DISABLE,
-        .modN = PWM_MODE_DISABLE,
-#if !defined(IR_OUTPUT_INVERSE)
-        .polP = PWM_POL_ACTIVE_LOW,
-        .polN = PWM_POL_ACTIVE_LOW,
-#else
-        .polP = PWM_POL_ACTIVE_HIGH,
-        .polN = PWM_POL_ACTIVE_HIGH,
-#endif
-        .idlP = PWM_IDLE_STATE_INACTIVE,
-        .idlN = PWM_IDLE_STATE_INACTIVE,
-        .brkP = PWM_BREAK_STATE_INACTIVE,
-        .brkN = PWM_BREAK_STATE_INACTIVE,
-        .thresholdL = 0,
-        .thresholdH = 0,
-        .dtg = 0,
-    };
+    tmpVal = BL_RD_REG(PWM_BASE, PWM_MC0_PERIOD);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PWM_INT_PERIOD_CNT, cnt);
+    BL_WR_REG(PWM_BASE, PWM_MC0_PERIOD, tmpVal);
+}
 
-    GLB_PER_Clock_UnGate(GLB_AHB_CLOCK_PWM);
+static void PWM_Stop_On_Repeat_Set(uint8_t en)
+{
+    uint32_t tmpVal;
 
-    PWMx_Disable(PWM0_ID);
-    PWMx_Init(PWM0_ID, &pwmxCfg);
-    for(PWM_CHx_Type ch = PWM_CH0; ch < PWM_CHx_MAX; ch++){
-        PWM_Channelx_Init(PWM0_ID, ch, &chxCfg);
-    }
-    PWM_Int_Mask(PWM0_ID, PWM_INT_REPT, UNMASK);
-    PWMx_Enable(PWM0_ID);
+    tmpVal = BL_RD_REG(PWM_BASE, PWM_MC0_CONFIG0);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PWM_STOP_ON_REPT, en);
+    BL_WR_REG(PWM_BASE, PWM_MC0_CONFIG0, tmpVal);
+}
+
+
+static void pwm_mc_start(uint8_t ch)
+{
+    PWM_Period_Count_Set(0);
+    PWM_Stop_On_Repeat_Set(1);
+
+    PWM_Int_Clear(PWM0_ID, PWM_INT_REPT);
+    while(PWM_Int_Status_Get(PWM0_ID, PWM_INT_REPT) == 0);
+
+    PWM_Channelx_Positive_Pwm_Mode_Set(PWM0_ID, ch, PWM_MODE_ENABLE);
 }
 
 static void pwm_mc_set_threshold(uint8_t ch, uint16_t threshold)
@@ -54,70 +71,66 @@ static void pwm_mc_set_threshold(uint8_t ch, uint16_t threshold)
     PWM_Channelx_Threshold_Set(PWM0_ID, ch, 1, threshold + 1);
 }
 
-static void pwm_mc_start(uint8_t ch)
+static void pwm_mc_output(uint16_t data)
 {
+    PWM_Period_Count_Set(data);
+
     PWM_Int_Clear(PWM0_ID, PWM_INT_REPT);
-    PWM_Channelx_Positive_Pwm_Mode_Set(PWM0_ID, ch, PWM_MODE_ENABLE);
     while(PWM_Int_Status_Get(PWM0_ID, PWM_INT_REPT) == 0);
+}
+
+static void pwm_mc_stop(uint8_t ch)
+{
+    PWM_Period_Count_Set(0);
+    PWM_Stop_On_Repeat_Set(0);
+
+    PWM_Channelx_Positive_Pwm_Mode_Set(PWM0_ID, ch, PWM_MODE_DISABLE);
+    PWM_Int_Clear(PWM0_ID, PWM_INT_REPT);
 }
 
 
 void bl_pwm_ir_tx_cfg(float freq_hz, float duty_cycle)
 {
-    uint32_t div = 1;
-    uint32_t period = SystemCoreClockGet()/(GLB_Get_BCLK_Div()+1)/(uint32_t)freq_hz;
+    uint16_t period;
 
-    while(period >= 65536){
-        div <<= 1;
-        period >>= 1;
-    }
+    bl_pwm_mc_port_init((uint32_t)freq_hz);
 
-    pwm_mc_init((uint16_t)div, (uint16_t)period);
-
+    PWMx_Period_Get(PWM0_ID, &period);
     pwm_threshold = (uint16_t)(period * duty_cycle);
 }
 
 void bl_pwm_ir_tx_pin_cfg(uint8_t pin)
 {
-    GLB_GPIO_Cfg_Type cfg;
+    bl_pwm_mc_ch_t ch = pin % 5;
 
-    cfg.drive = 3;
-    cfg.smtCtrl = 1;
-    cfg.gpioMode = GPIO_MODE_OUTPUT;
-    cfg.pullType = GPIO_PULL_NONE;
-    cfg.gpioPin = pin;
-    cfg.gpioFun = 8;
+#if !defined(CFG_IR_OUTPUT_INVERT)
+    bl_pwm_mc_channel_init(ch, pin, 0);
+#else
+    bl_pwm_mc_channel_init(ch, pin, 1);
+#endif
 
-    GLB_GPIO_Init(&cfg);
-
-    pwm_ch = (pin - 1) % 5;
-
-    pwm_mc_set_threshold(pwm_ch, 0);
-    pwm_mc_start(pwm_ch);
+    pwm_ch = ch - 1;
 }
 
 int bl_pwm_ir_tx(uint16_t data[], uint32_t len)
 {
     int mstatus;
     uint32_t i;
-    uint32_t tmpVal;
 
     mstatus = bl_irq_save();
+    pwm_mc_start(pwm_ch);
 
     for(i=0; i<len; i++){
-        tmpVal = BL_RD_REG(PWM_BASE, PWM_MC0_PERIOD);
-        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PWM_INT_PERIOD_CNT, data[i]);
-        BL_WR_REG(PWM_BASE, PWM_MC0_PERIOD, tmpVal);
-
         if(i % 2 == 0){
             pwm_mc_set_threshold(pwm_ch, pwm_threshold);
         }else{
             pwm_mc_set_threshold(pwm_ch, 0);
         }
 
-        pwm_mc_start(pwm_ch);
+        pwm_mc_output(data[i]);
     }
 
+    pwm_mc_stop(pwm_ch);
     bl_irq_restore(mstatus);
 
     return 0;
@@ -127,24 +140,21 @@ int bl_pwm_ir_tx_ex(uint32_t data[], uint32_t len)
 {
     int mstatus;
     uint32_t i;
-    uint32_t tmpVal;
 
     mstatus = bl_irq_save();
+    pwm_mc_start(pwm_ch);
 
     for(i=0; i<len; i++){
-        tmpVal = BL_RD_REG(PWM_BASE, PWM_MC0_PERIOD);
-        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PWM_INT_PERIOD_CNT, data[i] & 0xFFFF);
-        BL_WR_REG(PWM_BASE, PWM_MC0_PERIOD, tmpVal);
-
         if((data[i] >> 31) == 1){
             pwm_mc_set_threshold(pwm_ch, pwm_threshold);
         }else{
             pwm_mc_set_threshold(pwm_ch, 0);
         }
 
-        pwm_mc_start(pwm_ch);
+        pwm_mc_output(data[i] & 0xFFFF);
     }
 
+    pwm_mc_stop(pwm_ch);
     bl_irq_restore(mstatus);
 
     return 0;

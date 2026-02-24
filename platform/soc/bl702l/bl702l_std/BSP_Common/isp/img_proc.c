@@ -1,23 +1,17 @@
 #include <string.h>
 #include <bl808_isp_misc.h>
 #include <bl808_isp_wdr.h>
-#include "bl808_dvp_tsrc.h"
-#include "bl808_isp_axi_ctrl.h"
 
 #include "img_param.h"
 #include "img_proc.h"
-#include "firmware_wdr.h"
-#include "img_param_gc2053.h"
-#include "isp_back_array.h"
+#include "wdr_firmware.h"
+#include "bnr_firmware.h"
 
 #define PERFORMANCE_MONITOR 0
 #define IMG_PROC_SKIP_NUM   0
 #define DEFAULT_AWB_ALGO    AWB_ALGO_2
 #define ENABLE_3DNR         1
 #define WB_BIAS_CT_THRESH   COLOR_TEMP_D50
-
-#define GAIN_6_DB           1536
-#define INT_TO_GAIN_DB(x)   (BL_GAIN_DB)((x)<<8)
 
 #define GPIO_IR_BOARD_IRC     (0xFF)
 #define GPIO_SENSOR_BOARD_IRC (0xFF)
@@ -34,13 +28,6 @@
 #define IMG_UPDATE_MASK_CS          (1 << 9)
 #define IMG_UPDATE_MASK_BLC         (1 << 10)
 #define IMG_UPDATE_MASK_BNR         (1 << 11)
-
-#define PIX_USE_CLK                    (74250000)
-#define ISP_USE_CLK                    (80000000)
-#define CAMERA_RESOLUTION_X            1920
-#define CAMERA_RESOLUTION_Y            1080
-
-static BL_IMG_PARAM_DESC_T gc2053_img_param;
 
 typedef struct
 {
@@ -126,6 +113,7 @@ static void imgproc_set_reg()
     }
 
     if (imgproc_is_module_update(IMG_UPDATE_MASK_BNR)) {
+        bnr_hw_update();
     }
 
     if (imgproc_is_module_update(IMG_UPDATE_MASK_WB_GAIN)) {
@@ -176,7 +164,7 @@ static int imgproc_check_param_table()
 {
     int ret = 1;
 
-    ret *= (ISP_TBL_AUTO_ISO == (img_proc.img_param->ae_tbl->header.table));
+    ret *= (ISP_TBL_AUTO_ISO == (img_proc.img_param->ae_target_tbl->header.table));
     ret *= (ISP_TBL_CUSTOM_COLOR_TMPER == (img_proc.img_param->awb_white_region_tbl->header.table));
     ret *= (ISP_TBL_CUSTOM_COLOR_TMPER == (img_proc.img_param->wb_bias_tbl->header.table));
     ret *= (ISP_TBL_CUSTOM_COLOR_TMPER == (img_proc.img_param->wb_info_tbl->header.table));
@@ -199,7 +187,7 @@ static int imgproc_check_param_policy()
 {
     int ret = 1;
 
-    ret *= (ISP_POL_INTERPL == (img_proc.img_param->ae_tbl->header.policy));
+    ret *= (ISP_POL_INTERPL == (img_proc.img_param->ae_target_tbl->header.policy));
     ret *= (ISP_POL_INTERPL == (img_proc.img_param->awb_white_region_tbl->header.policy));
     ret *= (ISP_POL_INTERPL == (img_proc.img_param->wb_bias_tbl->header.policy));
     ret *= (ISP_POL_INTERPL == (img_proc.img_param->wb_info_tbl->header.policy));
@@ -264,7 +252,7 @@ static int img_update_ae_target(BL_GAIN_DB gain, int *ae_target)
 
     *ae_target = ae_target_new;
 
-    //    //MSG("ae_target: (%d ~ %d) -> %d\r\n", ae_target_L, ae_target_H, ae_target_new);
+    //    MSG("ae_target: (%d ~ %d) -> %d\r\n", ae_target_L, ae_target_H, ae_target_new);
 
     return 0;
 }
@@ -295,8 +283,8 @@ static int img_update_wb_gain(ISP_RB_Gain_Type *rb_gain, BL_COLOR_TEMP color_tem
         isp_cfg.rb_gain.b_gain = DIV_ROUND(rb_gain->b_gain * rb_bias->b_gain, RGB_GAIN_1X);
     }
 
-    //MSG("final wb gain: (%d, %d) -> (%d, %d)\r\n", rb_gain->r_gain, rb_gain->b_gain,
-       // isp_cfg.rb_gain.r_gain, isp_cfg.rb_gain.b_gain);
+    MSG("final wb gain: (%d, %d) -> (%d, %d)\r\n", rb_gain->r_gain, rb_gain->b_gain,
+        isp_cfg.rb_gain.r_gain, isp_cfg.rb_gain.b_gain);
 
     return 0;
 }
@@ -383,7 +371,7 @@ static int img_update_dpc(BL_GAIN_DB gain)
 
     param_idx = gain / GAIN_6_DB;
     imgproc_set_module_update(IMG_UPDATE_MASK_DPC);
-    //    //MSG("gain %.4f dB, param_idx %d\r\n", GAIN_DB_INT_TO_FLOAT(gain), param_idx);
+    //    MSG("gain %.4f dB, param_idx %d\r\n", GAIN_DB_INT_TO_FLOAT(gain), param_idx);
 
     img_param_get_defect_corr(param_idx, &defect_corr_L);
     img_param_get_defect_corr(param_idx + 1, &defect_corr_H);
@@ -397,9 +385,21 @@ static int img_update_dpc(BL_GAIN_DB gain)
     isp_cfg.dpc.data[3] = 50;
     isp_cfg.dpc.data[4] = 20;
 
-    //    //MSG("Defect corr: defect_THR_1 (%d ~ %d) -> %d, defect_THR_2 (%d ~ %d) -> %d\r\n",
+    //    MSG("Defect corr: defect_THR_1 (%d ~ %d) -> %d, defect_THR_2 (%d ~ %d) -> %d\r\n",
     //        defect_corr_L->defect_THR_1, defect_corr_H->defect_THR_1, defect_THR_1,
     //        defect_corr_L->defect_THR_2, defect_corr_H->defect_THR_2, defect_THR_2);
+
+    return 0;
+}
+
+static int img_update_bnr(BL_GAIN_DB gain)
+{
+    if (!imgproc_is_module_enable(ISP_ADJ_BNR)) {
+        return -1;
+    }
+
+    imgproc_set_module_update(IMG_UPDATE_MASK_BNR);
+    bnr_control(gain);
 
     return 0;
 }
@@ -485,7 +485,7 @@ static int img_update_lsc(BL_COLOR_TEMP color_temp)
         }
     }
 
-    //    //MSG("img_update_lsc: %d, %d, %d\r\n", isp_cfg.lsc.lsc_coef_r.coef[0], isp_cfg.lsc.lsc_coef_r.coef[1],
+    //    MSG("img_update_lsc: %d, %d, %d\r\n", isp_cfg.lsc.lsc_coef_r.coef[0], isp_cfg.lsc.lsc_coef_r.coef[1],
     //        isp_cfg.lsc.lsc_coef_r.coef[2]);
 
     return 0;
@@ -715,7 +715,7 @@ static int img_update_saturation(BL_GAIN_DB gain)
 
     linear_intpl_by_gain(saturation_L->value, saturation_H->value, gain, &(isp_cfg.saturation));
 
-    //    //MSG("saturation: (%d ~ %d) -> %d\r\n", saturation_L, saturation_H, saturation_new);
+    //    MSG("saturation: (%d ~ %d) -> %d\r\n", saturation_L, saturation_H, saturation_new);
 
     return 0;
 }
@@ -773,7 +773,7 @@ static int img_update_ee(BL_GAIN_DB gain)
     isp_cfg.ee_th.textureThresh = value;
     linear_intpl_by_gain(edge_enhance_L->edgeThresh, edge_enhance_H->edgeThresh, gain, &value);
     isp_cfg.ee_th.edgeThresh = value;
-    //    //MSG("EE: noise_thresh (%d ~ %d) -> %d\r\n", edge_enhance_L->noise_thresh, edge_enhance_H->noise_thresh, noise_thresh);
+    //    MSG("EE: noise_thresh (%d ~ %d) -> %d\r\n", edge_enhance_L->noise_thresh, edge_enhance_H->noise_thresh, noise_thresh);
 
     return 0;
 }
@@ -795,7 +795,7 @@ static int img_update_nr(BL_GAIN_DB gain)
     img_param_get_noise_reduction(param_idx + 1, &noise_reduct_H);
 
     linear_intpl_by_gain(noise_reduct_L->noise_level, noise_reduct_H->noise_level, gain, &(isp_cfg.noise_lv));
-    //    //MSG("NR: noise_level (%d ~ %d) -> %d\r\n", noise_reduct_L->noise_level, noise_reduct_H->noise_level, noise_level);
+    //    MSG("NR: noise_level (%d ~ %d) -> %d\r\n", noise_reduct_L->noise_level, noise_reduct_H->noise_level, noise_level);
 
     return 0;
 }
@@ -818,10 +818,10 @@ static int img_update_cs(BL_GAIN_DB gain)
     linear_intpl_by_gain(chroma_suppress_L->weight, chroma_suppress_H->weight, gain, &value);
     isp_cfg.cs.weight = value;
     linear_intpl_by_gain(chroma_suppress_L->gain_thresh, chroma_suppress_H->gain_thresh, gain, &value);
-    isp_cfg.cs.grey_thr = value;
+    isp_cfg.cs.gain_thresh = value;
 
     // ref to wdr
-    divisor = (1 << (8 - 1)) - isp_cfg.cs.grey_thr;
+    divisor = (1 << (8 - 1)) - isp_cfg.cs.gain_thresh;
     isp_cfg.cs.gain = ((1 << (8 - 1)) * (1 << 8) + (divisor - 1)) / divisor;
 
     return 0;
@@ -832,20 +832,13 @@ static void imgproc_set_init_only_module()
     img_update_blc();
 }
 
-static void load_isp_back_reg(void)
-{
-    uint32_t i;
-    uint32_t tmpVal;
-    
-    for(i=0;i<sizeof(isp_back_array)/4;i++){
-        tmpVal = isp_back_array[4*i]|isp_back_array[4*i+1]<<8|isp_back_array[4*i+2]<<16|isp_back_array[4*i+3]<<24;
-        *(volatile uint32_t*)(0x30011328+4*i) = tmpVal;
-    }
-}
-
 static int img_set_module_param(void)
 {
     uint8_t nr_str;
+    const bnr_fw_config_t *config;
+
+    img_param_get_bnr_config(&config);
+    bnr_config(config);
 
     img_param_get_default_2DNR_str(&nr_str);
     ISP_Set_2D_NR(nr_str);
@@ -926,7 +919,7 @@ static void imgproc_set_interrupt(BL_Fun_Type state)
         }
         else
         {
-            //MSG("AWB algo NOT Support!\r\n");
+            MSG("AWB algo NOT Support!\r\n");
         }
 
         CPU_Interrupt_Enable(ISP_WDR_IRQn);
@@ -953,19 +946,19 @@ int imgproc_init(void)
     ret = img_param_get_module(&(img_proc.img_param));
 
     if (-1 == ret) {
-        //MSG("improc: Get sensor param failed!\n");
+        MSG("improc: Get sensor param failed!\n");
     }
 
     ret = imgproc_check_param_table();
 
     if (-1 == ret) {
-        //MSG("improc: Please check module table!\n");
+        MSG("improc: Please check module table!\n");
     }
 
     ret = imgproc_check_param_policy();
 
     if (-1 == ret) {
-        //MSG("improc: Please check module policy!\n");
+        MSG("improc: Please check module policy!\n");
     }
 
     img_proc.skip_num = IMG_PROC_SKIP_NUM;
@@ -974,9 +967,10 @@ int imgproc_init(void)
 
     //imgproc_set_interrupt(DISABLE);
 
-    //ae_init();
-    //awb_init(img_proc.awb_algo);
-    //wdr_init();
+    ae_init();
+    awb_init(img_proc.awb_algo);
+    wdr_init();
+    bnr_init();
     //ir_board_config();
     //sensor_board_config();
 
@@ -1069,6 +1063,7 @@ void vImageControlTask(void)
         if (ae_info->iso_update || imgproc_is_update_force()) {
             img_update_ae_target(ae_info->iso, &(ae_info->luma_target));
             img_update_dpc(ae_info->iso);
+            img_update_bnr(ae_info->iso);
             img_update_cs(ae_info->iso);
             img_update_ee(ae_info->iso);
             img_update_nr(ae_info->iso);
@@ -1151,6 +1146,7 @@ void imgproc_control_init(void)
     if (ae_info->iso_update || imgproc_is_update_force()) {
         img_update_ae_target(ae_info->iso, &(ae_info->luma_target));
         img_update_dpc(ae_info->iso);
+        img_update_bnr(ae_info->iso);
         img_update_cs(ae_info->iso);
         img_update_ee(ae_info->iso);
         img_update_nr(ae_info->iso);
@@ -1187,7 +1183,7 @@ void imgproc_night_mode_enable(bool enable)
         ir_cut_switch(enable);
         day_night_mode = (enable ? BL_NIGHT_MODE : BL_DAY_MODE);
         pre_state = enable;
-        //MSG("night mode %d\r\n", enable);
+        MSG("night mode %d\r\n", enable);
     }
 }
 
@@ -1205,85 +1201,3 @@ int imgproc_stop(void)
 
     return 0;
 }
-
-void imgproc_complete_init(void)
-{
-    uint32_t fifoThreshold = 0;
-    
-    ISP_TG_Cfg_Type tgCfg = {
-        .sync_mode_value = ISP_SYNC_MODE_INPUT_VBLANK_NO_TOGGLE,
-        .ISP_clk = ISP_USE_CLK,
-        .pix_clk = PIX_USE_CLK,
-        .fps = 25,
-        .total_width = 2640,
-        .total_height = 1125,
-        .active_width = CAMERA_RESOLUTION_X,
-        .active_height = CAMERA_RESOLUTION_Y,
-        .out_width = CAMERA_RESOLUTION_X,
-        .out_height = CAMERA_RESOLUTION_Y,
-    };
-    
-    ae_config_t ae_cfg = {
-        {
-            {
-                CAMERA_RESOLUTION_X,
-                CAMERA_RESOLUTION_Y,
-            },
-            {
-                CAMERA_RESOLUTION_X,
-                CAMERA_RESOLUTION_Y,
-            }
-        },
-    };
-    
-    gc2053_img_param.name = "GC2053";
-    gc2053_img_param.state_tbl = &state_tbl;
-    gc2053_img_param.ae_tbl = &ae_fw;
-    gc2053_img_param.wb_info_tbl = &wb_info_use;
-    gc2053_img_param.wb_bias_tbl = &wb_bias;
-    gc2053_img_param.awb_white_region_tbl = &white_region_use;
-    gc2053_img_param.blc_tbl = &black_lvl_corr;
-    gc2053_img_param.defect_corr_tbl = &defect_corr;
-    gc2053_img_param.bnr_fw_config_tbl = &bnr_fw_config;
-    gc2053_img_param.lens_shading_corr_tbl = &lens_shading_corr;
-    gc2053_img_param.color_corr_tbl = &color_corr;
-    gc2053_img_param.gamma_corr_tbl = &gamma_corr;
-    gc2053_img_param.wdr_fw_config_tbl = &wdr_fw_config;
-    gc2053_img_param.saturation_tbl = &saturation;
-    gc2053_img_param.noise_reduction_tbl = &noise_reduction;
-    gc2053_img_param.edge_enhance_tbl = &edge_enhance;
-    gc2053_img_param.cs_tbl = &chroma_suppress;
-    
-    img_param_init(&gc2053_img_param);
-    
-    ISP_Clock_Sel(ISP_CLK_160MHz, ENABLE, 1);
-    ISP_Disable();
-    ISP_Enable();
-    ISP_Init();
-    ISP_Set_DPC_State(ENABLE);
-    ISP_Set_BNR_State(DISABLE);
-    ISP_Set_LSC_State(ENABLE);
-    ISP_Set_CCM_State(ENABLE);
-    ISP_Set_Gamma_State(ENABLE);
-    ISP_WDR_Set_WDR_State(ENABLE);
-    ISP_Init_Color_Enhancement();
-    ISP_Set_EE_State(ENABLE);
-    ISP_Set_ChromaSuppress_State(ENABLE);
-    ISP_MISC_DE_As_Hsync(DISABLE);
-    ISP_MISC_Bayer_Shift(0x3ff,ISP_MISC_BAYER_SHIFT_LEFT,2);
-    ISP_Set_TG_Cfg(&tgCfg);
-    ISP_Set_Bayer_Pattern(BAYER_PATTERN_BG);
-    ae_init();
-    awb_init(AWB_ALGO_3);
-    wdr_init();
-    ae_config(&ae_cfg, 0);
-    awb_config((awb_config_t*)&ae_cfg, 0);
-    wdr_config((wdr_config_t*)&ae_cfg, 0);
-    ISP_3DNR_Disable();
-    imgproc_init();
-    imgproc_control_init();
-    fifoThreshold = (ISP_USE_CLK-PIX_USE_CLK)/1000*CAMERA_RESOLUTION_X/(ISP_USE_CLK/1000)+10;
-    DVP_TSRC_Sensor_Input_Set(DVP_TSRC0_ID,fifoThreshold,DISABLE,DISABLE);
-    load_isp_back_reg();
-}
-

@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
@@ -5,6 +34,8 @@
 #include <lmac154.h>
 #ifdef CFG_OT_USE_ROM_CODE
 #include <rom_lmac154_ext.h>
+#else
+#include <lmac154_fpt.h>
 #endif
 #include <openthread_port.h>
 #include <ot_radio_trx.h>
@@ -43,6 +74,12 @@ void ot_radioInit(otRadio_opt_t opt)
 
     otRadioVar_ptr->opt.byte = opt.byte;
 
+#if (OPENTHREAD_FTD || OPENTHREAD_MTD)
+    otRadioVar_ptr->ot_findAddresses_ptr = ot_findAddresses_ftd;
+#elif OPENTHREAD_RADIO
+    otRadioVar_ptr->opt.bf.isFtd = true;
+#endif
+
     uint32_t tag = otrEnterCrit();
     utils_dlist_init(&otRadioVar_ptr->frameList);
     utils_dlist_init(&otRadioVar_ptr->rxFrameList);
@@ -62,10 +99,6 @@ void ot_radioInit(otRadio_opt_t opt)
         otLinkMetrics_init(IEEE802_15_4_RADIO_RECEIVE_SENSITIVITY);
     }
 
-#if (OPENTHREAD_FTD || OPENTHREAD_MTD)
-    otRadioVar_ptr->ot_findAddresses_ptr = ot_findAddresses_ftd;
-#endif
-    
     otrExitCrit(tag);
 }
 
@@ -393,7 +426,7 @@ otError otPlatRadioEnergyScan(otInstance *aInstance, uint8_t aScanChannel, uint1
 }
 void otPlatRadioEnableSrcMatch(otInstance *aInstance, bool aEnable) 
 {
-    lmac154_fptForcePending(!aEnable);
+    lmac154_setFramePendingSourceMatch(aEnable);
 }
 otError otPlatRadioAddSrcMatchShortEntry(otInstance *aInstance, otShortAddress aShortAddress) 
 {
@@ -405,18 +438,19 @@ otError otPlatRadioAddSrcMatchExtEntry(otInstance *aInstance, const otExtAddress
 }
 otError otPlatRadioClearSrcMatchShortEntry(otInstance *aInstance, otShortAddress aShortAddress) 
 {
-    return lmac154_fptSetShortAddrPending(aShortAddress, 0) == LMAC154_FPT_STATUS_SUCCESS ? OT_ERROR_NONE:OT_ERROR_NO_ADDRESS;
+    return lmac154_fptRemoveShortAddr(aShortAddress) == LMAC154_FPT_STATUS_SUCCESS ? OT_ERROR_NONE:OT_ERROR_NO_ADDRESS;
 }
 otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const otExtAddress *aExtAddress) 
 {
-    return lmac154_fptSetLongAddrPending((uint8_t *)aExtAddress->m8, 0) == LMAC154_FPT_STATUS_SUCCESS ? OT_ERROR_NONE:OT_ERROR_NO_ADDRESS;
+    return lmac154_fptRemoveLongAddr((uint8_t *)aExtAddress->m8) == LMAC154_FPT_STATUS_SUCCESS ? OT_ERROR_NONE:OT_ERROR_NO_ADDRESS;
 }
+
 void otPlatRadioClearSrcMatchShortEntries(otInstance *aInstance) 
 {
     uint8_t num = 128;
     uint16_t * plist = (uint16_t *)malloc(sizeof(uint16_t) * num);
 
-    lmac154_fpt_GetShortAddrList(plist, &num);
+    lmac154_fptGetShortAddrList(plist, &num);
     for (uint32_t i = 0; i < num; i ++) 
     {
         lmac154_fptRemoveShortAddr(plist[i]);
@@ -435,6 +469,7 @@ void otPlatRadioClearSrcMatchExtEntries(otInstance *aInstance)
     }
     free(plist);
 }
+
 uint32_t otPlatRadioGetSupportedChannelMask(otInstance *aInstance) 
 {
     return OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MASK;

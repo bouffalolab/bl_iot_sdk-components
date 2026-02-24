@@ -1,5 +1,34 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include <string.h>
-#include <bl_os_private.h>
+#include <bflb_os_private.h>
 #include <utils_tlv_bl.h>
 #include <bl60x_fw_api.h>
 
@@ -149,9 +178,9 @@ void bl_msg_update_channel_cfg(const char *code)
         channel_num_default = sizeof(bl_channels_24_General)/sizeof(bl_channels_24_General[0]);
         channels_default = bl_channels_24_General;
         country_default = &country_list[0];
-        bl_os_printf("[WF] %s NOT found, using General instead, num of channel %d\r\n", code, channel_num_default);
+        bflb_os_printf("[WF] %s NOT found, using General instead, num of channel %d\r\n", code, channel_num_default);
     } else {
-        bl_os_printf("[WF] country code %s used, num of channel %d\r\n", code, channel_num_default);
+        bflb_os_printf("[WF] country code %s used, num of channel %d\r\n", code, channel_num_default);
     }
 
 }
@@ -264,9 +293,9 @@ static inline void *bl_msg_zalloc(ke_msg_id_t const id,
 {
     struct lmac_msg *msg;
 
-    msg = (struct lmac_msg *)bl_os_malloc(sizeof(struct lmac_msg) + param_len);
+    msg = (struct lmac_msg *)bflb_os_malloc(sizeof(struct lmac_msg) + param_len);
     if (msg == NULL) {
-        bl_os_printf("%s: msg allocation failed\n", __func__);
+        bflb_os_printf("%s: msg allocation failed\n", __func__);
         return NULL;
     }
     memset(msg, 0, sizeof(struct lmac_msg) + param_len);
@@ -309,18 +338,18 @@ static int bl_send_msg(struct bl_hw *bl_hw, const void *msg_params,
     msg = container_of((void *)msg_params, struct lmac_msg, param);
 
     if (!bl_hw->ipc_env) {
-        bl_os_printf("%s: bypassing (restart must have failed)\r\n", __func__);
-        bl_os_free(msg);
+        bflb_os_printf("%s: bypassing (restart must have failed)\r\n", __func__);
+        bflb_os_free(msg);
         RWNX_DBG(RWNX_FN_LEAVE_STR);
         return -EBUSY;
     }
 
     nonblock = is_non_blocking_msg(msg->id);
 
-    cmd = bl_os_malloc(sizeof(struct bl_cmd));
+    cmd = bflb_os_malloc(sizeof(struct bl_cmd));
     if (NULL == cmd) {
-        bl_os_free(msg);
-        bl_os_printf("%s: failed to allocate mem for cmd, size is %d\r\n", __func__, sizeof(struct bl_cmd));
+        bflb_os_free(msg);
+        bflb_os_printf("%s: failed to allocate mem for cmd, size is %d\r\n", __func__, sizeof(struct bl_cmd));
         return -ENOMEM;
     }
     memset(cmd, 0, sizeof(struct bl_cmd));
@@ -336,7 +365,7 @@ static int bl_send_msg(struct bl_hw *bl_hw, const void *msg_params,
     ret = bl_hw->cmd_mgr.queue(&bl_hw->cmd_mgr, cmd);
 
     if (!nonblock) {
-        bl_os_free(cmd);
+        bflb_os_free(cmd);
     } else {
         ret = cmd->result;
     }
@@ -456,7 +485,7 @@ int bl_send_me_config_req(struct bl_hw *bl_hw)
     }
 
     /* Set parameters for the ME_CONFIG_REQ message */
-    bl_os_printf("[ME] HT supp %d, VHT supp %d\r\n", 1, 0);
+    bflb_os_printf("[ME] HT supp %d, VHT supp %d\r\n", 1, 0);
 
     req->ht_supp = 1;
     req->vht_supp = 0;

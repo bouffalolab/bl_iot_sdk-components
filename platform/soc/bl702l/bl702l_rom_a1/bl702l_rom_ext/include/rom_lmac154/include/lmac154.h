@@ -1382,7 +1382,7 @@ lmac154_fpt_status_t lmac154_fptRemoveLongAddr(uint8_t *ladr);
  * @return None
  *
 *******************************************************************************/
-void lmac154_fpt_GetShortAddrList(void *list, uint8_t *entry_num);
+void lmac154_fptGetShortAddrList(void *list, uint8_t *entry_num);
 
 
 /****************************************************************************//**
@@ -1456,5 +1456,7 @@ void lmac154_fptDump(int print_func(const char *fmt, ...));
  *
 *******************************************************************************/
 void lmac154_setTxRxTransTime(uint8_t timeInUs);
+
+void lmac154_setFramePendingSourceMatch(bool isEnable);
 
 #endif

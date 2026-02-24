@@ -1050,14 +1050,14 @@ BL_Err_Type ATTR_CLOCK_SECTION PDS_Power_Off_PLL(void)
 __WEAK
 BL_Err_Type ATTR_CLOCK_SECTION PDS_Set_Audio_PLL_Freq(PDS_AUDIO_PLL_Type audioPLLFreq)
 {
-    uint32_t sdmin_table[] = { 0x374BC6, 0x32CCED, 0x32CCED, 0x6E978D, 0x6C0000, 0x3E8000};
+    uint32_t sdmin_table[] = { 0x6E978C, 0x6599DA, 0x6599DA, 0x6E978D, 0x6C0000, 0x7D0000};
     uint32_t tmpVal = 0;
 
     CHECK_PARAM(IS_PDS_AUDIO_PLL_TYPE(audioPLLFreq));
 
-    /*set PDS_CLKPLL_REFDIV_RATIO as 0x2 */
+    /*set PDS_CLKPLL_REFDIV_RATIO as 0x4 */
     tmpVal = BL_RD_REG(PDS_BASE, PDS_CLKPLL_TOP_CTRL);
-    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PDS_CLKPLL_REFDIV_RATIO, 0x2);
+    tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PDS_CLKPLL_REFDIV_RATIO, 0x4);
     BL_WR_REG(PDS_BASE, PDS_CLKPLL_TOP_CTRL, tmpVal);
 
     /*set clkpll_sdmin as sdmin*/
@@ -1088,10 +1088,12 @@ BL_Err_Type ATTR_CLOCK_SECTION PDS_Set_Audio_PLL_Freq(PDS_AUDIO_PLL_Type audioPL
     /*set div for audio pll */
     tmpVal = BL_RD_REG(PDS_BASE, PDS_CLKPLL_TOP_CTRL);
 
-    if (audioPLLFreq != AUDIO_PLL_5644800_HZ) {
+    if (audioPLLFreq == AUDIO_PLL_12288000_HZ || audioPLLFreq == AUDIO_PLL_11289600_HZ) {
         tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PDS_CLKPLL_POSTDIV, 36);
-    } else {
+    } else if (audioPLLFreq == AUDIO_PLL_5644800_HZ) {
         tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PDS_CLKPLL_POSTDIV, 72);
+    } else {
+        tmpVal = BL_SET_REG_BITS_VAL(tmpVal, PDS_CLKPLL_POSTDIV, 18);
     }
 
     BL_WR_REG(PDS_BASE, PDS_CLKPLL_TOP_CTRL, tmpVal);

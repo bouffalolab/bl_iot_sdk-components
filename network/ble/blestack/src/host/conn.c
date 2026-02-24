@@ -239,6 +239,20 @@ void notify_disconnected(struct bt_conn *conn)
 	}
 }
 
+#if (CONFIG_BT_REMOTE_VERSION)
+void notify_remote_version(struct bt_conn *conn)
+{
+	struct bt_conn_cb *cb;
+
+	for (cb = callback_list; cb; cb = cb->_next) {
+		if (cb->remote_version) {
+			cb->remote_version(conn, conn->rv.version,
+				conn->rv.manufacturer, conn->rv.subversion);
+		}
+	}
+}
+#endif /* CONFIG_BT_REMOTE_VERSION */
+
 void notify_le_param_updated(struct bt_conn *conn)
 {
 	struct bt_conn_cb *cb;
@@ -344,7 +358,6 @@ static int send_conn_le_param_update(struct bt_conn *conn,
 			conn->le.pending_latency = param->latency;
 			conn->le.pending_timeout = param->timeout;
 		}
-
 		return rc;
 	}
 
@@ -516,6 +529,12 @@ static struct bt_conn *conn_new(void)
 	struct bt_conn *conn = NULL;
 	int i;
 
+	/* avoid function reentry, different connections use the same conn[i]*/
+	#ifdef BFLB_BLE_PATCH_CONN_NEW_REENTRY_RISK
+	unsigned int key;
+	key = irq_lock();
+	#endif
+
 	for (i = 0; i < ARRAY_SIZE(conns); i++) {
 		if (!atomic_get(&conns[i].ref)) {
 			conn = &conns[i];
@@ -524,15 +543,26 @@ static struct bt_conn *conn_new(void)
 	}
 
 	if (!conn) {
+		#ifdef BFLB_BLE_PATCH_CONN_NEW_REENTRY_RISK
+		irq_unlock(key);
+		#endif
 		return NULL;
 	}
 
 	(void)memset(conn, 0, sizeof(*conn));
+
+	#ifdef BFLB_BLE_PATCH_CONN_NEW_REENTRY_RISK
+	atomic_set(&conn->ref, 1);
+	irq_unlock(key);
+	#endif
+
 	k_delayed_work_init(&conn->update_work, conn_update_timeout);
 
 	k_work_init(&conn->tx_complete_work, tx_complete_work);
 
+	#ifndef BFLB_BLE_PATCH_CONN_NEW_REENTRY_RISK
 	atomic_set(&conn->ref, 1);
+	#endif
 
 	return conn;
 }
@@ -551,19 +581,25 @@ bool le_check_valid_conn(void)
     return false;
 }
 
-#if defined(BFLB_HOST_ASSISTANT)
-void bt_notify_disconnected(void)
+static void conn_destroy(struct bt_conn *conn, void *data)
 {
-    int i;
-
-    for(i= 0; i < ARRAY_SIZE(conns); i++){
-        if(atomic_get(&conns[i].ref)){
-			conns[i].err = BT_HCI_ERR_UNSPECIFIED;
-            notify_disconnected(&conns[i]);
-        }  
-    }
+	if (conn->state != BT_CONN_DISCONNECTED) {
+		bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
+		#if defined(BFLB_RELEASE_CMD_SEM_IF_CONN_DISC)
+		extern void hci_release_conn_related_cmd(void);
+		hci_release_conn_related_cmd();
+		#endif
+		conn->err = BT_HCI_ERR_UNSPECIFIED;
+		notify_disconnected(conn);
+		if(conn->ref)
+			bt_conn_unref(conn);
+	}
 }
-#endif//#if defined(BFLB_HOST_ASSISTANT)
+
+void bt_conn_cleanup_all(void)
+{
+	bt_conn_foreach(BT_CONN_TYPE_ALL, conn_destroy, NULL);
+}
 #endif
 
 #if defined(CONFIG_BT_BREDR)
@@ -1738,6 +1774,10 @@ static void conn_cleanup(struct bt_conn *conn)
 {
 	struct net_buf *buf;
 
+	#if defined(BFLB_BLE_PATCH_AVOID_CONN_CLEANUP_FAILED_EXCUTED_RISK)
+	bt_conn_unref(conn);
+	#endif
+
 	/* Give back any allocated buffers */
 	while ((buf = net_buf_get(&conn->tx_queue, K_NO_WAIT))) {
 		if (tx_data(buf)->tx) {
@@ -1792,7 +1832,9 @@ int bt_conn_prepare_events(struct k_poll_event events[])
 		/* when bt_conn_set_state set state to BT_CONN_CONNECTED. There is a risk the state is 
 		 * set, but tx_queue isn't init.
 		 */
-		 if(conn->tx_queue._queue.hdl == 0){
+		if((conn->tx_queue._queue.hdl == 0) 
+			|| (conn->tx_queue._queue.poll_events.head == 0) 
+			|| (conn->tx_queue._queue.poll_events.next == 0)){
 			BT_WARN("conn %p tx_queue is not vaild", conn);
 			continue;
 		}
@@ -1962,6 +2004,9 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 			process_unack_tx(conn);
 			tx_notify(conn);
 			atomic_set_bit(conn->flags, BT_CONN_CLEANUP);
+			#if defined(BFLB_BLE_PATCH_AVOID_CONN_CLEANUP_FAILED_EXCUTED_RISK)
+			bt_conn_ref(conn);
+			#endif
 			k_poll_signal_raise(&conn_change, 0);
 			/* The last ref will be dropped during cleanup */
 		} else if (old_state == BT_CONN_CONNECT) {
@@ -2300,6 +2345,10 @@ int bt_conn_le_param_update(struct bt_conn *conn,
 	       conn->le.features[0], param->interval_min,
 	       param->interval_max, param->latency, param->timeout);
 
+	if (!bt_le_conn_params_valid(param)) {
+		return -EINVAL;
+	}
+
 	/* Check if there's a need to update conn params */
 	if (conn->le.interval >= param->interval_min &&
 	    conn->le.interval <= param->interval_max &&
@@ -2327,7 +2376,6 @@ int bt_conn_le_param_update(struct bt_conn *conn,
 		conn->le.pending_timeout = param->timeout;
 		atomic_set_bit(conn->flags, BT_CONN_SLAVE_PARAM_SET);
 	}
-
 	return 0;
 }
 
@@ -2519,6 +2567,16 @@ struct bt_conn *bt_conn_create_le(const bt_addr_le_t *peer,
 		return NULL;
 	}
 
+	#if defined(BFLB_BLE_RESTRICT_CONN_ACTION_NOT_EXCEED_MAX_CONN)
+	if (bt_conn_get_remote_dev_info(NULL) == CONFIG_BT_MAX_CONN ||
+		(atomic_test_bit(bt_dev.flags, BT_DEV_ADVERTISING) &&
+		atomic_test_bit(bt_dev.flags,BT_DEV_ADVERTISING_CONNECTABLE) &&
+		bt_conn_get_remote_dev_info(NULL) == (CONFIG_BT_MAX_CONN - 1))){
+		BT_ERR("Cannot create le conn because of conn resource limitation(max_conn:%u)",CONFIG_BT_MAX_CONN);
+		return NULL;
+	}
+	#endif
+
 	if (!bt_le_conn_params_valid(param)) {
 		return NULL;
 	}
@@ -2549,7 +2607,14 @@ struct bt_conn *bt_conn_create_le(const bt_addr_le_t *peer,
 			return conn;
 		case BT_CONN_DISCONNECTED:
 			BT_WARN("Found valid but disconnected conn object");
-			goto start_scan;
+			//fix by bouffalo:not ref if conn of this peer has existed.
+#if defined(BFLB_BLE_PATCH_CONN_CREATE_LE_BEFORE_DISCONN_FULLY_COMPLETE_RISK)
+			bt_conn_unref(conn);
+			return NULL;
+#else
+			//fix end
+ 			goto start_scan;
+#endif
 		default:
 			bt_conn_unref(conn);
 			return NULL;
@@ -2570,7 +2635,9 @@ struct bt_conn *bt_conn_create_le(const bt_addr_le_t *peer,
 		return NULL;
 	}
 
+#ifndef BFLB_BLE_PATCH_CONN_CREATE_LE_BEFORE_DISCONN_FULLY_COMPLETE_RISK
 start_scan:
+#endif
 	bt_conn_set_param_le(conn, param);
 
 	bt_conn_set_state(conn, BT_CONN_CONNECT_SCAN);
@@ -2726,6 +2793,15 @@ struct net_buf *bt_conn_create_pdu_timeout(struct net_buf_pool *pool,
 {
 	struct net_buf *buf;
 
+	//check if current task is timer task or it is in interrupt isr
+	if(k_is_in_isr()){
+		BT_ERR("Allocating pdu in interrupt conext is not allowed.");
+		BT_ASSERT(0);
+	}else if(k_thread_check_by_name("Tmr Svc")){
+		BT_ERR("Allocating pdu in os timer task is not allowed.");
+		BT_ASSERT(0);
+	}
+
 	/*
 	 * PDU must not be allocated from ISR as we block with 'K_FOREVER'
 	 * during the allocation
@@ -2786,7 +2862,9 @@ int bt_conn_auth_passkey_entry(struct bt_conn *conn, unsigned int passkey)
 	if (!bt_auth) {
 		return -EINVAL;
 	}
-
+	if (passkey > 999999 || passkey < 0) {
+		return -EINVAL;
+	}
 	if (IS_ENABLED(CONFIG_BT_SMP) && conn->type == BT_CONN_TYPE_LE) {
 		bt_smp_auth_passkey_entry(conn, passkey);
 		return 0;

@@ -23,6 +23,7 @@
 
 #include "hal_spi.h"
 #include "hal_gpio.h"
+#include "bl702_spi.h"
 #include "xpt2046.h"
 // #include "lvgl.h"
 
@@ -39,8 +40,8 @@ uint16_t avg_buf_y[XPT2046_AVG_NUM];
 static void xpt2046_spi_read_reg(uint8_t reg, uint8_t *data, uint8_t byte_count)
 {
     gpio_write(TOUCH_PIN_CS, 0);
-    device_write(touch_spi, 0, &reg, 1);
-    device_read(touch_spi, 0, &reg, 1);
+    spi_transmit(touch_spi, &reg, 1, 0);
+    spi_receive(touch_spi, data, byte_count, 0);
     gpio_write(TOUCH_PIN_CS, 1);
 }
 

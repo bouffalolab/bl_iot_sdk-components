@@ -24,9 +24,9 @@ extern "C" {
 #if defined(BFLB_BLE)
 #include <stddef.h>
 #include <util_macro.h>
-#if defined(CFG_IOT_SDK) || defined(BL_MCU_SDK)
+#if defined(CONFIG_IOT_SDK) || defined(BL_MCU_SDK)
 #include "utils_string.h"
-#else/* CFG_IOT_SDK BL_MCU_SDK */
+#else/* CONFIG_IOT_SDK BL_MCU_SDK */
 #include "utils_getopt.h" //For BOUFFALO_SDK
 #endif/* FG_IOT_SDK BL_MCU_SDK*/
 #endif

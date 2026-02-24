@@ -13,7 +13,7 @@ DESCRIPTION
 
 #include "bluetooth.h"
 #include "gatt.h"
-#include "uuid.h"
+#include "bt_uuid.h"
 #include "ias.h"
 #include "bt_log.h"
 

@@ -1,4 +1,128 @@
 # Changes
+## 2026-02-10
+1. [blestack] Add CONFIG_BT_ATT_PREPARE_COUNT configuration option to make ATT prepare count configurable (0-64 range) with validation in both build system and compile-time checks.
+
+## 2026-02-03
+1. SPP Performance Enhancement: Increased MTU 1021 bytes and optimized L2CAP buffer configuration for transmission efficiency improvement.
+
+## 2026-01-20
+1.[blestack]: standardize include paths in blestack headers.
+
+## 2026-01-14
+1.[blestack] Add statistics mode to BLE scan CLI command.
+
+## 2026-01-07
+1.Save local irk to flash.
+
+## 2025-12-30
+1. Enhance A2DP stream pause control in CLI commands.
+
+## 2025-12-29
+1.[blestack]: Support Google Nearby Fastpair.
+
+## 2025-11-10
+1.[blestack]: fix CCC subscription crash and prevent configuration sharing.
+
+## 2025-10-30
+1. [blestack] set default CONFIG_BT_DEVICE_APPEARANCE to 0x0000(unknown device).
+ 
+## 2025-10-10
+1. [blestack]remove easyflash4 for bouffalo sdk.
+
+## 2025-10-10
+1. [blestack]support set tx power and set bdaddr command on bl616d platform.
+
+## 2025-09-24
+1. [blestack]Use common config a macro for Bouffalo_SDK.
+
+## 2025-09-03
+1. [blestack] blestack support HCI TL via UART.
+
+## 2025-08-08
+1. [blestack] Add bt_br_foreach_bond API to get BREDR Link key.
+
+## 2025-08-05
+1. [blestack] Refactor dynamic GATT callbacks to include connection context and fix parameter handling.
+
+## 2025-07-31
+1. [blestack] Add parameter validation and error handling.
+
+## 2025-07-23
+1. [blestack] DIS profile: add missing return after model setting initialization.
+
+## 2025-07-22
+1. [blestack] Increase maximum supported GATT services from 2 to 3 (SERVER_MAX_SERVICES).
+
+## 2025-07-17
+1. [blestack] Add GATT API parameter invalid check.
+
+## 2025-07-02
+1. [blestack] support ble stack on bl616d platform.
+2. [blestack] Optimize ble debug monitor, replace "BT_WARN" by "putchar" to avoid stack overflow.
+
+## 2025-06-16
+1. [blestack]Add bt_force_disable API to force disable host/controller.
+
+## 2025-06-13
+1. [blestack]Rename host assist API.
+
+## 2025-05-16
+1. [blestack]Enable CONFIG_BL_SDK at default settings(only Bouffalo SDK).
+
+## 2025-05-13
+1.[blestack]Sending acl data or hci commands in freertos timer task  is not permitted.
+
+## 2025-04-15
+1.[blestack]Fixed dynamic_gatt_pool.free reinit memory leak at dynamic gatt server init.
+
+## 2025-04-02
+1. Fixed some compilation warnings to enhance code stability.
+2. Enable CONFIG_BT_ECC at ble1m2s1bredr0. 
+
+## 2025-03-31
+1.[blestack]Fix conn_new reentry issue, avoid different connections use the same conn[i].
+2.[blestack]Fix BT_CONN_CONNECTED issue, there is a risk that conn->tx_queue._queue didn't finish when conn->state is set to BT_CONN_CONNECTED.
+3.[blestack]Fix bt_conn_create_le issue，there is a risk that conn create a connect to same address before disconnect complete, and new ref is not start from 0.
+
+## 2025-03-26
+1.[blestack]Fix memory leak issue because bt_dev.br.pkts semaphore does not be freed.
+
+## 2025-03-25
+1.[blestack] In ble_cli_cmds.c, do not make it call blestack APIs to send hci commands or hci data in recv_thread context.
+
+## 2025-03-07
+1.[blestack] Avoid conflict when ble slave and master are accessing the last resource at the same time.
+
+## 2025-02-28
+1.[blestack] Add reading remote version function. Setting CONFIG_BT_REMOTE_VERSION to 1 in proj_config.mk to enable this function.
+
+## 2025-02-10
+1.[blestack] Add CONFIG_BT_WORK_QUEUE_STACK_SIZE to config work_q thread size.
+
+## 2025-02-08
+1.[blestack] Fix build error when enable CONFIG_BT_TP_CLI
+
+## 2025-02-08
+1.[blestack] Add CONFIG_BT_RX_STACK_SIZE to config ble rx thread stack size.
+2.[blestack] Add bt_gatt_find_attr api to get struct bt_gatt_attr from handle.
+
+## 2025-02-08
+[blestack]support uart interface.
+
+## 2025-02-06
+[blestack]Add Throughput test cli and ble1m0s1sbredr0 Support DTM.
+
+## 2025-01-21
+[blestack]Support send two advertising in one adv event, this call be enabled by set CONFIG_BLE_ADV_TWO_PAYLOAD_IN_ONE_ADV_INTERVAL_WITH_ROME_CODE to 1.
+
+## 2025-01-13
+1.Fix the assert issue when it stops the work_q timer because of timer handle is null in some corner case.
+2.Fix hci command timeout becuase BT_HCI_EVT_NUM_COMPLETED_PACKETS evt fails to be handled in time.
+3.Fix memory leak issue because ble connection's tx queue fails to be freed in some corner case.
+
+## 2025-01-09
+[blestack]Rename uuid.h to bt_uuid.h to avoid incorrect inclusion.
+
 ## 2024-12-19
 [blestack]Fix the problem that repeated calls to bt_conn_create_br/bt_conn_create_sco and causes subsequent connection failure.
 

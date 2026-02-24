@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2016-2026 Bouffalolab.
+ *
+ * This file is part of
+ *     *** Bouffalolab Software Dev Kit ***
+ *      (see www.bouffalolab.com).
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of Bouffalo Lab nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -154,7 +183,7 @@ static const struct mem_hdr {
     {(uintptr_t)test_data, (unsigned int)sizeof(test_data), DUMP_BASE64_BYTE, "test_data_byte"},
     {(uintptr_t)test_data, (unsigned int)sizeof(test_data), DUMP_BASE64_WORD, "test_data_word"},
     {(uintptr_t) "asdasdasdasdasdsada", 0, DUMP_ASCII, "test_string"},
-#elif defined BL602
+#elif BL602
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "ram"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "wifi_ram"},
     {(uintptr_t)0x24B00000, (unsigned int)0x55c, DUMP_BASE64_WORD, "0x24B00000-0x24B0055C"},
@@ -171,7 +200,7 @@ static const struct mem_hdr {
     {(uintptr_t)0x4000E404, (unsigned int)0x04, DUMP_BASE64_WORD, "PDS_reg"},
     {(uintptr_t)0x4000F030, (unsigned int)0x04, DUMP_BASE64_WORD, "HBN_reg"},
     {(uintptr_t)0x28008000, (unsigned int)&__LD_CONFIG_EM_SEL, DUMP_BASE64_WORD, "EM_REG"},
-#elif defined BL702
+#elif BL702
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "tcm_ocram"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "hbnram"},
     {(uintptr_t)&_ld_ram_addr3, (unsigned int)&_ld_ram_size3, DUMP_BASE64_BYTE, "stack"},
@@ -181,7 +210,7 @@ static const struct mem_hdr {
 #endif
     {(uintptr_t)0x28008000, (unsigned int)&__LD_CONFIG_EM_SEL, DUMP_BASE64_WORD, "EM_REG"},
     {(uintptr_t)0x28000000, (unsigned int)&__LD_BLE_CORE_REG_SIZE, DUMP_BASE64_WORD, "BLE_CORE_REG"},
-#elif defined BL702L
+#elif BL702L
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "tcm_ocram"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "hbnram"},
     {(uintptr_t)&_ld_ram_addr3, (unsigned int)&_ld_ram_size3, DUMP_BASE64_BYTE, "stack"},
@@ -191,16 +220,16 @@ static const struct mem_hdr {
     {(uintptr_t)0x21020000, (unsigned int)0x20000, DUMP_BASE64_BYTE, "romcode"},
     {(uintptr_t)0x28008000, (unsigned int)&__LD_CONFIG_EM_SEL, DUMP_BASE64_WORD, "EM_REG"},
     {(uintptr_t)0x28000000, (unsigned int)&__LD_BLE_CORE_REG_SIZE, DUMP_BASE64_WORD, "BLE_CORE_REG"},
-#elif defined BL808
+#elif BL808
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "ram_psram"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "ram_wifi"},
     {(uintptr_t)&_ld_ram_addr3, (unsigned int)&_ld_ram_size3, DUMP_BASE64_BYTE, "ram_memory"},
     {(uintptr_t)&_ld_ram_addr4, (unsigned int)&_ld_ram_size4, DUMP_BASE64_BYTE, "xram_memory"},
     {(uintptr_t)0x28010000, (unsigned int)&__LD_CONFIG_EM_SEL, DUMP_BASE64_WORD, "EM_REG"},
-#elif defined WB03
+#elif WB03
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "ram_tcm"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "ram_wifi"},
-#elif defined BL616
+#elif BL616
     {(uintptr_t)0xf0004000, (unsigned int)12, DUMP_CSR, "dump riscv csr"},
     {(uintptr_t)&_ld_ram_addr1, (unsigned int)&_ld_ram_size1, DUMP_BASE64_BYTE, "ram_tcm"},
     {(uintptr_t)&_ld_ram_addr2, (unsigned int)&_ld_ram_size2, DUMP_BASE64_BYTE, "ram_wifi"},

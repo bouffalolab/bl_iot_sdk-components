@@ -429,9 +429,14 @@ void bl702_main()
     bl_sys_early_init();
 
     /*Init UART In the first place*/
+#if !defined(GPIO_SIM_PRINT)
     hosal_uart_init(&uart_stdio);
 #ifdef CONFIG_USE_UART_1_FOR_DEBUG
     hosal_uart_init(&uart_stdio_1);
+#endif
+#else
+    extern int bl_gpio_uart_tx_init(uint8_t id, uint8_t tx_pin, uint32_t baudrate);
+    bl_gpio_uart_tx_init(0, GPIO_SIM_PRINT_TX_PIN, GPIO_SIM_PRINT_BAUDRATE);
 #endif
     puts("Starting bl702 now....\r\n");
 

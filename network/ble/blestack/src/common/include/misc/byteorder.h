@@ -383,6 +383,23 @@ static inline u64_t sys_get_le64(const u8_t src[8])
  * @param src A valid pointer on a memory area where to copy the data from
  * @param length Size of both dst and src memory areas
  */
+#if defined(BFLB_BLE)
+static inline void sys_memcpy_swap(void *dst, const void *src, size_t length)
+{
+	u8_t *pdst = (u8_t *)dst;
+	const u8_t *psrc = (const u8_t *)src;
+
+	__ASSERT(((psrc < pdst && (psrc + length) <= pdst) ||
+		  (psrc > pdst && (pdst + length) <= psrc)),
+		 "Source and destination buffers must not overlap");
+
+	psrc += length - 1;
+
+	for (; length > 0; length--) {
+		*pdst++ = *psrc--;
+	}
+}
+#else
 static inline void sys_memcpy_swap(void *dst, const void *src, size_t length)
 {
 	__ASSERT(((src < dst && (src + length) <= dst) ||
@@ -395,7 +412,7 @@ static inline void sys_memcpy_swap(void *dst, const void *src, size_t length)
 		*((u8_t *)dst++) = *((u8_t *)src--);
 	}
 }
-
+#endif
 /**
  * @brief Swap buffer content
  *

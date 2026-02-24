@@ -47,10 +47,8 @@
 /** @defgroup  ILI9881C_Public_Macros
  *  @{
  */
-#define DSI_LANE_NUMBER_USE    2
-#define DSI_ILI9881C_BSIT_MODE 0
-#define LCD_CS_PIN             GPIO_PIN_10
-#define LCD_DC_PIN             GPIO_PIN_22
+#define LCD_CS_PIN GPIO_PIN_10
+#define LCD_DC_PIN GPIO_PIN_22
 
 #define CS1_HIGH gpio_write(LCD_CS_PIN, 1)
 #define CS1_LOW  gpio_write(LCD_CS_PIN, 0)

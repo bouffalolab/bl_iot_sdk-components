@@ -1,5 +1,42 @@
 # change log on lmac154 module
 
+## 2026/02/10
+- Version: 1.6.18
+  - BL702/BL702L: Improve to get frame pending result
+
+## 2025/12/06
+- Version: 1.6.17
+  - Add API to set/get coex priority
+
+## 2025/11/25
+- Version: 1.6.16
+- Changes
+  - BL702: Add a protection to send a frame.
+
+## 2025/9/17
+- Version: 1.6.15
+  - BL616: Remove unspported API
+
+## 2025/9/11
+- Version: 1.6.14
+- Changes
+  - BL702/BL702L: Record timestamp of rx done isr for monitor handling.
+
+## 2025/4/25
+- Version: 1.6.13
+- Changes
+  - BL702: Parse recieved packets and drop packets with wrong destination for standard 2015 enabled
+
+## 2025/3/12
+- Version: 1.6.12
+- Changes
+  - BL616: Apply TX power limit with channel and country code if phyrf lib supported
+
+## 2025/2/8
+- Version: 1.6.11
+- Changes
+  - Put nbr & fp table search function in  RAM
+
 ## 2024/12/13
 - Version: 1.6.10
 - Changes

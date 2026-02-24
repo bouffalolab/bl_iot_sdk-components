@@ -6,7 +6,9 @@
 #include "oad_main.h"
 #ifdef CONFIG_BT_SETTINGS
 #include "settings.h"
+#if defined(CONFIG_IOT_SDK)
 #include "ef_def.h"
+#endif /* CONFIG_IOT_SDK */
 #endif
 #include "conn_internal.h"
 #if !defined(CONFIG_BL_SDK)
@@ -100,12 +102,12 @@ static void oad_notify_block_req(struct bt_conn *conn)
 {
     struct net_buf_simple *buf = NET_BUF_SIMPLE(sizeof(struct oad_block_req_t) + OAD_OPCODE_SIZE);
     struct oad_block_req_t *block_req;
-    
+
     net_buf_simple_init(buf, 0);
     *(buf->data) = OAD_CMD_IMAG_BLOCK_REQ;
     block_req = (struct oad_block_req_t *)(buf->data+1);
     buf->len = sizeof(struct oad_block_req_t) + OAD_OPCODE_SIZE;
-    
+
     block_req->file_info.file_ver = oad_env.upgrd_file_ver;
     block_req->file_info.manu_code = oad_env.file_info.manu_code;
     block_req->file_offset = oad_env.upgrd_offset;
@@ -132,7 +134,7 @@ static void oad_notify_upgrd_end(struct bt_conn *conn, u8_t status)
             status=OAD_CHECK_HASH256_FAIL;
         }
     }
-    
+
     net_buf_simple_init(buf, 0);
     *(buf->data) = OAD_CMD_IMAG_UPGRD_END;
     upgrd_end = (struct oad_upgrd_end_t *)(buf->data+1);
@@ -196,7 +198,7 @@ static u8_t oad_write_flash(uint32_t filesize, uint32_t offset,u8_t *data, u16_t
 
         oad_env.new_img_addr = pt_fw_entry.start_address[!pt_fw_entry.active_index];
         size = pt_fw_entry.max_len[!pt_fw_entry.active_index];
-        
+
         BT_WARN("Upgrade file size is %d\r\n", oad_env.upgrd_file_size);
         if(oad_env.upgrd_file_size <= size){
             BT_WARN("flash erase\r\n");
@@ -215,7 +217,7 @@ static u8_t oad_write_flash(uint32_t filesize, uint32_t offset,u8_t *data, u16_t
     }else{
         BT_WARN("Write flash address invalid\r\n");
     }
-    
+
     BT_WARN("Start address : 0x%x\r\n",wflash_address);
     bflb_flash_write(wflash_address, data, len);
     oad_env.w_img_end_addr = wflash_address + len;
@@ -240,9 +242,9 @@ static u8_t oad_image_data_handler(struct bt_conn *conn,const u8_t *data, u16_t 
 		   return OAD_ABORT;
 		};
 		memset(wData.wdata_buf,0,WBUF_SIZE(conn));
-		wData.index = 0; 
+		wData.index = 0;
 	}
-	
+
 	if(wData.wdata_buf){
 		left_size = /*WBUF_SIZE(conn)*/OTA_WRITE_FLASH_SIZE - wData.index;
 		BT_WARN("left_size (0x%x) wData.index (0x%x) len (%d)\r\n",left_size,wData.index,len);
@@ -255,7 +257,7 @@ static u8_t oad_image_data_handler(struct bt_conn *conn,const u8_t *data, u16_t 
 			memcpy((wData.wdata_buf+wData.index),data,left_size);
 			wData.index += left_size;
 			if(wData.index == OTA_WRITE_FLASH_SIZE){
-                
+
 				if(oad_write_flash(oad_env.upgrd_file_size,oad_env.hosal_offset,wData.wdata_buf,OTA_WRITE_FLASH_SIZE)){
 					BT_ERR("Failed to write flash\r\n");
 					return OAD_ABORT;
@@ -328,7 +330,7 @@ static u8_t oad_image_block_resp_handler(struct bt_conn *conn, const u8_t *data,
                 status = OAD_MALORMED_CMD;
                 break;
             }
-            
+
             rsp_data = data + OAD_BLK_RSP_DATA_OFFSET;
             status = oad_image_data_handler(conn,rsp_data, block_rsp->data_size);
             if(status == OAD_UPGRD_CMPLT){
@@ -349,7 +351,7 @@ static u8_t oad_image_block_resp_handler(struct bt_conn *conn, const u8_t *data,
 			#endif
         }
         break;
-        
+
         default:
             status = OAD_MALORMED_CMD;
 
@@ -375,7 +377,7 @@ static void oad_image_identity_handler(struct bt_conn *conn, const u8_t *data, u
                                                                                            ef_info.file_offset,ef_info.last_wflash_addr);
 #else
     oad_env.new_img_addr = 0;
-	oad_env.w_img_end_addr = 0;    
+	oad_env.w_img_end_addr = 0;
 #endif
 
     if(identity->file_info.manu_code == oad_env.file_info.manu_code &&
@@ -407,7 +409,7 @@ static void oad_image_identity_handler(struct bt_conn *conn, const u8_t *data, u
 			BT_WARN("fail to start conn update\r\n");
 		else
 			BT_WARN("start conn update\r\n");
-		
+
         oad_env.upgrd_file_ver = identity->file_info.file_ver;
         oad_env.upgrd_file_size = identity->file_size;
         oad_env.upgrd_crc32 = identity->crc32;
@@ -417,18 +419,18 @@ static void oad_image_identity_handler(struct bt_conn *conn, const u8_t *data, u
         #endif
         oad_notify_block_req(conn);
     }else{
-        
+
         oad_notity_image_identity(conn);
     }
 }
-  
+
 static void oad_recv_callback(struct bt_conn *conn, const u8_t *data, u16_t len)
-{  
+{
     if (len){
         if (*data == OAD_CMD_IMAG_IDENTITY && ((len - 1) == sizeof(struct oad_image_identity_t))){
             oad_image_identity_handler(conn, data+1, len-1);
         }if (*data == OAD_CMD_IMAG_BLOCK_RESP){
-            oad_image_block_resp_handler(conn, data+1, len-1); 
+            oad_image_block_resp_handler(conn, data+1, len-1);
         }if(*data == OAD_CMD_IMAG_INFO){
             oad_image_info_handler(conn, data+1, len-1);
         }
@@ -460,7 +462,7 @@ static int fw_check_hash256(void)
     bin_size = oad_env.upgrd_file_size - 32;
     hash_addr = oad_env.w_img_end_addr - 32;
 
-    if (pt_table_get_active_entries_by_name(&pt_table_stuff[active_id], (uint8_t *)OTA_PARTITION_NAME_TYPE_FW, &pt_fw_entry)) 
+    if (pt_table_get_active_entries_by_name(&pt_table_stuff[active_id], (uint8_t *)OTA_PARTITION_NAME_TYPE_FW, &pt_fw_entry))
     {
         BT_WARN("Failed to get active entries by name\r\n");
         return -1;
@@ -511,7 +513,7 @@ static int fw_check_hash256(void)
     pt_fw_entry.active_index = !(pt_fw_entry.active_index & 0x01);
     pt_fw_entry.age++;
     int status = pt_table_update_entry(!active_id, &pt_table_stuff[active_id], &pt_fw_entry);
-    if (status != 0) 
+    if (status != 0)
     {
         BT_WARN("pt table update fail! %d\r\n", status);
         return -1;
@@ -552,7 +554,7 @@ void oad_service_enable(app_check_oad_cb cb)
     oad_env.new_img_addr = 0;
     bt_oad_service_enable();
     bt_oad_register_recv_cb(oad_recv_callback);
-    bt_oad_register_disc_cb(oad_disc_callback); 
+    bt_oad_register_disc_cb(oad_disc_callback);
 
 #if defined(CONFIG_BL_SDK)
     active_id = pt_table_get_active_partition_need_lock(pt_table_stuff);
