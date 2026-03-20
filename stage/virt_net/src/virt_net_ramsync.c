@@ -73,10 +73,14 @@ struct virt_net_custom_pbuf {
 #define VIRT_NET_RXBUFF_OFFSET (sizeof(struct virt_net_custom_pbuf))
 
 /* 头部的假数据，绕过DMA/SPI FIFO缓存 */
+#ifndef CFG_VIRT_NET_RXBUFF_CNT
 #if defined(CFG_USE_PSRAM)
 #define VIRT_NET_RXBUFF_CNT (16)
 #else
 #define VIRT_NET_RXBUFF_CNT (4)
+#endif
+#else
+#define VIRT_NET_RXBUFF_CNT CFG_VIRT_NET_RXBUFF_CNT
 #endif
 #define VIRT_NET_BUFF_SIZE (TP_PAYLOAD_LEN + VIRT_NET_RXBUFF_OFFSET) /* + sizeof(pbuf header) */
 #define VIRT_NET_MAX_PENDING_CMD (32)
@@ -293,6 +297,9 @@ static void __timer_callback(TimerHandle_t handle)
     struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)pvTimerGetTimerID(handle);
 
     printf("Dhcp timeout, Ip Got Failed.\r\n");
+
+    event_propagate(sobj, VIRT_NET_EV_ON_DHCP_TIMEOUT, NULL);
+
     if (sobj->vnet.ctrl) {
         sobj->vnet.ctrl(&sobj->vnet, VIRT_NET_CTRL_DISCONNECT_AP);
     }
@@ -324,8 +331,8 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
 #if LWIP_IPV6_AUTOCONFIG
       sobj->vnet.netif.ip6_autoconfig_enabled = 1;
 #endif
-      // dhcp6_set_struct(&sobj->vnet.netif, &sobj->vnet_dhcp6);
-      // dhcp6_enable_stateless(&sobj->vnet.netif);
+      dhcp6_set_struct(&sobj->vnet.netif, &sobj->vnet_dhcp6);
+      dhcp6_enable_stateless(&sobj->vnet.netif);
 #endif
 #if LWIP_IPV4
       netifapi_dhcp_start((struct netif *)&(sobj->vnet.netif));
@@ -449,6 +456,29 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
         memcpy(version, pkg_cmd->payload, 4);
         xSemaphoreGive(sem);
       }
+    }
+    break;
+  case VIRT_NET_CTRL_SLAVE_READY_IND:
+    {
+        printf("slave ready ind.\r\n");
+        if (sobj->sta_linkup) {
+            netifapi_netif_set_link_down(&sobj->vnet.netif);
+            printf("stop dhcp...\r\n");
+            #if LWIP_IPV4
+            netifapi_dhcp_stop((struct netif *)&sobj->vnet.netif);
+            #endif
+            #if LWIP_IPV6
+            dhcp6_disable((struct netif *)&sobj->vnet.netif);
+            #endif
+            netifapi_netif_set_down((struct netif *)&sobj->vnet.netif);
+            sobj->sta_linkup = 0;
+        }
+        event_propagate(sobj, VIRT_NET_EV_ON_SLAVE_READY, NULL);
+    }
+    break;
+  case VIRT_NET_CTRL_SLAVE_HEARTBEAT:
+    {
+        event_propagate(sobj, VIRT_NET_EV_ON_SLAVE_HEARTBEAT, NULL);
     }
     break;
   default:
@@ -871,7 +901,7 @@ virt_net_t virt_net_create(void *ctx)
 
   /* Init rx ind */
   assert(VIRT_NET_RXBUFF_CNT <= _BITSET_BITS);
-  sobj->rx_buf_ind.__bits[0] = (1 << VIRT_NET_RXBUFF_CNT) - 1;
+  sobj->rx_buf_ind.__bits[0] = ((uint64_t)1 << VIRT_NET_RXBUFF_CNT) - 1;
 
   sobj->rx_buf_ind_mutex = xSemaphoreCreateMutex();
   if (sobj->rx_buf_ind_mutex == NULL) {
