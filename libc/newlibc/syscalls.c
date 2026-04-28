@@ -473,7 +473,7 @@ void *_realloc_r(struct _reent *ptr, void *old, size_t newlen)
     void* result;
 
 #if defined(CFG_USE_PSRAM)
-    if (IS_PSARAM((uint32_t)old)) {
+    if ((NULL == old) || IS_PSARAM((uint32_t)old)) {
         result = (void*)pvPortReallocPsram(old, newlen);
     }
     else {
