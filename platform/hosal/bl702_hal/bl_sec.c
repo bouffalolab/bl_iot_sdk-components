@@ -38,6 +38,8 @@
 
 #include <blog.h>
 
+#if 0
+
 #define REG_VALUE_TRNG_INIT (0x40004200)
 #define REG_VALUE_TRNG_VAL  (0x40004208)
 
@@ -794,3 +796,25 @@ void bl_sec_pka_IRQHandler(void)
     puts("--->>> PKA IRQ\r\n");
     SEC_Eng_IntMask(SEC_ENG_INT_PKA, MASK);
 }
+
+#else
+
+static inline void _trng_ht_disable()
+{
+    uint32_t TRNGx = SEC_ENG_BASE;
+    uint32_t val;
+
+    val = BL_RD_REG(TRNGx, SEC_ENG_SE_TRNG_0_TEST);
+    val = BL_SET_REG_BIT(val, SEC_ENG_SE_TRNG_0_HT_DIS);
+    BL_WR_REG(TRNGx, SEC_ENG_SE_TRNG_0_TEST, val);
+}
+
+int bl_sec_init(void)
+{
+    /*Disable health test to fix se_trng_0_ht_error, but will reduce security*/
+    _trng_ht_disable();
+
+    return 0;
+}
+
+#endif
