@@ -1,34 +1,14 @@
-/*
- * Copyright (c) 2016-2026 Bouffalolab.
- *
- * This file is part of
- *     *** Bouffalolab Software Dev Kit ***
- *      (see www.bouffalolab.com).
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of Bouffalo Lab nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-#include BL_MFD_PLAT_H
-#include "bl_mfd.h"
+
+#if defined BL616 || defined BL616CL
+#include "bflb_mfd_common.h"
+#elif defined BL602
+#include "bflb_mfd_bl602.h"
+#elif defined BL702
+#include "bflb_mfd_bl702.h"
+#elif defined BL702L
+#include "bflb_mfd_bl702l.h"
+#endif
+#include "bflb_mfd.h"
 
 #define MATTER_FACTORY_DATA_NAME                    "MFD"
 
@@ -39,10 +19,10 @@
 
 typedef enum {
     ELEMENT_TYPE_SKIP = 0,
-    ELEMENT_TYPE_EFUSE_AES_IV = 1,                  /** not Matter factory data, which is for credential data decryption. 
-                                                        It must be placed in plaintext area with type id 0x8001 */
-    ELEMENT_TYPE_ELEMENT_START = 2,
-    ELEMENT_TYPE_DAC_CERT = ELEMENT_TYPE_ELEMENT_START,
+    ELEMENT_TYPE_ELEMENT_START = 1,
+    ELEMENT_TYPE_EFUSE_AES_IV = ELEMENT_TYPE_ELEMENT_START, /** not Matter factory data, which is for credential data decryption. 
+                                                            It must be placed in plaintext area with type id 0x8001 */
+    ELEMENT_TYPE_DAC_CERT = 2,
     ELEMENT_TYPE_DAC_PRIVATE_KEY,
     ELEMENT_TYPE_PASSCODE,
     ELEMENT_TYPE_PAI_CERT, 
@@ -64,9 +44,10 @@ typedef enum {
     ELEMENT_TYPE_MANUFACTORING_DATE,      
     ELEMENT_TYPE_HARDWARE_VERSION,        
     ELEMENT_TYPE_HARDWARE_VERSION_STRING,
-
+    ELEMENT_TYPE_PRODUCT_APPEARANCE_FINISH,        
+    ELEMENT_TYPE_PRODUCT_APPEARANCE_PRIMARY_COLOR,
     ELEMENT_TYPE_ELEMENT_END,
-    
+
     ELEMENT_TYPE_NUM = ELEMENT_TYPE_ELEMENT_END - ELEMENT_TYPE_ELEMENT_START,
     ELEMENT_TYPE_PLAIN_FLAG = 0x8000,
     ELEMENT_TYPE_ID_MASK = 0x7fff,
@@ -114,16 +95,13 @@ static bool mfd_parsePartitionData(uint32_t size, uint8_t *pData, uint8_t *pIv)
         p = NULL;
 
         id = ELEMENT_TYPE_ID_MASK & tlv.type_id;
-        if (ELEMENT_TYPE_EFUSE_AES_IV == id) {
-            if ((tlv.type_id & ELEMENT_TYPE_PLAIN_FLAG) && MFD_EFUSE_AES_IV_LEN == tlv.value_len) {
+
+        if (ELEMENT_TYPE_ELEMENT_START <= id && id <= ELEMENT_TYPE_ELEMENT_END && tlv.value_len) {
+            if (ELEMENT_TYPE_EFUSE_AES_IV == id
+                && (tlv.type_id & ELEMENT_TYPE_PLAIN_FLAG) && MFD_EFUSE_AES_IV_LEN == tlv.value_len) {
                 /** efuse aes iv must be placed in plaintext data area with a fixed length MFD_EFUSE_AES_IV_LEN */
                 memcpy(pIv, pData + offset + offsetof(ElementTlv_t, value), tlv.value_len);
             }
-
-            offset += (offsetof(ElementTlv_t, value) + tlv.value_len);
-            continue;
-        }
-        else if (ELEMENT_TYPE_ELEMENT_START <= id && id <= ELEMENT_TYPE_ELEMENT_END && tlv.value_len) {
 
             p = &(g_mfd_var.item[id - ELEMENT_TYPE_ELEMENT_START]);
             if (IS_FLASH_ADDR(pData + offset + offsetof(ElementTlv_t, value))) {
@@ -149,10 +127,10 @@ static bool mfd_parsePartitionData(uint32_t size, uint8_t *pData, uint8_t *pIv)
 
 static bool mfd_parseData(void) 
 {
-#ifndef BL_MFD_DECRYPT_BUF_LEN
-#define BL_MFD_DECRYPT_BUF_LEN 512
+#ifndef BFLB_MFD_DECRYPT_BUF_LEN
+#define BFLB_MFD_DECRYPT_BUF_LEN 512
 #endif
-    uint32_t mfd_decrypt_buf[BL_MFD_DECRYPT_BUF_LEN / sizeof(uint32_t)];
+    uint32_t mfd_decrypt_buf[BFLB_MFD_DECRYPT_BUF_LEN / sizeof(uint32_t)];
 
     MFD_RUNNING_MEMORY_CHECK();
 
@@ -189,7 +167,7 @@ static bool mfd_parseData(void)
         if (crc_value != *(uint32_t *)(xipaddr_base + 4 + cipher_size)) {
             return false;
         }
-        if (cipher_size > BL_MFD_DECRYPT_BUF_LEN) {
+        if (cipher_size > BFLB_MFD_DECRYPT_BUF_LEN) {
             return false;
         }
     }
@@ -206,7 +184,7 @@ static bool mfd_parseData(void)
     }
 
     if (cipher_size) {
-        if (false == bl_mfd_decrypt((uint8_t *)(xipaddr_base + 4), cipher_size, (uint8_t *)mfd_decrypt_buf, iv)) {
+        if (false == bflb_mfd_decrypt((uint8_t *)(xipaddr_base + 4), cipher_size, (uint8_t *)mfd_decrypt_buf, iv)) {
             return false;
         }
         if (false == mfd_parsePartitionData(cipher_size, (uint8_t *)mfd_decrypt_buf, (uint8_t *)iv)) {
@@ -431,7 +409,18 @@ int mfd_getHardwareVersionString(char * buf, uint32_t size)
     return mfd_copyDataItem(ELEMENT_TYPE_HARDWARE_VERSION_STRING,(uint8_t*)buf,size);
 }
 
+int mfd_getProductFinish(uint8_t * buf, uint32_t size) 
+{
+    return mfd_copyDataItem(ELEMENT_TYPE_PRODUCT_APPEARANCE_FINISH,buf,size);
+}
+
+int mfd_getProductPrimaryColor(char * buf, uint32_t size)
+{
+    return mfd_copyDataItem(ELEMENT_TYPE_PRODUCT_APPEARANCE_PRIMARY_COLOR,(uint8_t*)buf,size);
+}
+
 int mfd_getElementById(int16_t id, uint8_t * buf, uint32_t size)
 {
     return mfd_copyDataItem(id, buf, size);
 }
+
