@@ -30,6 +30,8 @@
 #include <reent.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <limits.h>
 #include <sys/time.h>
 
 #include "bl_sys_time.h"
@@ -46,8 +48,22 @@ int _gettimeofday_r(struct _reent *reent, struct timeval *tp, void *tzvp)
 
     if (tp) {
         bl_sys_time_get(&epoch_time);
+
+        /* CVE-2024-30949 fix: Prevent integer overflow in time conversion */
+        if (epoch_time > UINT64_MAX - 1000) {
+            reent->_errno = EOVERFLOW;
+            return -1;
+        }
+
         tp->tv_sec = epoch_time / 1000;
-        tp->tv_usec = (epoch_time % 1000) * 1000;
+
+        /* Safe calculation avoiding overflow */
+        uint64_t msec_remainder = epoch_time % 1000;
+        if (msec_remainder > UINT64_MAX / 1000) {
+            reent->_errno = EOVERFLOW;
+            return -1;
+        }
+        tp->tv_usec = msec_remainder * 1000;
     }
 
     if (tzp) {
@@ -61,7 +77,24 @@ int _gettimeofday_r(struct _reent *reent, struct timeval *tp, void *tzvp)
 int _settimeofday_r(struct _reent *reent, const struct timeval *tp, const struct timezone *tzp)
 {
     if (tp) {
-        bl_sys_time_update((uint64_t)tp->tv_sec * 1000 + (uint64_t)tp->tv_usec/1000);
+        /* CVE-2024-30949 fix: Prevent integer overflow in time conversion */
+        uint64_t sec_msec;
+
+        /* Check for overflow in seconds to milliseconds conversion */
+        if (tp->tv_sec > UINT64_MAX / 1000) {
+            reent->_errno = EOVERFLOW;
+            return -1;
+        }
+        sec_msec = (uint64_t)tp->tv_sec * 1000;
+
+        /* Check for overflow in addition */
+        uint64_t usec_msec = (uint64_t)tp->tv_usec / 1000;
+        if (sec_msec > UINT64_MAX - usec_msec) {
+            reent->_errno = EOVERFLOW;
+            return -1;
+        }
+
+        bl_sys_time_update(sec_msec + usec_msec);
     }
 
     if (tzp) {

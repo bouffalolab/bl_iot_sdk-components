@@ -445,6 +445,12 @@ void *_malloc_r(struct _reent *ptr, size_t size)
         return NULL;
     }
 
+    /* CVE-2021-3420 fix: Check for size overflow */
+    if (size > SIZE_MAX - 16) {
+        ptr->_errno = ENOMEM;
+        return NULL;
+    }
+
 #if defined(CFG_USE_PSRAM)
     if (xPortGetFreeHeapSizePsram() > size) {
         result = (void*)pvPortMallocPsram(size);
@@ -471,6 +477,12 @@ void *_malloc_r(struct _reent *ptr, size_t size)
 void *_realloc_r(struct _reent *ptr, void *old, size_t newlen)
 {
     void* result;
+
+    /* CVE-2021-3420 fix: Check for size overflow */
+    if (newlen > SIZE_MAX - 16) {
+        ptr->_errno = ENOMEM;
+        return NULL;
+    }
 
 #if defined(CFG_USE_PSRAM)
     if ((NULL == old) || IS_PSARAM((uint32_t)old)) {
@@ -499,8 +511,14 @@ void *_calloc_r(struct _reent *ptr, size_t size, size_t len)
 {
     void* result;
 
-    if (size == 0)
+    if (size == 0 || len == 0)
     {
+        return NULL;
+    }
+
+    /* CVE-2021-3420 fix: Check for integer overflow in size * len */
+    if (len > SIZE_MAX / size) {
+        ptr->_errno = ENOMEM;
         return NULL;
     }
 
@@ -521,7 +539,7 @@ void *_calloc_r(struct _reent *ptr, size_t size, size_t len)
     }
 
 #ifdef SYS_TRACE_MEM_ENABLE
-    trace_malloc(result, size, (void *)__builtin_return_address(0));
+    trace_malloc(result, size * len, (void *)__builtin_return_address(0));
 #endif
 
     return result;
