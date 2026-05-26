@@ -271,6 +271,7 @@ struct bt_hci_cmd_hdr {
 
 /* OpCode Group Fields */
 #define BT_OGF_LINK_CTRL                        0x01
+#define BT_OGF_LINK_POLICY                      0x02
 #define BT_OGF_BASEBAND                         0x03
 #define BT_OGF_INFO                             0x04
 #define BT_OGF_STATUS                           0x05
@@ -464,6 +465,24 @@ struct bt_hci_cp_user_passkey_neg_reply {
 struct bt_hci_cp_io_capability_neg_reply {
 	bt_addr_t bdaddr;
 	u8_t   reason;
+} __packed;
+
+/* Link Policy commands */
+#define BT_LINK_POLICY_DISABLE_ALL              0x0000
+#define BT_LINK_POLICY_ENABLE_ROLE_SWITCH       0x0001
+#define BT_LINK_POLICY_ENABLE_HOLD_MODE         0x0002
+#define BT_LINK_POLICY_ENABLE_SNIFF_MODE        0x0004
+#define BT_LINK_POLICY_ENABLE_PARK_STATE        0x0008
+
+#define BT_HCI_OP_WRITE_LINK_POLICY             BT_OP(BT_OGF_LINK_POLICY, 0x000d)
+struct bt_hci_cp_write_link_policy {
+	u16_t handle;
+	u16_t link_policy;
+} __packed;
+
+#define BT_HCI_OP_WRITE_DEFAULT_LINK_POLICY     BT_OP(BT_OGF_LINK_POLICY, 0x000f)
+struct bt_hci_cp_write_default_link_policy {
+	u16_t link_policy;
 } __packed;
 
 #define BT_HCI_OP_SET_EVENT_MASK                BT_OP(BT_OGF_BASEBAND, 0x0001)

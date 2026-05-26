@@ -1,4 +1,24 @@
 # Changes
+## 2026-05-07
+1.[blestack] split HCI UART transport into reusable layers .
+
+## 2026-04-17
+1.[blestack] serialize mtu and data len exchange for oad and atvv.
+
+## 2026-04-08
+1. [L2CAP BR] Fix stale CID on reconnection: clear channel CIDs when destroyed so reused channel structs get fresh allocation on next connection.
+2. [host/conn] Fix connection reference leak after BR/EDR role switch: track original creation role to correctly release the sticky reference regardless of post-RSW live role.
+
+## 2026-04-07
+1. [BR/EDR] Enable role switch in default link policy settings during initialization, so the controller accepts incoming role switch requests from the peer.
+2. [host/conn] Fix connection reference double-unref after BR/EDR slave-to-master role switch, which caused an assert during A2DP disconnect.
+
+## 2026-04-01
+1.[blestack] Add support for setting BLE static random address.
+
+## 2026-03-12
+1. [blestack] Refactor tinycrypt header include paths.
+
 ## 2026-02-10
 1. [blestack] Add CONFIG_BT_ATT_PREPARE_COUNT configuration option to make ATT prepare count configurable (0-64 range) with validation in both build system and compile-time checks.
 
@@ -30,7 +50,7 @@
 1. [blestack]remove easyflash4 for bouffalo sdk.
 
 ## 2025-10-10
-1. [blestack]support set tx power and set bdaddr command on bl616d platform.
+1. [blestack]support set tx power and set bdaddr command on bl618dg platform.
 
 ## 2025-09-24
 1. [blestack]Use common config a macro for Bouffalo_SDK.
@@ -57,7 +77,7 @@
 1. [blestack] Add GATT API parameter invalid check.
 
 ## 2025-07-02
-1. [blestack] support ble stack on bl616d platform.
+1. [blestack] support ble stack on bl618dg platform.
 2. [blestack] Optimize ble debug monitor, replace "BT_WARN" by "putchar" to avoid stack overflow.
 
 ## 2025-06-16

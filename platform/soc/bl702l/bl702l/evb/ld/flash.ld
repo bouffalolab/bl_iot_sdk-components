@@ -3,7 +3,7 @@ OUTPUT_ARCH( "riscv" )
 ENTRY( bl702_start )
 
 __EM_SIZE = DEFINED(__EM_SIZE) ? __EM_SIZE : 0K;
-__CACHE_SIZE = DEFINED(__CACHE_SIZE) ? __CACHE_SIZE : 16K;
+__CACHE_SIZE = DEFINED(__CACHE_SIZE) ? __CACHE_SIZE : 8K;
 __stack_size = DEFINED(__stack_size) ? __stack_size : 2K;
 
 MEMORY

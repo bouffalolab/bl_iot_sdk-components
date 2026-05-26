@@ -1,17 +1,47 @@
 # change log on Thread module
 
-## 2026/2/10
-- openthread_utils: 1.6.18
-  - BL702/BL702L: update frame pending operation
-- openthread_br: 1.6.20
-- openthread/openthread_port/openthread_rest: 1.6.21
+## 2026/05/28
+- openthread: 1.7.8
+  - openthread_port: add api to set Thread instance for openthread port layer
+- openthread_br: 1.7.2
 
-## 2026/1/22
-- openthread_utils: 1.6.17
-- openthread_br: 1.6.20
-  - do txt replace action if mdns instance existed
-- openthread/openthread_port/openthread_rest: 1.6.21
+## 2026/05/14
+- openthread: 1.7.7
+  - openthread_rest: fix the crash with bad http request
+- openthread_br: 1.7.2
+  - remove duplicate mDNS TXT publish
 
+## 2026/05/12
+- openthread: 1.7.6
+  - Build: merge openthread_ncp into top-level CMakeLists.txt (single library)
+  - Rename OT_NCP/OT_RCP/OT_CLI/OT_FTD/OT_MTD to CONFIG_OT_*
+  - Add CONFIG_OT_RCP (radio-only) mode
+  - openthread_port: drop CFG_PREFIX, gate CLI on SYS_AOS_CLI_ENABLE
+- openthread_br: 1.7.1
+
+## 2026/05/08
+- openthread: 1.7.5
+  - add CSL TX/RX support, enh-ack improvements and debug traces
+- openthread_br: 1.7.1
+
+## 2026/04/20
+- openthread: 1.7.4
+  - enh-ack timestamp handling and compatibility
+- openthread_br: 1.7.1
+
+## 2026/03/30
+- openthread: 1.7.2
+  - Refactor lmac154 init to app layer with stack enable API
+  - Add stack_idx parameter for multi-stack radio interface support
+- openthread_br: 1.7.1
+
+## 2026/01/22
+- openthread: 1.7.1
+  - Update Openthread Stack to 1.4
+  - Re-org openthread port and rest code
+- openthread_br: 1.7.1
+  - Re-org openthread br
+  
 ## 2026/1/20
 
 - openthread_utils: 1.6.17

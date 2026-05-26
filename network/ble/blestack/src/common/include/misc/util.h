@@ -199,7 +199,9 @@ static inline s64_t arithmetic_shift_right(s64_t value, u8_t shift)
  * value to be e.g. a literal "1" at expansion time in the next macro,
  * not "(1)", etc...  Standard recursive expansion does not work.
  */
+#ifndef IS_ENABLED
 #define IS_ENABLED(config_macro) _IS_ENABLED1(config_macro)
+#endif
 
 /* Now stick on a "_XXXX" prefix, it will now be "_XXXX1" if config_macro
  * is "1", or just "_XXXX" if it's undefined.

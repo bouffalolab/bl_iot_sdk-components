@@ -86,7 +86,12 @@ static sys_slist_t br_channels;
 NET_BUF_POOL_FIXED_DEFINE(br_sig_pool, CONFIG_BT_MAX_CONN,
 			  BT_L2CAP_BUF_SIZE(L2CAP_BR_MIN_MTU), NULL);
 #else
+#if (CONFIG_BLE_USING_DYNAMIC_RAM)
+struct net_buf_pool* p_br_sig_pool;
+#define br_sig_pool (*p_br_sig_pool)
+#else
 struct net_buf_pool br_sig_pool;
+#endif /* CONFIG_BLE_USING_DYNAMIC_RAM */
 #endif
 
 /* BR/EDR L2CAP signalling channel specific context */
@@ -170,6 +175,14 @@ static void l2cap_br_chan_destroy(struct bt_l2cap_chan *chan)
 	k_delayed_work_cancel(&chan->rtx_work);
 
 	atomic_clear(BR_CHAN(chan)->flags);
+
+#if defined(BFLB_BREDR_PATCH_CLEAR_L2CAP_BR_STALE_CID)
+	/* Clear CIDs so reused channel structs get fresh allocation
+	 * on next connection instead of keeping stale values.
+	 */
+	BR_CHAN(chan)->rx.cid = 0U;
+	BR_CHAN(chan)->tx.cid = 0U;
+#endif
 }
 
 static void l2cap_br_rtx_timeout(struct k_work *work)
@@ -1628,7 +1641,11 @@ void bt_l2cap_br_init(void)
 	#endif
 
 #if defined(BFLB_DYNAMIC_ALLOC_MEM)
+	#if (CONFIG_BLE_USING_DYNAMIC_RAM)
+	net_buf_init(&p_br_sig_pool, CONFIG_BT_MAX_CONN, BT_L2CAP_BUF_SIZE(L2CAP_BR_MIN_MTU), NULL);
+	#else
 	net_buf_init(&br_sig_pool, CONFIG_BT_MAX_CONN, BT_L2CAP_BUF_SIZE(L2CAP_BR_MIN_MTU), NULL);
+	#endif
 #endif
 	sys_slist_init(&br_servers);
 

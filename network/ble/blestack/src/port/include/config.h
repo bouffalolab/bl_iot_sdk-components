@@ -3,6 +3,11 @@
 
 #include "FreeRTOSConfig.h"
 
+/*
+ * Memory Alignment Macros
+ */
+#define MEM_ALIGN_32(x) (((x) + 3) & ~3)  /* Align to 4-byte boundary */
+
 /**
  * CONFIG_BLUETOOTH: Enable the bluetooh stack
  */
@@ -849,5 +854,17 @@ then it does disconnected flow once more. This will cause hardfault issue becaus
 
 /* Fix the issue that conn_new reentry before atomic_set is completed, then different connections may be use the same conns[i]*/
 #define BFLB_BLE_PATCH_CONN_NEW_REENTRY_RISK
+
+/* Fix BR/EDR connection reference double-unref or leak after slave-to-master role switch.
+ * Track original creation role so notify_disconnected releases the sticky ref correctly. */
+#define BFLB_BREDR_PATCH_FIX_BREDR_CONN_REF_AFTER_ROLE_SWITCH
+
+/* Enable role switch in default link policy during BR/EDR initialization,
+ * so the controller accepts incoming role switch requests from the peer. */
+#define BFLB_BREDR_PATCH_ENABLE_BREDR_DEFAULT_ROLE_SWITCH_POLICY
+
+/* Fix stale L2CAP BR CID on reconnection: clear channel CIDs when destroyed
+ * so reused channel structs get fresh allocation on next connection. */
+#define BFLB_BREDR_PATCH_CLEAR_L2CAP_BR_STALE_CID
 
 #endif /* BLE_CONFIG_H */

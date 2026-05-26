@@ -5,6 +5,10 @@
 #include <stdint.h> 
 #include "btble_test_cmd.h"
 
+#if defined(CONFIG_BLE_BEACON_ONLY)
+#include "btble_adv_api.h"
+#endif /* CONFIG_BLE_BEACON_ONLY */
+
 
 struct btblecontroller_resource_conf{
     //The size of bluetooth EM area

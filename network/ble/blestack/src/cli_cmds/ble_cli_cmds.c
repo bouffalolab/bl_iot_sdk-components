@@ -137,7 +137,7 @@ BLE_CLI(connect_test_psm);
 #endif
 BLE_CLI(read_rssi);
 BLE_CLI(unpair);
-#if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
+#if defined(BL702L) || defined(BL616)
 BLE_CLI(ble_throughput_calc);
 #endif
 #endif
@@ -271,7 +271,7 @@ BLE_CLI(le_test_end);
         [Conn Interval Max: 0x0006-0C80; e.g.0030] \
         [Conn Latency: 0x0000-01f3; e.g.0004] \
         [Supervision Timeout: 0x000A-0C80; e.g.0010]);
-#if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
+#if defined(BL702L) || defined(BL616)
     SHELL_CMD_EXPORT_ALIAS(blecli_ble_throughput_calc, ble_set_throughput_calc, ble set throughputcalc \
         Parameter:[enable];[duration]);
 #endif
@@ -438,7 +438,7 @@ const struct cli_command btStackCmdSet[] STATIC_CLI_CMD_ATTRIBUTE = {
     [Conn Interval Max,0x0006-0C80,e.g.0030]\r\n\
     [Conn Latency,0x0000-01f3,e.g.0004]\r\n\
     [Supervision Timeout,0x000A-0C80,e.g.0010]\r\n", blecli_send_l2cap_conn_param_update_req},
-    #if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
+    #if defined(BL702L) || defined(BL616)
     {"ble_set_throughput_calc", "ble set throughputcalc\r\nParameter [enable]\r\n [duration]\r\n", blecli_ble_throughput_calc},
     #endif
     #if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)
@@ -740,9 +740,16 @@ void btcli_enable_cb(int err)
 
 BLE_CLI(enable)
 {
+#if (CONFIG_BLE_USING_DYNAMIC_RAM)
+	extern struct bt_dev_t* p_bt_dev;
+	if (p_bt_dev && atomic_test_bit(bt_dev.flags, BT_DEV_ENABLE)) {
+		return;
+	}
+#else
     if (atomic_test_bit(bt_dev.flags, BT_DEV_ENABLE)) {
         return;
     }
+#endif /* CONFIG_BLE_USING_DYNAMIC_RAM */
     #if !defined (CONFIG_BT_HOST_HCI_TL)
     // Initialize BLE controller
     #if defined(BL702) || defined(BL602)
@@ -1818,7 +1825,7 @@ BLE_CLI(read_rssi)
     }
 }
 
-#if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
+#if defined(BL702L) || defined(BL616)
 BLE_CLI(ble_throughput_calc)
 {  
     int err;

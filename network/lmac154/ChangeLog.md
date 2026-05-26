@@ -1,8 +1,41 @@
 # change log on lmac154 module
 
-## 2026/02/10
-- Version: 1.6.18
-  - BL702/BL702L: Improve to get frame pending result
+## 2026/05/08
+- Version: 1.7.7
+- Changes
+  - Add CSL IE generation, enh-ack, debug traces and build fixes
+
+## 2026/04/20
+- Version: 1.7.6
+- Changes
+  - Aligning monitor function implementation across multiple platforms
+
+## 2026/04/20
+- Version: 1.7.5
+- Changes
+  - enh-ack timing and tx/rx state improvements
+
+## 2026/04/14
+- Version: 1.7.4
+- Changes
+  - refactor and enhance frame parsing and multi-platform restructure
+
+## 2026/03/30
+- Version: 1.7.3
+- Changes
+  - Add stack_idx parameter to support multiple 802.15.4 instances
+  - Simplify callback function signatures by using stack_idx
+  - Update both regular and interrupt callback functions
+
+## 2026/02/04
+- Version: 1.7.2
+- Changes
+  - BL618DG: fix compile error
+
+## 2026/01/22
+- Version: 1.7.1
+- Changes
+  - Re-org the code for dual stack operation
 
 ## 2025/12/06
 - Version: 1.6.17

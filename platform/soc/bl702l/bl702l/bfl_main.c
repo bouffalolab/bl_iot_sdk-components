@@ -107,6 +107,20 @@ void __attribute__((weak)) user_vApplicationMallocFailedHook(void)
     }
 }
 
+#if ( configUSE_TICK_HOOK != 0 )
+#if !defined(CFG_USE_ROM_CODE) || defined(CFG_BUILD_FREERTOS)
+void __attribute__((weak)) vApplicationTickHook( void )
+#else
+void __attribute__((weak)) user_vApplicationTickHook(void)
+#endif
+{
+#if defined(CFG_ZIGBEE_ENABLE)
+    extern void ZB_MONITOR(void);
+    ZB_MONITOR();
+#endif
+}
+#endif
+
 #if !defined(CFG_USE_ROM_CODE) || defined(CFG_BUILD_FREERTOS)
 void __attribute__((weak)) vApplicationIdleHook(void)
 {
@@ -121,16 +135,6 @@ void __attribute__((weak)) vApplicationIdleHook(void)
 void __attribute__((weak)) vApplicationSleep( TickType_t xExpectedIdleTime )
 {
     /*empty*/
-}
-#endif
-
-#if ( configUSE_TICK_HOOK != 0 )
-void __attribute__((weak)) vApplicationTickHook( void )
-{
-#if defined(CFG_ZIGBEE_ENABLE)
-    extern void ZB_MONITOR(void);
-    ZB_MONITOR();
-#endif
 }
 #endif
 

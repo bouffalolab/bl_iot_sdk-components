@@ -252,6 +252,8 @@ int bl_sys_early_init(void)
 
     HBN_Hw_Pu_Pd_Cfg(DISABLE);
 
+    HBN_Set_User_Boot_Config(2);
+
 //    HBN_Set_Ldo11_All_Vout(HBN_LDO_LEVEL_1P00V);
 
 #if !(defined(CFG_PDS_ENABLE) || defined(CFG_HBN_ENABLE))

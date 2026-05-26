@@ -57,7 +57,12 @@ static dynamic_gatt_noti_callbck_func_t noti_callback=NULL;
 #if !defined(BFLB_STATIC_ALLOC_MEM)
 NET_BUF_POOL_DEFINE(dynamic_gatt_pool, 1, SERVER_BUF_SIZE, 0, NULL);
 #else
+#if (CONFIG_BLE_USING_DYNAMIC_RAM)
+struct net_buf_pool* p_dynamic_gatt_pool;
+#define dynamic_gatt_pool (*p_dynamic_gatt_pool)
+#else
 struct net_buf_pool dynamic_gatt_pool;
+#endif /* CONFIG_BLE_USING_DYNAMIC_RAM */
 #endif
 
 static uint8_t attr_count;
@@ -116,12 +121,12 @@ static void *gatt_buf_add(const void *data, size_t len)
 	return ptr;
 }
 
-static void *gatt_buf_reserve(size_t len)
+static void __attribute__((unused)) *gatt_buf_reserve(size_t len)
 {
 	return gatt_buf_add(NULL, len);
 }
 
-static void gatt_buf_clear(void)
+static void __attribute__((unused)) gatt_buf_clear(void)
 {
 	(void)memset(&gatt_buf, 0, sizeof(gatt_buf));
 }
@@ -206,6 +211,7 @@ static struct bt_gatt_attr *add_ccc(const struct bt_gatt_attr *attr)
 	struct bt_gatt_attr *attr_desc;
 	struct bt_gatt_chrc *chrc = attr->user_data;
 	struct gatt_value *value = NEXT_DB_ATTR(attr)->user_data;
+	(void)value;
 	struct _bt_gatt_ccc *ccc_ptr;
 	/* Check characteristic properties */
 	if (!(chrc->properties &(BT_GATT_CHRC_NOTIFY | BT_GATT_CHRC_INDICATE))) {
@@ -557,9 +563,17 @@ struct bt_gatt_attr* ble_dynamic_gatt_get_attr(struct bt_uuid *uuid)
 void ble_dynamic_gatt_server_init(void)
 {
 	#if (BFLB_STATIC_ALLOC_MEM)
+	#if (CONFIG_BLE_USING_DYNAMIC_RAM)
+	net_buf_init(GATTSERVER, &p_dynamic_gatt_pool, 1, SERVER_BUF_SIZE, NULL);
+    #else
 	net_buf_init(GATTSERVER, &dynamic_gatt_pool, 1, SERVER_BUF_SIZE, NULL);
+    #endif /* CONFIG_BLE_USING_DYNAMIC_RAM */
 	#else
+	#if (CONFIG_BLE_USING_DYNAMIC_RAM)
+	net_buf_init(&p_dynamic_gatt_pool, 1, SERVER_BUF_SIZE, NULL);
+    #else
 	net_buf_init(&dynamic_gatt_pool, 1, SERVER_BUF_SIZE, NULL);
+    #endif /* CONFIG_BLE_USING_DYNAMIC_RAM */
 	#endif /* BFLB_STATIC_ALLOC_MEM */
 
 	server_buf = net_buf_alloc(&dynamic_gatt_pool, K_NO_WAIT);

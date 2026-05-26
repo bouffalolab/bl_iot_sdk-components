@@ -133,7 +133,11 @@ struct bt_dev_br {
 #define BT_DEV_VS_CMDS_MAX  2
 
 /* State tracking for the local Bluetooth controller */
+#if (CONFIG_BLE_USING_DYNAMIC_RAM)
+struct bt_dev_t {
+#else
 struct bt_dev {
+#endif /* CONFIG_BLE_USING_DYNAMIC_RAM */
 	/* Local Identity Address(es) */
 	bt_addr_le_t		id_addr[CONFIG_BT_ID_MAX];
 	u8_t                    id_count;
@@ -211,6 +215,11 @@ struct bt_dev {
 #if defined(BFLB_BLE_SMP_SUPPORT_DISABLE_PAIR)
     bool disable_pair;
 #endif
+
+	u8_t adv_ch_map;
+#if (CONFIG_BLE_USING_DYNAMIC_RAM)
+	struct k_poll_event* events;
+#endif /* CONFIG_BLE_USING_DYNAMIC_RAM */
 };
 
 #if defined (CONFIG_BT_STACK_PTS)
@@ -237,7 +246,12 @@ typedef enum __packed{
 
 #endif 
 
+#if (CONFIG_BLE_USING_DYNAMIC_RAM)
+extern struct bt_dev_t* p_bt_dev;
+#define bt_dev (*p_bt_dev)
+#else
 extern struct bt_dev bt_dev;
+#endif /* CONFIG_BLE_USING_DYNAMIC_RAM */
 
 #if !defined(BL602) && !defined(BL702)
 struct bt_controller_sdk_ver{
@@ -294,6 +308,11 @@ int set_adv_channel_map(bt_gap_adv_chnl_map_t channel);
 int bt_get_local_public_address(bt_addr_le_t *adv_addr);
 int bt_get_local_ramdon_address(bt_addr_le_t *adv_addr);
 int bt_set_local_public_address(u8_t *adv_addr);
+/* Notice: Changing identity address (including static random address) after pairing
+   will invalidate IRK and cause bonded devices to fail reconnection.
+   It is strongly recommended NOT to change the random address after security
+   (pairing/bonding) has been established with any peer device.*/
+int bt_set_local_random_address(const bt_addr_le_t *addr);
 int bt_le_set_data_len(struct bt_conn *conn, u16_t tx_octets, u16_t tx_time);
 int hci_le_set_phy(struct bt_conn *conn, uint8_t all_phys,
 		  uint8_t pref_tx_phy, uint8_t pref_rx_phy, uint8_t phy_opts);
@@ -309,7 +328,7 @@ int8_t bt_get_tx_pwr(void);
 #endif
 int bt_le_read_chan_map(struct bt_conn *conn, struct bt_hci_rp_le_read_chan_map *rsp_buf);
 
-#if defined(BL702L) || defined(BL616) || defined(BL606P) || defined(BL808)
+#if defined(BL702L) || defined(BL616)
 int bt_le_throughput_calc(bool enable, u8_t interval);
 int bt_le_set_conn_window(u8_t percentage);
 #endif

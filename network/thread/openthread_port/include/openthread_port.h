@@ -34,17 +34,12 @@
 extern "C" {
 #endif
 
-#include <FreeRTOS.h>
-#include <portmacro.h>
-#include <task.h>
-
-#include <openthread-core-config.h>
 #include <openthread/thread.h>
 #include <openthread/logging.h>
 
 #define VERSION_OT_SRC_MAJOR 1
-#define VERSION_OT_SRC_MINOR 6
-#define VERSION_OT_SRC_PATCH 21
+#define VERSION_OT_SRC_MINOR 7
+#define VERSION_OT_SRC_PATCH 8
 
 // #define VERSION_OT_SRC_EXTRA_INFO "customer-1"
 
@@ -64,21 +59,9 @@ extern "C" {
 #define OTRADIO_RX_FRAME_BUFFER_NUM         8
 #endif
 
-typedef union {
-    struct {
-        uint16_t isCoexEnable:1;
-        uint16_t isFtd:1;
-        uint16_t isLinkMetricEnable:1;
-        uint16_t isCSLReceiverEnable:1;
-        uint16_t isTimeSyncEnable:1;
-        uint16_t isImmAck4Error:1;
-        uint16_t isCslPhaseUpdated:1;
-        uint16_t isTxTimestampValid:1;
-        uint16_t isWiFiCoexEnable:1;
-        uint16_t unused:7;
-    } bf;
-    uint16_t byte;
-} __packed otRadio_opt_t;
+#ifndef CONFIG_NXSPI_OPENTHREAD_RADIO
+#define CONFIG_NXSPI_OPENTHREAD_RADIO       0
+#endif
 
 typedef enum _ot_system_event {
     OT_SYSTEM_EVENT_NONE                                = 0,
@@ -112,20 +95,11 @@ typedef enum _ot_system_event {
         OT_SYSTEM_EVENT_RADIO_RX_DONE | OT_SYSTEM_EVENT_RADIO_RX_CRC_FIALED,
     OT_SYSTEM_EVENT_RADIO_ALL_MASK                      = OT_SYSTEM_EVENT_RADIO_TX_ALL_MASK | OT_SYSTEM_EVENT_RADIO_RX_ALL_MASK,
 
-    OT_SYSTEM_EVENT_POLL                                = 0x00010000,
-    OT_SYSTEM_EVENT_POLL_DATA_TIMEOUT                   = 0x00020000,
-    OT_SYSTEM_EVENT_FULL_STACK                          = 0x00040000,
-    OT_SYSTEM_EVENT_RESET_NEXT_POLL                     = 0x00080000,
-    OT_SYSTEM_EVENT_MAC_TX_RETRY                        = 0x00100000,
-    OT_SYSTEM_EVENT_CSL_TIMER                           = 0x00200000,
-
     OT_SYSTEM_EVENT_OTBR_MASK                           = 0x00800000,
     OT_SYSTEM_EVENT_APP_MASK                            = 0xff000000,
 
     OT_SYSTEM_EVENT_ALL                                 = 0xffffffff,
 } ot_system_event_t;
-
-extern ot_system_event_t ot_system_event_var;
 
 /****************************************************************************//**
  * @brief  Start OpenThread task.
@@ -135,7 +109,7 @@ extern ot_system_event_t ot_system_event_var;
  * @return None
  *
 *******************************************************************************/
-void otrStart(otRadio_opt_t opt);
+void otrStart(void);
 
 /****************************************************************************//**
  * @brief  Get current OpenThread instance.
@@ -207,7 +181,29 @@ void ot_alarmTask(ot_system_event_t sevent);
  * @return None
  *
 *******************************************************************************/
-void ot_radioInit(otRadio_opt_t opt);
+void ot_radioInit(void);
+
+/****************************************************************************//**
+ * @brief  Set OpenThread instance used by radio event callbacks.
+ *
+ * @param  instance, OpenThread instance created by upper stack
+ *
+ * @return None
+ *
+*******************************************************************************/
+void ot_radioSetInstance(otInstance *instance);
+
+/****************************************************************************//**
+ * @brief  Set CSL TX SFD offset compensation value
+ *
+ * @param  aOffsetSymCnt: compensation in symbol count, added to the
+ *         estimated TX SFD time when computing CSL IE phase. Positive
+ *         means the actual TX SFD is later than the hardware estimate.
+ *
+ * @return None
+ *
+*******************************************************************************/
+void ot_radioSetCslTxOffset(int8_t aOffsetSymCnt);
 
 /****************************************************************************//**
  * @brief  Init uart.
@@ -340,16 +336,6 @@ void otrExitCrit(uint32_t tag);
 void otrNotifyEvent(ot_system_event_t sevent);
 
 /****************************************************************************//**
- * @brief  Get system event posted by otrNotifyEvent, and clean system event.
- *
- * @param  None
- *
- * @return system event
- *
-*******************************************************************************/
-ot_system_event_t otrGetNotifyEvent(void);
-
-/****************************************************************************//**
  * @brief  Get OTBR hostname
  *
  * @param  None
@@ -428,7 +414,7 @@ void otrAppProcess(ot_system_event_t sevent);
  * @return None
  *
 *******************************************************************************/
-#define OT_APP_NOTIFY_ISR(ebit)             otrNotifyEvent(ebit & OT_SYSTEM_EVENT_APP)
+#define OT_APP_NOTIFY_ISR(ebit)             otrNotifyEvent(ebit & OT_SYSTEM_EVENT_APP_MASK)
 
 
 /****************************************************************************//**
@@ -441,7 +427,7 @@ void otrAppProcess(ot_system_event_t sevent);
  * @return None
  *
 *******************************************************************************/
-#define OT_APP_NOTIFY(ebit)                 otrNotifyEvent(ebit & OT_SYSTEM_EVENT_APP)
+#define OT_APP_NOTIFY(ebit)                 otrNotifyEvent(ebit & OT_SYSTEM_EVENT_APP_MASK)
 
 /****************************************************************************//**
  * @brief  An interface for nxspi to notify rxd ready.
@@ -449,7 +435,7 @@ void otrAppProcess(ot_system_event_t sevent);
  * @return None
  *
 *******************************************************************************/
-#if NXSPI_OPENTHREAD_RADIO
+#if CONFIG_NXSPI_OPENTHREAD_RADIO
 void ot_nxspi_notify_rxd(void);
 #endif
 

@@ -39,6 +39,10 @@ enum {
 	#if defined(BFLB_BLE_AVOID_REMOVE_GATT_SUBSCRIPTION_RISK)
 	BT_CONN_GATT_REMOVE_SUBSCRIPTION_GOING,
 	#endif
+	#if defined(BFLB_BREDR_PATCH_FIX_BREDR_CONN_REF_AFTER_ROLE_SWITCH)
+	/* BR/EDR: original master role, survives role switch */
+	BT_CONN_BR_INITIAL_MASTER,
+	#endif
 	/* Total number of flags - must be at the end of the enum */
 	BT_CONN_NUM_FLAGS,
 };
@@ -343,6 +347,11 @@ struct net_buf *bt_conn_create_frag_timeout(size_t reserve, s32_t timeout);
 
 /* Initialize connection management */
 int bt_conn_init(void);
+
+#if (CONFIG_BLE_USING_DYNAMIC_RAM)
+/* Deinitialize connection management */
+int bt_conn_deinit(void);
+#endif /* CONFIG_BLE_USING_DYNAMIC_RAM */
 
 /* Selects based on connecton type right semaphore for ACL packets */
 struct k_sem *bt_conn_get_pkts(struct bt_conn *conn);

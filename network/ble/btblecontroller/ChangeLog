@@ -1,9 +1,50 @@
 # Changes
+## 2026-05-13
+1. Support extended advertising at BL702L.
+
+## 2026-04-16
+1. Add get mac api in adv only mode.
+
+## 2026-04-10
+1. Support beacon only using controller api, enable CONFIG_BLE_BEACON_ONLY to open this feature.
+
+## 2026-04-07
+1. [BL616/BL618DG] Fix BR/EDR slave-to-master role switch failure on first boot: the BT radio TX/RX path delay registers were left at HW default 0 because RF reset was skipped, breaking role-switch FHS timing compensation. Program the canonical values during RF initialization so the link driver reads correct delays.
+2. [BR/EDR] When role switch policy is not enabled, reject incoming role switch requests with "Role Change Not Allowed" instead of "Unsupported Remote Feature", matching the spec and preventing some peers from retrying indefinitely.
+
+## 2026-03-27
+1.[BL616CL]Fix the issue that the device may fail to enter ble deep sleep mode on the next attempt after software wakeup from BLE deep sleep.
+
+## 2026-03-25
+1.[BL616CL/BL702L]Disable BLE WLAN coexistence connection keep feature. BL702L is BLE-only (no WLAN), BL616CL disabled for ROM code builds.
+
+## 2026-03-23
+1.Fix a BlueZ initialization failure caused by the fact that btblecontroller's local supported commands include the HCI Set Default PHY command, even though PHY update functionality is not supported.
+
+## 2026-03-19
+1. Optimize BLE coexistence priority boost timing to event boundary for better BLE/WiFi fairness. Boost priority at event start instead of scheduling phase, reducing WiFi blocking time by ~90%.
+2. fix: WiFi MAC recovery by blocking ACK/BA auto-response during BLE priority boost period.
+
+## 2026-03-16
+1.[BL702L]If only BLE legacy advertising is active, put BLE into a lightweight mode for transmitting advertisements after waking up from PDS(power down sleep) to reduce power consumption.
+
+## 2026-03-16
+1.[BL616CL]Add bl616cl specific RISC-V architecture options.
+
+## 2026-03-06
+1. Properly clean up PDS allocated resources in BLE controller deinit.
+
+## 2026-02-24
+1. refactor: Replace manual bit operations with dedicated getter/setter functions in BLE coexistence priority management.
+
+## 2026-02-06
+1. fix: BLE coexistence priority boost for CRC/RX timeout/Length/LLID/SN/RXNESN errors.
+
 ## 2026-02-02
-1.[BL616L/BL616]Bound __EM_SIZE in ld file to CONFIG_EM_SIZE
+1.[BL616CL/BL616]Bound __EM_SIZE in ld file to CONFIG_EM_SIZE
 
 ## 2026-01-23
-1.[BL616L]Add ble m2s1 and m0s1 libs for BL616L.
+1.[BL616CL]Add ble m2s1 and m0s1 libs for BL616CL.
 
 ## 2026-01-21
 1.Fix EBQ issue: Fix end isr not generated caused by commit(bfe34725).
@@ -13,7 +54,7 @@
 5.Fix EBQ issue: Optimise scan rssi.
 
 ## 2026-01-21
-1.[BL616L]Add ble mfg lib for BL616L.
+1.[BL616CL]Add ble mfg lib for BL616CL.
 
 ## 2026-01-20
 1.Fix EBQ issue: Correct the way to calculate time_offset in iso framed seg.
@@ -33,7 +74,7 @@
 1.Optimize connection parameter update handling for multi-connection scenarios.
 
 ## 2025-11-24
-1.[BL616][BL616D][BL702L]Fix the crash issue when the remaining EM is not used by ke memory.
+1.[BL616][BL618DG][BL702L]Fix the crash issue when the remaining EM is not used by ke memory.
 
 ## 2025-11-20
 1. Send voice data over hci also for qualification test.
@@ -41,19 +82,19 @@
 3. Set BR/EDR's tx power to the max value for qualification test.
 
 ## 2025-11-19
-1.[BL616D]Write and read the deepsleep related registers based on 40MHz cycles.
+1.[BL618DG]Write and read the deepsleep related registers based on 40MHz cycles.
 
 ## 2025-11-18
-1.[BL616D]Set combo path as default setting.
+1.[BL618DG]Set combo path as default setting.
 
 ## 2025-11-12
-1.[BL616D]Correct ble T_IFS over 1M PHY on fpga.
+1.[BL618DG]Correct ble T_IFS over 1M PHY on fpga.
 
 ## 2025-11-04
 1. Ensure the minimum tx power set to br/edr is 0 dbm when decreasing tx power.
 
 ## 2025-10-31
-1.[BL616D]Make bluetooth get mac address from efuse.
+1.[BL618DG]Make bluetooth get mac address from efuse.
 
 ## 2025-10-21
 1. Added new BLE event priority configuration APIs for controller.
@@ -62,31 +103,31 @@
 1. Fix the CONFIG_BLE_ACT_MAX number of ble1m10s1bredr0 lib  to resolve resource insufficiency issues.
 
 ## 2025-10-16
-1.[BL616L][BL616D]Fix issue found in EBQ test:btblecontroller doesn't report hci number of complete packet event when it rejects the hci iso tx data because tx path from host to controller is not set up.
-2.[BL616L]Fix issue found in EBQ test:BIS receiver triggers a synchronization timeout window widening value has reached its limit.
-3.[BL616L][BL616D]Fix issue found in EBQ test:The count of hci number of complete packet event reported by cis is less than expected in some corner case.
+1.[BL616CL][BL618DG]Fix issue found in EBQ test:btblecontroller doesn't report hci number of complete packet event when it rejects the hci iso tx data because tx path from host to controller is not set up.
+2.[BL616CL]Fix issue found in EBQ test:BIS receiver triggers a synchronization timeout window widening value has reached its limit.
+3.[BL616CL][BL618DG]Fix issue found in EBQ test:The count of hci number of complete packet event reported by cis is less than expected in some corner case.
 
 ## 2025-10-15
-1.[BL616D]Fix an error when receive disconnect command during send cis req, and cis req is reject.
-2.[BL616D]T_IFS + 1us for 1M rx2tx
+1.[BL618DG]Fix an error when receive disconnect command during send cis req, and cis req is reject.
+2.[BL618DG]T_IFS + 1us for 1M rx2tx
 
 ## 2025-10-15
-1.[BL616D]Fix the issue that BIS receiver fails to receive the second BIS event's packet.
-2.[BL616L][FPGA]Fix issue found in EBQ test: A crash occurred when the hci layer was retrieving the length of the returned event.
-3.[BL616L][FPGA]Fix issue found in EBQ test: T_IFS is small (about 147us) when rx is on 500k coded phy.
+1.[BL618DG]Fix the issue that BIS receiver fails to receive the second BIS event's packet.
+2.[BL616CL][FPGA]Fix issue found in EBQ test: A crash occurred when the hci layer was retrieving the length of the returned event.
+3.[BL616CL][FPGA]Fix issue found in EBQ test: T_IFS is small (about 147us) when rx is on 500k coded phy.
 
 ## 2025-09-24
-1.[BL616][BL616D]Use common config a macro for Bouffalo_SDK
+1.[BL616][BL618DG]Use common config a macro for Bouffalo_SDK
 
 ## 2025-09-11
-1. [BL616D]Use HZ32M to calculate sleep time.
+1. [BL618DG]Use HZ32M to calculate sleep time.
 
 ## 2025-09-09
 1.Enhance btble controller port layer.
 
 ## 2025-09-05
-1.[BL616D]Fix rx2tx T_IFS < 148us when using coded 500k phy;
-2.[BL616D]Change access address error register address.
+1.[BL618DG]Fix rx2tx T_IFS < 148us when using coded 500k phy;
+2.[BL618DG]Change access address error register address.
 
 ## 2025-09-04
 1.[BL616] calling specified phyrf configuration API
@@ -95,7 +136,7 @@
 1.[BL616]Only do sw pds reset during btblecontroller initialization if PDS is enabled to avoid USB disconnection in wlan&ble transparent transmission firmware.
 
 ## 2025-08-06
-1. [BL616D]Change the ble rx rssi conversion.
+1. [BL618DG]Change the ble rx rssi conversion.
 
 ## 2025-07-23
 1.[BL702L]Create a rom patch to fix the assert issue in end isr because et status is 0 which is unexpected.
@@ -104,22 +145,22 @@
 1.Unify chip-specific directory naming to use full chip names.
 
 ## 2025-07-17
-1.[BL616D]Add tmp rf_force_switch to enable bluetooth RF 2G Path.
+1.[BL618DG]Add tmp rf_force_switch to enable bluetooth RF 2G Path.
 
 ## 2025-07-10
-1.[BL616D]Change the hci uart pin config.
+1.[BL618DG]Change the hci uart pin config.
 
 ## 2025-07-03
-1.[bl616][BL616L][BL616D]Support entering long-term sleep when there is no BLE activity.
+1.[bl616][BL616CL][BL618DG]Support entering long-term sleep when there is no BLE activity.
 
 ## 2025-07-02
-1. [BL616D] Add BL616D support BT feature.
+1. [BL618DG] Add BL618DG support BT feature.
 
 ## 2025-06-16
 1. Integrate DTM HCI CMD header files to prevent inconsistencies between MFG and standard HCI CMD header files.
 
 ## 2025-06-11
-1. [BL616D] Add BL616D support (under verfication).
+1. [BL618DG] Add BL618DG support (under verfication).
 
 ## 2025-06-10
 1.[bl702L][bl616]To avoid sleep problems, it is forbidden to do software wakeup when the remaining sleep time is less than or equal to 1ms.
