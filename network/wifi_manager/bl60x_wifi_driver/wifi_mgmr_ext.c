@@ -46,6 +46,7 @@
 #include "wifi_mgmr_profile.h"
 #include "bl_mod_params.h"
 #include "bl_msg_tx.h"
+#include "bl_wifi.h"
 
 #include "wifi_hosal.h"
 #include <wifi_hosal.h>
@@ -162,7 +163,7 @@ static void wifi_eth_sta_enable(struct netif *netif, uint8_t mac[6])
     memcpy(netif->hwaddr, mac, 6);//overwrite mac addressin netif
     if (mac_is_unvalid(netif->hwaddr)) {
         /* set netif MAC hardware address */
-        wifi_hosal_efuse_read_mac(netif->hwaddr);
+        bl_wifi_mac_addr_get(netif->hwaddr);
         if (mac_is_unvalid(netif->hwaddr)) {
             /*Make sure we have a default valid MAC address*/
             //TODO generate a random mac address
@@ -297,7 +298,7 @@ int wifi_mgmr_sta_mac_get(uint8_t mac[6])
     /*should we set default mac address/get efuse address here?*/
     //TODO use unified mac address init
     if (mac_is_unvalid(wifiMgmr.wlan_sta.mac)) {
-        wifi_hosal_efuse_read_mac(wifiMgmr.wlan_sta.mac);
+        bl_wifi_mac_addr_get(wifiMgmr.wlan_sta.mac);
         if (mac_is_unvalid(wifiMgmr.wlan_sta.mac)) {
             /*Make sure we have a default valid MAC address*/
             //TODO generate a random mac address
@@ -609,7 +610,7 @@ static void wifi_eth_ap_enable(struct netif *netif, uint8_t mac[6])
     memcpy(netif->hwaddr, mac, 6);//overwrite mac addressin netif
     if (mac_is_unvalid(netif->hwaddr)) {
         /* set netif MAC hardware address */
-        wifi_hosal_efuse_read_mac(netif->hwaddr);
+        bl_wifi_mac_addr_get(netif->hwaddr);
         if (mac_is_unvalid(netif->hwaddr)) {
             /*Make sure we have a default valid MAC address*/
             //TODO generate a random mac address
@@ -670,7 +671,7 @@ int wifi_mgmr_ap_mac_get(uint8_t mac[6])
     /*should we set default mac address/get efuse address here?*/
     //TODO use unified mac address init
     mac_is_unvalid(wifiMgmr.wlan_ap.mac);
-    wifi_hosal_efuse_read_mac(wifiMgmr.wlan_ap.mac);
+    bl_wifi_mac_addr_get(wifiMgmr.wlan_ap.mac);
     if (mac_is_unvalid(wifiMgmr.wlan_ap.mac)) {
         /*Make sure we have a default valid MAC address*/
         //TODO generate a random mac address

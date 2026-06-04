@@ -40,6 +40,7 @@
 #include "bl_defs.h"
 #include "bl_tx.h"
 #include "bl_msg_tx.h"
+#include "bl_wifi.h"
 #include "bflb_os_private.h"
 #include "wifi_mgmr.h"
 #include "wifi_mgmr_api.h"
@@ -308,7 +309,7 @@ int bl606a0_wifi_init(wifi_conf_t *conf)
 
     bflb_os_printf("\r\n\r\n[BL] Initi Wi-Fi");
     memset(mac, 0, sizeof(mac));
-    wifi_hosal_efuse_read_mac(mac);
+    bl_wifi_mac_addr_get(mac);
     bflb_os_printf(" with MAC #### %02X:%02X:%02X:%02X:%02X:%02X ####\r\n", mac[0],
             mac[1],
             mac[2],
