@@ -56,7 +56,9 @@
 #include "bitset.h"
 
 #include "virt_net.h"
+#include "virt_net_pending.h"
 #include "pkg_protocol.h"
+#include "virt_net_protocol.h"
 #include <ramsync_upper.h>
 #include "blog.h"
 
@@ -73,25 +75,37 @@ struct virt_net_custom_pbuf {
 #define VIRT_NET_RXBUFF_OFFSET (sizeof(struct virt_net_custom_pbuf))
 
 /* 头部的假数据，绕过DMA/SPI FIFO缓存 */
+#ifndef CFG_VIRT_NET_RXBUFF_CNT
 #if defined(CFG_USE_PSRAM)
 #define VIRT_NET_RXBUFF_CNT (16)
 #else
 #define VIRT_NET_RXBUFF_CNT (4)
 #endif
+#else
+#define VIRT_NET_RXBUFF_CNT CFG_VIRT_NET_RXBUFF_CNT
+#endif
 #define VIRT_NET_BUFF_SIZE (TP_PAYLOAD_LEN + VIRT_NET_RXBUFF_OFFSET) /* + sizeof(pbuf header) */
-#define VIRT_NET_MAX_PENDING_CMD (32)
-
 BITSET_DEFINE(rx_buf_ind, VIRT_NET_RXBUFF_CNT);
 
 typedef uint8_t (*rx_buff_t)[VIRT_NET_BUFF_SIZE];
 
 static int inited = 0;
 
-/* semaphore slot */
-static SemaphoreHandle_t sem_slot[VIRT_NET_MAX_PENDING_CMD];
-static void *sem_context[VIRT_NET_MAX_PENDING_CMD];
+struct virt_net_waiter {
+  SemaphoreHandle_t sem;
+  int result;
+};
+
+struct virt_net_completion_context {
+  struct virt_net_ramsync *sobj;
+  uint8_t *response;
+};
+
+static struct virt_net_pending_table pending_table;
 static SemaphoreHandle_t slot_mutex;
 static StaticSemaphore_t xSlotMutexBuffer;
+static SemaphoreHandle_t tx_mutex;
+static StaticSemaphore_t xTxMutexBuffer;
 
 static uint8_t* tx_buffer;
 
@@ -118,39 +132,6 @@ struct virt_net_ramsync {
 static int __virt_net_ramsync_init(virt_net_t obj);
 static int __virt_net_ramsync_deinit(virt_net_t obj);
 static void __virt_net_task(void *pvParameters);
-
-static inline int acquire_semaphore_slot(SemaphoreHandle_t sem) {
-  int idx;
-  assert(sem != NULL);
-
-  xSemaphoreTake(slot_mutex, portMAX_DELAY);
-  for (idx = 0; idx < (sizeof(sem_slot) / sizeof(sem_slot[0])); idx++) {
-    if (sem_slot[idx] != NULL) {
-      continue;
-    }
-
-    sem_slot[idx] = sem;
-    xSemaphoreGive(slot_mutex);
-    return idx;
-  }
-  xSemaphoreGive(slot_mutex);
-
-  return -1;
-}
-
-static inline SemaphoreHandle_t release_semaphore_slot(int idx) {
-  assert(idx >= 0 && idx < (sizeof(sem_slot) / sizeof(sem_slot[0])));
-  SemaphoreHandle_t ret = NULL;
-
-  xSemaphoreTake(slot_mutex, portMAX_DELAY);
-  if (sem_slot[idx]) {
-    ret = sem_slot[idx];
-    sem_slot[idx] = NULL;
-  }
-  xSemaphoreGive(slot_mutex);
-
-  return ret;
-}
 
 static uint8_t *__alloc_rxbuf(struct virt_net_ramsync *sobj) {
   assert(sobj != NULL);
@@ -235,11 +216,20 @@ static err_t __link_output(struct netif *netif, struct pbuf *p)
   unsigned int offset = 0;
   uint16_t subtype;
   struct pkg_protocol *pkg_header = (struct pkg_protocol *)tx_buffer;
+  size_t frame_length;
+  int tx_result;
   assert(sobj != NULL);
 
+  xSemaphoreTake(tx_mutex, portMAX_DELAY);
+  if (TP_PAYLOAD_LEN < sizeof(*pkg_header) + sizeof(subtype) ||
+      p->tot_len > TP_PAYLOAD_LEN - sizeof(*pkg_header) - sizeof(subtype)) {
+    xSemaphoreGive(tx_mutex);
+    return ERR_BUF;
+  }
+
   subtype = 0x2000;
-  memcpy(pkg_header->payload + offset, &subtype, 2);
-  offset = 2;
+  memcpy(pkg_header->payload + offset, &subtype, sizeof(subtype));
+  offset = sizeof(subtype);
 
   for (curr = p; curr != NULL; curr = curr->next) {
     memcpy(pkg_header->payload + offset, curr->payload, curr->len);
@@ -250,13 +240,15 @@ static err_t __link_output(struct netif *netif, struct pbuf *p)
   /**netbus: 
    * 1. handle_eth_wifi_frame_recv passes (pkg_header->length - 2) to pbuf_take
    * 2. pbuf has 1514 tot_len limitation*/
-  pkg_header->length = p->tot_len + 2;
+  pkg_header->length = p->tot_len + sizeof(subtype);
 
-  uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-                          pkg_header->length + 4 + sizeof(struct pkg_protocol), URAMSYNC_FOREVER);
+  frame_length = sizeof(*pkg_header) + pkg_header->length;
+  tx_result = uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
+                                      frame_length, URAMSYNC_FOREVER);
   blog_info("__link_output pkg_header->len:%d type:0x%x\r\n", pkg_header->length, pkg_header->type);
+  xSemaphoreGive(tx_mutex);
 
-  return ERR_OK;
+  return tx_result;
 }
 
 static void pbuf_free_spi_custom_fn(struct pbuf *p) {
@@ -276,6 +268,9 @@ static int pkg_protocol_data_handler(struct virt_net_ramsync *sobj, struct pkg_p
 
   pbuf = pbuf_alloced_custom(PBUF_RAW, pkg_header->length, PBUF_REF, &spbuf->p,
                              (uint8_t *)pkg_header->payload, pkg_header->length);
+  if (pbuf == NULL) {
+    return -1;
+  }
 
   if (!sobj->vnet.netif.input) {
     return -1;
@@ -293,6 +288,9 @@ static void __timer_callback(TimerHandle_t handle)
     struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)pvTimerGetTimerID(handle);
 
     printf("Dhcp timeout, Ip Got Failed.\r\n");
+
+    event_propagate(sobj, VIRT_NET_EV_ON_DHCP_TIMEOUT, NULL);
+
     if (sobj->vnet.ctrl) {
         sobj->vnet.ctrl(&sobj->vnet, VIRT_NET_CTRL_DISCONNECT_AP);
     }
@@ -305,10 +303,206 @@ static void wifi_info_gate(struct netif* netif, uint32_t *ip, uint32_t *gw, uint
     *gw = netif_ip4_gw(netif)->addr;
 }
 
+static int complete_mac(void *context, const void *payload, size_t payload_len)
+{
+  struct virt_net_completion_context *completion_context = context;
+  const struct pkg_protocol *frame = payload;
+  const struct pkg_protocol_cmd *pkg_cmd;
+  uint8_t *mac;
+
+  if (completion_context == NULL || completion_context->sobj == NULL ||
+      completion_context->response == NULL || frame == NULL ||
+      payload_len != sizeof(*frame) + sizeof(*pkg_cmd) + 6U) {
+    return -1;
+  }
+
+  pkg_cmd = (const struct pkg_protocol_cmd *)frame->payload;
+  mac = completion_context->response;
+  memcpy(mac, pkg_cmd->payload, 6U);
+  memcpy(completion_context->sobj->vnet.mac, pkg_cmd->payload, 6U);
+  blog_info("got mac:%x:%x:%x:%x:%x:%x\r\n",
+            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+  return 0;
+}
+
+static int complete_scan(void *context, const void *payload,
+                         size_t payload_len)
+{
+  struct virt_net_completion_context *completion_context = context;
+  struct pkg_protocol *frame = (struct pkg_protocol *)payload;
+  netbus_fs_scan_ind_cmd_msg_t *msg;
+  size_t expected_len;
+  uint16_t i;
+
+  if (completion_context == NULL || completion_context->sobj == NULL ||
+      frame == NULL ||
+      payload_len < sizeof(*frame) +
+          offsetof(netbus_fs_scan_ind_cmd_msg_t, records)) {
+    return -1;
+  }
+
+  msg = (netbus_fs_scan_ind_cmd_msg_t *)frame->payload;
+  expected_len = sizeof(*frame) +
+      offsetof(netbus_fs_scan_ind_cmd_msg_t, records) +
+      (size_t)msg->num * sizeof(msg->records[0]);
+  if (payload_len != expected_len) {
+    return -1;
+  }
+
+  blog_info("Scan done! num = %d \r\n", msg->num);
+  for (i = 0; i < msg->num; i++) {
+    blog_info("%.*s %d %d %d %d %d\r\n",
+              (int)sizeof(msg->records[i].ssid),
+              (const char *)msg->records[i].ssid,
+              msg->records[i].channel, msg->records[i].rssi,
+              msg->records[i].channel, msg->records[i].auth_mode,
+              msg->records[i].cipher);
+  }
+
+  return event_propagate(completion_context->sobj,
+                         VIRT_NET_EV_ON_SCAN_DONE, frame);
+}
+
+static int complete_link_status(void *context, const void *payload,
+                                size_t payload_len)
+{
+  struct virt_net_completion_context *completion_context = context;
+  struct pkg_protocol *frame = (struct pkg_protocol *)payload;
+  netbus_fs_link_status_ind_cmd_msg_t *status;
+  ip4_addr_t ip = {0}, gw = {0}, mask = {0};
+  char ip_str[20], gw_str[20], mask_str[20];
+
+  if (completion_context == NULL || completion_context->sobj == NULL ||
+      frame == NULL ||
+      payload_len != sizeof(*frame) +
+          sizeof(netbus_fs_link_status_ind_cmd_msg_t)) {
+    return -1;
+  }
+
+  status = (netbus_fs_link_status_ind_cmd_msg_t *)frame->payload;
+  blog_info("get link status indicate!\r\n");
+  wifi_info_gate(&completion_context->sobj->vnet.netif,
+                 &ip.addr, &gw.addr, &mask.addr);
+  strcpy(ip_str, ip4addr_ntoa(&ip));
+  strcpy(gw_str, ip4addr_ntoa(&gw));
+  strcpy(mask_str, ip4addr_ntoa(&mask));
+  blog_info("%s,%s,%s\r\n", ip_str, gw_str, mask_str);
+  if (status->record.link_status == BF1B_WIFI_LINK_STATUS_UP) {
+    blog_info("link status up!\r\n");
+  } else if (status->record.link_status == BF1B_WIFI_LINK_STATUS_DOWN) {
+    blog_info("link status down!\r\n");
+  } else {
+    blog_info("link status unknown!\r\n");
+  }
+
+  if (strcmp(ip_str, "0.0.0.0") && status->record.mgmr_state == 3) {
+    status->record.mgmr_state = 4;
+  }
+  blog_info("state:%d\r\n", status->record.mgmr_state);
+  blog_info("ssid:%.*s\r\n", (int)sizeof(status->record.ssid),
+            (const char *)status->record.ssid);
+  blog_info("bssid: %02x%02x%02x%02x%02x%02x\r\n",
+            status->record.bssid[0], status->record.bssid[1],
+            status->record.bssid[2], status->record.bssid[3],
+            status->record.bssid[4], status->record.bssid[5]);
+
+  return event_propagate(completion_context->sobj,
+                         VIRT_NET_EV_ON_LINK_STATUS_DONE, frame);
+}
+
+static int complete_dev_version(void *context, const void *payload,
+                                size_t payload_len)
+{
+  struct virt_net_completion_context *completion_context = context;
+  const struct pkg_protocol *frame = payload;
+  const struct pkg_protocol_cmd *pkg_cmd;
+
+  if (completion_context == NULL || completion_context->response == NULL ||
+      frame == NULL ||
+      payload_len != sizeof(*frame) + sizeof(*pkg_cmd) + sizeof(uint32_t)) {
+    return -1;
+  }
+
+  pkg_cmd = (const struct pkg_protocol_cmd *)frame->payload;
+  memcpy(completion_context->response, pkg_cmd->payload, sizeof(uint32_t));
+
+  return 0;
+}
+
+static int complete_pending_response(struct pkg_protocol *pkg_header)
+{
+  struct pkg_protocol_cmd *pkg_cmd =
+      (struct pkg_protocol_cmd *)pkg_header->payload;
+  struct virt_net_pending_entry snapshot;
+  struct virt_net_waiter *waiter;
+  void *finished_waiter = NULL;
+  int completion_result;
+  int finish_result;
+
+  xSemaphoreTake(slot_mutex, portMAX_DELAY);
+  if (virt_net_pending_claim(&pending_table, pkg_cmd->msg_id, pkg_cmd->cmd,
+                             &snapshot) != VIRT_NET_PENDING_CLAIMED) {
+    xSemaphoreGive(slot_mutex);
+    return 0;
+  }
+  xSemaphoreGive(slot_mutex);
+
+  completion_result = snapshot.complete(
+      snapshot.context, pkg_header,
+      sizeof(*pkg_header) + (size_t)pkg_header->length);
+
+  waiter = (struct virt_net_waiter *)snapshot.waiter;
+  xSemaphoreTake(slot_mutex, portMAX_DELAY);
+  waiter->result = completion_result;
+  finish_result = virt_net_pending_finish(&pending_table, snapshot.token,
+                                          &finished_waiter);
+  assert(finish_result == 0);
+  assert(finished_waiter == waiter);
+  if (finish_result == 0 && finished_waiter == waiter) {
+    xSemaphoreGive(waiter->sem);
+  }
+  xSemaphoreGive(slot_mutex);
+
+  return completion_result;
+}
+
+static int wait_for_pending_response(struct virt_net_waiter *waiter,
+                                     uint16_t token, uint32_t timeout)
+{
+  enum virt_net_pending_state state;
+
+  if (xSemaphoreTake(waiter->sem, timeout) == pdTRUE) {
+    return waiter->result;
+  }
+
+  xSemaphoreTake(slot_mutex, portMAX_DELAY);
+  state = virt_net_pending_cancel(&pending_table, token);
+  switch (state) {
+  case VIRT_NET_PENDING_WAITING:
+    xSemaphoreGive(slot_mutex);
+    return -1;
+  case VIRT_NET_PENDING_COMPLETING:
+    xSemaphoreGive(slot_mutex);
+    if (xSemaphoreTake(waiter->sem, portMAX_DELAY) != pdTRUE) {
+      return -1;
+    }
+    return waiter->result;
+  case VIRT_NET_PENDING_FREE:
+    xSemaphoreGive(slot_mutex);
+    if (xSemaphoreTake(waiter->sem, 0) != pdTRUE) {
+      return -1;
+    }
+    return waiter->result;
+  default:
+    xSemaphoreGive(slot_mutex);
+    return -1;
+  }
+}
+
 static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_protocol *pkg_header) 
 {
   struct pkg_protocol_cmd *pkg_cmd = (struct pkg_protocol_cmd *)pkg_header->payload;
-  SemaphoreHandle_t sem;
 
   blog_info("pkg_protocol_cmd_handler cmd:0x%x.\r\n", pkg_cmd->cmd);
   switch (pkg_cmd->cmd) {
@@ -320,7 +514,9 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
       blog_info("start dhcp...\r\n");
       netifapi_netif_set_up(&sobj->vnet.netif);
 #if LWIP_IPV6
+      LOCK_TCPIP_CORE();
       netif_create_ip6_linklocal_address(&sobj->vnet.netif, 1);
+      UNLOCK_TCPIP_CORE();
 #if LWIP_IPV6_AUTOCONFIG
       sobj->vnet.netif.ip6_autoconfig_enabled = 1;
 #endif
@@ -360,95 +556,36 @@ static int pkg_protocol_cmd_handler(struct virt_net_ramsync *sobj, struct pkg_pr
     break;
 
   case VIRT_NET_CTRL_MAC_IND:
-    {
-      uint8_t *mac = (uint8_t *)sem_context[pkg_cmd->msg_id];
-      assert(mac != NULL);
-
-      sem = release_semaphore_slot(pkg_cmd->msg_id);
-      if (sem) {
-
-        memcpy(mac, pkg_cmd->payload, 6);
-        memcpy(sobj->vnet.mac, pkg_cmd->payload, 6);
-        blog_info("got mac:%x:%x:%x:%x:%x:%x\r\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-        xSemaphoreGive(sem);
-      }
-    }
-    break;
   case VIRT_NET_CTRL_SCAN_IND:
-    do {
-      netbus_fs_scan_ind_cmd_msg_t* msg = (netbus_fs_scan_ind_cmd_msg_t*)pkg_header->payload;
-      blog_info("Scan done! num = %d \r\n", msg->num);
-
-      for (int i = 0; i < msg->num; i++) {
-        blog_info("%s %d %d %d %d %d\r\n", msg->records[i].ssid
-            , msg->records[i].channel, msg->records[i].rssi
-            , msg->records[i].channel, msg->records[i].auth_mode
-            , msg->records[i].cipher);
-      }
-
-      sem = release_semaphore_slot(pkg_cmd->msg_id);
-      if (sem) {
-        event_propagate(sobj, VIRT_NET_EV_ON_SCAN_DONE, pkg_header);
-        xSemaphoreGive(sem);
-      }
-    } while (0);
-    break;
   case VIRT_NET_CTRL_GET_LINK_STATUS_IND:
-    {
-    do {
-      netbus_fs_link_status_ind_cmd_msg_t *status = (netbus_fs_link_status_ind_cmd_msg_t *)pkg_header->payload;
-      blog_info("get link status indicate!\r\n");
-      ip4_addr_t ip = {0}, gw = {0}, mask = {0};
-      char ip_str[20], gw_str[20], mask_str[20];
-
-      wifi_info_gate(&sobj->vnet.netif, &ip.addr, &gw.addr, &mask.addr);
-      strcpy(ip_str, ip4addr_ntoa(&ip));
-      strcpy(gw_str, ip4addr_ntoa(&gw));
-      strcpy(mask_str, ip4addr_ntoa(&mask));
-      blog_info("%s,%s,%s\r\n", ip_str, gw_str, mask_str);
-      if (status->record.link_status == BF1B_WIFI_LINK_STATUS_UP) {
-        blog_info("link status up!\r\n");
-      } else if (status->record.link_status == BF1B_WIFI_LINK_STATUS_DOWN){
-        blog_info("link status down!\r\n");
-      } else {
-        blog_info("link status unknown!\r\n");
-      }
-
-      /*get ip*/
-      if (strcmp(ip_str, "0.0.0.0") && status->record.mgmr_state == 3) {
-        status->record.mgmr_state = 4;
-      }
-      blog_info("state:%d\r\n", status->record.mgmr_state);
-      blog_info("ssid:%s\r\n", status->record.ssid);
-      blog_info("bssid: %02x%02x%02x%02x%02x%02x\r\n",
-        status->record.bssid[0],
-        status->record.bssid[1],
-        status->record.bssid[2],
-        status->record.bssid[3],
-        status->record.bssid[4],
-        status->record.bssid[5]
-      );
-      event_propagate(sobj, VIRT_NET_EV_ON_LINK_STATUS_DONE, pkg_header);
-
-      sem = release_semaphore_slot(pkg_cmd->msg_id);
-      if (sem) {
-        xSemaphoreGive(sem);
-      }
-
-    } while (0);
-    break;
-    }
   case VIRT_NET_CTRL_GET_DEV_VERSION_IND:
+    complete_pending_response(pkg_header);
+    break;
+  case VIRT_NET_CTRL_SLAVE_READY_IND:
     {
-      uint8_t *version = (uint8_t *)sem_context[pkg_cmd->msg_id];
-      assert(version != NULL);
+        printf("slave ready ind.\r\n");
+        if (sobj->sta_linkup) {
+            netifapi_netif_set_link_down(&sobj->vnet.netif);
+            printf("stop dhcp...\r\n");
+            #if LWIP_IPV4
+            netifapi_dhcp_stop((struct netif *)&sobj->vnet.netif);
+            #endif
+            #if LWIP_IPV6
+            dhcp6_disable((struct netif *)&sobj->vnet.netif);
+            #endif
+            netifapi_netif_set_down((struct netif *)&sobj->vnet.netif);
+            sobj->sta_linkup = 0;
+        }
+        event_propagate(sobj, VIRT_NET_EV_ON_SLAVE_READY, NULL);
 
-      sem = release_semaphore_slot(pkg_cmd->msg_id);
-      if (sem) {
-        memcpy(version, pkg_cmd->payload, 4);
-        xSemaphoreGive(sem);
-      }
+        if (sobj->vnet.ctrl) {
+            sobj->vnet.ctrl(&sobj->vnet, VIRT_NET_CTRL_CMD_CFM, VIRT_NET_CTRL_SLAVE_READY_IND);
+        }
+    }
+    break;
+  case VIRT_NET_CTRL_SLAVE_HEARTBEAT:
+    {
+        event_propagate(sobj, VIRT_NET_EV_ON_SLAVE_HEARTBEAT, NULL);
     }
     break;
   default:
@@ -466,6 +603,7 @@ static void __virt_net_task(void *pvParameters)
   uint8_t *rx_buffer;
   struct pkg_protocol *pkg_header;
   uint32_t recvd_len;
+  int rx_result;
   assert(sobj->task_virt_net == xTaskGetCurrentTaskHandle());
 
   while (sobj->running) {
@@ -479,15 +617,20 @@ static void __virt_net_task(void *pvParameters)
  
     pkg_header = (struct pkg_protocol *)(rx_buffer + VIRT_NET_RXBUFF_OFFSET);
 
-    uramsync_rx_pop(&sobj->ramsync_ctx, (uint8_t *)pkg_header, &recvd_len, URAMSYNC_FOREVER);
-    blog_info("Recv pkg_header->len:%d type:0x%x recvd_len %d.\r\n\r\n", pkg_header->length, pkg_header->type, recvd_len);
-    
-    /* FIXME: api should reutrn valid payload */
-    if (recvd_len == 0) {
-      /* we should release the buffer */
+    recvd_len = 0;
+    rx_result = uramsync_rx_pop(&sobj->ramsync_ctx, (uint8_t *)pkg_header,
+                                &recvd_len, URAMSYNC_FOREVER);
+    if (rx_result != 0) {
+      blog_info("Drop virt-net RX failure, result:%d.\r\n", rx_result);
       __free_rxbuf(sobj, rx_buffer);
       continue;
     }
+    if (virt_net_frame_validate(pkg_header, recvd_len) != 0) {
+      blog_info("Drop malformed virt-net frame, recvd_len:%d.\r\n", recvd_len);
+      __free_rxbuf(sobj, rx_buffer);
+      continue;
+    }
+    blog_info("Recv pkg_header->len:%d type:0x%x recvd_len %d.\r\n\r\n", pkg_header->length, pkg_header->type, recvd_len);
 
     switch (pkg_header->type) {
     case PKG_DATA_FRAME:
@@ -548,266 +691,240 @@ static int __virt_net_ramsync_control(virt_net_t obj, int cmd, ...)
   struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)obj;
   struct pkg_protocol *pkg_header = (struct pkg_protocol *)tx_buffer;
   struct pkg_protocol_cmd *pkg_cmd = (struct pkg_protocol_cmd *)pkg_header->payload;
-
+  struct virt_net_waiter response_waiter = {0};
+  struct virt_net_completion_context completion_context = {
+    .sobj = sobj,
+    .response = NULL,
+  };
+  virt_net_pending_complete_fn completion = NULL;
   va_list args;
+  const uint8_t *ssid = NULL;
+  const uint8_t *passphrase = NULL;
+  uint8_t *response_context = NULL;
+  unsigned int ssid_len = 0;
+  unsigned int passphrase_len = 0;
+  uint16_t confirm_cmd = 0;
+  uint16_t expected_response_cmd = 0;
+  uint16_t msg_id = VIRT_NET_PENDING_UNSOLICITED_TOKEN;
+  SemaphoreHandle_t response_sem = NULL;
+  StaticSemaphore_t sem_buffer;
+  uint32_t response_timeout = 0;
+  const char *response_error = NULL;
+  int acquire_result;
+  int tx_result;
+  size_t frame_length;
+
+  switch (cmd) {
+  case VIRT_NET_CTRL_CONNECT_AP:
+    va_start(args, cmd);
+    ssid_len = va_arg(args, unsigned int);
+    passphrase_len = va_arg(args, unsigned int);
+    ssid = va_arg(args, const uint8_t *);
+    passphrase = va_arg(args, const uint8_t *);
+    va_end(args);
+    if (ssid_len > sizeof(((struct pkg_cmd_connect_ap *)0)->ssid) ||
+        passphrase_len > sizeof(((struct pkg_cmd_connect_ap *)0)->passphr) ||
+        (ssid_len != 0U && ssid == NULL) ||
+        (passphrase_len != 0U && passphrase == NULL) ||
+        sizeof(*pkg_header) + sizeof(*pkg_cmd) +
+            sizeof(struct pkg_cmd_connect_ap) > TP_PAYLOAD_LEN) {
+      printf("ssid_len or passphr_len too long \r\n");
+      return -1;
+    }
+    break;
+  case VIRT_NET_CTRL_GET_MAC:
+    va_start(args, cmd);
+    response_context = va_arg(args, uint8_t *);
+    va_end(args);
+    completion_context.response = response_context;
+    expected_response_cmd = VIRT_NET_CTRL_MAC_IND;
+    completion = complete_mac;
+    break;
+  case VIRT_NET_CTRL_START_SCAN:
+    expected_response_cmd = VIRT_NET_CTRL_SCAN_IND;
+    completion = complete_scan;
+    break;
+  case VIRT_NET_CTRL_GET_LINK_STATUS:
+    expected_response_cmd = VIRT_NET_CTRL_GET_LINK_STATUS_IND;
+    completion = complete_link_status;
+    break;
+  case VIRT_NET_CTRL_GET_DEV_VERSION:
+    va_start(args, cmd);
+    response_context = va_arg(args, uint8_t *);
+    va_end(args);
+    completion_context.response = response_context;
+    expected_response_cmd = VIRT_NET_CTRL_GET_DEV_VERSION_IND;
+    completion = complete_dev_version;
+    break;
+  case VIRT_NET_CTRL_CMD_CFM:
+    va_start(args, cmd);
+    confirm_cmd = (uint16_t)va_arg(args, unsigned int);
+    va_end(args);
+    break;
+  default:
+    break;
+  }
+
+  if (completion != NULL) {
+    response_sem = xSemaphoreCreateBinaryStatic(&sem_buffer);
+    response_waiter.sem = response_sem;
+    response_waiter.result = -1;
+    assert(response_waiter.sem != NULL);
+
+    xSemaphoreTake(slot_mutex, portMAX_DELAY);
+    acquire_result = virt_net_pending_acquire(
+        &pending_table, expected_response_cmd, &response_waiter,
+        &completion_context, completion, &msg_id);
+    xSemaphoreGive(slot_mutex);
+    if (acquire_result != 0) {
+      printf("Bug? too many pending commands\r\n");
+      return -1;
+    }
+  }
+
+  xSemaphoreTake(tx_mutex, portMAX_DELAY);
 
   switch (cmd) {
   case VIRT_NET_CTRL_HELLO:
-    {
-      pkg_header->type = PKG_CMD_FRAME;
-      pkg_header->length = sizeof(struct pkg_protocol_cmd);
-
-      pkg_cmd->cmd = VIRT_NET_CTRL_HELLO;
-      pkg_cmd->msg_id = -1;
-
-      blog_info("send hello\r\n");
-    }
+    pkg_header->type = PKG_CMD_FRAME;
+    pkg_header->length = sizeof(struct pkg_protocol_cmd);
+    pkg_cmd->cmd = VIRT_NET_CTRL_HELLO;
+    pkg_cmd->msg_id = UINT16_MAX;
+    blog_info("send hello\r\n");
     break;
   case VIRT_NET_CTRL_CONNECT_AP:
     {
       struct pkg_cmd_connect_ap *connect_ap_cmd = (struct pkg_cmd_connect_ap *)&pkg_cmd->payload;
-      uint8_t *tmp;
-      int passphr_len;
 
       pkg_header->type = PKG_CMD_FRAME;
       pkg_header->length = sizeof(struct pkg_protocol_cmd) + sizeof(struct pkg_cmd_connect_ap);
-
       pkg_cmd->cmd = VIRT_NET_CTRL_CONNECT_AP;
-      pkg_cmd->msg_id = -1;
-
-      va_start(args, cmd);
-      /* XXX avoid misaligned acces */
-      connect_ap_cmd->ssid_len = (uint8_t)va_arg(args, unsigned int);
-      passphr_len = (uint8_t)va_arg(args, unsigned int);
-
-      if (connect_ap_cmd->ssid_len > sizeof(connect_ap_cmd->ssid) || passphr_len > sizeof(connect_ap_cmd->passphr)) {
-
-        printf("ssid_len or passphr_len too long \r\n");
-        va_end(args);
-
-        return -1;
-      }
+      pkg_cmd->msg_id = UINT16_MAX;
+      connect_ap_cmd->ssid_len = (uint16_t)ssid_len;
 
       /* Copy ssid */
-      tmp = va_arg(args, uint8_t *);
       memset(connect_ap_cmd->ssid, 0, sizeof(connect_ap_cmd->ssid));
       memset(connect_ap_cmd->ssid_tail, 0, sizeof(connect_ap_cmd->ssid_tail));
-      strncpy((char *)connect_ap_cmd->ssid, (const char *)tmp, connect_ap_cmd->ssid_len);
+      if (ssid_len != 0U) {
+        memcpy(connect_ap_cmd->ssid, ssid, ssid_len);
+      }
 
       /* Copy passphr */
-      tmp = va_arg(args, uint8_t *);
       memset(connect_ap_cmd->passphr, 0, sizeof(connect_ap_cmd->passphr));
       memset(connect_ap_cmd->psk_tail, 0, sizeof(connect_ap_cmd->psk_tail));
-      strncpy((char *)connect_ap_cmd->passphr, (const char *)tmp, passphr_len);
+      if (passphrase_len != 0U) {
+        memcpy(connect_ap_cmd->passphr, passphrase, passphrase_len);
+      }
 
-      va_end(args);
-
-      blog_info("connect ap ssid:%s, passphr:%s\r\n", connect_ap_cmd->ssid, connect_ap_cmd->passphr);
+      blog_info("connect ap ssid:%.*s, password_set:%d, password_len:%u\r\n",
+                (int)ssid_len, (const char *)connect_ap_cmd->ssid,
+                passphrase_len != 0U, passphrase_len);
     }
     break;
- case VIRT_NET_CTRL_DISCONNECT_AP:
-    {
-      pkg_header->type = PKG_CMD_FRAME;
-      pkg_header->length = sizeof(struct pkg_protocol_cmd);
-
-      pkg_cmd->cmd = VIRT_NET_CTRL_DISCONNECT_AP;
-      pkg_cmd->msg_id = -1;
-  
-      blog_info("send disconnect\r\n");
-    }
-    break; 
+  case VIRT_NET_CTRL_DISCONNECT_AP:
+    pkg_header->type = PKG_CMD_FRAME;
+    pkg_header->length = sizeof(struct pkg_protocol_cmd);
+    pkg_cmd->cmd = VIRT_NET_CTRL_DISCONNECT_AP;
+    pkg_cmd->msg_id = UINT16_MAX;
+    blog_info("send disconnect\r\n");
+    break;
   case VIRT_NET_CTRL_GET_MAC:
-    {
-      uint8_t *tmp;
-
-      SemaphoreHandle_t sem;
-      StaticSemaphore_t sem_buff;
-      int msg_id;
-
-      sem = xSemaphoreCreateBinaryStatic(&sem_buff);
-      assert(sem != NULL);
-
-      msg_id = acquire_semaphore_slot(sem);
-      if (msg_id < 0) {
-        printf("Bug? too many pending commands, try to enlarge sem_slot\r\n");
-        return -1;
-      }
-      pkg_header->type = PKG_CMD_FRAME;
-      pkg_header->length = sizeof(struct pkg_protocol_cmd);
-
-      pkg_cmd->cmd = VIRT_NET_CTRL_GET_MAC;
-      pkg_cmd->msg_id = msg_id;
-      
-      va_start(args, cmd);
-
-      tmp = va_arg(args, uint8_t *);
-
-      sem_context[msg_id] = (void *)tmp;
-
-      va_end(args);
-
-      blog_info("get mac..\r\n");
-
-      uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-                              pkg_header->length + 4, URAMSYNC_FOREVER);
-      blog_info("GET_MAC pkg_header->len:%d type:0x%x\r\n\r\n", pkg_header->length, pkg_header->type);
-      
-        /* waiting response */
-      if (xSemaphoreTake(sem, 3000) != pdTRUE) {
-        release_semaphore_slot(msg_id);
-        printf("get mac failed!!!!\r\n");
-        return -1;
-      }
-          
-      release_semaphore_slot(msg_id);
-      return 0;
-    }
+    pkg_header->type = PKG_CMD_FRAME;
+    pkg_header->length = sizeof(struct pkg_protocol_cmd);
+    pkg_cmd->cmd = VIRT_NET_CTRL_GET_MAC;
+    pkg_cmd->msg_id = msg_id;
+    response_timeout = 3000;
+    response_error = "get mac failed!!!!\r\n";
+    blog_info("get mac..\r\n");
     break;
   case VIRT_NET_CTRL_START_SCAN:
-    do {
-      SemaphoreHandle_t sem;
-      StaticSemaphore_t sem_buff;
-      int msg_id;
-      static uint8_t test_buf[128];
-
-      sem = xSemaphoreCreateBinaryStatic(&sem_buff);
-      assert(sem != NULL);
-
-      msg_id = acquire_semaphore_slot(sem);
-      if (msg_id < 0) {
-        blog_info("Bug? too many pending commands, try to enlarge sem_slot\r\n");
-        return -1;
-      }
-
-      pkg_header->type = PKG_CMD_FRAME;
-      pkg_header->length = sizeof(struct pkg_protocol) + sizeof(struct pkg_protocol_cmd);
-
-      pkg_cmd->cmd = VIRT_NET_CTRL_START_SCAN;
-      pkg_cmd->msg_id = msg_id;
-
-      sem_context[msg_id] = (void *)test_buf;
-
-      uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-          pkg_header->length + 4, URAMSYNC_FOREVER);
-      blog_info("SCAN pkg_header->len:%d type:0x%x\r\n\r\n", pkg_header->length, pkg_header->type);
-
-      blog_info("scan..\r\n");
-
-      /* waiting response */
-      if (xSemaphoreTake(sem, 10000) != pdTRUE) {
-          release_semaphore_slot(msg_id);
-          printf("scan failed!!!!\r\n");
-          return -1;
-      }
-
-      release_semaphore_slot(msg_id);
-      return 0;
-    } while (0);
+    pkg_header->type = PKG_CMD_FRAME;
+    pkg_header->length = sizeof(struct pkg_protocol_cmd);
+    pkg_cmd->cmd = VIRT_NET_CTRL_START_SCAN;
+    pkg_cmd->msg_id = msg_id;
+    response_timeout = 10000;
+    response_error = "scan failed!!!!\r\n";
+    blog_info("scan..\r\n");
     break;
   case VIRT_NET_CTRL_GET_LINK_STATUS:
-    {
-      SemaphoreHandle_t sem;
-      StaticSemaphore_t sem_buff;
-      int msg_id;
-
-      sem = xSemaphoreCreateBinaryStatic(&sem_buff);
-      assert(sem != NULL);
-
-      msg_id = acquire_semaphore_slot(sem);
-      if (msg_id < 0) {
-        printf("Bug? too many pending commands, try to enlarge sem_slot\r\n");
-        return -1;
-      }
-      pkg_header->type = PKG_CMD_FRAME;
-      pkg_header->length = sizeof(struct pkg_protocol_cmd);
-
-      pkg_cmd->cmd = VIRT_NET_CTRL_GET_LINK_STATUS;
-      pkg_cmd->msg_id = msg_id;
-
-      blog_info("get link status..\r\n");
-
-      uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-          pkg_header->length + 4, URAMSYNC_FOREVER);
-      blog_info("LINK STATUS pkg_header->len:%d type:0x%x\r\n\r\n", pkg_header->length, pkg_header->type);
-
-      /* waiting response */
-      if (xSemaphoreTake(sem, 3000) != pdTRUE) {
-        release_semaphore_slot(msg_id);
-        printf("get link status failed!!!!\r\n");
-        return -1;
-      }
-
-      release_semaphore_slot(msg_id);
-      return 0;
-    }
+    pkg_header->type = PKG_CMD_FRAME;
+    pkg_header->length = sizeof(struct pkg_protocol_cmd);
+    pkg_cmd->cmd = VIRT_NET_CTRL_GET_LINK_STATUS;
+    pkg_cmd->msg_id = msg_id;
+    response_timeout = 3000;
+    response_error = "get link status failed!!!!\r\n";
+    blog_info("get link status..\r\n");
     break;
   case VIRT_NET_CTRL_HBN:
-    {
-      blog_info("enter hbn\r\n");
-
-      pkg_header->type = PKG_CMD_FRAME;
-      pkg_header->length = sizeof(struct pkg_protocol_cmd);
-
-      pkg_cmd->cmd = VIRT_NET_CTRL_HBN;
-      pkg_cmd->msg_id = -1;
-    }
+    blog_info("enter hbn\r\n");
+    pkg_header->type = PKG_CMD_FRAME;
+    pkg_header->length = sizeof(struct pkg_protocol_cmd);
+    pkg_cmd->cmd = VIRT_NET_CTRL_HBN;
+    pkg_cmd->msg_id = UINT16_MAX;
     break;
   case VIRT_NET_CTRL_GET_DEV_VERSION:
+    pkg_header->type = PKG_CMD_FRAME;
+    pkg_header->length = sizeof(struct pkg_protocol_cmd);
+    pkg_cmd->cmd = VIRT_NET_CTRL_GET_DEV_VERSION;
+    pkg_cmd->msg_id = msg_id;
+    response_timeout = 3000;
+    response_error = "get slave version failed!!!!\r\n";
+    blog_info("get slave version..\r\n");
+    break;
+  case VIRT_NET_CTRL_CMD_CFM:
     {
-      uint8_t *tmp;
-      SemaphoreHandle_t sem;
-      StaticSemaphore_t sem_buff;
-      int msg_id;
+      struct pkg_cmd_confirm *cfm = (struct pkg_cmd_confirm *)&pkg_cmd->payload;
 
-      sem = xSemaphoreCreateBinaryStatic(&sem_buff);
-      assert(sem != NULL);
-
-      msg_id = acquire_semaphore_slot(sem);
-      if (msg_id < 0) {
-        printf("Bug? too many pending commands, try to enlarge sem_slot\r\n");
-        return -1;
-      }
       pkg_header->type = PKG_CMD_FRAME;
-      pkg_header->length = sizeof(struct pkg_protocol_cmd);
-
-      pkg_cmd->cmd = VIRT_NET_CTRL_GET_DEV_VERSION;
-      pkg_cmd->msg_id = msg_id;
-
-      va_start(args, cmd);
-
-      tmp = va_arg(args, uint8_t *);
-
-      sem_context[msg_id] = (void *)tmp;
-
-      va_end(args);
-
-      blog_info("get slave version..\r\n");
-
-      uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-                              pkg_header->length + 4, URAMSYNC_FOREVER);
-      blog_info("GET_DEV_VERSION pkg_header->len:%d type:0x%x\r\n\r\n", pkg_header->length, pkg_header->type);
-
-        /* waiting response */
-      if (xSemaphoreTake(sem, 3000) != pdTRUE) {
-        release_semaphore_slot(msg_id);
-        printf("get slave version failed!!!!\r\n");
-        return -1;
-      }
-
-      release_semaphore_slot(msg_id);
-      return 0;
+      pkg_header->length = sizeof(struct pkg_protocol_cmd) + sizeof(struct pkg_cmd_confirm);
+      pkg_cmd->cmd = VIRT_NET_CTRL_CMD_CFM;
+      pkg_cmd->msg_id = UINT16_MAX;
+      cfm->cmdId = confirm_cmd;
+      blog_info("send cfm for cmdId=%04x\r\n", cfm->cmdId);
     }
     break;
   default:
     printf("unsupport cmd:%d\r\n", cmd);
-    break;
+    xSemaphoreGive(tx_mutex);
+    if (completion != NULL) {
+      (void)wait_for_pending_response(&response_waiter, msg_id, 0);
+    }
+    return -1;
   }
 
-  uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-                          pkg_header->length + 4, URAMSYNC_FOREVER);
-  blog_info("CTRL pkg_header->len:%d type:0x%x\r\n\r\n", pkg_header->length, pkg_header->type);
+  frame_length = sizeof(*pkg_header) + pkg_header->length;
+  if (frame_length > TP_PAYLOAD_LEN) {
+    xSemaphoreGive(tx_mutex);
+    if (completion != NULL) {
+      (void)wait_for_pending_response(&response_waiter, msg_id, 0);
+    }
+    return -1;
+  }
 
-  return 0;
+  tx_result = uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
+                                      frame_length, URAMSYNC_FOREVER);
+  blog_info("CTRL pkg_header->len:%d type:0x%x\r\n\r\n", pkg_header->length, pkg_header->type);
+  xSemaphoreGive(tx_mutex);
+
+  if (tx_result != 0) {
+    if (completion != NULL) {
+      (void)wait_for_pending_response(&response_waiter, msg_id, 0);
+    }
+    return tx_result;
+  }
+
+  if (completion != NULL) {
+    if (xSemaphoreTake(response_sem, response_timeout) == pdTRUE) {
+      tx_result = response_waiter.result;
+    } else {
+      tx_result = wait_for_pending_response(&response_waiter, msg_id, 0);
+    }
+    if (tx_result != 0) {
+      printf("%s", response_error);
+    }
+  }
+
+  return tx_result;
 }
 
 static int __virt_net_ramsync_init(virt_net_t obj) 
@@ -851,9 +968,22 @@ virt_net_t virt_net_create(void *ctx)
 {
 
   if (inited == 0) {
-    inited = 1;
     slot_mutex = xSemaphoreCreateMutexStatic(&xSlotMutexBuffer);
-    memset(sem_slot, 0, sizeof(sem_slot));
+    tx_mutex = xSemaphoreCreateMutexStatic(&xTxMutexBuffer);
+    if (slot_mutex == NULL || tx_mutex == NULL) {
+      printf("create virt_net command mutex failed\r\n");
+      if (slot_mutex != NULL) {
+        vSemaphoreDelete(slot_mutex);
+        slot_mutex = NULL;
+      }
+      if (tx_mutex != NULL) {
+        vSemaphoreDelete(tx_mutex);
+        tx_mutex = NULL;
+      }
+      return NULL;
+    }
+    virt_net_pending_init(&pending_table, 0U);
+    inited = 1;
   }
 
   struct virt_net_ramsync *sobj = malloc(sizeof(struct virt_net_ramsync));
@@ -871,7 +1001,7 @@ virt_net_t virt_net_create(void *ctx)
 
   /* Init rx ind */
   assert(VIRT_NET_RXBUFF_CNT <= _BITSET_BITS);
-  sobj->rx_buf_ind.__bits[0] = (1 << VIRT_NET_RXBUFF_CNT) - 1;
+  sobj->rx_buf_ind.__bits[0] = ((uint64_t)1 << VIRT_NET_RXBUFF_CNT) - 1;
 
   sobj->rx_buf_ind_mutex = xSemaphoreCreateMutex();
   if (sobj->rx_buf_ind_mutex == NULL) {
@@ -924,12 +1054,14 @@ virt_net_t virt_net_create(void *ctx)
   return &sobj->vnet;
 
 _errout_4:
-  free(sobj->rx_buff);
-_errout_3:
   free(tx_buffer);
+  tx_buffer = NULL;
+_errout_3:
+  free(sobj->rx_buff);
 _errout_2:
   vSemaphoreDelete(sobj->rx_buf_ind_mutex);
 _errout_1:
+  uramsync_deinit(&sobj->ramsync_ctx);
   free(sobj);
 
   return NULL;
@@ -940,30 +1072,34 @@ int virt_net_delete(void *ctx)
   if (!inited) {
     return 0;
   }
-  inited = 0;
 
   struct virt_net_ramsync *sobj = ctx;
+
+  if (sobj == NULL) {
+    return -1;
+  }
 
   vTaskDelete(sobj->task_virt_net);
 
   uramsync_deinit(&sobj->ramsync_ctx);
 
-  if(sobj){
-    free(sobj);
-  }
-
   if (sobj->rx_buf_ind_mutex){
     vSemaphoreDelete(sobj->rx_buf_ind_mutex);
+    sobj->rx_buf_ind_mutex = NULL;
   }
 
   if (sobj->rx_buff){
     free(sobj->rx_buff);
+    sobj->rx_buff = NULL;
   }
 
   if(tx_buffer){
     free(tx_buffer);
+    tx_buffer = NULL;
   }
+
+  free(sobj);
+  inited = 0;
 
   return 0;
 }
-

@@ -173,7 +173,7 @@ static void oad_notity_image_identity(struct bt_conn *conn)
     bt_oad_notify(conn, buf->data, buf->len);
 }
 
-void ota_finish(struct k_work *work)
+static void oad_upgrade_finish(struct k_work *work)
 {
 
     BT_WARN("oad_upgrade\r\n");
@@ -593,5 +593,5 @@ void oad_service_enable(app_check_oad_cb cb)
     BT_WARN("Active PT:%d,Age %d\r\n", active_id, pt_table_stuff[active_id].pt_table.age);
     //my_dump_partition(&pt_table_stuff[active_id]);
 #endif
-    k_delayed_work_init(&oad_env.upgrd_work, ota_finish);
+    k_delayed_work_init(&oad_env.upgrd_work, oad_upgrade_finish);
 }

@@ -28,6 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <stdio.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <FreeRTOS.h>
 #include <task.h>
@@ -35,7 +36,16 @@
 #include <wifi_mgmr_ext.h>
 #include <blog.h>
 #include <netbus_wifi_mgmr_cmd_handlers.h>
+#include <ramsync_upper.h>
 #include <supplicant_api.h>
+
+void __attribute__((weak)) netbus_cmd_confirm_hook(netbus_cmd_confirm_msg_t *cfm)
+{
+    if (cfm)
+    {
+        blog_info("Get cmd confirm: cmdId=%04x\r\n", cfm->args.cmdId);
+    }
+}
 
 static void stop_ap(void)
 {
@@ -169,6 +179,8 @@ static void handle_connect_ap(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_
     blog_info("handle connect_ap\r\n");
     wifi_interface_t wifi_interface;
     netbus_ts_connect_ap_cmd_msg_t *ccmd;
+    char ssid[sizeof(ccmd->ssid) + 1];
+    char password[sizeof(ccmd->password) + 1];
 
     if (!(env->mode == NETBUS_WIFI_MODE_NONE ||
                 env->mode == NETBUS_WIFI_MODE_STA)) {
@@ -181,11 +193,16 @@ static void handle_connect_ap(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_
     }
 
     ccmd = (netbus_ts_connect_ap_cmd_msg_t *)cmd->data_ptr;
-    // FIXME distinguish open AP
-    if (strlen((char *)ccmd->ssid) == 0) {
-        blog_info("SSID or PASSWORD NULL\r\n");
-        return;
+    if (ccmd->ssid_len == 0 || ccmd->ssid_len > sizeof(ccmd->ssid)) {
+        blog_info("invalid SSID length %u\r\n",
+                  (unsigned int)ccmd->ssid_len);
+        goto ret;
     }
+    memcpy(ssid, ccmd->ssid, ccmd->ssid_len);
+    ssid[ccmd->ssid_len] = '\0';
+    memcpy(password, ccmd->password, sizeof(ccmd->password));
+    password[sizeof(ccmd->password)] = '\0';
+
     blog_info("cur mode:%d\r\n", env->mode);
     if (env->mode == NETBUS_WIFI_MODE_NONE) {
         env->mode = NETBUS_WIFI_MODE_STA;
@@ -197,16 +214,19 @@ static void handle_connect_ap(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_
     }
     wifi_mgmr_sta_autoconnect_enable();
     wifi_interface = wifi_mgmr_sta_enable();
-    blog_info("connect ssid %s, password %s\r\n", ccmd->ssid, ccmd->password);
-    if (ccmd->password && strlen((char *)ccmd->password)) {
-        wifi_mgmr_sta_connect(wifi_interface, (char *)ccmd->ssid, (char *)ccmd->password, NULL, NULL, 0, 0);
+    blog_info("connect ssid %s, security %s\r\n", ssid,
+              password[0] ? "secured" : "open");
+    if (password[0]) {
+        wifi_mgmr_sta_connect(wifi_interface, ssid, password, NULL, NULL, 0, 0);
     }
     else {
         /** for open network */
-        wifi_mgmr_sta_connect(wifi_interface, (char *)ccmd->ssid, NULL, NULL, NULL, 0, 0);
+        wifi_mgmr_sta_connect(wifi_interface, ssid, NULL, NULL, NULL, 0, 0);
     }
 ret:
-    vPortFree(cmd->data_ptr);
+    if (cmd->data_ptr != NULL) {
+        vPortFree(cmd->data_ptr);
+    }
 }
 
 static void handle_disconnect_ap(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t *cmd)
@@ -234,9 +254,10 @@ static void handle_disconnect_ap(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_m
 static void handle_ap_connected(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t *cmd)
 {
     blog_info("handle ap_connected\r\n");
-    netbus_min_cmd_msg_t msg;
-
-    msg.cmd = BFLB_CMD_AP_CONNECTED_IND;
+    netbus_min_cmd_msg_t msg = {
+        .cmd = BFLB_CMD_AP_CONNECTED_IND,
+        .msg_id = UINT16_MAX,
+    };
 
     bflbmsg_send(&env->trcver_ctx, BF1B_MSG_TYPE_CMD, &msg, sizeof(msg));
 }
@@ -244,9 +265,10 @@ static void handle_ap_connected(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_ms
 static void handle_ap_disconnected(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t *cmd)
 {
     blog_info("handle ap_disconnect\r\n");
-    netbus_min_cmd_msg_t msg;
-
-    msg.cmd = BFLB_CMD_AP_DISCONNECTED_IND;
+    netbus_min_cmd_msg_t msg = {
+        .cmd = BFLB_CMD_AP_DISCONNECTED_IND,
+        .msg_id = UINT16_MAX,
+    };
 
     bflbmsg_send(&env->trcver_ctx, BF1B_MSG_TYPE_CMD, &msg, sizeof(msg));
 }
@@ -285,7 +307,9 @@ static void handle_start_ap(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cm
     netbus_ts_start_ap_cmd_msg_t *ccmd;
     wifi_interface_t wifi_interface;
     int channel;
-    char *passwd;
+    const char *passwd;
+    char ssid[sizeof(ccmd->ssid) + 1];
+    char password[sizeof(ccmd->password) + 1];
 
     if (!(env->mode == NETBUS_WIFI_MODE_NONE ||
                 env->mode == NETBUS_WIFI_MODE_STA)) {
@@ -298,22 +322,26 @@ static void handle_start_ap(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cm
     }
 
     ccmd = (netbus_ts_start_ap_cmd_msg_t *)cmd->data_ptr;
-
-    if (strlen((char *)ccmd->ssid) == 0) {
-        log_error("SSID null\r\n");
-        return;
+    if (ccmd->ssid_len == 0 || ccmd->ssid_len > sizeof(ccmd->ssid)) {
+        log_error("invalid SSID length %u\r\n",
+                  (unsigned int)ccmd->ssid_len);
+        goto ret;
     }
+    memcpy(ssid, ccmd->ssid, ccmd->ssid_len);
+    ssid[ccmd->ssid_len] = '\0';
+    memcpy(password, ccmd->password, sizeof(ccmd->password));
+    password[sizeof(ccmd->password)] = '\0';
 
     channel = ccmd->channel;
     if (ccmd->is_open) {
         passwd = NULL;
     } else {
-        passwd = (char *)ccmd->password;
+        passwd = password;
     }
-    blog_info("Starting AP with SSID %s, channel %d, password %s\r\n",
-            ccmd->ssid,
+    blog_info("Starting AP with SSID %s, channel %d, security %s\r\n",
+            ssid,
             channel,
-            passwd ? passwd : "[nil]"
+            passwd ? "secured" : "open"
             );
     if (env->mode == NETBUS_WIFI_MODE_NONE) {
         env->mode = NETBUS_WIFI_MODE_AP;
@@ -321,9 +349,11 @@ static void handle_start_ap(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cm
         env->mode = NETBUS_WIFI_MODE_AP_STA;
     }
     wifi_interface = wifi_mgmr_ap_enable();
-    wifi_mgmr_ap_start(wifi_interface, (char *)ccmd->ssid, 0, passwd, channel);
+    wifi_mgmr_ap_start(wifi_interface, ssid, 0, (char *)passwd, channel);
 ret:
-    vPortFree(cmd->data_ptr);
+    if (cmd->data_ptr != NULL) {
+        vPortFree(cmd->data_ptr);
+    }
 }
 
 static void handle_stop_ap(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t *cmd)
@@ -410,24 +440,62 @@ static uint8_t auth_to_sdio(uint8_t auth)
     return ret;
 }
 
-static void send_scan_ind(wifi_mgmr_ap_item_t *array, uint32_t cnt)
+static uint32_t scan_record_capacity(void)
 {
-    int i;
-    netbus_wifi_mgmr_msg_t swm_msg;
-    int ind_msg_len;
+    const size_t fixed_size =
+        offsetof(netbus_fs_scan_ind_cmd_msg_t, records);
+    size_t max_payload;
 
+    if (TP_PAYLOAD_LEN < sizeof(netbus_msg_t)) {
+        return 0;
+    }
+    max_payload = TP_PAYLOAD_LEN - sizeof(netbus_msg_t);
+    if (max_payload < fixed_size) {
+        return 0;
+    }
+
+    return (uint32_t)((max_payload - fixed_size) /
+                      sizeof(struct bflbwifi_scan_record));
+}
+
+static int send_scan_ind(netbus_wifi_mgmr_ctx_t *env,
+                         wifi_mgmr_ap_item_t *array, uint32_t cnt)
+{
+    uint32_t i;
+    uint32_t capacity;
+    netbus_wifi_mgmr_msg_t swm_msg;
+    netbus_fs_scan_ind_cmd_msg_t *ind_msg;
+    size_t ind_msg_len;
+
+    if (env == NULL) {
+        return -1;
+    }
+    if (array == NULL && cnt > 0) {
+        blog_info("scan returned count without records\r\n");
+        cnt = 0;
+    }
+
+    capacity = scan_record_capacity();
+    if (cnt > capacity) {
+        blog_info("truncate scan results from %lu to %lu\r\n",
+                  (unsigned long)cnt, (unsigned long)capacity);
+        cnt = capacity;
+    }
+
+    memset(&swm_msg, 0, sizeof(swm_msg));
     swm_msg.type = NETBUS_WIFI_MGMR_MSG_TYPE_CMD;
     swm_msg.u.cmd.cmd = BFLB_CMD_SCAN_IND;
 
-    ind_msg_len = sizeof(netbus_fs_scan_ind_cmd_msg_t) + cnt * sizeof(struct bflbwifi_ap_record);
-    netbus_fs_scan_ind_cmd_msg_t *ind_msg = (netbus_fs_scan_ind_cmd_msg_t *)pvPortMalloc(ind_msg_len);
+    ind_msg_len = offsetof(netbus_fs_scan_ind_cmd_msg_t, records) +
+                  cnt * sizeof(ind_msg->records[0]);
+    ind_msg = (netbus_fs_scan_ind_cmd_msg_t *)pvPortMalloc(ind_msg_len);
     if (ind_msg == NULL) {
         printf("malloc failed\r\n");
-        return;
+        return -1;
     }
     ind_msg->hdr.cmd = BFLB_CMD_SCAN_IND;
-    ind_msg->hdr.msg_id = g_netbus_wifi_mgmr_env.scan_cmd_id;
-    ind_msg->num = cnt;
+    ind_msg->hdr.msg_id = env->scan_cmd_id;
+    ind_msg->num = (uint16_t)cnt;
     for (i = 0; i < cnt; i++) {
         wifi_mgmr_ap_item_t *si = &array[i];
         struct bflbwifi_scan_record *di = &ind_msg->records[i];
@@ -441,11 +509,14 @@ static void send_scan_ind(wifi_mgmr_ap_item_t *array, uint32_t cnt)
     }
 
     swm_msg.u.cmd.data_ptr = (void *)ind_msg;
-    swm_msg.u.cmd.data_len = ind_msg_len;
-    if (netbus_wifi_mgmr_msg_send(&g_netbus_wifi_mgmr_env, &swm_msg, true, false)) {
+    swm_msg.u.cmd.data_len = (uint16_t)ind_msg_len;
+    if (netbus_wifi_mgmr_msg_send(env, &swm_msg, true, false)) {
         printf("[scan ind] mgmr queue full, drop\r\n");
         vPortFree(ind_msg);
+        return -1;
     }
+
+    return 0;
 }
 
 static void do_wifi_scan(void *pvParameters)
@@ -456,15 +527,18 @@ static void do_wifi_scan(void *pvParameters)
     int ret;
 
     ret = wifi_mgmr_all_ap_scan(&ap_ary, &cnt);
-    if(ret != 0) {
+    if (ret != 0) {
         printf("wifi all ap scan error %d\r\n", ret);
+        send_scan_ind(env, NULL, 0);
         goto clean;
     }
 
-    send_scan_ind(ap_ary, cnt);
+    send_scan_ind(env, ap_ary, cnt);
 
 clean:
-    vPortFree(ap_ary);
+    if (ap_ary != NULL) {
+        vPortFree(ap_ary);
+    }
     env->scan_in_progress = false;
     vTaskDelete(NULL);
 }
@@ -479,7 +553,12 @@ static void handle_start_scan(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_
     env->scan_cmd_id = cmd->msg_id;
     env->scan_in_progress = true;
 
-    xTaskCreate(do_wifi_scan, (char*)"wifi_scan", 2048, env, 21, NULL);
+    if (xTaskCreate(do_wifi_scan, (char*)"wifi_scan", 2048, env, 21,
+                    NULL) != pdPASS) {
+        log_error("failed to create scan task\r\n");
+        send_scan_ind(env, NULL, 0);
+        env->scan_in_progress = false;
+    }
 }
 
 static void handle_scan_ind(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t *cmd)
@@ -698,11 +777,26 @@ static void handle_get_dev_version(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr
     bflbmsg_send(&env->trcver_ctx, BF1B_MSG_TYPE_CMD, &msg, sizeof(msg));
 }
 
+static void handle_get_confirm(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t *cmd)
+{
+    blog_info("handle get confirm\r\n");
+
+    if (!cmd->data_ptr || cmd->data_len != sizeof(netbus_cmd_confirm_msg_t)) {
+        log_error("msg format error\r\n");
+        goto ret;
+    }
+
+    netbus_cmd_confirm_hook((netbus_cmd_confirm_msg_t *)cmd->data_ptr);
+ret:
+    vPortFree(cmd->data_ptr);
+}
+
 static void handle_ping(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_msg_cmd_t *cmd)
 {
-    netbus_min_cmd_msg_t msg;
-
-    msg.cmd = BFLB_CMD_PING;
+    netbus_min_cmd_msg_t msg = {
+        .cmd = BFLB_CMD_PING,
+        .msg_id = cmd->msg_id,
+    };
 
     bflbmsg_send(&env->trcver_ctx, BF1B_MSG_TYPE_CMD, &msg, sizeof(msg));
 }
@@ -842,6 +936,11 @@ void netbus_wifi_mgmr_cmd_entry(netbus_wifi_mgmr_ctx_t *env, netbus_wifi_mgmr_ms
         blog_info("BFLB_CMD_HBN start\r\n");
         handle_hbn(env, cmd);
         blog_info("BFLB_CMD_HBN end\r\n");
+        break;
+    case BFLB_CMD_CFM:
+        blog_info("BFLB_CMD_CFM start\r\n");
+        handle_get_confirm(env, cmd);
+        blog_info("BFLB_CMD_CFM end\r\n");
         break;
     default:
         blog_info("default start\r\n");

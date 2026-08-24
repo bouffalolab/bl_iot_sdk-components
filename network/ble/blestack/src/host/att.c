@@ -2636,6 +2636,11 @@ void bt_att_set_mtu(u16_t mtu)
 		BT_ERR("Invalid MTU size %d",mtu);
 	}
 }
+
+u16_t bt_att_get_local_mtu(void)
+{
+	return local_mtu_size;
+}
 #endif
 
 

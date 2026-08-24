@@ -259,7 +259,7 @@ static void __ramsync_low_rx_cb(void *arg)
 
     for (int i = 0; i < TP_TXPAYLOAD_NUM; i++) {
         if (uramsync->p_rx->payload[i].magic == TP_ST_MAGIC && 
-            ((uramsync->p_rx->payload[i].len <= (TP_PAYLOAD_LEN + 4 + 4)) &&
+            ((uramsync->p_rx->payload[i].len <= (TP_PAYLOAD_LEN + TP_PAYLOAD_META_LEN)) &&
             (uramsync->p_rx->payload[i].seq == (uramsync->p_tx->payload[i].rseq + 1)))) {
             flag = 1;
         }
@@ -714,7 +714,8 @@ first_point:
                 lentmp = uramsync->p_rx->payload[i].len;
                 rseqtmp = uramsync->p_tx->payload[i].rseq;
 
-                if ((lentmp > (TP_PAYLOAD_LEN + 4 + 4)) ||
+                if ((lentmp > (TP_PAYLOAD_LEN + TP_PAYLOAD_META_LEN)) ||
+                    (lentmp <= TP_PAYLOAD_META_LEN) ||
                     (seqtmp != (rseqtmp + 1))
                     ) {// seq len invalid
                     continue;
@@ -758,7 +759,7 @@ first_point:
         while (1) {
             res = desc_push_toback(&uramsync->rx_desc,
                     uramsync->p_rx_cache->buf,
-                    uramsync->p_rx_cache->len,
+                    uramsync->p_rx_cache->len - TP_PAYLOAD_META_LEN,
                     POLL_UNIT_TIME_MS);//DESC_FOREVER
             if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
                 goto first_point;
@@ -795,7 +796,7 @@ int uramsync_init(tp_uramsync_t *uramsync, uint32_t type)
         return -2;
     }
     uramsync->rx_sem = xSemaphoreCreateBinary();
-    if(uramsync->tx_sem == NULL){
+    if(uramsync->rx_sem == NULL){
         vSemaphoreDelete(uramsync->tx_sem);
         return -2;
     }
@@ -901,4 +902,3 @@ void test_reset_signal_cb(void *arg)
 {
     __reset_signal_cb(arg);
 }
-

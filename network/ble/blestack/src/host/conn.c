@@ -107,8 +107,10 @@ static struct bt_conn_cb *callback_list;
 
 #if defined(CONFIG_BT_BREDR)
 #if (CONFIG_BLE_USING_DYNAMIC_RAM)
+static struct bt_conn *br_conns;
 static struct bt_conn *sco_conns;
 #else
+static struct bt_conn br_conns[CONFIG_BT_ACL_CONN];
 static struct bt_conn sco_conns[CONFIG_BT_MAX_SCO_CONN];
 #endif /* CONFIG_BLE_USING_DYNAMIC_RAM */
 
@@ -573,26 +575,26 @@ struct bt_conn *iso_conn_new(struct bt_conn *conns, size_t size)
 }
 #endif
 
-static struct bt_conn *conn_new(void)
+static struct bt_conn *conn_new(struct bt_conn *pool, size_t pool_size)
 {
 	struct bt_conn *conn = NULL;
-	int i;
+	size_t i;
 
 #if (CONFIG_BLE_USING_DYNAMIC_RAM)
-	if (!conns) {
+	if (!pool) {
 		return NULL;
 	}
 #endif
 
-	/* avoid function reentry, different connections use the same conn[i]*/
+	/* avoid function reentry, different connections use the same pool[i] */
 	#ifdef BFLB_BLE_PATCH_CONN_NEW_REENTRY_RISK
 	unsigned int key;
 	key = irq_lock();
 	#endif
 
-	for (i = 0; i < CONFIG_BT_MAX_CONN; i++) {
-		if (!atomic_get(&conns[i].ref)) {
-			conn = &conns[i];
+	for (i = 0; i < pool_size; i++) {
+		if (!atomic_get(&pool[i].ref)) {
+			conn = &pool[i];
 			break;
 		}
 	}
@@ -633,11 +635,19 @@ bool le_check_valid_conn(void)
     }
 #endif
 
-    for(i= 0; i < CONFIG_BT_MAX_CONN; i++){
+    for(i = 0; i < CONFIG_BT_MAX_CONN; i++){
         if(atomic_get(&conns[i].ref)){
             return true;
-        }       
+        }
     }
+
+#if defined(CONFIG_BT_BREDR)
+    for(i = 0; i < CONFIG_BT_ACL_CONN; i++){
+        if(atomic_get(&br_conns[i].ref)){
+            return true;
+        }
+    }
+#endif
 
     return false;
 }
@@ -865,23 +875,23 @@ struct bt_conn *bt_conn_lookup_addr_br(const bt_addr_t *peer)
 	int i;
 
 #if (CONFIG_BLE_USING_DYNAMIC_RAM)
-	if (!conns) {
+	if (!br_conns) {
 		return NULL;
 	}
 #endif
 
-	for (i = 0; i < CONFIG_BT_MAX_CONN; i++) {
-		BT_DBG("Addre (%s)",bt_hex(conns[i].br.dst.val,6));
-		if (!atomic_get(&conns[i].ref)) {
+	for (i = 0; i < CONFIG_BT_ACL_CONN; i++) {
+		BT_DBG("Addre (%s)",bt_hex(br_conns[i].br.dst.val,6));
+		if (!atomic_get(&br_conns[i].ref)) {
 			continue;
 		}
 
-		if (conns[i].type != BT_CONN_TYPE_BR) {
+		if (br_conns[i].type != BT_CONN_TYPE_BR) {
 			continue;
 		}
 
-		if (!bt_addr_cmp(peer, &conns[i].br.dst)) {
-			return bt_conn_ref(&conns[i]);
+		if (!bt_addr_cmp(peer, &br_conns[i].br.dst)) {
+			return bt_conn_ref(&br_conns[i]);
 		}
 	}
 
@@ -926,7 +936,7 @@ struct bt_conn *bt_conn_add_sco(const bt_addr_t *peer, int link_type)
 
 struct bt_conn *bt_conn_add_br(const bt_addr_t *peer)
 {
-	struct bt_conn *conn = conn_new();
+	struct bt_conn *conn = conn_new(br_conns, CONFIG_BT_ACL_CONN);
 
 	if (!conn) {
 		return NULL;
@@ -1888,26 +1898,14 @@ static void conn_cleanup(struct bt_conn *conn)
     #endif
 }
 
-int bt_conn_prepare_events(struct k_poll_event events[])
+static int conn_prepare_events(struct bt_conn *pool, size_t pool_size,
+			       struct k_poll_event events[])
 {
-	int i, ev_count = 0;
+	int ev_count = 0;
+	size_t i;
 
-	BT_DBG("");
-
-#if (CONFIG_BLE_USING_DYNAMIC_RAM)
-	/* Check if connection subsystem has been initialized by checking p_conn_change */
-	if (!p_conn_change) {
-		BT_DBG("Connection subsystem not initialized yet");
-		return 0;
-	}
-#endif
-
-	conn_change.signaled = 0U;
-	k_poll_event_init(&events[ev_count++], K_POLL_TYPE_SIGNAL,
-			  K_POLL_MODE_NOTIFY_ONLY, &conn_change);
-
-	for (i = 0; i < CONFIG_BT_MAX_CONN; i++) {
-		struct bt_conn *conn = &conns[i];
+	for (i = 0; i < pool_size; i++) {
+		struct bt_conn *conn = &pool[i];
 
 		if (!atomic_get(&conn->ref)) {
 			continue;
@@ -1945,6 +1943,34 @@ int bt_conn_prepare_events(struct k_poll_event events[])
 	return ev_count;
 }
 
+int bt_conn_prepare_events(struct k_poll_event events[])
+{
+	int ev_count = 0;
+
+	BT_DBG("");
+
+#if (CONFIG_BLE_USING_DYNAMIC_RAM)
+	/* Check if connection subsystem has been initialized by checking p_conn_change */
+	if (!p_conn_change) {
+		BT_DBG("Connection subsystem not initialized yet");
+		return 0;
+	}
+#endif
+
+	conn_change.signaled = 0U;
+	k_poll_event_init(&events[ev_count++], K_POLL_TYPE_SIGNAL,
+			  K_POLL_MODE_NOTIFY_ONLY, &conn_change);
+
+	ev_count += conn_prepare_events(conns, CONFIG_BT_MAX_CONN,
+				       &events[ev_count]);
+#if defined(CONFIG_BT_BREDR)
+	ev_count += conn_prepare_events(br_conns, CONFIG_BT_ACL_CONN,
+				       &events[ev_count]);
+#endif
+
+	return ev_count;
+}
+
 void bt_conn_process_tx(struct bt_conn *conn)
 {
 	struct net_buf *buf;
@@ -1977,7 +2003,7 @@ void bt_conn_process_tx(struct bt_conn *conn)
 
 struct bt_conn *bt_conn_add_le(u8_t id, const bt_addr_le_t *peer)
 {
-	struct bt_conn *conn = conn_new();
+	struct bt_conn *conn = conn_new(conns, CONFIG_BT_MAX_CONN);
 
 	if (!conn) {
 		return NULL;
@@ -2125,7 +2151,6 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 			/* this indicate Directed advertising stopped */
 			if (conn->err) {
 				notify_connected(conn);
-				bt_conn_unref(conn);//bouffalo fix:unref the ref is increased in bt_conn_create_slave_le.
 			}
 
 			bt_conn_unref(conn);
@@ -2165,9 +2190,33 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 	}
 }
 
+static struct bt_conn *conn_lookup_handle(struct bt_conn *pool,
+					 size_t pool_size, u16_t handle)
+{
+	size_t i;
+
+	for (i = 0; i < pool_size; i++) {
+		if (!atomic_get(&pool[i].ref)) {
+			continue;
+		}
+
+		/* We only care about connections with a valid handle */
+		if (pool[i].state != BT_CONN_CONNECTED &&
+		    pool[i].state != BT_CONN_DISCONNECT) {
+			continue;
+		}
+
+		if (pool[i].handle == handle) {
+			return bt_conn_ref(&pool[i]);
+		}
+	}
+
+	return NULL;
+}
+
 struct bt_conn *bt_conn_lookup_handle(u16_t handle)
 {
-	int i;
+	struct bt_conn *conn;
 
 #if (CONFIG_BLE_USING_DYNAMIC_RAM)
 	if (!conns) {
@@ -2175,42 +2224,20 @@ struct bt_conn *bt_conn_lookup_handle(u16_t handle)
 	}
 #endif
 
-	for (i = 0; i < CONFIG_BT_MAX_CONN; i++) {
-		if (!atomic_get(&conns[i].ref)) {
-			continue;
-		}
-
-		/* We only care about connections with a valid handle */
-		if (conns[i].state != BT_CONN_CONNECTED &&
-		    conns[i].state != BT_CONN_DISCONNECT) {
-			continue;
-		}
-
-		if (conns[i].handle == handle) {
-			return bt_conn_ref(&conns[i]);
-		}
+	conn = conn_lookup_handle(conns, CONFIG_BT_MAX_CONN, handle);
+	if (conn) {
+		return conn;
 	}
 
 #if defined(CONFIG_BT_BREDR)
-#if (CONFIG_BLE_USING_DYNAMIC_RAM)
-	if (!sco_conns) {
-		return NULL;
+	conn = conn_lookup_handle(br_conns, CONFIG_BT_ACL_CONN, handle);
+	if (conn) {
+		return conn;
 	}
-#endif
-	for (i = 0; i < CONFIG_BT_MAX_SCO_CONN; i++) {
-		if (!atomic_get(&sco_conns[i].ref)) {
-			continue;
-		}
 
-		/* We only care about connections with a valid handle */
-		if (sco_conns[i].state != BT_CONN_CONNECTED &&
-		    sco_conns[i].state != BT_CONN_DISCONNECT) {
-			continue;
-		}
-
-		if (sco_conns[i].handle == handle) {
-			return bt_conn_ref(&sco_conns[i]);
-		}
+	conn = conn_lookup_handle(sco_conns, CONFIG_BT_MAX_SCO_CONN, handle);
+	if (conn) {
+		return conn;
 	}
 #endif
 
@@ -2292,43 +2319,37 @@ struct bt_conn *bt_conn_lookup_state_le(const bt_addr_le_t *peer,
 	return NULL;
 }
 
+static void conn_foreach(struct bt_conn *pool, size_t pool_size, int type,
+			 void (*func)(struct bt_conn *conn, void *data), void *data)
+{
+	size_t i;
+
+	for (i = 0; i < pool_size; i++) {
+		if (!atomic_get(&pool[i].ref)) {
+			continue;
+		}
+
+		if (!(pool[i].type & type)) {
+			continue;
+		}
+
+		func(&pool[i], data);
+	}
+}
+
 void bt_conn_foreach(int type, void (*func)(struct bt_conn *conn, void *data),
 		     void *data)
 {
-	int i;
-
 #if (CONFIG_BLE_USING_DYNAMIC_RAM)
 	if (!conns) {
 		return;
 	}
 #endif
 
-	for (i = 0; i < CONFIG_BT_MAX_CONN; i++) {
-		if (!atomic_get(&conns[i].ref)) {
-			continue;
-		}
-
-		if (!(conns[i].type & type)) {
-			continue;
-		}
-
-		func(&conns[i], data);
-	}
+	conn_foreach(conns, CONFIG_BT_MAX_CONN, type, func, data);
 #if defined(CONFIG_BT_BREDR)
-	if (type & BT_CONN_TYPE_SCO) {
-#if (CONFIG_BLE_USING_DYNAMIC_RAM)
-		if (!sco_conns) {
-			return;
-		}
-#endif
-		for (i = 0; i < CONFIG_BT_MAX_SCO_CONN; i++) {
-			if (!atomic_get(&sco_conns[i].ref)) {
-				continue;
-			}
-
-			func(&sco_conns[i], data);
-		}
-	}
+	conn_foreach(br_conns, CONFIG_BT_ACL_CONN, type, func, data);
+	conn_foreach(sco_conns, CONFIG_BT_MAX_SCO_CONN, type, func, data);
 #endif /* defined(CONFIG_BT_BREDR) */
 }
 
@@ -2403,20 +2424,42 @@ int bt_conn_get_info(const struct bt_conn *conn, struct bt_conn_info *info)
 	return -EINVAL;
 }
 
-int bt_conn_get_remote_dev_info(struct bt_conn_info *info)
+static int conn_get_remote_dev_info(struct bt_conn *pool, size_t pool_size,
+				    struct bt_conn_info *info)
 {
-    int link_num = 0;
+	int link_num = 0;
+	size_t i;
 
-    for (int i = 0; i < CONFIG_BT_MAX_CONN; i++) {
-        if ((!atomic_get(&conns[i].ref)) || (conns[i].state == BT_CONN_DISCONNECTED)) {
-                continue;
-        }
-        if(info)
-            bt_conn_get_info(&conns[i], &info[link_num]);
-        link_num ++;
-    }
+	for (i = 0; i < pool_size; i++) {
+#if defined(BFLB_BLE_PATCH_FILTER_CONN_INFO_CONNECTED_LE)
+		if ((!atomic_get(&pool[i].ref)) || (pool[i].state != BT_CONN_CONNECTED)){
+#else
+		if ((!atomic_get(&pool[i].ref)) || (pool[i].state == BT_CONN_DISCONNECTED)) {
+#endif /* BFLB_BLE_PATCH_FILTER_CONN_INFO_CONNECTED_LE */
+			continue;
+		}
+		if (info) {
+			bt_conn_get_info(&pool[i], &info[link_num]);
+		}
+		link_num++;
+	}
 
-   return link_num;
+	return link_num;
+}
+
+int bt_conn_get_remote_dev_info(struct bt_conn_info *info, u8_t type)
+{
+	if (type == BT_CONN_TYPE_LE) {
+		return conn_get_remote_dev_info(conns, CONFIG_BT_MAX_CONN, info);
+	}
+
+#if defined(CONFIG_BT_BREDR)
+	if (type == BT_CONN_TYPE_BR) {
+		return conn_get_remote_dev_info(br_conns, CONFIG_BT_ACL_CONN, info);
+	}
+#endif
+
+	return -EINVAL;
 }
 
 static int bt_hci_disconnect(struct bt_conn *conn, u8_t reason)
@@ -2698,10 +2741,10 @@ struct bt_conn *bt_conn_create_le(const bt_addr_le_t *peer,
 	}
 
 	#if defined(BFLB_BLE_RESTRICT_CONN_ACTION_NOT_EXCEED_MAX_CONN)
-	if (bt_conn_get_remote_dev_info(NULL) == CONFIG_BT_MAX_CONN ||
+	if (bt_conn_get_remote_dev_info(NULL, BT_CONN_TYPE_LE) == CONFIG_BT_MAX_CONN ||
 		(atomic_test_bit(bt_dev.flags, BT_DEV_ADVERTISING) &&
 		atomic_test_bit(bt_dev.flags,BT_DEV_ADVERTISING_CONNECTABLE) &&
-		bt_conn_get_remote_dev_info(NULL) == (CONFIG_BT_MAX_CONN - 1))){
+		bt_conn_get_remote_dev_info(NULL, BT_CONN_TYPE_LE) == (CONFIG_BT_MAX_CONN - 1))){
 		BT_ERR("Cannot create le conn because of conn resource limitation(max_conn:%u)",CONFIG_BT_MAX_CONN);
 		return NULL;
 	}
@@ -2880,7 +2923,7 @@ start_adv:
 	if (err) {
 		BT_WARN("Directed advertising could not be started: %d", err);
 
-		bt_conn_unref(conn);
+				bt_conn_unref(conn);
 		return NULL;
 	}
 
@@ -3101,27 +3144,71 @@ int bt_conn_auth_pairing_confirm(struct bt_conn *conn)
 
 u8_t bt_conn_index(struct bt_conn *conn)
 {
-	u8_t index = conn - conns;
+	ptrdiff_t index;
 
-	__ASSERT(index < CONFIG_BT_MAX_CONN, "Invalid bt_conn pointer");
-	return index;
+#if defined(CONFIG_BT_BREDR)
+	if (conn->type == BT_CONN_TYPE_BR) {
+		index = conn - br_conns;
+		__ASSERT(index >= 0 && index < CONFIG_BT_ACL_CONN,
+			 "Invalid BR/EDR bt_conn pointer");
+		return (u8_t)index;
+	}
+#endif
+
+	index = conn - conns;
+	__ASSERT(index >= 0 && index < CONFIG_BT_MAX_CONN,
+		 "Invalid LE bt_conn pointer");
+	return (u8_t)index;
 }
 
-struct bt_conn *bt_conn_lookup_id(u8_t id)
+static struct bt_conn *conn_lookup_id(struct bt_conn *pool,
+				      size_t pool_size, u8_t id)
 {
 	struct bt_conn *conn;
 
-	if (id >= CONFIG_BT_MAX_CONN) {
+	if (!pool || id >= pool_size) {
 		return NULL;
 	}
 
-	conn = &conns[id];
+	conn = &pool[id];
 
 	if (!atomic_get(&conn->ref)) {
 		return NULL;
 	}
 
 	return bt_conn_ref(conn);
+}
+
+struct bt_conn *bt_conn_lookup_id(u8_t id)
+{
+	return conn_lookup_id(conns, CONFIG_BT_MAX_CONN, id);
+}
+
+u8_t bt_conn_get_acl_id(struct bt_conn *conn)
+{
+	u8_t id = bt_conn_index(conn);
+
+#if defined(CONFIG_BT_BREDR)
+	if (conn->type == BT_CONN_TYPE_BR) {
+		return CONFIG_BT_MAX_CONN + id;
+	}
+#endif
+
+	return id;
+}
+
+struct bt_conn *bt_conn_lookup_acl_id(u8_t id)
+{
+	if (id < CONFIG_BT_MAX_CONN) {
+		return conn_lookup_id(conns, CONFIG_BT_MAX_CONN, id);
+	}
+
+#if defined(CONFIG_BT_BREDR)
+	id -= CONFIG_BT_MAX_CONN;
+	return conn_lookup_id(br_conns, CONFIG_BT_ACL_CONN, id);
+#else
+	return NULL;
+#endif
 }
 
 struct bt_conn *bt_conn_get(u8_t id)
@@ -3158,6 +3245,8 @@ int bt_conn_init(void)
 	const size_t free_tx_size = MEM_ALIGN_32(sizeof(struct k_fifo));
 	const size_t conn_change_size = MEM_ALIGN_32(sizeof(struct k_poll_signal));
 #if defined(CONFIG_BT_BREDR)
+	const size_t br_conns_size =
+		MEM_ALIGN_32(CONFIG_BT_ACL_CONN * sizeof(struct bt_conn));
 	const size_t sco_conns_size = MEM_ALIGN_32(CONFIG_BT_MAX_SCO_CONN * sizeof(struct bt_conn));
 #endif
 #if defined(BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)
@@ -3167,7 +3256,7 @@ int bt_conn_init(void)
 	/* Calculate total size (sizes already aligned) */
 	size_t total_size = conns_size + conn_tx_size + free_tx_size + conn_change_size;
 #if defined(CONFIG_BT_BREDR)
-	total_size += sco_conns_size;
+	total_size += br_conns_size + sco_conns_size;
 #endif
 #if defined(BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)
 	total_size += peripheral_pref_con_params_size;
@@ -3202,6 +3291,9 @@ int bt_conn_init(void)
 	offset += conn_change_size;
 
 #if defined(CONFIG_BT_BREDR)
+	br_conns = (struct bt_conn *)(g_conn_mem_pool + offset);
+	offset += br_conns_size;
+
 	sco_conns = (struct bt_conn *)(g_conn_mem_pool + offset);
 	offset += sco_conns_size;
 #endif
@@ -3315,6 +3407,7 @@ int bt_conn_deinit(void)
 	p_free_tx = NULL;
 	p_conn_change = NULL;
 #if defined(CONFIG_BT_BREDR)
+	br_conns = NULL;
 	sco_conns = NULL;
 #endif
 #if defined(BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)

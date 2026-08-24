@@ -1869,6 +1869,12 @@ void bt_l2cap_init(void)
 #if (CONFIG_BLE_USING_DYNAMIC_RAM)
 void bt_l2cap_deinit(void)
 {
+	#if defined(BFLB_BREDR_PATCH_DEINIT_CLEANUP)
+	if (IS_ENABLED(CONFIG_BT_BREDR)) {
+		bt_l2cap_br_deinit();
+	}
+	#endif
+
 	if (bt_l2cap_pool) {
 		k_free(bt_l2cap_pool);
 		bt_l2cap_pool = NULL;

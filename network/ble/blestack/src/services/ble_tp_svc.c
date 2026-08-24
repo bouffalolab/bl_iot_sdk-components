@@ -284,7 +284,12 @@ static void ble_tp_task(void *pvParameters)
          uint8_t *msg = k_fifo_get(&ble_tp_queue, K_FOREVER);
          if(msg == NULL)
              continue;
- 
+
+         if (ble_tp_conn == NULL) {
+             k_free(msg);
+             continue;
+         }
+
          switch(*msg){
              case TP_MSG_EXCHAGNE_MTU:
              {

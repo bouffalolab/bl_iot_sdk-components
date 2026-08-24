@@ -258,6 +258,7 @@ void bt_att_deinit(void);
 u16_t bt_att_get_mtu(struct bt_conn *conn);
 #if defined(BFLB_BLE_SET_LOCAL_ATT_MTU_SIZE)
 void bt_att_set_mtu(u16_t mtu);
+u16_t bt_att_get_local_mtu(void);
 #endif
 
 #if defined(CONFIG_BLE_AT_CMD)

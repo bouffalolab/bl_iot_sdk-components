@@ -16,6 +16,10 @@
 
 #define NUMERIC_CHARACTERS 10
 
+#if defined(CONFIG_IOT_SDK)
+extern int bl_putchar(int c);
+#endif
+
 static inline void putd(uint8_t data){
     char c;
     c = (data >> 4) & 0xf;
@@ -24,7 +28,11 @@ static inline void putd(uint8_t data){
     } else {
         c = 'A' + (c - NUMERIC_CHARACTERS);
     }
+    #if defined(CONFIG_IOT_SDK)
+    bl_putchar(c);
+    #else
     putchar(c);
+    #endif
 
     c = data & 0xf;
     if (c < NUMERIC_CHARACTERS) {
@@ -32,7 +40,11 @@ static inline void putd(uint8_t data){
     } else {
         c = 'A' + (c - NUMERIC_CHARACTERS);
     }
+    #if defined(CONFIG_IOT_SDK)
+    bl_putchar(c);
+    #else
     putchar(c);
+    #endif
 }
 
 void bt_monitor_send(uint16_t opcode, const void *data, size_t len)

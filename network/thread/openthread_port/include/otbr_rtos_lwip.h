@@ -88,6 +88,8 @@ void otbr_udp_clear_flags(struct udp_pcb * pcb, uint32_t flag);
 void otbr_lwip_napt_enable_no(u8_t number, int enable);
 
 void otbr_lwip_assert_core_locked(char * file, int line);
+bool otbr_lwip_core_lock_acquire(char * file, int line);
+void otbr_lwip_core_lock_release(bool locked);
 void otbr_lwip_lock_tcpip_core(void);
 void otbr_lwip_unlock_tcpip_core(void); 
 

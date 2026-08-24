@@ -146,6 +146,9 @@ u8_t* get_pub_key()
 
 #if defined(CONFIG_BT_BREDR)
 static bt_br_discovery_cb_t *discovery_cb;
+#if defined(BFLB_BREDR_PATCH_EXTENDED_INQUIRY_RESULT_CALLBACK)
+static bt_br_discovery_result_cb_t *discovery_result_cb;
+#endif /* BFLB_BREDR_PATCH_EXTENDED_INQUIRY_RESULT_CALLBACK */
 struct bt_br_discovery_result *discovery_results;
 static size_t discovery_results_size;
 static size_t discovery_results_count;
@@ -161,8 +164,8 @@ struct hast_cb *host_assist_cb;
 #endif
 
 #if defined(CONFIG_BT_CONN)
-/* command FIFO + conn_change signal + MAX_CONN */
-#define EV_COUNT (2 + CONFIG_BT_MAX_CONN)
+/* command FIFO + conn_change signal + LE and BR/EDR connections */
+#define EV_COUNT (2 + CONFIG_BT_MAX_CONN + CONFIG_BT_ACL_CONN)
 #else
 /* command FIFO */
 #define EV_COUNT 1
@@ -213,7 +216,7 @@ struct acl_data {
 	/** BT_BUF_ACL_IN */
 	u8_t  type;
 
-	/* Index into the bt_conn storage array */
+	/* ID unique across the LE and BR/EDR connection pools */
 	u8_t  id;
 
 	/** ACL connection handle */
@@ -353,7 +356,7 @@ static void report_completed_packet(struct net_buf *buf)
 		return;
 	}
 
-	conn = bt_conn_lookup_id(acl(buf)->id);
+	conn = bt_conn_lookup_acl_id(acl(buf)->id);
 	if (!conn) {
 		BT_WARN("Unable to look up conn with id 0x%02x", acl(buf)->id);
 		return;
@@ -906,7 +909,7 @@ static void hci_acl(struct net_buf *buf)
 		return;
 	}
 
-	acl(buf)->id = bt_conn_index(conn);
+	acl(buf)->id = bt_conn_get_acl_id(conn);
 
 	bt_conn_recv(conn, buf, flags);
 	bt_conn_unref(conn);
@@ -1249,8 +1252,6 @@ static void hci_disconn_complete(struct net_buf *buf)
 	}
 #endif /* defined(CONFIG_BT_CENTRAL) && !defined(CONFIG_BT_WHITELIST) */
 
-	bt_conn_unref(conn);
-
 #if defined(BFLB_RELEASE_CMD_SEM_IF_CONN_DISC)
 	hci_release_conn_related_cmd();
 #endif
@@ -1258,6 +1259,8 @@ static void hci_disconn_complete(struct net_buf *buf)
 #if defined(BFLB_BLE)
 	notify_disconnected(conn);
 #endif
+
+	bt_conn_unref(conn);
 
 #if defined(CONFIG_BLE_RECONNECT_TEST)
 	if (conn->role == BT_CONN_ROLE_MASTER) {
@@ -1512,6 +1515,16 @@ static struct bt_conn *find_pending_connect(bt_addr_le_t *peer_addr)
 	return bt_conn_lookup_state_le(peer_addr, BT_CONN_CONNECT_DIR_ADV);
 }
 
+#if defined(BFLB_BLE_PATCH_SELECT_CONN_BY_ROLE)
+static struct bt_conn *find_pending_connect_with_role(bt_addr_le_t *peer_addr, uint8_t role)
+{
+	if(role == BT_HCI_ROLE_MASTER){
+		return bt_conn_lookup_state_le(peer_addr, BT_CONN_CONNECT);
+	}
+	return bt_conn_lookup_state_le(peer_addr, BT_CONN_CONNECT_DIR_ADV);
+}
+#endif
+
 static void enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 {
 	u16_t handle = sys_le16_to_cpu(evt->handle);
@@ -1558,10 +1571,14 @@ static void enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 		}
 
 		if (IS_ENABLED(CONFIG_BT_CENTRAL)) {
+			#if defined(BFLB_BLE_PATCH_HANDLE_EXISTED_CONN_ERROR_CODE)
+			if (conn->err == BT_HCI_ERR_UNKNOWN_CONN_ID || conn->err == BT_HCI_ERR_CONN_ALREADY_EXISTS){
+			#else
 			/*
 			 * Handle cancellation of outgoing connection attempt.
 			 */
 			if (conn->err == BT_HCI_ERR_UNKNOWN_CONN_ID) {
+			#endif
 				/* We notify before checking autoconnect flag
 				 * as application may choose to change it from
 				 * callback.
@@ -1599,7 +1616,11 @@ static void enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 		bt_addr_le_copy(&peer_addr, &evt->peer_addr);
 	}
 
+	#if defined(BFLB_BLE_PATCH_SELECT_CONN_BY_ROLE)
+	conn = find_pending_connect_with_role(&id_addr, evt->role);
+	#else
 	conn = find_pending_connect(&id_addr);
+	#endif
 
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) &&
 	    evt->role == BT_HCI_ROLE_SLAVE) {
@@ -1612,9 +1633,7 @@ static void enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 		/* for slave we may need to add new connection */
 		if (!conn) {
 			conn = bt_conn_add_le(bt_dev.adv_id, &id_addr);
-		}else if(conn->state == BT_CONN_CONNECT_DIR_ADV){
-			bt_conn_unref(conn);//bouffalo fix:unref the ref increased in bt_conn_create_slave_le.
-        }
+		}
 	}
 
 	if (IS_ENABLED(CONFIG_BT_CENTRAL) &&
@@ -1679,7 +1698,7 @@ static void enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 			BT_LE_STATES_SLAVE_CONN_ADV(bt_dev.le.states)
 			#if defined(BFLB_BLE_RESTRICT_CONN_ACTION_NOT_EXCEED_MAX_CONN)
 			 && atomic_test_bit(bt_dev.flags,BT_DEV_ADVERTISING_CONNECTABLE) &&
-			(bt_conn_get_remote_dev_info(NULL) < CONFIG_BT_MAX_CONN)
+			(bt_conn_get_remote_dev_info(NULL, BT_CONN_TYPE_LE) < CONFIG_BT_MAX_CONN)
 			#endif
 			) {
 			if (IS_ENABLED(CONFIG_BT_PRIVACY)) {
@@ -1740,7 +1759,7 @@ static void enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 	if ((evt->role == BT_HCI_ROLE_MASTER) &&
 		atomic_test_bit(bt_dev.flags, BT_DEV_ADVERTISING) &&
 		atomic_test_bit(bt_dev.flags,BT_DEV_ADVERTISING_CONNECTABLE) &&
-		bt_conn_get_remote_dev_info(NULL) == CONFIG_BT_MAX_CONN){
+		bt_conn_get_remote_dev_info(NULL, BT_CONN_TYPE_LE) == CONFIG_BT_MAX_CONN){
 		err = bt_le_adv_stop();
 	}
 	#endif
@@ -3046,6 +3065,14 @@ static void report_discovery_results(void)
 
 	atomic_clear_bit(bt_dev.flags, BT_DEV_INQUIRY);
 
+#if defined(BFLB_BREDR_PATCH_FIX_DISCOVERY_STOP_DURING_NAME_RESOLVE)
+	/* Discovery stopped while resolving names; callback already detached. */
+	if (!discovery_cb) {
+		BT_WARN("Discovery stopped, skip result callback");
+		return;
+	}
+#endif
+
 	discovery_cb(discovery_results, discovery_results_count);
 
 	discovery_cb = NULL;
@@ -3178,6 +3205,12 @@ static void extended_inquiry_result(struct net_buf *buf)
 	result->rssi = evt->rssi;
 	memcpy(result->cod, evt->cod, 3);
 	memcpy(result->eir, evt->eir, sizeof(result->eir));
+
+#if defined(BFLB_BREDR_PATCH_EXTENDED_INQUIRY_RESULT_CALLBACK)
+	if (discovery_result_cb) {
+		discovery_result_cb(result);
+	}
+#endif /* BFLB_BREDR_PATCH_EXTENDED_INQUIRY_RESULT_CALLBACK */
 }
 
 static void remote_name_request_complete(struct net_buf *buf)
@@ -3257,6 +3290,14 @@ check_names:
 
 	/* all names resolved, report discovery results */
 	atomic_clear_bit(bt_dev.flags, BT_DEV_INQUIRY);
+
+#if defined(BFLB_BREDR_PATCH_FIX_DISCOVERY_STOP_DURING_NAME_RESOLVE)
+	/* Discovery stopped while resolving names; callback already detached. */
+	if (!discovery_cb) {
+		BT_WARN("Discovery stopped, skip result callback");
+		return;
+	}
+#endif
 
 	discovery_cb(discovery_results, discovery_results_count);
 
@@ -3437,6 +3478,48 @@ static void role_change(struct net_buf *buf)
 
 	bt_conn_unref(conn);
 }
+
+#if defined(BFLB_BREDR_PATCH_ENABLE_SNIFF_MODE)
+static void mode_change(struct net_buf *buf)
+{
+	struct bt_hci_evt_mode_change *evt = (void *)buf->data;
+	u16_t handle = sys_le16_to_cpu(evt->handle);
+	u16_t interval = sys_le16_to_cpu(evt->interval);
+	struct bt_conn *conn;
+	const char *mode_str;
+
+	if (evt->status) {
+		BT_WARN("Mode change failed, handle %u status 0x%02x",
+			handle, evt->status);
+		return;
+	}
+
+	switch (evt->mode) {
+	case BT_HCI_MODE_ACTIVE:
+		mode_str = "active";
+		break;
+	case BT_HCI_MODE_HOLD:
+		mode_str = "hold";
+		break;
+	case BT_HCI_MODE_SNIFF:
+		mode_str = "sniff";
+		break;
+	default:
+		mode_str = "unknown";
+		break;
+	}
+
+	conn = bt_conn_lookup_handle(handle);
+	if (conn) {
+		BT_WARN("Mode change: conn %p now %s (interval %u slots, %u ms)",
+			conn, mode_str, interval, (interval * 625) / 1000);
+		bt_conn_unref(conn);
+	} else {
+		BT_WARN("Mode change: handle %u now %s (interval %u slots)",
+			handle, mode_str, interval);
+	}
+}
+#endif /* BFLB_BREDR_PATCH_ENABLE_SNIFF_MODE */
 #endif /* CONFIG_BT_BREDR */
 
 #if defined(CONFIG_BT_SMP)
@@ -4522,6 +4605,10 @@ static const struct event_handler normal_events[] = {
 		      sizeof(struct bt_hci_evt_remote_ext_features)),
 	EVENT_HANDLER(BT_HCI_EVT_ROLE_CHANGE, role_change,
 		      sizeof(struct bt_hci_evt_role_change)),
+#if defined(BFLB_BREDR_PATCH_ENABLE_SNIFF_MODE)
+	EVENT_HANDLER(BT_HCI_EVT_MODE_CHANGE, mode_change,
+		      sizeof(struct bt_hci_evt_mode_change)),
+#endif /* BFLB_BREDR_PATCH_ENABLE_SNIFF_MODE */
 	EVENT_HANDLER(BT_HCI_EVT_SYNC_CONN_COMPLETE, synchronous_conn_complete,
 		      sizeof(struct bt_hci_evt_sync_conn_complete)),
 #endif /* CONFIG_BT_BREDR */
@@ -6406,6 +6493,17 @@ int bt_disable_action(void)
     net_buf_deinit(&frag_pool);
     #endif
     #if defined(CONFIG_BT_BREDR)
+    #if defined(BFLB_BREDR_PATCH_DEINIT_CLEANUP) && \
+        !(CONFIG_BLE_USING_DYNAMIC_RAM)
+    /* Tear down BR/EDR profile SDP records (a2dp/avrcp/hfp/spp each registered
+     * one via bt_sdp_register_service during enable). When CONFIG_BLE_USING_DYNAMIC_RAM
+     * is on, this is already done through bt_conn_deinit()->bt_l2cap_deinit()->
+     * bt_l2cap_br_deinit(); guard below runs it for the non-dynamic-RAM build so
+     * num_services is decremented each disable cycle. Without this, num_services
+     * grows monotonically across enable cycles and exhausts BT_SDP_MAX_SERVICES
+     * ("Reached max allowed registrations, bt_sdp_register_service"). */
+    bt_l2cap_br_deinit();
+    #endif
     net_buf_deinit(&br_sig_pool);
     net_buf_deinit(&sdp_pool);
     net_buf_deinit(&dummy_pool);
@@ -7308,7 +7406,7 @@ int set_adv_enable(bool enable)
 	}
 
 	#if defined(BFLB_BLE_RESTRICT_CONN_ACTION_NOT_EXCEED_MAX_CONN)
-	if (enable && atomic_test_bit(bt_dev.flags,BT_DEV_ADVERTISING_CONNECTABLE) && bt_conn_get_remote_dev_info(NULL) == CONFIG_BT_MAX_CONN){
+	if (enable && atomic_test_bit(bt_dev.flags,BT_DEV_ADVERTISING_CONNECTABLE) && bt_conn_get_remote_dev_info(NULL, BT_CONN_TYPE_LE) == CONFIG_BT_MAX_CONN){
 		BT_ERR("Cannot do connectable adv because of conn resource limitation(max_conn:%u)",CONFIG_BT_MAX_CONN);
 		return -EACCES;
 	}
@@ -7680,7 +7778,7 @@ int bt_le_adv_start(const struct bt_le_adv_param *param,
 	#endif
 
 	#if defined(BFLB_BLE_RESTRICT_CONN_ACTION_NOT_EXCEED_MAX_CONN)
-	if(param->options & BT_LE_ADV_OPT_CONNECTABLE && bt_conn_get_remote_dev_info(NULL) == CONFIG_BT_MAX_CONN)
+	if(param->options & BT_LE_ADV_OPT_CONNECTABLE && bt_conn_get_remote_dev_info(NULL, BT_CONN_TYPE_LE) == CONFIG_BT_MAX_CONN)
 	{
 		BT_ERR("Cannot do connectable adv because of conn resource limitation(max_conn:%u)",CONFIG_BT_MAX_CONN);
 		return -EACCES;
@@ -8173,7 +8271,7 @@ int8_t bt_get_tx_pwr(void)
 #endif
 
 
-#if defined(BL702L) || defined(BL616)
+#if defined(BL702L) || defined(BL616) || defined(BL618DG) || defined(BL616CL)
 int bt_le_throughput_calc(bool enable, u8_t interval)
 {
     struct bt_hci_cp_vs_le_throughput_calc set_param;
@@ -8420,6 +8518,13 @@ static bool valid_br_discov_param(const struct bt_br_discovery_param *param,
 	return true;
 }
 
+#if defined(BFLB_BREDR_PATCH_EXTENDED_INQUIRY_RESULT_CALLBACK)
+void bt_br_discovery_result_cb_register(bt_br_discovery_result_cb_t cb)
+{
+	discovery_result_cb = cb;
+}
+#endif /* BFLB_BREDR_PATCH_EXTENDED_INQUIRY_RESULT_CALLBACK */
+
 int bt_br_discovery_start(const struct bt_br_discovery_param *param,
 			  struct bt_br_discovery_result *results, size_t cnt,
 			  bt_br_discovery_cb_t cb)
@@ -8465,9 +8570,27 @@ int bt_br_discovery_stop(void)
 	}
 
 	err = bt_hci_cmd_send_sync(BT_HCI_OP_INQUIRY_CANCEL, NULL, NULL);
+#if defined(BFLB_BREDR_PATCH_FIX_DISCOVERY_STOP_DURING_NAME_RESOLVE)
+	/* Inquiry already completed while the host is still resolving names:
+	 * Inquiry Cancel returns Command Disallowed (-EACCES). Treat it as a
+	 * successful stop -- fall through to cancel the in-flight name requests
+	 * and clear the discovery state so a restart works, then return 0.
+	 */
+	if (err && err != -EACCES) {
+		return err;
+	}
+#else
 	if (err) {
 		return err;
 	}
+#endif
+
+	/* Detach the callback before issuing the cancels below: a name-resolution
+	 * completion may race in while we wait on Remote Name Cancel, and we must
+	 * not report results after stop. The !discovery_cb guards in the report
+	 * paths drop such late completions.
+	 */
+	discovery_cb = NULL;
 
 	for (i = 0; i < discovery_results_count; i++) {
 		struct discovery_priv *priv;
@@ -8494,7 +8617,6 @@ int bt_br_discovery_stop(void)
 
 	atomic_clear_bit(bt_dev.flags, BT_DEV_INQUIRY);
 
-	discovery_cb = NULL;
 	discovery_results = NULL;
 	discovery_results_size = 0;
 	discovery_results_count = 0;
@@ -8615,6 +8737,59 @@ int bt_br_write_eir(u8_t fec, u8_t *data)
 
     return bt_hci_cmd_send_sync(BT_HCI_OP_WRITE_EXT_INQUIRY_RESP, buf, NULL);
 }
+
+#if defined(BFLB_BREDR_PATCH_ENABLE_SNIFF_MODE)
+int bt_br_conn_enter_sniff(struct bt_conn *conn, u16_t min_interval,
+			   u16_t max_interval)
+{
+	struct bt_hci_cp_sniff_mode *cp;
+	struct net_buf *buf;
+
+	if (!conn || conn->type != BT_CONN_TYPE_BR) {
+		return -EINVAL;
+	}
+
+	buf = bt_hci_cmd_create(BT_HCI_OP_SNIFF_MODE, sizeof(*cp));
+	if (!buf) {
+		return -ENOBUFS;
+	}
+
+	cp = net_buf_add(buf, sizeof(*cp));
+	cp->handle = sys_cpu_to_le16(conn->handle);
+	cp->max_interval = sys_cpu_to_le16(max_interval);
+	cp->min_interval = sys_cpu_to_le16(min_interval);
+	/* attempt/timeout: number of slots the slave listens around the
+	 * sniff anchor. Keep small but non-zero so the link stays alive.
+	 */
+	cp->attempt = sys_cpu_to_le16(4);
+	cp->timeout = sys_cpu_to_le16(1);
+
+	/* Sniff Mode is an asynchronous command: the controller replies with
+	 * Command Status and later a Mode Change event. Use the non-sync send.
+	 */
+	return bt_hci_cmd_send(BT_HCI_OP_SNIFF_MODE, buf);
+}
+
+int bt_br_conn_exit_sniff(struct bt_conn *conn)
+{
+	struct bt_hci_cp_exit_sniff_mode *cp;
+	struct net_buf *buf;
+
+	if (!conn || conn->type != BT_CONN_TYPE_BR) {
+		return -EINVAL;
+	}
+
+	buf = bt_hci_cmd_create(BT_HCI_OP_EXIT_SNIFF_MODE, sizeof(*cp));
+	if (!buf) {
+		return -ENOBUFS;
+	}
+
+	cp = net_buf_add(buf, sizeof(*cp));
+	cp->handle = sys_cpu_to_le16(conn->handle);
+
+	return bt_hci_cmd_send(BT_HCI_OP_EXIT_SNIFF_MODE, buf);
+}
+#endif /* BFLB_BREDR_PATCH_ENABLE_SNIFF_MODE */
 
 int bt_br_internal_update_a2dp_status(u16_t conHandle,u8_t status)
 {

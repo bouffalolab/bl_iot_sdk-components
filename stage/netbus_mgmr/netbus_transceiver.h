@@ -66,7 +66,7 @@ enum {
 
 typedef struct {
     uint16_t type;
-    uint16_t len; // type + len + payload
+    uint16_t len; // payload length
     uint8_t payload[];
 } __attribute__((packed)) netbus_msg_t;
 

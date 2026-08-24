@@ -40,4 +40,9 @@ int btblecontroller_putchar(int c);
 #endif
 void btblecontroller_puts(const char *str);
 uint64_t btblecontroller_mtimer_get_time_us(void);
+#if defined(BL618DG)
+void btblecontroller_gpio_config(uint8_t pin, uint8_t is_high);
+void btblecontroller_rc32k_xtal_count_trigger(void);
+uint16_t btblecontroller_rc32k_xtal_count_wait_result(void);
+#endif
 #endif

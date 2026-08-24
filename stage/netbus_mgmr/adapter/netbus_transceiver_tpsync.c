@@ -111,7 +111,12 @@ static void handle_eth_wifi_frame_recv(netbus_wifi_mgmr_ctx_t *ctx, const uint8_
 {
     uint16_t subtype;
 
-    subtype = frame[0] + (frame[1] << 8);
+    if (frame == NULL || frame_len <= sizeof(subtype)) {
+        blog_error("ethernet frame missing subtype or payload\r\n");
+        return;
+    }
+
+    memcpy(&subtype, frame, sizeof(subtype));
     blog_info("wifi frame handle, subtype 0x%x\r\n", subtype);
     switch (subtype) {
     case BF1B_MSG_ETH_WIFI_FRAME_SUBTYPE_STA_TO_WIFI_TX:
@@ -132,6 +137,32 @@ static void handle_eth_wifi_frame_recv(netbus_wifi_mgmr_ctx_t *ctx, const uint8_
     }
 }
 
+static bool netbus_cmd_requires_header_only(uint16_t cmd)
+{
+    switch (cmd) {
+    case BFLB_CMD_RESET:
+    case BFLB_CMD_HELLO:
+    case BFLB_CMD_GET_MAC:
+    case BFLB_CMD_AP_CONNECTED_IND:
+    case BFLB_CMD_AP_DISCONNECTED_IND:
+    case BFLB_CMD_DISCONNECT_AP:
+    case BFLB_CMD_STOP_AP:
+    case BFLB_CMD_START_SCAN:
+    case BFLB_CMD_GET_STA_LIST:
+    case BFLB_CMD_GET_LINK_STATUS:
+    case BFLB_CMD_START_MONITOR:
+    case BFLB_CMD_STOP_MONITOR:
+    case BFLB_CMD_GET_CHANNEL:
+    case BFLB_CMD_GET_DEV_VERSION:
+    case BFLB_CMD_OTA:
+    case BFLB_CMD_PING:
+    case BFLB_CMD_HBN:
+        return true;
+    default:
+        return false;
+    }
+}
+
 static void handle_cmd_recv(netbus_wifi_mgmr_ctx_t *ctx, const uint8_t *data, const uint16_t data_len)
 {
     netbus_wifi_mgmr_msg_t swm_msg;
@@ -139,7 +170,19 @@ static void handle_cmd_recv(netbus_wifi_mgmr_ctx_t *ctx, const uint8_t *data, co
     void *dptr = NULL;
     int dlen;
 
+    if (data == NULL || data_len < sizeof(netbus_min_cmd_msg_t)) {
+        blog_error("cmd of unexpected size\r\n");
+        return;
+    }
+
     cmd = (netbus_min_cmd_msg_t *)data;
+    if (netbus_cmd_requires_header_only(cmd->cmd) &&
+        data_len != sizeof(*cmd)) {
+        blog_error("header-only cmd 0x%x has invalid size %u\r\n",
+                   cmd->cmd, data_len);
+        return;
+    }
+
     memset(&swm_msg, 0, sizeof(swm_msg));
     swm_msg.type = NETBUS_WIFI_MGMR_MSG_TYPE_CMD;
     swm_msg.u.cmd.cmd = cmd->cmd;
@@ -157,14 +200,33 @@ static void handle_cmd_recv(netbus_wifi_mgmr_ctx_t *ctx, const uint8_t *data, co
         memcpy(dptr, data, dlen);
         swm_msg.u.cmd.data_ptr = dptr;
         swm_msg.u.cmd.data_len = dlen;
-    } else {
-        blog_error("cmd of unexpected size\r\n");
-        return;
     }
     if (netbus_wifi_mgmr_msg_send(ctx, &swm_msg, true, false)) {
         blog_error("mgmr msg send failed, drop cmd\r\n");
         vPortFree(dptr);
     }
+}
+
+static int netbus_msg_validate(const void *data_ptr, uint16_t data_len)
+{
+    const netbus_msg_t *msg = data_ptr;
+
+    if (data_ptr == NULL || data_len < sizeof(*msg)) {
+        return -1;
+    }
+    if (msg->len != data_len - sizeof(*msg)) {
+        return -1;
+    }
+    if (msg->type == BF1B_MSG_TYPE_ETH_WIFI_FRAME &&
+        msg->len <= sizeof(uint16_t)) {
+        return -1;
+    }
+    if (msg->type == BF1B_MSG_TYPE_CMD &&
+        msg->len < sizeof(netbus_min_cmd_msg_t)) {
+        return -1;
+    }
+
+    return 0;
 }
 
 static void netbus_recv_cb(void *arg, void *data_ptr, uint16_t data_len)
@@ -173,8 +235,13 @@ static void netbus_recv_cb(void *arg, void *data_ptr, uint16_t data_len)
 
     netbus_wifi_mgmr_ctx_t *ctx;
 
-    msg = (netbus_msg_t *)data_ptr;
+    (void)arg;
+    if (netbus_msg_validate(data_ptr, data_len) != 0) {
+        blog_error("invalid netbus frame length %u\r\n", data_len);
+        return;
+    }
 
+    msg = (netbus_msg_t *)data_ptr;
     blog_info("netbus_recv len:%d type:0x%x\r\n\r\n", msg->len, msg->type);
 
     ctx = &g_netbus_wifi_mgmr_env;
@@ -260,113 +327,97 @@ int bflb_net_wifi_trcver_set_present(net_wifi_trcver_ctx_t *ctx, bool present)
     return 0;
 }
 
-typedef struct _netbus_struct_desc {
-    uint16_t type;
-    uint16_t len;
-    uint8_t buf[1];
-} netbus_msgtlv_t;
-
 // type len data
-int bl_netbus_write_tlv(uint16_t type, const void *data_ptr, uint16_t data_len)
+static int bl_netbus_write_tlv(uint16_t type, const void *data_ptr, uint16_t data_len)
 {
-    netbus_msgtlv_t *msg = NULL;
+    netbus_msg_t *msg;
     int ret;
 
-    msg = aos_malloc(sizeof(netbus_msgtlv_t) + data_len);
+    if ((data_len > 0 && data_ptr == NULL) ||
+        data_len > TP_PAYLOAD_LEN - sizeof(*msg) || gp_ramsync == NULL) {
+        return -1;
+    }
+
+    msg = aos_malloc(sizeof(*msg) + data_len);
     if (!msg) {
         blog_error("mem err\r\n");
+        return -1;
     }
     msg->type = type;
     msg->len = data_len;
-    memcpy(msg->buf, data_ptr, data_len);
+    if (data_len > 0) {
+        memcpy(msg->payload, data_ptr, data_len);
+    }
 
-    uramsync_tx_push_toback(gp_ramsync, msg, 4 + data_len, URAMSYNC_FOREVER);
+    ret = uramsync_tx_push_toback(gp_ramsync, msg,
+                                  sizeof(*msg) + data_len,
+                                  URAMSYNC_FOREVER);
     blog_info("netbus_write->len:%d type:0x%x\r\n\r\n", msg->len, msg->type);
-    ret = data_len;
     aos_free(msg);
 
     return ret;
 }
 // type1 len pbuf
 // type2 len pbuf1 len buf2
-int bl_netbus_write_pbuf_tlv(struct pbuf *p)
+static int bl_netbus_write_pbuf_tlv(uint16_t type, struct pbuf *p)
 {
-    struct pbuf *next;
-    uint16_t type;
-    uint16_t len;
-    uint8_t *buf;
-    int off;
+    netbus_msg_t *msg;
+    uint16_t copied;
     int ret;
 
-    if (!p) {
+    if (p == NULL || p->tot_len == 0 || gp_ramsync == NULL ||
+        p->tot_len > TP_PAYLOAD_LEN - sizeof(*msg)) {
         return -1;
     }
 
-    buf = aos_malloc(NETBUS_MSG_MAXSIZE);
-    if (!buf) {
+    msg = aos_malloc(sizeof(*msg) + p->tot_len);
+    if (!msg) {
         blog_error("mem err\r\n");
+        return -1;
     }
 
-    off = 0;
-
-    type = 0x7878;// fixme enum
-    memcpy(buf + off, &type, 2);
-    off += 2;
-
-    len = p->tot_len;// ??? fixme
-    memcpy(buf + off, &len, 2);
-    off += 2;
-
-    memcpy(buf + off, p->payload, p->len);
-    off += p->len;// ??? fixme
-
-    next = p->next;
-    while (next) {
-        memcpy(buf + off, next->payload, next->len);// ??? fixme
-        off += next->len;// ??? fixme
-        next = next->next;
+    msg->type = type;
+    msg->len = p->tot_len;
+    copied = pbuf_copy_partial(p, msg->payload, p->tot_len, 0);
+    if (copied != p->tot_len) {
+        aos_free(msg);
+        return -1;
     }
 
-    if (off > NETBUS_MSG_MAXSIZE) {
-        blog_error("length %d BUG !!!\r\n", off);
-        while(1);
-    }
-
-    uramsync_tx_push_toback(gp_ramsync, buf, off, URAMSYNC_FOREVER);
-    blog_info("netbus_write->len:%d type:0x%x\r\n\r\n", len, type);
-    ret = off;
-    aos_free(buf);
+    ret = uramsync_tx_push_toback(gp_ramsync, msg,
+                                  sizeof(*msg) + msg->len,
+                                  URAMSYNC_FOREVER);
+    blog_info("netbus_write->len:%d type:0x%x\r\n\r\n", msg->len, msg->type);
+    aos_free(msg);
 
     return ret;
 }
 
 int bflbmsg_send(net_wifi_trcver_ctx_t *ctx, const uint16_t type, const void *payload, const uint16_t payload_len)
 {
-    int ret = 0;
-    if (!ctx->host_present) {
+    if (ctx == NULL || !ctx->host_present) {
         blog_error("host_present = NULL?\r\n");
         return -1;
     }
-    bl_netbus_write_tlv(type, payload, payload_len);
 
-    return ret;
+    return bl_netbus_write_tlv(type, payload, payload_len);
 }
 
 int bflbmsg_send_pbuf(net_wifi_trcver_ctx_t *ctx, const uint16_t type, const uint16_t subtype, struct pbuf *p, bool is_amsdu, void *cb, void *cb_arg)
 {
-    int ret = 0;
+    (void)subtype;
+    (void)is_amsdu;
+    (void)cb;
+    (void)cb_arg;
 
-    if (!ctx->host_present) {
+    if (ctx == NULL || !ctx->host_present) {
         return -1;
     }
 
-    bl_netbus_write_pbuf_tlv(p);
-
-    return ret;
+    return bl_netbus_write_pbuf_tlv(type, p);
 }
 
 void bflbwrite_s_reg(net_wifi_trcver_ctx_t *ctx, const uint32_t offset, const uint8_t val)
 {
 	//log_warn("bflbwrite_s_reg offset = %ld, val = %d\r\n", offset, val);
 }
-

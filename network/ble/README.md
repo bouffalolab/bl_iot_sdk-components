@@ -4,6 +4,7 @@ BL602：
 libblecontroller_bl602_m0s1： 1 BLE connection is supported, BL602 can only be slave in this connection. 
 libblecontroller_bl602_m0s1s: Based on libblecontroller_bl602_m0s1, add BLE scan feature.
 libblecontroller_bl602_m1s1:  1 BLE connection is supported, BL602 can be master or slave in this connection.
+libblecontroller_bl602_m2s1:  2 BLE connections are supported, BL602 can be master or slave in this connection.
 
 BL702:
 libblecontroller_bl702_m0s0sp：BL702 support BLE scan feature and BLE PDS(power down sleep) feature.

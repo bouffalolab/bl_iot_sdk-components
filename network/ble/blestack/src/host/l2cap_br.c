@@ -83,7 +83,7 @@ static sys_slist_t br_channels;
 
 /* Pool for outgoing BR/EDR signaling packets, min MTU is 48 */
 #if !defined(BFLB_DYNAMIC_ALLOC_MEM)
-NET_BUF_POOL_FIXED_DEFINE(br_sig_pool, CONFIG_BT_MAX_CONN,
+NET_BUF_POOL_FIXED_DEFINE(br_sig_pool, CONFIG_BT_ACL_CONN,
 			  BT_L2CAP_BUF_SIZE(L2CAP_BR_MIN_MTU), NULL);
 #else
 #if (CONFIG_BLE_USING_DYNAMIC_RAM)
@@ -103,7 +103,7 @@ struct bt_l2cap_br {
 	uint32_t			info_feat_mask;
 };
 
-static struct bt_l2cap_br bt_l2cap_br_pool[CONFIG_BT_MAX_CONN];
+static struct bt_l2cap_br bt_l2cap_br_pool[CONFIG_BT_ACL_CONN];
 
 struct bt_l2cap_chan *bt_l2cap_br_lookup_rx_cid(struct bt_conn *conn,
 						uint16_t cid)
@@ -1642,9 +1642,9 @@ void bt_l2cap_br_init(void)
 
 #if defined(BFLB_DYNAMIC_ALLOC_MEM)
 	#if (CONFIG_BLE_USING_DYNAMIC_RAM)
-	net_buf_init(&p_br_sig_pool, CONFIG_BT_MAX_CONN, BT_L2CAP_BUF_SIZE(L2CAP_BR_MIN_MTU), NULL);
+	net_buf_init(&p_br_sig_pool, CONFIG_BT_ACL_CONN, BT_L2CAP_BUF_SIZE(L2CAP_BR_MIN_MTU), NULL);
 	#else
-	net_buf_init(&br_sig_pool, CONFIG_BT_MAX_CONN, BT_L2CAP_BUF_SIZE(L2CAP_BR_MIN_MTU), NULL);
+	net_buf_init(&br_sig_pool, CONFIG_BT_ACL_CONN, BT_L2CAP_BUF_SIZE(L2CAP_BR_MIN_MTU), NULL);
 	#endif
 #endif
 	sys_slist_init(&br_servers);
@@ -1680,6 +1680,29 @@ void bt_l2cap_br_init(void)
 
 }
 
+#if defined(BFLB_BREDR_PATCH_DEINIT_CLEANUP)
+void bt_l2cap_br_deinit(void)
+{
+	if (IS_ENABLED(CONFIG_BT_SPP)) {
+		bt_spp_deinit();
+	}
+
+	if (IS_ENABLED(CONFIG_BT_HFP)) {
+		bt_hfp_hf_deinit();
+	}
+
+	if (IS_ENABLED(CONFIG_BT_A2DP)) {
+		bt_a2dp_deinit();
+	}
+
+	if (IS_ENABLED(CONFIG_BT_AVRCP)) {
+		bt_avrcp_deinit();
+	}
+
+	bt_rfcomm_deinit();
+}
+#endif
+
 int bt_l2cap_br_echo_req(struct bt_conn *conn)
 {
     struct net_buf *rsp_buf;
@@ -1694,4 +1717,3 @@ int bt_l2cap_br_echo_req(struct bt_conn *conn)
 	bt_l2cap_send(conn, BT_L2CAP_CID_BR_SIG, rsp_buf);
 	return 0; 
 }
-

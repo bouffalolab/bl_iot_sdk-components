@@ -5,7 +5,6 @@
  *
  * @brief UART Driver for HCI over UART operation.
  *
- * Copyright (C) RivieraWaves 2009-2015
  *
  *
  ****************************************************************************************
@@ -80,14 +79,39 @@ typedef enum
 }UART_RX_FIFO_ISR_TYPE;
 
 /**
+ * @brief UART HCI initialization configuration.
+ *
+ * This configuration must be set before btble_uart_init(). DMA and IRQ
+ * transport selection cannot be changed after UART initialization.
+ */
+typedef struct
+{
+  uint8_t uart_id;
+  uint8_t tx_pin;
+  uint8_t rx_pin;
+  uint8_t cts_pin;
+  uint8_t rts_pin;
+  uint32_t baudrate;
+  uint8_t dma_enable;
+  uint8_t flow_ctrl_enable;
+} btble_uart_config_t;
+
+/**
  * @brief Get baudrate divisor macro
- */ 
+ */
 #define uart_get_baudrate_div(baudrate) (BAUDRATE_DIV_##baudrate)
 
 /*
  * FUNCTION DECLARATIONS
  ****************************************************************************************
  */
+
+/**
+ * @brief Sets the UART HCI initialization configuration.
+ *
+ * Must be called before btble_uart_init().
+ */
+int btble_uart_configure(const btble_uart_config_t *config);
 
 /**
  ****************************************************************************************

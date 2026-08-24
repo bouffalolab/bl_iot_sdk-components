@@ -265,6 +265,40 @@ void otbr_lwip_assert_core_locked(char * file, int line)
    }
 }
 
+bool otbr_lwip_core_lock_acquire(char * file, int line)
+{
+    if (!lock_tcpip_core) {
+        /** tcpip stack is not started yet, still in single thread context */
+        return false;
+    }
+
+    if (sys_is_inside_interrupt()) {
+        /** a mutex can not be taken from interrupt context, keep the
+         *  original hard stop for this genuinely unexpected case */
+        otbr_lwip_assert_core_locked(file, line);
+        return false;
+    }
+
+    if (sys_mutex_is_locked(&lock_tcpip_core)) {
+        /** the lwip core lock is already held, the same condition
+         *  otbr_lwip_assert_core_locked() accepts; run inline as before */
+        return false;
+    }
+
+    /** the caller does not hold the lwip core lock; take it to serialize
+     *  with the tcpip thread instead of crashing. With
+     *  LWIP_TCPIP_CORE_LOCKING enabled this is what tcpip_api_call() does */
+    LOCK_TCPIP_CORE();
+    return true;
+}
+
+void otbr_lwip_core_lock_release(bool locked)
+{
+    if (locked) {
+        UNLOCK_TCPIP_CORE();
+    }
+}
+
 void otbr_lwip_napt_enable_no(u8_t number, int enable) 
 {
     ip_napt_enable_no(number, enable);
@@ -311,7 +345,7 @@ bool otbr_rtos_timer_delete(otbr_rtos_void_type_t timerHandle)
 
 otbr_rtos_void_type_t otbr_rtos_mutex_create(void) 
 {
-    return xSemaphoreCreateMutex();
+    return xSemaphoreCreateRecursiveMutex();
 }
 void otbr_rtos_mutex_delete(otbr_rtos_void_type_t mutexHandle)
 {
@@ -342,15 +376,15 @@ void otbr_rtos_semaphore_delete(otbr_rtos_void_type_t semapHandle)
 bool otbr_rtos_semaphore_take(otbr_rtos_void_type_t semapHandle, uint32_t timeout) 
 {
     if (timeout == -1) {
-        return xSemaphoreTakeRecursive(semapHandle, portMAX_DELAY) == pdPASS;
+        return xSemaphoreTake(semapHandle, portMAX_DELAY) == pdPASS;
     }
     else {
-        return xSemaphoreTakeRecursive(semapHandle, pdMS_TO_TICKS(timeout)) == pdPASS;
+        return xSemaphoreTake(semapHandle, pdMS_TO_TICKS(timeout)) == pdPASS;
     }
 }
 bool otbr_rtos_semaphore_give(otbr_rtos_void_type_t semapHandle) 
 {
-    return xSemaphoreGiveRecursive(semapHandle) == pdPASS;
+    return xSemaphoreGive(semapHandle) == pdPASS;
 }
 
 otbr_rtos_void_type_t otbr_rtos_queue_create(uint32_t queue_num, uint32_t entry_size)

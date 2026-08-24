@@ -155,7 +155,7 @@ otError otPlatSettingsSet(otInstance *aInstance, uint16_t aKey, const uint8_t *a
     lfs->cfg->lock(lfs->cfg);
 
     do {
-        ret = lfs_file_open(lfs, &file, key, LFS_O_CREAT | LFS_O_RDWR);
+        ret = lfs_file_open(lfs, &file, key, LFS_O_CREAT | LFS_O_RDWR | LFS_O_TRUNC);
         if (ret != LFS_ERR_OK) {
             break;
         }

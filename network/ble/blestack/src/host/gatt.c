@@ -2638,7 +2638,11 @@ int bt_gatt_exchange_mtu(struct bt_conn *conn,
 		return -ENOMEM;
 	}
 
+	#if defined(BFLB_BLE_SET_LOCAL_ATT_MTU_SIZE)
+	mtu = bt_att_get_local_mtu();
+	#else
 	mtu = BT_ATT_MTU;
+	#endif
 
 	BT_DBG("Client MTU %u", mtu);
 

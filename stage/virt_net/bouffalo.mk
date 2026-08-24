@@ -8,7 +8,9 @@ COMPONENT_PRIV_INCLUDEDIRS := include
 
 ## This component's src
 COMPONENT_SRCS := src/virt_net.c \
+				  src/virt_net_protocol.c \
 				  src/virt_net_ramsync.c \
+				  src/virt_net_pending.c \
 				  test/virt_net_test.c \
 
 COMPONENT_OBJS := $(patsubst %.c,%.o, $(COMPONENT_SRCS))

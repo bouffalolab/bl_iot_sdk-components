@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdint.h>
 #include <cJSON.h>
 
 #include <lwip/err.h>
@@ -73,17 +74,17 @@ static const http_resp_state_line_t http_resp_state_lines[] = {
   },
   {
     .state = 400,
-    .txt_len = sizeof("204 Bad Request"),
+    .txt_len = sizeof("400 Bad Request"),
     .txt = "400 Bad Request",
   },
   {
-    .state = 401,
-    .txt_len = sizeof("401 Forbidden"),
-    .txt = "401 Forbidden",
+    .state = 403,
+    .txt_len = sizeof("403 Forbidden"),
+    .txt = "403 Forbidden",
   },
   {
     .state = 404,
-    .txt_len = sizeof("401 Not Found"),
+    .txt_len = sizeof("404 Not Found"),
     .txt = "404 Not Found",
   },
   {
@@ -103,7 +104,7 @@ static const http_resp_state_line_t http_resp_state_lines[] = {
   },
   {
     .state = 500,
-    .txt_len = sizeof("401 Internal Server Error"),
+    .txt_len = sizeof("500 Internal Server Error"),
     .txt = "500 Internal Server Error",
   },
   {
@@ -126,10 +127,10 @@ static int hex_to_bytes(char *aHex, uint8_t *aBytes, uint16_t aBytesLength)
     size_t      hexLength = strlen(aHex);
     const char *hexEnd    = aHex + hexLength;
     uint8_t *   cur       = aBytes;
-    uint8_t     numChars  = hexLength & 1;
+    uint8_t     numChars  = 0;
     uint8_t     byte      = 0;
 
-    if ((hexLength + 1) / 2 > aBytesLength) {
+    if ((hexLength & 1) != 0 || hexLength / 2 > aBytesLength) {
         return -1;
     }
 
@@ -161,6 +162,65 @@ static int hex_to_bytes(char *aHex, uint8_t *aBytes, uint16_t aBytesLength)
     }
 
     return (int)(cur - aBytes);
+}
+
+static bool hex_to_dataset_tlvs(char *aHex, otOperationalDatasetTlvs *aDatasetTlvs)
+{
+    int length;
+
+    if (aHex == NULL || aDatasetTlvs == NULL) {
+        return false;
+    }
+
+    length = hex_to_bytes(aHex, aDatasetTlvs->mTlvs, OT_OPERATIONAL_DATASET_MAX_LENGTH);
+    if (length <= 0) {
+        return false;
+    }
+
+    aDatasetTlvs->mLength = (uint8_t)length;
+    return true;
+}
+
+static bool json_number_to_uint64(const cJSON *aJson, uint64_t aMax, uint64_t *aValue)
+{
+    double   number;
+    uint64_t value;
+
+    if (!cJSON_IsNumber(aJson) || aValue == NULL) {
+        return false;
+    }
+
+    number = aJson->valuedouble;
+    if (number < 0 || number > (double)aMax) {
+        return false;
+    }
+
+    value = (uint64_t)number;
+    if ((double)value != number) {
+        return false;
+    }
+
+    *aValue = value;
+    return true;
+}
+
+static bool json_to_optional_bool(const cJSON *aJson, bool *aPresent, bool *aValue)
+{
+    if (aPresent == NULL || aValue == NULL) {
+        return false;
+    }
+
+    *aPresent = aJson != NULL;
+    if (!*aPresent) {
+        return true;
+    }
+
+    if (!cJSON_IsBool(aJson)) {
+        return false;
+    }
+
+    *aValue = cJSON_IsTrue(aJson);
+    return true;
 }
 
 static cJSON *array_to_json(uint8_t * aArray, size_t len) 
@@ -269,67 +329,35 @@ exit:
 
 static cJSON * ip6prefix_to_json(otIp6NetworkPrefix * ip6prefix) 
 {
-    cJSON               * json = NULL;
-    char                * ip6addr_str = NULL;
-    bool                is_done = false;
-    ip6_addr_t          ip6addr;
-    int                 num_stop = 0;
-    int                 i = 0;
+    otIp6Prefix prefix = {};
+    char        prefixString[OT_IP6_PREFIX_STRING_SIZE];
 
-    ip6addr_str = (char *) malloc(40);
-    VerifyOrExit(ip6addr_str != NULL && ip6prefix != NULL);
-
-    memset(&ip6addr, 0, sizeof(ip6_addr_t));
-    memcpy(&ip6addr, ip6prefix->m8, OT_IP6_PREFIX_SIZE);
-    VerifyOrExit(ip6addr_ntoa_r(&ip6addr, ip6addr_str, 40) != NULL);
-
-    for (i = 0; i < strlen(ip6addr_str); i ++) {
-        if (ip6addr_str[i] == ':') {
-            num_stop ++;
-        }
-        if (num_stop >= (OT_IP6_PREFIX_SIZE - 1) / 2) {
-            break;
-        }
+    if (ip6prefix == NULL) {
+        return NULL;
     }
-    VerifyOrExit(i < strlen(ip6addr_str));
 
-    i += ( 1 + snprintf(ip6addr_str + i + 1, 40 - i - 1, ":/%d", (OT_IP6_ADDRESS_SIZE - OT_IP6_PREFIX_SIZE) * 8));
-    ip6addr_str[i] = '\0';
+    memcpy(prefix.mPrefix.mFields.m8, ip6prefix->m8, OT_IP6_PREFIX_SIZE);
+    prefix.mLength = OT_IP6_PREFIX_BITSIZE;
+    otIp6PrefixToString(&prefix, prefixString, sizeof(prefixString));
 
-    json = cJSON_CreateString((const char *)ip6addr_str);
-    VerifyOrExit(json != NULL);
-
-    is_done = true;
-    
-exit:
-    if (false == is_done && json) {
-        cJSON_Delete(json);
-        json = NULL;
-    }
-    if (ip6addr_str) {
-        free(ip6addr_str);
-    }
-    
-    return json;
+    return cJSON_CreateString(prefixString);
 }
 
 static bool json_to_ip6prefix(cJSON * json, otIp6NetworkPrefix * aIpPrefix)
 {
-    char                * p = json->valuestring;
-    int                 i = 0;
+    otIp6Prefix prefix;
 
-    for (i = 0; i < strlen(p) && p[i] != '/'; i ++) {}
-
-    if (i >= strlen(p)) {
+    if (json == NULL || json->valuestring == NULL || aIpPrefix == NULL) {
         return false;
     }
 
-    if (OT_IP6_PREFIX_SIZE != atoi(p + i + 1)) {
+    if (otIp6PrefixFromString(json->valuestring, &prefix) != OT_ERROR_NONE ||
+        prefix.mLength != OT_IP6_PREFIX_BITSIZE) {
         return false;
     }
-    p[i] = '\0';
 
-    return OT_IP6_PREFIX_SIZE == hex_to_bytes(p, aIpPrefix->m8, OT_IP6_PREFIX_SIZE);
+    memcpy(aIpPrefix->m8, prefix.mPrefix.mFields.m8, OT_IP6_PREFIX_SIZE);
+    return true;
 }
 
 static cJSON * timestamp_to_json(otTimestamp * aTimestamp)
@@ -345,7 +373,7 @@ static cJSON * timestamp_to_json(otTimestamp * aTimestamp)
     VerifyOrExit((j = cJSON_CreateNumber(aTimestamp->mTicks)) != NULL);
     cJSON_AddItemToObject(json, "Ticks", j);
 
-    VerifyOrExit((j = cJSON_CreateNumber(aTimestamp->mAuthoritative)) != NULL);
+    VerifyOrExit((j = cJSON_CreateBool(aTimestamp->mAuthoritative)) != NULL);
     cJSON_AddItemToObject(json, "Authoritative", j);
 
     is_done = true;
@@ -361,11 +389,17 @@ exit:
 
 static bool json_to_timestamp(cJSON *json, otTimestamp * aTimestamp)
 {
-    cJSON *j = NULL;
+    cJSON    *j = NULL;
+    uint64_t value;
+    bool     present;
+    bool     boolValue;
 
     j = cJSON_GetObjectItemCaseSensitive(json, "Seconds");
     if (cJSON_IsNumber(j)) {
-        aTimestamp->mSeconds = (uint64_t)(j->valuedouble);
+        if (!json_number_to_uint64(j, 0xffffffffffffULL, &value)) {
+            return false;
+        }
+        aTimestamp->mSeconds = value;
     }
     else if (j) {
         return false;
@@ -373,14 +407,22 @@ static bool json_to_timestamp(cJSON *json, otTimestamp * aTimestamp)
 
     j = cJSON_GetObjectItemCaseSensitive(json, "Ticks");
     if (cJSON_IsNumber(j)) {
-        aTimestamp->mTicks = (uint16_t)(j->valueint);
+        if (!json_number_to_uint64(j, 0x7fff, &value)) {
+            return false;
+        }
+        aTimestamp->mTicks = (uint16_t)value;
     }
     else if (j) {
         return false;
     }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "Authoritative");
-    aTimestamp->mAuthoritative = cJSON_IsTrue(j);
+    if (!json_to_optional_bool(j, &present, &boolValue)) {
+        return false;
+    }
+    if (present) {
+        aTimestamp->mAuthoritative = boolValue;
+    }
 
     return true;
 }
@@ -441,38 +483,92 @@ exit:
 static bool json_to_security_policy(cJSON * json, otSecurityPolicy * aSecurityPolicy)
 {
     cJSON               * j = NULL;
+    uint64_t            value;
+    bool                present;
+    bool                boolValue;
 
     j = cJSON_GetObjectItemCaseSensitive(json, "RotationTime");
     if (cJSON_IsNumber(j)) {
-        aSecurityPolicy->mRotationTime = (uint16_t)(j->valueint);
+        if (!json_number_to_uint64(j, UINT16_MAX, &value)) {
+            return false;
+        }
+        aSecurityPolicy->mRotationTime = (uint16_t)value;
+    }
+    else if (j) {
+        return false;
     }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "ObtainNetworkKey");
-    aSecurityPolicy->mObtainNetworkKeyEnabled = cJSON_IsTrue(j);
+    if (!json_to_optional_bool(j, &present, &boolValue)) {
+        return false;
+    }
+    if (present) {
+        aSecurityPolicy->mObtainNetworkKeyEnabled = boolValue;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "NativeCommissioning");
-    aSecurityPolicy->mNativeCommissioningEnabled = cJSON_IsTrue(j);
+    if (!json_to_optional_bool(j, &present, &boolValue)) {
+        return false;
+    }
+    if (present) {
+        aSecurityPolicy->mNativeCommissioningEnabled = boolValue;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "Routers");
-    aSecurityPolicy->mRoutersEnabled = cJSON_IsTrue(j);
+    if (!json_to_optional_bool(j, &present, &boolValue)) {
+        return false;
+    }
+    if (present) {
+        aSecurityPolicy->mRoutersEnabled = boolValue;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "ExternalCommissioning");
-    aSecurityPolicy->mExternalCommissioningEnabled = cJSON_IsTrue(j);
+    if (!json_to_optional_bool(j, &present, &boolValue)) {
+        return false;
+    }
+    if (present) {
+        aSecurityPolicy->mExternalCommissioningEnabled = boolValue;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "CommercialCommissioning");
-    aSecurityPolicy->mCommercialCommissioningEnabled = cJSON_IsTrue(j);
+    if (!json_to_optional_bool(j, &present, &boolValue)) {
+        return false;
+    }
+    if (present) {
+        aSecurityPolicy->mCommercialCommissioningEnabled = boolValue;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "AutonomousEnrollment");
-    aSecurityPolicy->mAutonomousEnrollmentEnabled = cJSON_IsTrue(j);
+    if (!json_to_optional_bool(j, &present, &boolValue)) {
+        return false;
+    }
+    if (present) {
+        aSecurityPolicy->mAutonomousEnrollmentEnabled = boolValue;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "NetworkKeyProvisioning");
-    aSecurityPolicy->mNetworkKeyProvisioningEnabled = cJSON_IsTrue(j);
+    if (!json_to_optional_bool(j, &present, &boolValue)) {
+        return false;
+    }
+    if (present) {
+        aSecurityPolicy->mNetworkKeyProvisioningEnabled = boolValue;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "TobleLink");
-    aSecurityPolicy->mTobleLinkEnabled = cJSON_IsTrue(j);
+    if (!json_to_optional_bool(j, &present, &boolValue)) {
+        return false;
+    }
+    if (present) {
+        aSecurityPolicy->mTobleLinkEnabled = boolValue;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "NonCcmRouters");
-    aSecurityPolicy->mNonCcmRoutersEnabled = cJSON_IsTrue(j);
+    if (!json_to_optional_bool(j, &present, &boolValue)) {
+        return false;
+    }
+    if (present) {
+        aSecurityPolicy->mNonCcmRoutersEnabled = boolValue;
+    }
 
     return true;
 }
@@ -547,7 +643,8 @@ exit:
 
 static bool json_to_active_dataset(cJSON * json, otOperationalDataset * aDataset)
 {
-    cJSON * j = NULL;
+    cJSON    * j = NULL;
+    uint64_t value;
 
     if (otDatasetCreateNewNetwork(otrGetInstance(), aDataset) != OT_ERROR_NONE) {
         return false;
@@ -570,19 +667,23 @@ static bool json_to_active_dataset(cJSON * json, otOperationalDataset * aDataset
     j = cJSON_GetObjectItemCaseSensitive(json, "NetworkKey");
     if (cJSON_IsString(j)) {
         VerifyOrExit(j->valuestring != NULL);
-        if (0 != memcmp(j->valuestring, "random", sizeof("random"))) {
-            VerifyOrExit(hex_to_bytes(j->valuestring, aDataset->mNetworkKey.m8, OT_NETWORK_KEY_SIZE));
+        if (0 != strcmp(j->valuestring, "random")) {
+            VerifyOrExit(hex_to_bytes(j->valuestring, aDataset->mNetworkKey.m8,
+                                      OT_NETWORK_KEY_SIZE) == OT_NETWORK_KEY_SIZE);
         }
         aDataset->mComponents.mIsNetworkKeyPresent = true;
     }
     else if (cJSON_IsNull(j)) {
         aDataset->mComponents.mIsNetworkKeyPresent = false;
     }
+    else if (j) {
+        return false;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "ExtPanId");
     if (cJSON_IsString(j)) {
         VerifyOrExit(j->valuestring != NULL);
-        if (0 != memcmp(j->valuestring, "random", sizeof("random"))) {
+        if (0 != strcmp(j->valuestring, "random")) {
             VerifyOrExit(hex_to_bytes(j->valuestring, aDataset->mExtendedPanId.m8, OT_EXT_PAN_ID_SIZE) 
                          == OT_EXT_PAN_ID_SIZE);
         }
@@ -591,10 +692,14 @@ static bool json_to_active_dataset(cJSON * json, otOperationalDataset * aDataset
     else if (cJSON_IsNull(j)) {
         aDataset->mComponents.mIsExtendedPanIdPresent = false;
     }
+    else if (j) {
+        return false;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "MeshLocalPrefix");
     if (cJSON_IsString(j)) {
-        if (0 != memcmp(j->valuestring, "random", sizeof("random"))) {
+        VerifyOrExit(j->valuestring != NULL);
+        if (0 != strcmp(j->valuestring, "random")) {
             VerifyOrExit(json_to_ip6prefix(j, &aDataset->mMeshLocalPrefix) == true);
         }
         aDataset->mComponents.mIsMeshLocalPrefixPresent = true;
@@ -602,16 +707,19 @@ static bool json_to_active_dataset(cJSON * json, otOperationalDataset * aDataset
     else if (cJSON_IsNull(j)) {
         aDataset->mComponents.mIsMeshLocalPrefixPresent = false;
     }
+    else if (j) {
+        return false;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "PanId");
     if (cJSON_IsNumber(j)) {
-        if (0 != memcmp(j->valuestring, "random", sizeof("random"))) {
-            aDataset->mPanId                      = (otPanId)(j->valueint);
-        }
+        VerifyOrExit(json_number_to_uint64(j, UINT16_MAX, &value));
+        aDataset->mPanId                      = (otPanId)value;
         aDataset->mComponents.mIsPanIdPresent = true;
     }
     else if (cJSON_IsString(j)) {
-        if (0 != memcmp(j->valuestring, "random", sizeof("random"))) {
+        VerifyOrExit(j->valuestring != NULL);
+        if (0 != strcmp(j->valuestring, "random")) {
             return false;
         }
         aDataset->mComponents.mIsPanIdPresent = true;
@@ -619,30 +727,39 @@ static bool json_to_active_dataset(cJSON * json, otOperationalDataset * aDataset
     else if (cJSON_IsNull(j)) {
         aDataset->mComponents.mIsPanIdPresent = false;
     }
+    else if (j) {
+        return false;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "NetworkName");
     if (cJSON_IsString(j)) {
         VerifyOrExit(j->valuestring != NULL);
-        if (0 == memcmp(j->valuestring, "OpenThread-<PanId>", sizeof("OpenThread-<PanId>"))) {
-            snprintf(aDataset->mNetworkName.m8, OT_NETWORK_NAME_MAX_SIZE, "OpenThread-%04x", aDataset->mPanId);
+        if (0 == strcmp(j->valuestring, "OpenThread-<PanId>")) {
+            snprintf(aDataset->mNetworkName.m8, sizeof(aDataset->mNetworkName.m8),
+                     "OpenThread-%04x", aDataset->mPanId);
         }
         else {
-            VerifyOrExit(strlen(j->valuestring) <= OT_NETWORK_NAME_MAX_SIZE);
-            strncpy(aDataset->mNetworkName.m8, j->valuestring, OT_NETWORK_NAME_MAX_SIZE);
+            VerifyOrExit(otNetworkNameFromString(&aDataset->mNetworkName,
+                                                 j->valuestring) == OT_ERROR_NONE);
         }
         aDataset->mComponents.mIsNetworkNamePresent = true;
     }
     else if (cJSON_IsNull(j)) {
         aDataset->mComponents.mIsNetworkNamePresent = false;
     }
+    else if (j) {
+        return false;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "Channel");
     if (cJSON_IsNumber(j)) {
-        aDataset->mChannel                      = (uint16_t)(j->valueint);
+        VerifyOrExit(json_number_to_uint64(j, UINT16_MAX, &value));
+        aDataset->mChannel                      = (uint16_t)value;
         aDataset->mComponents.mIsChannelPresent = true;
     }
     else if (cJSON_IsString(j)) {
-        if (0 != memcmp(j->valuestring, "random", sizeof("random"))) {
+        VerifyOrExit(j->valuestring != NULL);
+        if (0 != strcmp(j->valuestring, "random")) {
             return false;
         }
         aDataset->mComponents.mIsChannelPresent = true;
@@ -650,17 +767,23 @@ static bool json_to_active_dataset(cJSON * json, otOperationalDataset * aDataset
     else if (cJSON_IsNull(j)) {
         aDataset->mComponents.mIsChannelPresent = false;
     }
+    else if (j) {
+        return false;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "PSKc");
     if (cJSON_IsString(j)) {
         VerifyOrExit(j->valuestring != NULL);
-        if (0 != memcmp(j->valuestring, "random", sizeof("random"))) {
+        if (0 != strcmp(j->valuestring, "random")) {
             VerifyOrExit(hex_to_bytes(j->valuestring, aDataset->mPskc.m8, OT_PSKC_MAX_SIZE) == OT_PSKC_MAX_SIZE);
         }
         aDataset->mComponents.mIsPskcPresent = true;
     }
     else if (cJSON_IsNull(j)) {
         aDataset->mComponents.mIsPskcPresent = false;
+    }
+    else if (j) {
+        return false;
     }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "SecurityPolicy");
@@ -671,14 +794,21 @@ static bool json_to_active_dataset(cJSON * json, otOperationalDataset * aDataset
     else if (cJSON_IsNull(j)) {
         aDataset->mComponents.mIsSecurityPolicyPresent = false;
     }
+    else if (j) {
+        return false;
+    }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "ChannelMask");
     if (cJSON_IsNumber(j)) {
-        aDataset->mChannelMask                      = j->valueint;
+        VerifyOrExit(json_number_to_uint64(j, UINT32_MAX, &value));
+        aDataset->mChannelMask                      = (uint32_t)value;
         aDataset->mComponents.mIsChannelMaskPresent = true;
     }
     else if (cJSON_IsNull(j)) {
         aDataset->mComponents.mIsChannelMaskPresent = false;
+    }
+    else if (j) {
+        return false;
     }
 
     return true;
@@ -721,7 +851,8 @@ exit:
 static bool json_to_pending_datase(cJSON * json, otOperationalDataset * aDataset)
 {
     cJSON               * j = NULL;
-    otTimestamp         timestamp;
+    otTimestamp         timestamp = {.mSeconds = 1};
+    uint64_t            value;
 
     j = cJSON_GetObjectItemCaseSensitive(json, "ActiveDataset");
     if (cJSON_IsObject(j)) {
@@ -730,9 +861,7 @@ static bool json_to_pending_datase(cJSON * json, otOperationalDataset * aDataset
     else if (cJSON_IsString(j)) {
         otOperationalDatasetTlvs datasetTlvs;
 
-        datasetTlvs.mLength = hex_to_bytes(j->valuestring, datasetTlvs.mTlvs, OT_OPERATIONAL_DATASET_MAX_LENGTH);
-        VerifyOrExit(datasetTlvs.mLength > 0);
-
+        VerifyOrExit(hex_to_dataset_tlvs(j->valuestring, &datasetTlvs));
         VerifyOrExit(otDatasetParseTlvs(&datasetTlvs, aDataset) == OT_ERROR_NONE);
     }
     else {
@@ -748,17 +877,21 @@ static bool json_to_pending_datase(cJSON * json, otOperationalDataset * aDataset
     else if (cJSON_IsNull(j)) {
         aDataset->mComponents.mIsPendingTimestampPresent = false;
     }
-    else {
+    else if (j) {
         return false;
     }
 
     j = cJSON_GetObjectItemCaseSensitive(json, "Delay");
     if (cJSON_IsNumber(j)) {
-        aDataset->mDelay                      = j->valueint;
+        VerifyOrExit(json_number_to_uint64(j, UINT32_MAX, &value));
+        aDataset->mDelay                      = (uint32_t)value;
         aDataset->mComponents.mIsDelayPresent = true;
     }
     else if (cJSON_IsNull(j)) {
         aDataset->mComponents.mIsDelayPresent = false;
+    }
+    else if (j) {
+        return false;
     }
 
     return true;
@@ -1259,12 +1392,14 @@ static int openthread_rest_put_dataset_raw (http_accept_type_t accept_type, void
         otDatasetConvertToTlvs(&dataset, &datasetTlvs);
         resp_state = http_resp_state_created;
     }
+    else {
+        VerifyOrExit(errorOt == OT_ERROR_NONE,
+                     resp_state = http_resp_state_internal_server_error);
+    }
 
     if (str) {
-        int iBytes = hex_to_bytes(str, datasetUpdateTlvs.mTlvs, OT_OPERATIONAL_DATASET_MAX_LENGTH);
-        VerifyOrExit(iBytes >= 0, resp_state = http_resp_state_bad_request);
-        datasetUpdateTlvs.mLength = iBytes;
-
+        VerifyOrExit(hex_to_dataset_tlvs(str, &datasetUpdateTlvs),
+                     resp_state = http_resp_state_bad_request);
         VerifyOrExit(otDatasetParseTlvs(&datasetUpdateTlvs, &dataset) == OT_ERROR_NONE, 
                      resp_state = http_resp_state_bad_request);
         VerifyOrExit(otDatasetUpdateTlvs(&dataset, &datasetTlvs) == OT_ERROR_NONE, 
@@ -1473,7 +1608,6 @@ bool openthread_rest_request(void *connection, http_method_type_t method,
 
         printf ("http request [%s]: %s\r\n", method_str[method], uri);
         if (NULL == req_list[i].uri) {
-            ret_state = http_resp_state_forbidden;
             break;
         }
 
@@ -1491,7 +1625,8 @@ char * openthread_rest_construct_resp(http_accept_type_t accept_type, http_resp_
     int body_len = body? strlen(body): 0;
     uint32_t resp_len = body_len + OPENTHREAD_RESP_HDR_LEN + 1;
 
-    VerifyOrExit((int)resp_state < sizeof(http_resp_state_lines) /  sizeof(http_resp_state_lines[0]));
+    VerifyOrExit((int)resp_state >= 0 &&
+                 (int)resp_state < sizeof(http_resp_state_lines) / sizeof(http_resp_state_lines[0]));
 
     resp = p = (char *)malloc(resp_len);
     VerifyOrExit(resp);
@@ -1520,9 +1655,10 @@ char * openthread_rest_construct_resp(http_accept_type_t accept_type, http_resp_
     p += sizeof(HTTP_CONTENT_LEN) - 1;
 
     if (resp_state == http_resp_state_no_content) {
+        body_len = 0;
         p += snprintf(p, resp_len - (size_t)(p - resp), "%d\r\n\r\n", 0);
     } 
-    else if (resp_state == http_resp_state_ok) {
+    else if (resp_state == http_resp_state_ok || resp_state == http_resp_state_created) {
         p += snprintf(p, resp_len - (size_t)(p - resp), "%d\r\n\r\n", body_len);
         VerifyOrExit((size_t)(p - resp) + body_len + 1 < resp_len, (free(resp), resp = NULL));
         if (body_len) {
@@ -1540,10 +1676,9 @@ char * openthread_rest_construct_resp(http_accept_type_t accept_type, http_resp_
     }
     p[body_len] = '\0';
 
+exit:
     if (body) {
         free(body);
     }
-
-exit:
     return resp;
 }

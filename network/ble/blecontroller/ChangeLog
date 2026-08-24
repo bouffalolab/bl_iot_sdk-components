@@ -1,5 +1,11 @@
 
 # Changes
+## 2026-07-09
+1.[bl602]Add blecontroller_602_m2s1 library.
+
+## 2026-05-25
+1.[bl602][bl702]Fix the issue that stale pending adv/scan-rsp data from bt_le_adv_update_data() overwrites fresh data set by the next bt_le_adv_start() after advertising is stopped before the deferred update is applied. (BLE_FIX_STALE_PENDING_ADV_DATA)
+
 ## 2025-10-31
 1.[BL602]Make bluetooth get mac address from efuse.
 

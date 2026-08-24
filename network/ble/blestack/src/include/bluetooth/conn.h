@@ -123,13 +123,14 @@ const bt_addr_le_t *bt_conn_get_dst(const struct bt_conn *conn);
 
 /** @brief Get array index of a connection
  *
- *  This function is used to map bt_conn to index of an array of
- *  connections. The array has CONFIG_BT_MAX_CONN elements.
+ *  This function maps a connection to its index in the corresponding LE or
+ *  BR/EDR connection pool.
  *
  *  @param conn Connection object.
  *
  *  @return Index of the connection object.
- *  The range of the returned value is 0..CONFIG_BT_MAX_CONN-1
+ *  LE connections return 0..CONFIG_BT_MAX_CONN-1. BR/EDR connections return
+ *  0..CONFIG_BT_ACL_CONN-1.
  */
 u8_t bt_conn_index(struct bt_conn *conn);
 
@@ -211,10 +212,13 @@ int bt_conn_get_info(const struct bt_conn *conn, struct bt_conn_info *info);
 /** @brief Get connected devices' info
  *
  *  @param info Connection info object.
+ *  @param type Exact connection type to query (BT_CONN_TYPE_LE or
+ *              BT_CONN_TYPE_BR). When info is non-NULL, its array capacity
+ *              must match the configured maximum for that type.
  *
- *  @return Connected device number.
+ *  @return Connected device number or (negative) error code on failure.
  */
- int bt_conn_get_remote_dev_info(struct bt_conn_info *info);
+int bt_conn_get_remote_dev_info(struct bt_conn_info *info, u8_t type);
 
 /** @brief Update the connection parameters.
  *
@@ -986,6 +990,31 @@ struct esco_para {
  *  @return Valid connection object on success or NULL otherwise.
  */
 struct bt_conn *bt_conn_create_sco(const bt_addr_t *peer,const struct esco_para *para);
+
+#if defined(BFLB_BREDR_PATCH_ENABLE_SNIFF_MODE)
+/** @brief Put a BR/EDR connection into sniff mode.
+ *
+ *  Intervals are in 0.625ms slots (e.g. 160 = 100ms). Sniff mode reduces the
+ *  radio time an idle/low-rate link consumes, freeing bandwidth for active
+ *  links in a multi-connection scenario.
+ *
+ *  @param conn         BR/EDR connection object.
+ *  @param min_interval Minimum sniff interval in 0.625ms slots.
+ *  @param max_interval Maximum sniff interval in 0.625ms slots.
+ *
+ *  @return 0 on success or negative value on error.
+ */
+int bt_br_conn_enter_sniff(struct bt_conn *conn, u16_t min_interval,
+			   u16_t max_interval);
+
+/** @brief Exit sniff mode, returning the connection to active mode.
+ *
+ *  @param conn BR/EDR connection object.
+ *
+ *  @return 0 on success or negative value on error.
+ */
+int bt_br_conn_exit_sniff(struct bt_conn *conn);
+#endif /* BFLB_BREDR_PATCH_ENABLE_SNIFF_MODE */
 
 #endif
 #if defined (BFLB_BLE_GAP_SET_PERIPHERAL_PREF_PARAMS)

@@ -261,7 +261,7 @@ struct bt_smp_br {
 	struct k_delayed_work 	work;
 };
 
-static struct bt_smp_br bt_smp_br_pool[CONFIG_BT_MAX_CONN];
+static struct bt_smp_br bt_smp_br_pool[CONFIG_BT_ACL_CONN];
 #endif /* CONFIG_BT_BREDR */
 
 #if defined(CONFIG_BT_STACK_PTS) || defined(CONFIG_AUTO_PTS)
@@ -1166,6 +1166,20 @@ static void bt_smp_br_disconnected(struct bt_l2cap_chan *chan)
 
 	k_delayed_work_cancel(&smp->work);
 
+#ifdef BFLB_BREDR_PATCH_DEINIT_CLEANUP
+	/* cancel() only stops the timer; the FreeRTOS timer handle is only
+	 * released by del_timer(). Must run before memset() below, which
+	 * would otherwise wipe both handles and leak the underlying timer
+	 * objects (mirrors bt_smp_disconnected()'s LE counterpart). */
+	if (smp->work.timer.timer.hdl) {
+		k_delayed_work_del_timer(&smp->work);
+	}
+
+	if (chan->rtx_work.timer.timer.hdl) {
+		k_delayed_work_del_timer(&chan->rtx_work);
+	}
+#endif
+
 	(void)memset(smp, 0, sizeof(*smp));
 }
 
@@ -1776,7 +1790,7 @@ static int bt_smp_br_accept(struct bt_conn *conn, struct bt_l2cap_chan **chan)
 
 	BT_DBG("conn %p handle %u", conn, conn->handle);
 
-	for (i = 0; i < CONFIG_BT_MAX_CONN; i++) {
+	for (i = 0; i < CONFIG_BT_ACL_CONN; i++) {
 		struct bt_smp_br *smp = &bt_smp_br_pool[i];
 
 		if (smp->chan.chan.conn) {

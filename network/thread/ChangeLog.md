@@ -1,5 +1,36 @@
 # change log on Thread module
 
+## 2026/08/19
+- openthread: 1.7.11
+  - openthread_rest: preserve the selected HTTP parser error status in the response
+  - openthread_rest: harden HTTP request parsing (method, version and Accept header handling, request framing)
+  - openthread_rest: validate REST dataset JSON input (hex fields and numeric ranges)
+  - openthread_rest: harden REST dataset field semantics and make Active Dataset handling type-safe
+  - openthread_rest: correct REST response status lines and response body semantics
+  - openthread_port: create FreeRTOS mutexes as recursive to match their recursive take/give API
+  - openthread_port: take one-shot query semaphores with the non-recursive FreeRTOS API
+  - openthread_port: truncate the previous LittleFS value when overwriting a settings key
+  - openthread: refresh a reused outbound NAT64 mapping before its idle timeout expires
+- openthread_br: 1.7.3
+  - fix platform UDP socket ownership and close/connect lifecycle: release send and deferred
+    receive buffers, retain the PCB for async callbacks, disconnect on an unspecified peer,
+    complete close even when the tcpip mailbox is full, and snapshot receive socket state
+    (fixes the `udp_remove: invalid pcb` coredump)
+  - update the raw netif transmit queue tail under the transmit lock to fix a cross-thread use-after-free
+  - unblock one-shot mDNS query completion by giving the done semaphore when the query is answered
+  - run MLDv2 group membership changes under the lwIP core lock when callers do not hold it
+    (fixes the `wifi_sta_disconnect` coredump with an active Border Router)
+
+## 2026/06/16
+- openthread: 1.7.10
+  - openthread_port: otr_isStackIdle returns true early when ot_radio_ctx.instance is NULL to avoid dereferencing an uninitialized pointer.
+- openthread_br: 1.7.2
+
+## 2026/06/09
+- openthread: 1.7.9
+  - openthread_port: avoid idle sleep with pending tx frame
+- openthread_br: 1.7.2
+
 ## 2026/05/28
 - openthread: 1.7.8
   - openthread_port: add api to set Thread instance for openthread port layer

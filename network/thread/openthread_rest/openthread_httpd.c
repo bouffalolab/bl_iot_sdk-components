@@ -36,7 +36,7 @@
  *
  */
 #include <string.h> /* memset */
-#include <stdlib.h> /* atoi */
+#include <stdlib.h> /* malloc, free */
 #include <stdio.h>
 
 #include "lwip/init.h"
@@ -63,12 +63,9 @@
 
 #if LWIP_TCP && LWIP_CALLBACK_API
 
-/** Minimum length for a valid HTTP/0.9 request: "GET /\r\n" -> 7 bytes */
-#define MIN_REQ_LEN   7
-
 #define CRLF "\r\n"
-#define HTTP11_CONNECTIONKEEPALIVE  "Connection: keep-alive"
-#define HTTP11_CONNECTIONKEEPALIVE2 "Connection: Keep-Alive"
+#define HTTP_VERSION_10 "HTTP/1.0"
+#define HTTP_VERSION_11 "HTTP/1.1"
 
 #define HTTP_IS_DYNAMIC_FILE(hs) 0
 
@@ -148,6 +145,108 @@ static const http_method_t http_method_list[] = {
     .method_len = sizeof("DELETE")
   },
 };
+
+static bool
+http_ascii_equal_ignore_case(const char *left, size_t left_length, const char *right)
+{
+  size_t right_length = strlen(right);
+
+  if (left_length != right_length) {
+    return false;
+  }
+
+  for (size_t i = 0; i < left_length; i++) {
+    unsigned char left_char = (unsigned char)left[i];
+    unsigned char right_char = (unsigned char)right[i];
+
+    if (left_char >= 'A' && left_char <= 'Z') {
+      left_char = (unsigned char)(left_char + ('a' - 'A'));
+    }
+    if (right_char >= 'A' && right_char <= 'Z') {
+      right_char = (unsigned char)(right_char + ('a' - 'A'));
+    }
+    if (left_char != right_char) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool
+http_version_is_supported(const char *version, size_t version_length)
+{
+  return (version_length == sizeof(HTTP_VERSION_10) - 1 &&
+          memcmp(version, HTTP_VERSION_10, version_length) == 0) ||
+         (version_length == sizeof(HTTP_VERSION_11) - 1 &&
+          memcmp(version, HTTP_VERSION_11, version_length) == 0);
+}
+
+static bool
+http_parse_header_field(const char *line,
+                        size_t line_length,
+                        const char **name,
+                        size_t *name_length,
+                        const char **value,
+                        size_t *value_length)
+{
+  const char *colon = memchr(line, ':', line_length);
+  const char *value_start;
+  const char *value_end;
+
+  if (colon == NULL || colon == line || name == NULL || name_length == NULL ||
+      value == NULL || value_length == NULL) {
+    return false;
+  }
+
+  for (const char *cursor = line; cursor < colon; cursor++) {
+    if (*cursor == ' ' || *cursor == '\t') {
+      return false;
+    }
+  }
+
+  value_start = colon + 1;
+  value_end = line + line_length;
+  while (value_start < value_end && (*value_start == ' ' || *value_start == '\t')) {
+    value_start++;
+  }
+  while (value_end > value_start && (value_end[-1] == ' ' || value_end[-1] == '\t')) {
+    value_end--;
+  }
+
+  *name = line;
+  *name_length = (size_t)(colon - line);
+  *value = value_start;
+  *value_length = (size_t)(value_end - value_start);
+  return true;
+}
+
+static bool
+http_parse_content_length(const char *text, size_t length, u32_t max_value, u32_t *result)
+{
+  u32_t value = 0;
+
+  if (length == 0 || result == NULL) {
+    return false;
+  }
+
+  for (size_t i = 0; i < length; i++) {
+    u32_t digit;
+
+    if (text[i] < '0' || text[i] > '9') {
+      return false;
+    }
+
+    digit = (u32_t)(text[i] - '0');
+    if (digit > max_value || value > (max_value - digit) / 10) {
+      return false;
+    }
+    value = value * 10 + digit;
+  }
+
+  *result = value;
+  return true;
+}
 
 #if LWIP_HTTPD_KILL_OLD_ON_CONNECTIONS_EXCEEDED
 /** global list of active HTTP connections, use to kill the oldest when
@@ -393,11 +492,6 @@ http_eof(struct altcp_pcb *pcb, struct http_state *hs)
   if (hs->file_handle.data) {
     free((void *)hs->file_handle.data);
     hs->file_handle.data = NULL;
-
-    if (hs->req) {
-      http_parse_request(NULL, hs, pcb);
-      hs->keepalive = 1;
-    }
   }
 
   /* HTTP/1.1 persistent connection? (Not supported for SSI) */
@@ -559,29 +653,26 @@ static err_t
 http_parse_request(struct pbuf *inp, struct http_state *hs, struct altcp_pcb *pcb)
 {
   char *data = NULL, * body = NULL;
-  u32_t data_len, line_len, body_len = 0;
-  u16_t req_len;
+  u32_t data_len, body_len = 0, header_len;
   struct pbuf *p = inp;
   char *uri = NULL;
   char *ver = NULL;
-  char *sp1, *sp2, *http_header_start = NULL, *http_header_end = NULL, *ptr = NULL;
+  char *sp1, *sp2, *http_header_end = NULL, *ptr = NULL;
   http_method_type_t method_type = http_method_type_unkown;
   http_accept_type_t accept_type = http_accept_type_json;
   http_resp_state_t  error_state = http_resp_state_ok;
-  char body_len_str[8];
+  bool content_length_found = false;
 #ifdef LWIP_DEBUG
   char * lwip_debug_str = NULL;
 #endif
 
   LWIP_UNUSED_ARG(pcb); /* only used for post */
   LWIP_ASSERT("hs != NULL", hs != NULL);
-  LWIP_ASSERT("(p != NULL || hs->req =! NULL)", (p != NULL || hs->req != NULL));
+  LWIP_ASSERT("(p != NULL || hs->req != NULL)", (p != NULL || hs->req != NULL));
 
   if ((hs->handle != NULL) || (hs->file != NULL)) {
     LWIP_DEBUGF(HTTPD_DEBUG, ("Received data while sending a file\n"));
-    if (inp) {
-      pbuf_chain(hs->req, inp);
-    }
+    hs->keepalive = 0;
     return ERR_USE;
   }
 
@@ -595,13 +686,7 @@ http_parse_request(struct pbuf *inp, struct http_state *hs, struct altcp_pcb *pc
     }
   }
 
-  /* received enough data for minimal request? */
   data_len = hs->req->tot_len;
-#ifdef LWIP_DEBUG
-  lwip_debug_str = "Invalid length\n";
-#endif
-  VerifyOrExit(data_len >= MIN_REQ_LEN, error_state = http_resp_state_bad_request);
-
   data = (char *)malloc(data_len + 1);
 #ifdef LWIP_DEBUG
   lwip_debug_str = "No enough memory\n";
@@ -614,79 +699,101 @@ http_parse_request(struct pbuf *inp, struct http_state *hs, struct altcp_pcb *pc
   error_state = http_resp_state_bad_request;
 
   if (http_header_end != NULL) {
+    size_t method_length;
+
     LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE, ("HTTP request receved, try to parse.\n"));
-    
-    /** try to find content-length */
-    sp1 = data + 2;
-    do {
-      sp1 = lwip_strnstr(sp1, HTTP_CONTENT_LEN, http_header_end - sp1 + sizeof(CRLF) - 1);
-      if (sp1) {
-        sp1 = sp1 + sizeof(HTTP_CONTENT_LEN) - 1;
-        sp2 = lwip_strnstr(sp1, CRLF, (size_t)(http_header_end - sp1 + sizeof(CRLF) - 1));
+    hs->keepalive = 0;
+    header_len = (u32_t)(http_header_end - data) + 2 * (sizeof(CRLF) - 1);
+    VerifyOrExit(header_len <= LWIP_HTTPD_MAX_REQ_LENGTH,
+                 error_state = http_resp_state_bad_request);
+
+    /** Parse the request line exactly once. */
+    sp1 = lwip_strnstr(data, CRLF, (size_t)(http_header_end - data + sizeof(CRLF) - 1));
 #ifdef LWIP_DEBUG
-        lwip_debug_str = "No found http request\n";
+    lwip_debug_str = "Failed to get HTTP request line\n";
 #endif
-        VerifyOrExit(sp2 && (size_t)(sp2 - sp1) < sizeof(body_len_str), error_state = http_resp_state_bad_request);
+    VerifyOrExit(sp1 != NULL, error_state = http_resp_state_bad_request);
+    sp2 = memchr(data, ' ', (size_t)(sp1 - data));
+    VerifyOrExit(sp2 != NULL && sp2 > data,
+                 error_state = http_resp_state_bad_request);
 
-        memcpy(body_len_str, sp1, (size_t)(sp2 - sp1));
-        body_len_str[(size_t)(sp2 - sp1)] = '\0';
-        body_len = atoi(body_len_str);
-
-        sp1 = sp2 + 2;
+    method_length = (size_t)(sp2 - data);
+    for (size_t i = 0; i < sizeof(http_method_list) / sizeof(http_method_list[0]); i++) {
+      if (method_length == http_method_list[i].method_len - 1 &&
+          memcmp(data, http_method_list[i].method, method_length) == 0) {
+        method_type = http_method_list[i].id;
+        break;
       }
-    } while (sp1);
+    }
 
-    hs->req_len = body_len + (size_t)(http_header_end - data) + 2 * (sizeof(CRLF) - 1);
+    uri = sp2 + 1;
+    VerifyOrExit(uri < sp1 && uri[0] == '/',
+                 error_state = http_resp_state_bad_request);
+    sp2 = memchr(uri, ' ', (size_t)(sp1 - uri));
+    VerifyOrExit(sp2 != NULL && sp2 > uri && sp2 + 1 < sp1,
+                 error_state = http_resp_state_bad_request);
+    ver = sp2 + 1;
+    VerifyOrExit(http_version_is_supported(ver, (size_t)(sp1 - ver)),
+                 error_state = http_resp_state_bad_request);
+    sp2[0] = '\0';
+
+    /** Parse each header field once. */
+    ptr = sp1 + sizeof(CRLF) - 1;
+
+    while (ptr < http_header_end) {
+      const char *field_name;
+      const char *field_value;
+      size_t field_name_length;
+      size_t field_value_length;
+
+      sp2 = lwip_strnstr(ptr, CRLF, (size_t)(http_header_end - ptr + sizeof(CRLF) - 1));
+#ifdef LWIP_DEBUG
+      lwip_debug_str = "Invalid HTTP header field\n";
+#endif
+      VerifyOrExit(sp2 != NULL &&
+                   http_parse_header_field(ptr,
+                                           (size_t)(sp2 - ptr),
+                                           &field_name,
+                                           &field_name_length,
+                                           &field_value,
+                                           &field_value_length),
+                   error_state = http_resp_state_bad_request);
+
+      LWIP_DEBUGF(HTTPD_DEBUG,
+                  ("HTTP header: [%.*s]\n", (int)(sp2 - ptr), ptr));
+
+      if (http_ascii_equal_ignore_case(field_name, field_name_length, "Content-Length")) {
+        VerifyOrExit(!content_length_found &&
+                     http_parse_content_length(field_value,
+                                               field_value_length,
+                                               LWIP_HTTPD_MAX_REQ_LENGTH - header_len,
+                                               &body_len),
+                     error_state = http_resp_state_bad_request);
+        content_length_found = true;
+      }
+      else if (http_ascii_equal_ignore_case(field_name, field_name_length, "Transfer-Encoding")) {
+        VerifyOrExit(false, error_state = http_resp_state_bad_request);
+      }
+      else if (http_ascii_equal_ignore_case(field_name, field_name_length, "Connection")) {
+        hs->keepalive = http_ascii_equal_ignore_case(field_value,
+                                                     field_value_length,
+                                                     "keep-alive");
+      }
+      else if (http_ascii_equal_ignore_case(field_name, field_name_length, "Accept")) {
+        if (http_ascii_equal_ignore_case(field_value, field_value_length, "application/json")) {
+          accept_type = http_accept_type_json;
+        }
+        else if (http_ascii_equal_ignore_case(field_value, field_value_length, "text/plain")) {
+          accept_type = http_accept_type_txt;
+        }
+      }
+      ptr = sp2 + sizeof(CRLF) - 1;
+    }
+
+    hs->req_len = (uint16_t)(header_len + body_len);
     LWIP_DEBUGF(HTTPD_DEBUG, ("Expect %d bytes, and %ld bytes received\n", hs->req_len, data_len));
     VerifyOrExit(data_len >= hs->req_len, error_state = http_resp_state_none);
-
-    /** try to request line */
-    ptr = data;
-    do {
-      sp2 = lwip_strnstr(ptr, CRLF, (size_t)(http_header_end + sizeof(CRLF) - ptr - 1));
-#ifdef LWIP_DEBUG
-      lwip_debug_str = "Failed to get http request line\n";
-#endif
-      VerifyOrExit(sp2, error_state = http_resp_state_bad_request);
-      sp2[0] = '\0';
-      sp1 = lwip_strnstr(ptr, " ", (size_t)(sp2 - ptr));
-      if (sp1) {
-        for (int i = 0; i < sizeof(http_method_list)/ sizeof(http_method_list[0]); i ++) {
-          if (0 == memcmp(ptr, http_method_list[i].method, http_method_list[i].method_len - 1)) {
-            method_type = http_method_list[i].id;
-            break;
-          }
-        }
-
-        if (sp1[1] == '/') {
-          uri = sp1 + 1;
-          sp1 = lwip_strnstr(uri, " ", (size_t)(sp2 - uri));
-          if (sp1 == NULL) {
-            sp1 = sp2;
-          } 
-          else {
-            ver = sp1 + 1;
-          }
-          if (sp1 > uri && (size_t)(sp1 - uri) > 1) {
-            sp1[0] = '\0';
-          }
-          else {
-            uri = NULL;
-          }
-
-          if (uri && method_type != http_method_type_unkown) {
-            http_header_start = sp2 + 2;
-          }
-        }
-      }
-
-      ptr = sp2 + 2;
-    } while (ptr < http_header_end);
-
-#ifdef LWIP_DEBUG
-    lwip_debug_str = "Failed to parse requet line\n";
-#endif
-    VerifyOrExit(uri && http_header_start, error_state = http_resp_state_bad_request);
+    data[hs->req_len] = '\0';
 
 #ifdef LWIP_DEBUG
     lwip_debug_str = "Unsupported request method\n";
@@ -696,33 +803,9 @@ http_parse_request(struct pbuf *inp, struct http_state *hs, struct altcp_pcb *pc
     lwip_debug_str = NULL;
 #endif
     LWIP_DEBUGF(HTTPD_DEBUG, ("Received %s %s request for URI: %s\n",
-                              ver ? ver:"HTTP/0.9", http_method_list[method_type].method, uri));
+                              ver, http_method_list[method_type].method, uri));
 
-    /* Try to parse http header */
-    ptr = http_header_start;
-
-    do {
-      line_len = strlen(ptr);
-      LWIP_DEBUGF(HTTPD_DEBUG, ("HTTP header: [%s], %ld\n", ptr, line_len));
-
-      if (lwip_strnstr(ptr, HTTP11_CONNECTIONKEEPALIVE, line_len) 
-        || lwip_strnstr(ptr, HTTP11_CONNECTIONKEEPALIVE2, line_len)) {
-        hs->keepalive = 1;
-      } else {
-        hs->keepalive = 0;
-      }
-
-      if (0 == memcmp(ptr, HTTP_HDR_ACCEPT_JSON, line_len)) {
-        accept_type = http_accept_type_json;
-      }
-      else if (0 == memcmp(ptr, HTTP_HDR_ACCEPT_TXT, line_len)) {
-        accept_type = http_accept_type_txt;
-      }
-
-      ptr = ptr + line_len + 2;
-    } while (ptr < http_header_end);
-
-    LWIP_DEBUGF(HTTPD_DEBUG, ("More %ld bytes over body %ld bytes.\n", 
+    LWIP_DEBUGF(HTTPD_DEBUG, ("More %ld bytes over body %ld bytes.\n",
                               data_len - (body_len + (size_t)(http_header_end - data) + 2 * (sizeof(CRLF) - 1)),
                               body_len));
 
@@ -741,6 +824,7 @@ http_parse_request(struct pbuf *inp, struct http_state *hs, struct altcp_pcb *pc
   else {
     LWIP_DEBUGF(HTTPD_DEBUG, ("Received %ld bytes, but not found CRLF CRLF\n", data_len));
     VerifyOrExit(data_len < LWIP_HTTPD_MAX_REQ_LENGTH, error_state = http_resp_state_bad_request);
+    error_state = http_resp_state_none;
   }
 
 #ifdef LWIP_DEBUG
@@ -760,23 +844,11 @@ exit:
 
   if (error_state == http_resp_state_ok) {
     if (hs->req) {
-      p = hs->req;
-      req_len = hs->req_len;
-      while (p && req_len) {
-        if (p->len > req_len) {
-          memmove(p->payload, (char *)p->payload + req_len, req_len);
-          p->len -= req_len;
-          p->tot_len -= req_len;
-          break;
-        }
-        else {
-          hs->req = p->next;
-          p->next = NULL;
-          p->tot_len = p->len;
-          pbuf_free(p);
-          p = hs->req;
-        }
+      if (data_len > hs->req_len) {
+        hs->keepalive = 0;
       }
+      pbuf_free(hs->req);
+      hs->req = NULL;
     }
 
     return http_init_file(hs, &hs->file_handle, 0, NULL);
@@ -785,9 +857,10 @@ exit:
     return ERR_INPROGRESS;
   }
   else {
+    hs->keepalive = 0;
     pbuf_free(hs->req);
     hs->req = NULL;
-    return http_init_error_file(hs, http_resp_state_bad_request);
+    return http_init_error_file(hs, error_state);
   }
 }
 
@@ -975,7 +1048,7 @@ http_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t err)
     }
   } else {
     LWIP_DEBUGF(HTTPD_DEBUG, ("http_recv: already sending data\n"));
-    /* already sending but still receiving data, we might want to RST here? */
+    hs->keepalive = 0;
     pbuf_free(p);
   }
 

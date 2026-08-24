@@ -42,10 +42,27 @@
 
 #if OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE
 
+static uint32_t sNow;
+
+extern "C" uint32_t otPlatAlarmMilliGetNow(void) { return sNow; }
+
 namespace ot {
 namespace BorderRouter {
 
 static ot::Instance *sInstance;
+
+otNat64AddressMapping GetOnlyAddressMapping(void)
+{
+    Nat64::Translator::AddressMappingIterator iterator;
+    otNat64AddressMapping                     mapping;
+
+    sInstance->Get<Nat64::Translator>().InitAddressMappingIterator(iterator);
+    SuccessOrQuit(sInstance->Get<Nat64::Translator>().GetNextAddressMapping(iterator, mapping));
+    VerifyOrQuit(sInstance->Get<Nat64::Translator>().GetNextAddressMapping(iterator, mapping) == kErrorNotFound,
+                 "Expected exactly one NAT64 address mapping");
+
+    return mapping;
+}
 
 void DumpMessageInHex(const char *prefix, const uint8_t *aBuf, size_t aBufLen)
 {
@@ -205,6 +222,21 @@ void TestNat64(void)
                                       0x12, 0x34, 0x00, 0x0c, 0xa1, 0x8d, 0x61, 0x62, 0x63, 0x64};
 
         TestCase6To4("good v6 udp datagram", kIp6Packet, Nat64::Translator::kForward, kIp4Packet, sizeof(kIp4Packet));
+
+        otNat64AddressMapping mapping = GetOnlyAddressMapping();
+        const uint32_t elapsed = Nat64::Translator::kAddressMappingIdleTimeoutMsec / 2;
+
+        VerifyOrQuit(mapping.mRemainingTimeMs == Nat64::Translator::kAddressMappingIdleTimeoutMsec);
+
+        sNow += elapsed;
+        mapping = GetOnlyAddressMapping();
+        VerifyOrQuit(mapping.mRemainingTimeMs == Nat64::Translator::kAddressMappingIdleTimeoutMsec - elapsed);
+
+        TestCase6To4("reused v6 mapping refreshes idle timeout", kIp6Packet, Nat64::Translator::kForward, kIp4Packet,
+                     sizeof(kIp4Packet));
+        mapping = GetOnlyAddressMapping();
+        VerifyOrQuit(mapping.mRemainingTimeMs == Nat64::Translator::kAddressMappingIdleTimeoutMsec,
+                     "Outbound reuse did not refresh the NAT64 mapping idle timeout");
     }
 
     {

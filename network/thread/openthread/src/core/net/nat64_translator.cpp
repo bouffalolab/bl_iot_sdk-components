@@ -461,8 +461,11 @@ Translator::AddressMapping *Translator::FindOrAllocateMapping(const Ip6::Headers
     AddressMapping *mapping      = mActiveAddressMappings.FindMatching(aIp6Headers.GetSourceAddress());
 #endif
 
-    // Exit if we found a valid mapping.
-    VerifyOrExit(mapping == nullptr);
+    if (mapping != nullptr)
+    {
+        mapping->Touch(TimerMilli::GetNow(), aIp6Headers.GetIpProto());
+        ExitNow();
+    }
 
     mapping = AllocateMapping(aIp6Headers);
 

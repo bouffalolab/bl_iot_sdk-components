@@ -1,4 +1,53 @@
 # Changes
+## 2026-08-13
+1. Add UART HCI transport and unify the UART driver into a single runtime-configurable source.
+
+## 2026-08-07
+1.[BL618DG]Pass to LPFW whether the next BLE wake is for ble event programming.
+2.[BL618DG]On both app firmware and LPFW ble wakeup paths, resync co time after a long sleep and process expired timers in app firmware.
+
+## 2026-07-31
+1.[BL702L]Allow external control of btble simple logging.
+
+## 2026-07-29
+1.[BL618DG]Add an API to restore BLE advertising and handle connection indication in app firmware when transitioning from lpfw to app.
+
+## 2026-07-24
+1. [BL616/BL618DG] Add ble1m4s1bredr1 controller library.
+
+## 2026-07-023
+1.[BL618DG]Add BLE LP FW info recording and query API.
+
+## 2026-07-021
+1.[BL616L]Change the ble power min value.
+2.[BL618DG]Change the ble/bt power min value.
+3.[BL618DG]Implement hardware K 32K interface and result retrieval.
+
+## 2026-07-02
+1. Fix controller-to-host ACL flow control for external HCI TL transports.
+
+##2026-06-30
+1.Reject initiator connection if a link with same peer already exists.
+
+## 2026-06-18
+1.[BL618DG]Fix rx failure in slave device at sniff anchor point sometimes.
+2.[BL618DG]Fix EBQ issue: Fix power control test failures and T_IFS timing.
+3.[BL616CL]Fix EBQ issue: Fix power control test failures.
+
+## 2026-06-17
+1.Fix EBQ issue: Fix the issue of missing scheduling of subsequent CIS subevents in certain corner case.
+2.Fix EBQ issue: Fix the issue of CIS subevent scheduling conflict with ACL scheduling.
+
+## 2026-06-12
+1.Fix ChSel field in ADV_NONCONN_IND and ADV_SCAN_IND to comply with the Bluetooth Core Specification.
+
+## 2026-06-08
+1. [BL616/BL618DG] Add ble1m10s1bredr1 controller library (7 ACL + 3 BLE, 64K EM).
+2. Make CONFIG_CON_ACL configurable, driven by controller library variant.
+
+## 2026-06-04
+1. [BL616/BL616CL/BL618DG] Add continuous (infinite) TX test payload codes 0xC0-0xC7 to the LE TX test (le_tx_test).
+
 ## 2026-05-13
 1. Support extended advertising at BL702L.
 

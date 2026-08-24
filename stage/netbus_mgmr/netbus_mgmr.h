@@ -84,6 +84,11 @@ enum {
     BFLB_CMD_PING,
     BFLB_CMD_HBN,
 
+    BFLB_CMD_SLAVE_READY_IND,
+    BFLB_CMD_SLAVE_HEARTBEAT,
+
+    BFLB_CMD_CFM = 0x2000,
+
     BFLB_CMD_EXT,
 };
 
@@ -261,6 +266,34 @@ typedef struct {
         netbus_wifi_mgmr_msg_cmd_t cmd;
     } u;
 } netbus_wifi_mgmr_msg_t;
+
+typedef struct {
+    uint8_t reserved;
+} bflb_slave_ready_ind_t;
+
+typedef struct {
+    netbus_min_cmd_msg_t hdr;
+    bflb_slave_ready_ind_t args;
+} netbus_slave_ready_ind_msg_t;
+
+typedef struct {
+    uint8_t reserved;
+} bflb_slave_heartbeat_t;
+
+typedef struct {
+    netbus_min_cmd_msg_t hdr;
+    bflb_slave_heartbeat_t args;
+} netbus_slave_heartbeat_msg_t;
+
+typedef struct {
+    uint16_t cmdId;
+} bflb_cmd_confirm_t;
+
+typedef struct {
+    netbus_min_cmd_msg_t hdr;
+    bflb_cmd_confirm_t args;
+} netbus_cmd_confirm_msg_t;
+
 #pragma pack(pop)
 
 enum {

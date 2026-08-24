@@ -1,4 +1,62 @@
 # Changes
+## 2026-08-12
+1. [BR/EDR] Add per-device Extended Inquiry Result callback support under BFLB_BREDR_PATCH_EXTENDED_INQUIRY_RESULT_CALLBACK, with CLI test output for address, class of device, RSSI, and EIR name.
+
+## 2026-08-05
+fix: support HCI monitor output on IoT SDK.
+feat: add SPP MTU query and A2DP stream controls.
+
+## 2026-07-31
+1. [blestack] Fix GATT MTU exchange to use the runtime local ATT MTU instead of the compile-time BT_ATT_MTU value.
+
+## 2026-07-30
+1.Make OAD finish callback private to avoid conflict with other components.
+
+## 2026-07-28
+1. [BR/EDR] Size the HCI RX buffer for SPP's 1007-byte L2CAP RX MTU, including HCI ACL and L2CAP headers.
+
+## 2026-07-24
+1. [host/conn] Split LE and BR/EDR ACL connections into independent pools sized by CONFIG_BT_MAX_CONN and CONFIG_BT_ACL_CONN, with pool-local connection indexes and a private unique ID only for HCI ACL RX buffers.
+2. [blestack] Size BR/EDR L2CAP, SMP, profiles, and connection-info CLI resources with CONFIG_BT_ACL_CONN, derived from the selected controller library's ACL capacity.
+
+## 2026-07-23
+1. [bredr_cli_cmds] Add bt profile deinit and cleanup related CLI support under BFLB_BREDR_PATCH_DEINIT_CLEANUP.
+2. [blestack] Complete BR/EDR profile deinitialization support in host-side paths under BFLB_BREDR_PATCH_DEINIT_CLEANUP.
+
+## 2026-07-10
+1. [bredr_cli_cmds] Reduce code size by replacing embedded A2DP source audio data with a generated test tone.
+
+## 2026-07-03
+1. [blestack] Fix BLE connection info reporting to show only connected LE links, avoiding pending connection objects being shown with zero remote addresses.
+
+## 2026-06-30
+1.Fix concurrent connection collision issue with same peer between advertiser and initiator.
+
+## 2026-06-29
+1. [blestack] Add black-box test CLI commands (cancel discover/write/read/indicate, gatt_indicate, conn_count, directed_adv).
+2. [blestack] Hold conn reference in ble_tp_task to avoid use-after-free on disconnect.
+
+## 2026-06-26
+1. [ble_tp_cli] Improve throughput rate accuracy: replace software-timer sampling with self-timed reporter using xTaskGetTickCount real elapsed time, eliminating jitter from task preemption and timer-callback blocking. Rate unit corrected from mislabeled Kb/s to KB/s (/1024).
+
+## 2026-06-18
+1. [BR/EDR] Fix discovery being stuck after stop during the name-resolution window: when the inquiry has already completed and the host is resolving device names, Inquiry Cancel returns Command Disallowed (-EACCES); treat this as a successful stop -- detach the callback, cancel the in-flight remote name requests, clear the discovery state, and return 0 so a subsequent start works. Late name completions racing with the cancels are dropped via the detached-callback guards instead of being reported after stop.
+
+## 2026-06-09
+1. [blestack] Add BR/EDR sniff mode support.
+2. [bredr_cli_cmds] Add bredr_sniff/bredr_unsniff CLI commands.
+3. [bredr_cli_cmds] Add spp_tp_start/spp_tp_stop SPP throughput test commands with per-link rate limiting.
+
+## 2026-06-04
+1. [blestack] Fix directed advertising refcount over-unref crash. the original "bouffalo fix" unref'd one ref prematurely in enh_conn_complete, causing the crash from excessive unrefs on failure.
+
+## 2026-05-29
+1. [blestack] Add BL618DG and BL616CL to BLE feature macros: hci_core.c/h, ble_cli_cmds.c, hci_vs.h.
+2. [bredr_cli_cmds] Fix duplicate bredr_start_inquiry CLI entry.
+3. [bredr_cli_cmds] Fix cod[1] copy-paste bug, should be cod[2] for device class byte 3.
+4. [bredr_cli_cmds] Add missing BT_AVDTP_CLI macro definition in non-CONFIG_SHELL branch.
+5. [bredr_cli_cmds] Fix stream_pause variable scope: move declaration from CONFIG_BT_AVRCP to CONFIG_BT_A2DP block.
+
 ## 2026-05-07
 1.[blestack] split HCI UART transport into reusable layers .
 
