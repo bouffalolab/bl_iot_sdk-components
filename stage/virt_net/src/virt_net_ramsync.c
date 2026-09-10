@@ -85,6 +85,15 @@ struct virt_net_custom_pbuf {
 #define VIRT_NET_BUFF_SIZE (TP_PAYLOAD_LEN + VIRT_NET_RXBUFF_OFFSET) /* + sizeof(pbuf header) */
 #define VIRT_NET_MAX_PENDING_CMD (32)
 
+/* Bounded enqueue for the data path. When the wire TX queue stays full this
+ * long, the link is stalled; blocking forever deadlocks the tcpip thread
+ * against the rx buffer pump (uplink slots are freed by processing the wire
+ * acknowledgements, which only this pump delivers). Drop the frame and let
+ * the stack retry instead. */
+#ifndef CFG_VIRT_NET_TX_PUSH_TIMEOUT_MS
+#define CFG_VIRT_NET_TX_PUSH_TIMEOUT_MS (100)
+#endif
+
 BITSET_DEFINE(rx_buf_ind, VIRT_NET_RXBUFF_CNT);
 
 typedef uint8_t (*rx_buff_t)[VIRT_NET_BUFF_SIZE];
@@ -166,7 +175,6 @@ static uint8_t *__alloc_rxbuf(struct virt_net_ramsync *sobj) {
   if (idx == 0) {
     xSemaphoreGive(sobj->rx_buf_ind_mutex);
 
-    printf("rx buff alloc failed!\r\n");
     return NULL;
   }
 
@@ -256,8 +264,15 @@ static err_t __link_output(struct netif *netif, struct pbuf *p)
    * 2. pbuf has 1514 tot_len limitation*/
   pkg_header->length = p->tot_len + 2;
 
-  uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-                          pkg_header->length + 4 + sizeof(struct pkg_protocol), URAMSYNC_FOREVER);
+  if (uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
+                              pkg_header->length + 4 + sizeof(struct pkg_protocol),
+                              CFG_VIRT_NET_TX_PUSH_TIMEOUT_MS) != 0) {
+    /* The wire TX queue stayed full for the whole bounded wait: the link is
+     * stalled. Drop the frame and let the stack retry instead of blocking
+     * the tcpip thread forever (that deadlocked the rx pump). */
+    return ERR_MEM;
+  }
+
   blog_info("__link_output pkg_header->len:%d type:0x%x\r\n", pkg_header->length, pkg_header->type);
 
   return ERR_OK;
@@ -506,8 +521,21 @@ static void __virt_net_task(void *pvParameters)
 
     rx_buffer = __alloc_rxbuf(sobj);
     if (rx_buffer == NULL) {
-      printf("no rx buffer, suspend..\r\n");
-      vTaskSuspend(NULL);
+      /* Pool exhausted (e.g. an mDNS burst pinned by lwIP). Dropping the wire
+       * packet and keeping the pump running keeps ACK processing alive;
+       * suspending here deadlocks the whole wire (uplink slots are freed by
+       * processing the acknowledgements only this pump delivers). */
+      {
+        static uint32_t rx_drop_last_log;
+        uint32_t drop_now = xTaskGetTickCount();
+
+        if (drop_now - rx_drop_last_log >= pdMS_TO_TICKS(1000)) {
+          rx_drop_last_log = drop_now;
+          printf("no rx buffer, drop packet\r\n");
+        }
+      }
+      recvd_len = 0;
+      uramsync_rx_pop(&sobj->ramsync_ctx, NULL, &recvd_len, pdMS_TO_TICKS(20));
       continue;
     }
  

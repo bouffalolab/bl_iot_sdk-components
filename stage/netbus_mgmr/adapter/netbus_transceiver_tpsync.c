@@ -44,6 +44,13 @@
 static tp_uramsync_t *gp_ramsync;
 #define NETBUS_MSG_MAXSIZE             (TP_PAYLOAD_LEN)
 
+/* The Wi-Fi TX pbuf pool can be transiently drained by traffic bursts. Retry
+ * for this long before dropping the frame, so a short drain pause does not
+ * turn into avoidable loss. */
+#ifndef NETBUS_TX_PBUF_WAIT_MS
+#define NETBUS_TX_PBUF_WAIT_MS 500
+#endif
+
 static void handle_sta_ap_to_wifi_tx(netbus_wifi_mgmr_ctx_t *ctx, const uint8_t *frame, const uint16_t frame_len, bool is_sta)
 {
     netbus_wifi_mgmr_msg_t swm_msg;
@@ -56,6 +63,16 @@ static void handle_sta_ap_to_wifi_tx(netbus_wifi_mgmr_ctx_t *ctx, const uint8_t 
 
     extern struct pbuf *get_tx_pbuf(netbus_wifi_mgmr_ctx_t *env);
     p = get_tx_pbuf(ctx);
+
+    if (!p) {
+        uint32_t wait_start = xTaskGetTickCount();
+
+        do {
+            vTaskDelay(pdMS_TO_TICKS(1));
+            p = get_tx_pbuf(ctx);
+        } while (!p &&
+                 (xTaskGetTickCount() - wait_start < pdMS_TO_TICKS(NETBUS_TX_PBUF_WAIT_MS)));
+    }
 
     if (!p) {
         blog_error("no more tx pbuf, flow control not working?\r\n");

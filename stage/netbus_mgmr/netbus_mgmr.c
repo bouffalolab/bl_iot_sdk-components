@@ -154,7 +154,7 @@ static void netbuswifi_cmd_mgmr_task(void *pvParameters)
 }
 
 #ifndef NETBUS_TX_PBUF_CNT
-#define NETBUS_TX_PBUF_CNT 16
+#define NETBUS_TX_PBUF_CNT 32
 #endif
 
 #ifndef NETBUS_TX_PBUF_SIZE
