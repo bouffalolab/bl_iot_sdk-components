@@ -154,7 +154,12 @@ static void netbuswifi_cmd_mgmr_task(void *pvParameters)
 }
 
 #ifndef NETBUS_TX_PBUF_CNT
-#define NETBUS_TX_PBUF_CNT 32
+/* 25 = what actually fits: pbuf_alloc(PBUF_RAM, 1600) draws from the 42 KiB
+ * lwIP heap (lwipopts.h MEM_SIZE under CFG_NETBUS_WIFI_ENABLE) and only 25
+ * succeed at boot — init_tx_desc stops at the first allocation failure.
+ * Sizing this to 25 keeps the free-count arithmetic honest. Raise MEM_SIZE
+ * (>= 56 KiB) if a larger pool is really wanted. */
+#define NETBUS_TX_PBUF_CNT 25
 #endif
 
 #ifndef NETBUS_TX_PBUF_SIZE

@@ -73,12 +73,11 @@ struct virt_net_custom_pbuf {
 #define VIRT_NET_RXBUFF_OFFSET (sizeof(struct virt_net_custom_pbuf))
 
 /* 头部的假数据，绕过DMA/SPI FIFO缓存 */
+/* 32 buffers: absorbs LAN mDNS bursts (packets pinned by lwIP for seconds)
+ * without dropping real downlink frames. Memory comes from PSRAM on PSRAM
+ * builds (~51 KiB); override with CFG_VIRT_NET_RXBUFF_CNT if needed. */
 #ifndef CFG_VIRT_NET_RXBUFF_CNT
-#if defined(CFG_USE_PSRAM)
-#define VIRT_NET_RXBUFF_CNT (16)
-#else
-#define VIRT_NET_RXBUFF_CNT (4)
-#endif
+#define VIRT_NET_RXBUFF_CNT (32)
 #else
 #define VIRT_NET_RXBUFF_CNT CFG_VIRT_NET_RXBUFF_CNT
 #endif
