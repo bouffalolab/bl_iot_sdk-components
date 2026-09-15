@@ -419,6 +419,129 @@ void mbedtls_aes_decrypt( mbedtls_aes_context *ctx,
 }
 #endif /* !MBEDTLS_DEPRECATED_REMOVED */
 
+#if defined(BFLB_CCM_HW_BATCH)
+/* DMA buffers follow the same placement as the single-block AES buffers.
+ * All accesses, including copying the result, are protected by the AES lock. */
+#define BFLB_AES_BULK_MAX_BYTES 1600
+static ATTR_NOCACHE_NOINIT_RAM_SECTION unsigned char bulk_in[BFLB_AES_BULK_MAX_BYTES];
+static ATTR_NOCACHE_NOINIT_RAM_SECTION unsigned char bulk_chain_out[BFLB_AES_BULK_MAX_BYTES];
+static ATTR_NOCACHE_NOINIT_RAM_SECTION unsigned char bulk_counters[BFLB_AES_BULK_MAX_BYTES];
+
+/* BL702 is little-endian. Only the caller-facing side uses aligned word
+ * accesses; the OCRAM side may be byte-aligned after the leading bytes.
+ * may_alias permits accessing byte buffers without violating aliasing rules. */
+typedef uint32_t ccm_bulk_word __attribute__((__may_alias__));
+
+static ATTR_TCM_SECTION __attribute__((noinline)) void ccm_bulk_copy_in(
+    unsigned char *out, const unsigned char *in, size_t len )
+{
+    while( len && ( (uintptr_t) in & 3 ) )
+    {
+        *out++ = *in++;
+        len--;
+    }
+    while( len >= 4 )
+    {
+        uint32_t word = *(const ccm_bulk_word *) in;
+        out[0] = (unsigned char) word;
+        out[1] = (unsigned char)( word >> 8 );
+        out[2] = (unsigned char)( word >> 16 );
+        out[3] = (unsigned char)( word >> 24 );
+        in += 4;
+        out += 4;
+        len -= 4;
+    }
+    while( len-- )
+        *out++ = *in++;
+}
+
+static ATTR_TCM_SECTION __attribute__((noinline)) void ccm_bulk_copy_out(
+    unsigned char *out, const unsigned char *in, size_t len )
+{
+    while( len && ( (uintptr_t) out & 3 ) )
+    {
+        *out++ = *in++;
+        len--;
+    }
+    while( len >= 4 )
+    {
+        uint32_t word = (uint32_t) in[0] | ( (uint32_t) in[1] << 8 ) |
+                        ( (uint32_t) in[2] << 16 ) | ( (uint32_t) in[3] << 24 );
+        *(ccm_bulk_word *) out = word;
+        in += 4;
+        out += 4;
+        len -= 4;
+    }
+    while( len-- )
+        *out++ = *in++;
+}
+
+static ATTR_TCM_SECTION __attribute__((noinline)) void ccm_bulk_xor(
+    unsigned char *out, const unsigned char *in, const unsigned char *stream, size_t len )
+{
+    for( size_t i = 0; i < len; i++ )
+        out[i] = in[i] ^ stream[i];
+}
+
+/* Whole-message CBC-MAC and CTR share one lock and one plaintext copy.
+ * DMA inputs/outputs remain disjoint; only the CPU XOR is in-place. */
+int mbedtls_aes_crypt_ccm_bulk( mbedtls_aes_context *ctx,
+                                unsigned char mac[16], const unsigned char ctr[16],
+                                const unsigned char *in, unsigned char *out,
+                                size_t len )
+{
+    int ret;
+    size_t offset;
+    unsigned int i, q;
+
+    if( ctx == NULL || mac == NULL || ctr == NULL || in == NULL || out == NULL ||
+        len == 0 || len > BFLB_AES_BULK_MAX_BYTES || ctr[0] < 1 || ctr[0] > 7 )
+        return( MBEDTLS_ERR_AES_BAD_INPUT_DATA );
+    const size_t padded = ( len + 15 ) & ~(size_t) 15;
+    bflb_sec_aes_mutex_take();
+    ccm_bulk_copy_in( bulk_in, in, len );
+    memset( bulk_in + len, 0, padded - len );
+    memcpy( &link_ctx_temp, &ctx->link_ctx, sizeof( struct bflb_aes_link_s ) );
+    link_ctx_temp.aes_mode = AES_MODE_CBC;
+    link_ctx_temp.aes_dec_en = 0;
+    link_ctx_temp.aes_newiv_dis = 0;
+    memcpy( &link_ctx_temp.aes_iv0, mac, 16 );
+    ret = bflb_aes_link_update( ctx->aes, (uint32_t) &link_ctx_temp,
+                                bulk_in, bulk_chain_out, padded );
+    if( ret == 0 )
+        memcpy( mac, bulk_chain_out + padded - 16, 16 );
+
+    if( ret == 0 )
+    {
+        q = ctr[0] + 1;
+        memcpy( bulk_counters, ctr, 16 );
+        for( offset = 16; offset < padded; offset += 16 )
+        {
+            memcpy( bulk_counters + offset, bulk_counters + offset - 16, 16 );
+            for( i = 0; i < q; i++ )
+            {
+                if( ++bulk_counters[offset + 15 - i] != 0 )
+                    break;
+            }
+        }
+        link_ctx_temp.aes_mode = AES_MODE_ECB;
+        ret = bflb_aes_link_update( ctx->aes, (uint32_t) &link_ctx_temp,
+                                    bulk_counters, bulk_chain_out, padded );
+        if( ret == 0 )
+        {
+            ccm_bulk_xor( bulk_in, bulk_in, bulk_chain_out, len );
+            ccm_bulk_copy_out( out, bulk_in, len );
+        }
+    }
+    mbedtls_platform_zeroize( bulk_in, padded );
+    mbedtls_platform_zeroize( bulk_chain_out, padded );
+    mbedtls_platform_zeroize( bulk_counters, padded );
+    bflb_sec_aes_mutex_give();
+
+    return( ret == 0 ? 0 : MBEDTLS_ERR_PLATFORM_HW_ACCEL_FAILED );
+}
+#endif /* BFLB_CCM_HW_BATCH */
+
 /*
  * AES-ECB block encryption/decryption
  */

@@ -23,6 +23,12 @@
 #include "mbedtls/error.h"
 #include "mbedtls/constant_time.h"
 
+#if defined(BFLB_CCM_HW_BATCH) && !defined(MBEDTLS_BLOCK_CIPHER_C)
+/* Whole-message AES-CCM operation provided by the hardware AES backend. */
+int mbedtls_aes_crypt_ccm_bulk(void *aes_ctx, unsigned char mac[16], const unsigned char ctr[16],
+                               const unsigned char *in, unsigned char *out, size_t len);
+#endif
+
 #if defined(MBEDTLS_BLOCK_CIPHER_C)
 #include "block_cipher_internal.h"
 #endif
@@ -387,6 +393,29 @@ int mbedtls_ccm_update(mbedtls_ccm_context *ctx,
     *output_len = input_len;
 
     ret = 0;
+
+#if defined(BFLB_CCM_HW_BATCH) && !defined(MBEDTLS_BLOCK_CIPHER_C)
+    /* Whole-message fast path includes a zero-padded final MAC block and
+     * its CTR keystream. Only actual plaintext bytes are written to output. */
+    if ((mbedtls_cipher_get_type(&ctx->cipher_ctx) == MBEDTLS_CIPHER_AES_128_ECB ||
+         mbedtls_cipher_get_type(&ctx->cipher_ctx) == MBEDTLS_CIPHER_AES_192_ECB ||
+         mbedtls_cipher_get_type(&ctx->cipher_ctx) == MBEDTLS_CIPHER_AES_256_ECB) &&
+        (ctx->mode == MBEDTLS_CCM_ENCRYPT || ctx->mode == MBEDTLS_CCM_STAR_ENCRYPT) &&
+        ctx->processed == 0 && input_len == ctx->plaintext_len &&
+        ctx->tag_len != 0 && input_len > 32 && input_len <= 1584) {
+        void *aes_ctx = ctx->MBEDTLS_PRIVATE(cipher_ctx).MBEDTLS_PRIVATE(cipher_ctx);
+        ret = mbedtls_aes_crypt_ccm_bulk(aes_ctx, ctx->y, ctx->ctr, input, output,
+                                         input_len);
+        if (ret != 0) {
+            ctx->state |= CCM_STATE__ERROR;
+            goto exit;
+        }
+        ctx->processed += input_len;
+        /* No payload remains. finish() resets the counter to zero for S0;
+         * no counter advance or generic tail AES transactions are needed. */
+        goto exit;
+    }
+#endif
 
     while (input_len > 0) {
         offset = ctx->processed % 16;
