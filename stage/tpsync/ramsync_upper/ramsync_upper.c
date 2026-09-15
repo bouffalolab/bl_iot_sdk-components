@@ -749,35 +749,42 @@ first_point:
             }
 
             if (slot_have_validdata) {
+                /* ACK (rseq) = wire 层已收妥并校验。必须在此处更新（转发入队之前）：
+                 * 若推迟到入队成功后，rx_desc 积压会冻结 rseq，BL706 槽位无法
+                 * 复用，上行随转发积压整体停摆（ACK 与转发解耦）。 */
+                taskENTER_CRITICAL();
+                for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
+                    uramsync->p_tx->payload[i].rseq = uramsync->p_rx_cache->seq;  // __rx_rseq_update
+                }
+                taskEXIT_CRITICAL();
                 //tpdbg_log("[%s] [task_rx] 1. ensure slot have new data.\r\n", uramsync->name);
                 break;
             }
         }
 
         /* slot to desc */
-        while (1) {
-            res = desc_push_toback(&uramsync->rx_desc,
-                    uramsync->p_rx_cache->buf,
-                    uramsync->p_rx_cache->len,
-                    POLL_UNIT_TIME_MS);//DESC_FOREVER
-            if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-                goto first_point;
-            }
-            if (res != 0) {
-                continue;
-            }
-            break;
-        }
+        {
+            int retry = 0;
 
-        tpdbg_log("[%s] [task_rx] 2. slot2desc,update rseq = %ld cache.crc = 0x%08lx.\r\n",
-                uramsync->name, uramsync->p_rx_cache->seq, uramsync->p_rx_cache->crc);
-
-        // update txtxtxtxtxtxtx!!!!! st rseq
-        taskENTER_CRITICAL();
-        for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
-            uramsync->p_tx->payload[i].rseq = uramsync->p_rx_cache->seq;  // __rx_rseq_update
+            while (1) {
+                res = desc_push_toback(&uramsync->rx_desc,
+                        uramsync->p_rx_cache->buf,
+                        uramsync->p_rx_cache->len,
+                        POLL_UNIT_TIME_MS);//DESC_FOREVER
+                if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
+                    goto first_point;
+                }
+                if (res == 0) {
+                    break;
+                }
+                /* 有界重试后丢弃：该帧已 wire-ACK（rseq 已越过），若无限重试，
+                 * rs_rx 卡死在此，rseq 停止推进，BL706 槽位无法复用 → wire 级联
+                 * 停摆。UDP 丢帧由上层兜底。 */
+                if (++retry >= 6) {
+                    break;
+                }
+            }
         }
-        taskEXIT_CRITICAL();
     }
 }
 
