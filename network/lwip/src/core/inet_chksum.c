@@ -606,3 +606,55 @@ lwip_chksum_copy(void *dst, const void *src, u16_t len)
   return LWIP_CHKSUM(dst, len);
 }
 #endif /* (LWIP_CHKSUM_COPY_ALGORITHM == 1) */
+
+#if (LWIP_CHKSUM_COPY_ALGORITHM == 2) /* Version #2 */
+/** Copy and checksum aligned data in one pass. */
+u16_t
+lwip_chksum_copy(void *dst, const void *src, u16_t len)
+{
+  u8_t *dst8 = (u8_t *)dst;
+  const u8_t *src8 = (const u8_t *)src;
+  u32_t sum = 0;
+
+  if ((((mem_ptr_t)dst8 | (mem_ptr_t)src8) & 3U) != 0U) {
+    MEMCPY(dst, src, len);
+    return LWIP_CHKSUM(dst, len);
+  }
+
+  while (len > 3) {
+    u32_t word = *(const u32_t *)(const void *)src8;
+    u32_t next = sum + word;
+
+    *(u32_t *)(void *)dst8 = word;
+    if (next < sum) {
+      next++;
+    }
+    sum = next;
+    src8 += 4;
+    dst8 += 4;
+    len = (u16_t)(len - 4);
+  }
+
+  /* Fold before adding the tail so its additions cannot overflow. */
+  sum = FOLD_U32T(sum);
+
+  if (len > 1) {
+    u16_t word = *(const u16_t *)(const void *)src8;
+    *(u16_t *)(void *)dst8 = word;
+    sum += word;
+    src8 += 2;
+    dst8 += 2;
+    len = (u16_t)(len - 2);
+  }
+  if (len > 0) {
+    u16_t tail = 0;
+    *dst8 = *src8;
+    ((u8_t *)&tail)[0] = *src8;
+    sum += tail;
+  }
+
+  sum = FOLD_U32T(sum);
+  sum = FOLD_U32T(sum);
+  return (u16_t)sum;
+}
+#endif /* (LWIP_CHKSUM_COPY_ALGORITHM == 2) */
