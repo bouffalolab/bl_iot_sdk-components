@@ -73,7 +73,8 @@ static struct lfs_config cfg = {
     .read_size = 512,
     .prog_size = 256,
     .lookahead_size = 256,
-    .cache_size = 512,
+    /* Cache a full flash block to reduce repeated metadata reads. */
+    .cache_size = LITTLEFS_FLASH_BLOCK_SIZE,
 
     .block_size = LITTLEFS_FLASH_BLOCK_SIZE,
     .block_cycles = LITTLEFS_FLASH_BLOCK_CYCLE,
