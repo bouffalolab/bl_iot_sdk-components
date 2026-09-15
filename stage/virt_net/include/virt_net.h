@@ -153,6 +153,9 @@ enum virt_net_cmd{
 typedef int (*virt_net_cmd_callback_t)(virt_net_t obj, enum virt_net_cmd cmd, void *param);
 
 virt_net_t virt_net_create(void *ctx);
+/* Raw push: bypass socket/lwIP, enqueue a prebuilt wire frame directly
+ * (frame layout must match what the linkoutput path emits). */
+int virt_net_ramsync_raw_push(virt_net_t obj, void *buf, uint32_t len, uint32_t timeout_ms);
 int virt_net_delete(void *ctx);
 void virt_net_setup_callback(virt_net_t obj, virt_net_event_callback cb, void *opaque);
 int virt_net_send_nop(virt_net_t obj);

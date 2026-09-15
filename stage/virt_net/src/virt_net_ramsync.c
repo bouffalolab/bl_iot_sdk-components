@@ -127,6 +127,16 @@ struct virt_net_ramsync {
 #endif
 };
 
+int virt_net_ramsync_raw_push(virt_net_t obj, void *buf, uint32_t len, uint32_t timeout_ms)
+{
+  struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)obj;
+
+  if (sobj == NULL || buf == NULL || len == 0 || len > TP_PAYLOAD_LEN - 8) {
+    return -1;
+  }
+  return uramsync_tx_push_toback(&sobj->ramsync_ctx, buf, len, timeout_ms);
+}
+
 static int __virt_net_ramsync_init(virt_net_t obj);
 static int __virt_net_ramsync_deinit(virt_net_t obj);
 static void __virt_net_task(void *pvParameters);
