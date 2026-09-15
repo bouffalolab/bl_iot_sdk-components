@@ -699,6 +699,12 @@ first_point:
                 }
             }
 
+            /* A-drain (rx): keep validating+ACK+enqueueing while slots hold
+             * new in-order frames, instead of one frame per semaphore round
+             * trip — rseq progress tracks wire arrival rate, not wakeup
+             * frequency. */
+            do {
+            slot_have_validdata = 0;
             for (i = 0; i < TP_TXPAYLOAD_NUM; i++) {
                 if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
                     goto first_point;
@@ -748,6 +754,11 @@ first_point:
                 break;
             }
 
+            if (!slot_have_validdata) {
+                /* A-drain done: no new in-order frame in any slot. */
+                break;
+            }
+
             if (slot_have_validdata) {
                 /* ACK (rseq) = wire 层已收妥并校验。必须在此处更新（转发入队之前）：
                  * 若推迟到入队成功后，rx_desc 积压会冻结 rseq，BL706 槽位无法
@@ -758,32 +769,35 @@ first_point:
                 }
                 taskEXIT_CRITICAL();
                 //tpdbg_log("[%s] [task_rx] 1. ensure slot have new data.\r\n", uramsync->name);
-                break;
-            }
-        }
 
-        /* slot to desc */
-        {
-            int retry = 0;
+                /* slot to desc (inside A-drain: each frame enqueues right
+                 * after its ACK so the scan can move to the next slot) */
+                {
+                    int retry = 0;
 
-            while (1) {
-                res = desc_push_toback(&uramsync->rx_desc,
-                        uramsync->p_rx_cache->buf,
-                        uramsync->p_rx_cache->len,
-                        POLL_UNIT_TIME_MS);//DESC_FOREVER
-                if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
-                    goto first_point;
+                    while (1) {
+                        res = desc_push_toback(&uramsync->rx_desc,
+                                uramsync->p_rx_cache->buf,
+                                uramsync->p_rx_cache->len,
+                                POLL_UNIT_TIME_MS);//DESC_FOREVER
+                        if (URAMSYNC_STATUE_RUNNING != uramsync->status) {
+                            goto first_point;
+                        }
+                        if (res == 0) {
+                            break;
+                        }
+                        /* 有界重试后丢弃：该帧已 wire-ACK（rseq 已越过），若无限重试，
+                         * rs_rx 卡死在此，rseq 停止推进，BL706 槽位无法复用 → wire 级联
+                         * 停摆。UDP 丢帧由上层兜底。 */
+                        if (++retry >= 6) {
+                            break;
+                        }
+                    }
                 }
-                if (res == 0) {
-                    break;
+                /* scan slots again for the next in-order frame */
                 }
-                /* 有界重试后丢弃：该帧已 wire-ACK（rseq 已越过），若无限重试，
-                 * rs_rx 卡死在此，rseq 停止推进，BL706 槽位无法复用 → wire 级联
-                 * 停摆。UDP 丢帧由上层兜底。 */
-                if (++retry >= 6) {
-                    break;
-                }
-            }
+            } while (slot_have_validdata);   /* frames remain → rescan */
+            break; /* drain done: wait for the next rx completion */
         }
     }
 }
