@@ -36,6 +36,11 @@ typedef struct {
     void *hdl;
 } desc_msg_t;
 
+typedef struct {
+    uint8_t   *buf;
+    uint32_t  len;
+} desc_t;
+
 #define DESC_FOREVER 0xFFFFFFFF
 #define DESC_BUF_DEBUG_ENABLE    (0)
 

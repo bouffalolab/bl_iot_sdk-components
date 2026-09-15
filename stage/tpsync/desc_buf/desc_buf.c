@@ -39,11 +39,6 @@
 #include <tpdbg.h>
 #include "desc_buf.h"
 
-typedef struct{
-    uint8_t   *buf;
-    uint32_t  len;
-} desc_t;
-
 int desc_init(desc_msg_t *q, uint32_t items)
 {
     if (NULL == q) {

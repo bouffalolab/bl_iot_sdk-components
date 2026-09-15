@@ -239,14 +239,24 @@ static void netif_status_callback(struct netif *netif) {
 }
 
 
-static err_t __link_output(struct netif *netif, struct pbuf *p) 
+static err_t __link_output(struct netif *netif, struct pbuf *p)
 {
   struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)netif->state;
   struct pbuf *curr;
   unsigned int offset = 0;
   uint16_t subtype;
-  struct pkg_protocol *pkg_header = (struct pkg_protocol *)tx_buffer;
+  uint16_t full_len = (uint16_t)(p->tot_len + 2 + 4 + sizeof(struct pkg_protocol));
+  uint8_t *out_buf;
+  struct pkg_protocol *pkg_header;
+  desc_t out_desc;
   assert(sobj != NULL);
+
+  /* Build directly in the descriptor buffer to avoid the intermediate copy. */
+  out_buf = (uint8_t *)malloc(full_len);
+  if (out_buf == NULL) {
+    return ERR_MEM;
+  }
+  pkg_header = (struct pkg_protocol *)out_buf;
 
   subtype = 0x2000;
   memcpy(pkg_header->payload + offset, &subtype, 2);
@@ -258,21 +268,19 @@ static err_t __link_output(struct netif *netif, struct pbuf *p)
   }
 
   pkg_header->type = PKG_DATA_FRAME;
-  /**netbus: 
+  /**netbus:
    * 1. handle_eth_wifi_frame_recv passes (pkg_header->length - 2) to pbuf_take
    * 2. pbuf has 1514 tot_len limitation*/
   pkg_header->length = p->tot_len + 2;
 
-  if (uramsync_tx_push_toback(&sobj->ramsync_ctx, tx_buffer,
-                              pkg_header->length + 4 + sizeof(struct pkg_protocol),
-                              CFG_VIRT_NET_TX_PUSH_TIMEOUT_MS) != 0) {
-    /* The wire TX queue stayed full for the whole bounded wait: the link is
-     * stalled. Drop the frame and let the stack retry instead of blocking
-     * the tcpip thread forever (that deadlocked the rx pump). */
+  out_desc.buf = out_buf;
+  out_desc.len = full_len;
+  /* A successful enqueue transfers buffer ownership to the descriptor consumer. */
+  if (xQueueSendToBack(sobj->ramsync_ctx.tx_desc.hdl, &out_desc,
+                       pdMS_TO_TICKS(CFG_VIRT_NET_TX_PUSH_TIMEOUT_MS)) != pdPASS) {
+    free(out_buf);
     return ERR_MEM;
   }
-
-  blog_info("__link_output pkg_header->len:%d type:0x%x\r\n", pkg_header->length, pkg_header->type);
 
   return ERR_OK;
 }
