@@ -122,6 +122,9 @@ struct virt_net_ramsync {
   uint8_t sta_linkup;
   TimerHandle_t dhcp_timer;
   struct rx_buf_ind rx_buf_ind;
+  TaskHandle_t raw_test_task;
+  uint32_t raw_test_payload_len;
+  uint32_t raw_test_duration_sec;
 #if LWIP_IPV6
   struct dhcp6 vnet_dhcp6;
 #endif
@@ -135,6 +138,38 @@ int virt_net_ramsync_raw_push(virt_net_t obj, void *buf, uint32_t len, uint32_t 
     return -1;
   }
   return uramsync_tx_push_toback(&sobj->ramsync_ctx, buf, len, timeout_ms);
+}
+
+static void __ramsync_raw_test_task(void *pvParameters)
+{
+  struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)pvParameters;
+  ramsync_raw_test_header_t *header;
+  uint8_t *payload;
+  uint32_t start_tick, frames = 0;
+  payload = pvPortMalloc(sobj->raw_test_payload_len);
+  if (payload == NULL) { sobj->raw_test_task = NULL; vTaskDelete(NULL); return; }
+  header = (ramsync_raw_test_header_t *)payload;
+  memset(payload, 0, sobj->raw_test_payload_len);
+  header->magic = RAMSYNC_RAW_TEST_MAGIC;
+  for (uint32_t i = sizeof(*header); i < sobj->raw_test_payload_len; i++) payload[i] = (uint8_t)i;
+  start_tick = xTaskGetTickCount();
+  while (xTaskGetTickCount() - start_tick < pdMS_TO_TICKS(sobj->raw_test_duration_sec * 1000UL)) {
+    header->seq = frames++; header->flags = 0;
+    (void)uramsync_tx_push_toback(&sobj->ramsync_ctx, payload, sobj->raw_test_payload_len, 1000);
+  }
+  header->seq = frames; header->flags = RAMSYNC_RAW_TEST_FLAG_END;
+  (void)uramsync_tx_push_toback(&sobj->ramsync_ctx, payload, sobj->raw_test_payload_len, 2000);
+  vPortFree(payload); sobj->raw_test_task = NULL; vTaskDelete(NULL);
+}
+
+int virt_net_ramsync_raw_test_start(virt_net_t obj, uint32_t payload_len, uint32_t duration_sec)
+{
+  struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)obj;
+  if (sobj == NULL || payload_len < sizeof(ramsync_raw_test_header_t) || payload_len > RAMSYNC_APP_PAYLOAD_MAX || duration_sec == 0 || duration_sec > 3600) return -1;
+  if (sobj->raw_test_task != NULL) return -2;
+  sobj->raw_test_payload_len = payload_len; sobj->raw_test_duration_sec = duration_sec;
+  if (xTaskCreate(__ramsync_raw_test_task, "rsraw_tx", 512, sobj, 10, &sobj->raw_test_task) != pdPASS) { sobj->raw_test_task = NULL; return -3; }
+  return 0;
 }
 
 static int __virt_net_ramsync_init(virt_net_t obj);
