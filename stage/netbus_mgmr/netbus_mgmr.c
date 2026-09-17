@@ -31,6 +31,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 #include <queue.h>
+#include <timers.h>
 #include <lwip/netif.h>
 #include <blog.h>
 #include <bl_wifi.h>
@@ -205,6 +206,18 @@ static void init_tx_desc(netbus_wifi_mgmr_ctx_t *env)
     blog_info("Total pbufs num: %d\r\n", alloced_num);
 }
 
+/* Per-slot handout age + write-off marks for the stuck-pbuf reclaimer, plus
+ * global handout activity for the TXCFM watchdog traffic gating. Marking is
+ * driven by the (test-gated) watchdog; the arrays stay all-zero in production
+ * builds, where the reclaimer hook below is a fast no-op table walk. */
+static volatile uint32_t tx_pbuf_handout_tick[NETBUS_TX_PBUF_CNT];
+static volatile uint8_t tx_pbuf_reclaimed[NETBUS_TX_PBUF_CNT];
+static volatile uint32_t tx_pbuf_last_handout_tick;
+static volatile uint32_t tx_pbuf_cfm_count; /* bumped once per bl_tx_cfm */
+#ifndef NETBUS_TX_PBUF_RECLAIM_MS
+#define NETBUS_TX_PBUF_RECLAIM_MS (120000)
+#endif
+
 struct pbuf *get_tx_pbuf(netbus_wifi_mgmr_ctx_t *env)
 {
     int i;
@@ -212,10 +225,15 @@ struct pbuf *get_tx_pbuf(netbus_wifi_mgmr_ctx_t *env)
     struct pbuf *p;
 
     for (i = 0; i < desc->pbufs_num; ++i) {
+        if (tx_pbuf_reclaimed[i]) {
+            continue;
+        }
         p = desc->pbufs[i];
         if (p->ref == 1) {
             // restore
             memcpy(p, &desc->pbufs_back[i], sizeof(*p));
+        tx_pbuf_handout_tick[i] = xTaskGetTickCount();
+        tx_pbuf_last_handout_tick = tx_pbuf_handout_tick[i];
             return p;
         }
     }
@@ -230,6 +248,9 @@ int get_tx_pbuf_free_count(netbus_wifi_mgmr_ctx_t *env)
     struct pbuf *p;
 
     for (i = 0; i < desc->pbufs_num; ++i) {
+        if (tx_pbuf_reclaimed[i]) {
+            continue;
+        }
         p = desc->pbufs[i];
         if (p->ref == 1) {
             cnt++;
@@ -238,14 +259,110 @@ int get_tx_pbuf_free_count(netbus_wifi_mgmr_ctx_t *env)
     return cnt;
 }
 
+/* Called by bl_tx_cfm instead of pbuf_free for pool pbufs. Returns 1 when the
+ * slot had been written off as lost and the confirm arrived late: the backed
+ * header is restored (ref back to 1) and the slot returns to service, so the
+ * caller must not pbuf_free it down to zero. */
+int netbus_tx_pbuf_cfm_reclaimed(struct pbuf *p)
+{
+    int i;
+
+    for (i = 0; i < NETBUS_TX_PBUF_CNT; i++) {
+        if (g_netbus_wifi_mgmr_env.tx_desc.pbufs[i] == p && tx_pbuf_reclaimed[i]) {
+            memcpy(g_netbus_wifi_mgmr_env.tx_desc.pbufs[i],
+                   &g_netbus_wifi_mgmr_env.tx_desc.pbufs_back[i],
+                   sizeof(struct pbuf));
+            tx_pbuf_reclaimed[i] = 0;
+            printf("[TXWD][BL602] pbuf[%d] late cfm: recovered to pool\r\n", i);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int update_tx_pbuf_free_cnt_to_scratch_reg(void)
 {
+    /* Called once per firmware TX confirm (bl_tx_cfm); the watchdog uses this
+     * counter as the progress signal — the free LEVEL stays flat at steady
+     * state and cannot distinguish stalls from equilibrium. */
+    tx_pbuf_cfm_count++;
     if (g_netbus_wifi_mgmr_env.init) {
         int free_cnt = get_tx_pbuf_free_count(&g_netbus_wifi_mgmr_env);
         bflbwrite_s_reg(&g_netbus_wifi_mgmr_env.trcver_ctx, 0, free_cnt);
     }
     return 0;
 }
+
+/* TXCFM watchdog: sample the tx pbuf free count every second. Frames in
+ * flight (free < pool size) whose count stops increasing mean the firmware
+ * TX-confirm path is stalled; announce the stall once, then report its
+ * measured duration when a confirm finally arrives. */
+static TimerHandle_t txcfm_wd_timer;
+static uint32_t txcfm_wd_prev_cfm;
+static uint32_t txcfm_wd_stall_start; /* 0 = not stalling */
+static bool txcfm_wd_announced;
+
+static void txcfm_wd_cb(TimerHandle_t t)
+{
+    int free = get_tx_pbuf_free_count(&g_netbus_wifi_mgmr_env);
+    uint32_t now = xTaskGetTickCount();
+    uint32_t cfm = tx_pbuf_cfm_count;
+    int traffic_recent;
+    int progress;
+    int i;
+
+    (void)t;
+    if (!g_netbus_wifi_mgmr_env.init) {
+        return;
+    }
+
+    /* Stuck-pbuf reclaimer: a slot handed out long ago and still not
+     * confirmed is written off (skipped by get_tx_pbuf); if its confirm
+     * arrives late, netbus_tx_pbuf_cfm_reclaimed() returns it to service. */
+    for (i = 0; i < NETBUS_TX_PBUF_CNT; i++) {
+        struct pbuf *p = g_netbus_wifi_mgmr_env.tx_desc.pbufs[i];
+
+        if (!tx_pbuf_reclaimed[i] && tx_pbuf_handout_tick[i] != 0 &&
+            p->ref > 1 && now - tx_pbuf_handout_tick[i] >= NETBUS_TX_PBUF_RECLAIM_MS) {
+            tx_pbuf_reclaimed[i] = 1;
+            printf("[TXWD][BL602] pbuf[%d] stuck %lu ms, written off (free=%d)\r\n",
+                   i,
+                   (unsigned long)((now - tx_pbuf_handout_tick[i]) * portTICK_PERIOD_MS),
+                   free);
+        }
+    }
+
+    /* Stall accounting is confirm-EVENT based: the free LEVEL flatlines at
+     * steady-state pipeline depth and would misreport normal flow as a
+     * stall. Zero confirms while send traffic is recent is a real stall;
+     * once started it keeps timing until a confirm arrives. */
+    progress = (cfm != txcfm_wd_prev_cfm);
+    traffic_recent = (tx_pbuf_last_handout_tick != 0) &&
+                     (now - tx_pbuf_last_handout_tick < pdMS_TO_TICKS(5000));
+
+    if (progress) {
+        if (txcfm_wd_stall_start != 0) {
+            printf("[TXWD][BL602] TXCFM stall END held=%lu ms\r\n",
+                   (unsigned long)((now - txcfm_wd_stall_start) * portTICK_PERIOD_MS));
+            txcfm_wd_stall_start = 0;
+            txcfm_wd_announced = false;
+        }
+    } else if (free < NETBUS_TX_PBUF_CNT && (traffic_recent || txcfm_wd_stall_start != 0)) {
+        if (txcfm_wd_stall_start == 0) {
+            txcfm_wd_stall_start = now;
+        } else if (!txcfm_wd_announced &&
+                   now - txcfm_wd_stall_start >= pdMS_TO_TICKS(2000)) {
+            txcfm_wd_announced = true;
+            printf("[TXWD][BL602] TXCFM stall: free=%d in_flight=%d tick=%lu\r\n",
+                   free, NETBUS_TX_PBUF_CNT - free, (unsigned long)now);
+        }
+    } else {
+        txcfm_wd_stall_start = 0;
+        txcfm_wd_announced = false;
+    }
+    txcfm_wd_prev_cfm = cfm;
+}
+
 
 int netbus_wifi_mgmr_start(netbus_wifi_mgmr_ctx_t *env)
 {
@@ -285,6 +402,11 @@ int netbus_wifi_mgmr_start(netbus_wifi_mgmr_ctx_t *env)
     // sdiowifi_tty_init(env, 0, "/dev/ttysd0");
 
     env->init = true;
+
+    txcfm_wd_timer = xTimerCreate("txcfm_wd", pdMS_TO_TICKS(1000), pdTRUE, NULL, txcfm_wd_cb);
+    if (txcfm_wd_timer) {
+        xTimerStart(txcfm_wd_timer, 0);
+    }
 
     return 0;
 }

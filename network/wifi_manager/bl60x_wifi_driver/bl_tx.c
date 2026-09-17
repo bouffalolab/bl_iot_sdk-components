@@ -421,7 +421,19 @@ int bl_tx_cfm(void *pthis, void *host_id)
 #if defined(CFG_CHIP_BL808) || defined(CFG_CHIP_BL606P)
     ipc_host_txbuf_free((struct txbuf_host *)host_id);
 #else
-    pbuf_free(p);
+    {
+#ifdef CFG_NETBUS_WIFI_ENABLE
+        extern int netbus_tx_pbuf_cfm_reclaimed(struct pbuf *p);
+        /* A slot written off as lost and recovered here must not be freed
+         * down to zero; the hook restores it to the netbus pool instead. */
+        if (netbus_tx_pbuf_cfm_reclaimed(p)) {
+            update_tx_pbuf_free_cnt_to_scratch_reg();
+            tx_cntrl_sta_trigger_pending |= BIT_STA(sta->sta_idx);
+            return ret;
+        }
+#endif
+        pbuf_free(p);
+    }
 #endif
 
 #ifdef CFG_NETBUS_WIFI_ENABLE

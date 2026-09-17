@@ -46,7 +46,10 @@
 #define TP_RXPAYLOAD_NUM         (2)
 #define TP_RXDESC_NUM            (16)
 #define TP_PAYLOAD_LEN           (1024 + 512)// 512
-
+#if BFLB_THROUGHPUT_TEST_ENABLE
+#define RAMSYNC_FRAME_OVERHEAD    (8)
+#define RAMSYNC_APP_PAYLOAD_MAX   (TP_PAYLOAD_LEN - RAMSYNC_FRAME_OVERHEAD)
+#endif
 #define RAMSYNC_TX_STACK_SIZE    (1024)// Bytes
 #define RAMSYNC_RX_STACK_SIZE    (1024)// Bytes
 #define RAMSYNC_RESET_SATCK_SIZE (1024)
@@ -67,6 +70,17 @@
 #define URAMSYNC_MASTER_DEV_TYPE (1)
 #define URAMSYNC_SLAVE_DEV_TYPE  (2)
 
+#if BFLB_THROUGHPUT_TEST_ENABLE
+#define RAMSYNC_RAW_TEST_MAGIC    (0x52535450UL)
+#define RAMSYNC_RAW_TEST_FLAG_END (1UL << 0)
+#define RAMSYNC_DIAG_LATENCY_BUCKETS (9)
+
+typedef struct __ramsync_raw_test_header {
+    uint32_t magic;
+    uint32_t seq;
+    uint32_t flags;
+} ramsync_raw_test_header_t;
+#endif
 /* Structure for tp_uramsync_t */
 typedef struct __tp_payload {
     uint32_t magic;
