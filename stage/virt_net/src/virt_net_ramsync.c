@@ -122,9 +122,11 @@ struct virt_net_ramsync {
   uint8_t sta_linkup;
   TimerHandle_t dhcp_timer;
   struct rx_buf_ind rx_buf_ind;
+#if BFLB_THROUGHPUT_TEST_ENABLE
   TaskHandle_t raw_test_task;
   uint32_t raw_test_payload_len;
   uint32_t raw_test_duration_sec;
+#endif
 #if LWIP_IPV6
   struct dhcp6 vnet_dhcp6;
 #endif
@@ -140,37 +142,122 @@ int virt_net_ramsync_raw_push(virt_net_t obj, void *buf, uint32_t len, uint32_t 
   return uramsync_tx_push_toback(&sobj->ramsync_ctx, buf, len, timeout_ms);
 }
 
+/* Raw ramsync saturation test. The header/type it uses (ramsync_raw_test_header_t,
+ * RAMSYNC_RAW_TEST_*, RAMSYNC_APP_PAYLOAD_MAX in ramsync_upper.h) only exists under
+ * BFLB_THROUGHPUT_TEST_ENABLE, so this whole block has to be gated the same way. */
+#if BFLB_THROUGHPUT_TEST_ENABLE
 static void __ramsync_raw_test_task(void *pvParameters)
 {
   struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)pvParameters;
   ramsync_raw_test_header_t *header;
   uint8_t *payload;
-  uint32_t start_tick, frames = 0;
+  uint32_t start_tick, last_tick;
+  uint32_t frames = 0, bytes = 0, last_bytes = 0, enqueue_errors = 0;
+
   payload = pvPortMalloc(sobj->raw_test_payload_len);
-  if (payload == NULL) { sobj->raw_test_task = NULL; vTaskDelete(NULL); return; }
+  if (payload == NULL)
+  {
+    printf("[RSRAW][BL706] allocation failed: len=%lu\r\n",
+           (unsigned long)sobj->raw_test_payload_len);
+    sobj->raw_test_task = NULL;
+    vTaskDelete(NULL);
+    return;
+  }
+
   header = (ramsync_raw_test_header_t *)payload;
   memset(payload, 0, sobj->raw_test_payload_len);
   header->magic = RAMSYNC_RAW_TEST_MAGIC;
-  for (uint32_t i = sizeof(*header); i < sobj->raw_test_payload_len; i++) payload[i] = (uint8_t)i;
-  start_tick = xTaskGetTickCount();
-  while (xTaskGetTickCount() - start_tick < pdMS_TO_TICKS(sobj->raw_test_duration_sec * 1000UL)) {
-    header->seq = frames++; header->flags = 0;
-    (void)uramsync_tx_push_toback(&sobj->ramsync_ctx, payload, sobj->raw_test_payload_len, 1000);
+  for (uint32_t i = sizeof(*header); i < sobj->raw_test_payload_len; i++)
+  {
+    payload[i] = (uint8_t)i;
   }
-  header->seq = frames; header->flags = RAMSYNC_RAW_TEST_FLAG_END;
-  (void)uramsync_tx_push_toback(&sobj->ramsync_ctx, payload, sobj->raw_test_payload_len, 2000);
-  vPortFree(payload); sobj->raw_test_task = NULL; vTaskDelete(NULL);
+
+  start_tick = xTaskGetTickCount();
+  last_tick = start_tick;
+  printf("[RSRAW][BL706] start: len=%lu duration=%lu s\r\n",
+         (unsigned long)sobj->raw_test_payload_len,
+         (unsigned long)sobj->raw_test_duration_sec);
+
+  while (xTaskGetTickCount() - start_tick < pdMS_TO_TICKS(sobj->raw_test_duration_sec * 1000UL))
+  {
+    uint32_t now, elapsed_ms, interval_ms;
+
+    header->seq = frames;
+    header->flags = 0;
+    if (uramsync_tx_push_toback(&sobj->ramsync_ctx, payload,
+                                sobj->raw_test_payload_len, 1000) == 0)
+    {
+      frames++;
+      bytes += sobj->raw_test_payload_len;
+    }
+    else
+    {
+      enqueue_errors++;
+    }
+
+    now = xTaskGetTickCount();
+    if (now - last_tick < pdMS_TO_TICKS(1000))
+    {
+      continue;
+    }
+    elapsed_ms = (now - start_tick) * portTICK_PERIOD_MS;
+    interval_ms = (now - last_tick) * portTICK_PERIOD_MS;
+    printf("[RSRAW][BL706] frames=%lu bytes=%lu rate=%.3f Mbit/s current=%.3f Mbit/s enq_err=%lu\r\n",
+           (unsigned long)frames, (unsigned long)bytes,
+           elapsed_ms ? ((float)bytes * 8.0f / ((float)elapsed_ms * 1000.0f)) : 0.0f,
+           interval_ms ? ((float)(bytes - last_bytes) * 8.0f / ((float)interval_ms * 1000.0f)) : 0.0f,
+           (unsigned long)enqueue_errors);
+    last_bytes = bytes;
+    last_tick = now;
+  }
+
+  /* End-of-test marker: the receiver counts frames and validates sequence. */
+  header->seq = frames;
+  header->flags = RAMSYNC_RAW_TEST_FLAG_END;
+  if (uramsync_tx_push_toback(&sobj->ramsync_ctx, payload,
+                              sobj->raw_test_payload_len, 2000) != 0)
+  {
+    enqueue_errors++;
+    printf("[RSRAW][BL706] warning: end marker enqueue failed\r\n");
+  }
+
+  {
+    uint32_t elapsed_ms = (xTaskGetTickCount() - start_tick) * portTICK_PERIOD_MS;
+    float rate_mbit = elapsed_ms ? ((float)bytes * 8.0f / ((float)elapsed_ms * 1000.0f)) : 0.0f;
+    printf("[RSRAW][BL706] done: frames=%lu bytes=%lu elapsed=%lu ms rate=%.3f Mbit/s enq_err=%lu\r\n",
+           (unsigned long)frames, (unsigned long)bytes, (unsigned long)elapsed_ms,
+           rate_mbit, (unsigned long)enqueue_errors);
+  }
+
+  vPortFree(payload);
+  sobj->raw_test_task = NULL;
+  vTaskDelete(NULL);
 }
 
 int virt_net_ramsync_raw_test_start(virt_net_t obj, uint32_t payload_len, uint32_t duration_sec)
 {
   struct virt_net_ramsync *sobj = (struct virt_net_ramsync *)obj;
-  if (sobj == NULL || payload_len < sizeof(ramsync_raw_test_header_t) || payload_len > RAMSYNC_APP_PAYLOAD_MAX || duration_sec == 0 || duration_sec > 3600) return -1;
-  if (sobj->raw_test_task != NULL) return -2;
-  sobj->raw_test_payload_len = payload_len; sobj->raw_test_duration_sec = duration_sec;
-  if (xTaskCreate(__ramsync_raw_test_task, "rsraw_tx", 512, sobj, 10, &sobj->raw_test_task) != pdPASS) { sobj->raw_test_task = NULL; return -3; }
+
+  if (sobj == NULL || payload_len < sizeof(ramsync_raw_test_header_t) ||
+      payload_len > RAMSYNC_APP_PAYLOAD_MAX || duration_sec == 0 || duration_sec > 3600)
+  {
+    return -1;
+  }
+  if (sobj->raw_test_task != NULL)
+  {
+    return -2;
+  }
+
+  sobj->raw_test_payload_len    = payload_len;
+  sobj->raw_test_duration_sec   = duration_sec;
+  if (xTaskCreate(__ramsync_raw_test_task, "rsraw_tx", 512, sobj, 10, &sobj->raw_test_task) != pdPASS)
+  {
+    sobj->raw_test_task = NULL;
+    return -3;
+  }
   return 0;
 }
+#endif /* BFLB_THROUGHPUT_TEST_ENABLE */
 
 static int __virt_net_ramsync_init(virt_net_t obj);
 static int __virt_net_ramsync_deinit(virt_net_t obj);

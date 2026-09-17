@@ -156,7 +156,9 @@ virt_net_t virt_net_create(void *ctx);
 /* Raw push: bypass socket/lwIP, enqueue a prebuilt wire frame directly
  * (frame layout must match what the linkoutput path emits). */
 int virt_net_ramsync_raw_push(virt_net_t obj, void *buf, uint32_t len, uint32_t timeout_ms);
+#if BFLB_THROUGHPUT_TEST_ENABLE
 int virt_net_ramsync_raw_test_start(virt_net_t obj, uint32_t payload_len, uint32_t duration_sec);
+#endif
 int virt_net_delete(void *ctx);
 void virt_net_setup_callback(virt_net_t obj, virt_net_event_callback cb, void *opaque);
 int virt_net_send_nop(virt_net_t obj);
