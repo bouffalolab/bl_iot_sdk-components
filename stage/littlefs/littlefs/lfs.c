@@ -1960,6 +1960,10 @@ static int lfs_dir_splittingcompact(lfs_t *lfs, lfs_mdir_t *dir,
             // performance
             LFS_WARN("Unable to split {0x%"PRIx32", 0x%"PRIx32"}",
                     dir->pair[0], dir->pair[1]);
+            // NOSPC may leave a partial program cache from the failed split.
+            // Discard it before fallback compaction; this does not flush data
+            // or free any flash blocks.
+            lfs_cache_drop(lfs, &lfs->pcache);
             break;
         } else {
             end = split;
@@ -1995,7 +1999,13 @@ static int lfs_dir_splittingcompact(lfs_t *lfs, lfs_mdir_t *dir,
         }
     }
 
-    return lfs_dir_compact(lfs, dir, attrs, attrcount, source, begin, end);
+    int err = lfs_dir_compact(lfs, dir, attrs, attrcount, source, begin, end);
+    if (err == LFS_ERR_NOSPC) {
+        // Fallback compaction may create another partial program cache.
+        // Discard it so a later write can switch blocks without asserting.
+        lfs_cache_drop(lfs, &lfs->pcache);
+    }
+    return err;
 }
 #endif
 

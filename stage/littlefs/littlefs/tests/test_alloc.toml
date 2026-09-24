@@ -651,3 +651,43 @@ code = '''
 
     lfs_unmount(&lfs) => 0;
 '''
+
+[[case]] # keep writing after a full directory cannot split
+define.LFS_BLOCK_SIZE = 512
+define.LFS_BLOCK_COUNT = 8
+if = 'LFS_BLOCK_SIZE == 512 && LFS_BLOCK_COUNT == 8'
+code = '''
+    lfs_format(&lfs, &cfg) => 0;
+    lfs_mount(&lfs, &cfg) => 0;
+
+    int created = 0;
+    for (int i = 0; i < 100; i++) {
+        sprintf(path, "key%02d", i);
+        err = lfs_file_open(&lfs, &file, path, LFS_O_WRONLY | LFS_O_CREAT);
+        if (err == LFS_ERR_NOSPC || err == LFS_ERR_NAMETOOLONG) {
+            break;
+        }
+        err => 0;
+        lfs_file_write(&lfs, &file, "v", 1) => 1;
+        err = lfs_file_close(&lfs, &file);
+        if (err == LFS_ERR_NOSPC) {
+            break;
+        }
+        err => 0;
+        created++;
+    }
+    created >= 8 => true;
+    created < 100 => true;
+    lfs.pcache.block => (lfs_block_t)-1;
+
+    lfs_file_open(&lfs, &file, "after-full", LFS_O_WRONLY | LFS_O_CREAT) => 0;
+    lfs_file_write(&lfs, &file, "v", 1) => 1;
+    lfs_file_close(&lfs, &file) => 0;
+    lfs.pcache.block => (lfs_block_t)-1;
+
+    lfs_file_open(&lfs, &file, "key00", LFS_O_RDONLY) => 0;
+    lfs_file_read(&lfs, &file, buffer, 1) => 1;
+    buffer[0] => 'v';
+    lfs_file_close(&lfs, &file) => 0;
+    lfs_unmount(&lfs) => 0;
+'''
